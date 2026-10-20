@@ -29,7 +29,7 @@ It used to pass `-vf subtitles=`, which is libass and draws text only. FFmpeg re
 - **An external VobSub is a second input.** `SubtitleInput` reads a `.sub` through its `.idx` when there is one, because the palette and canvas size live there. FFmpeg rebases every input to start at 0, which would pull a subtitle file's first line to the start of the video, so the file is opened with `-isync 0` to stay on the video's clock. It gets no `-ss` of its own: seeking both inputs hung FFmpeg, and `-isync` already applies the video's seek, so a line on screen at the seek point still shows.
 - **An embedded line already on screen at a seek point is skipped.** Its packet lies before the seek, so subtitles resume from the next line.
 - **Burn-in runs on the CPU**, so it is excluded from the full-GPU pipeline: GPU decode hands frames to system memory, and a GPU encoder gets them back after the overlay (`docs/hardware-acceleration.md`).
-- `ImageSubtitleBurnInTests` draws a generated PGS box (`PgsSubtitleFile`) with a real FFmpeg and checks the pixels in each segment, for an embedded track and an external file, from the start and after a seek. They skip without FFmpeg on PATH; the PR check installs it.
+- `ImageSubtitleBurnInTests` draws a generated PGS box (`PgsSubtitleFile`) with a real FFmpeg and checks the pixels in each segment, for an embedded track and an external file, from the start and after a seek. They skip without FFmpeg on PATH; the PR check installs jellyfin-ffmpeg7, the FFmpeg the image ships, on Ubuntu 24.04 (Ubuntu 26.04's own FFmpeg 8.0 times them out).
 
 ### Which track plays when nobody picked one
 

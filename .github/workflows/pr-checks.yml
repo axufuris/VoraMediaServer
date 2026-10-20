@@ -19,7 +19,9 @@ permissions:
 jobs:
   backend:
     name: Backend
-    runs-on: ubuntu-latest
+    # Pinned: ubuntu-latest moved to 26.04 on 2026-10-20, and the FFmpeg
+    # below comes from Jellyfin's repository for this release.
+    runs-on: ubuntu-24.04
     services:
       postgres:
         image: pgvector/pgvector:pg16
@@ -57,9 +59,21 @@ jobs:
         run: dotnet build Vora.slnx --no-restore --configuration "$BUILD_CONFIGURATION"
 
       # Tests that start a real encode, like the GPU-failure retry, skip
-      # without FFmpeg on PATH.
+      # without FFmpeg on PATH. They run against jellyfin-ffmpeg7, installed
+      # the way src/Vora.Api/Dockerfile installs it, so they test the FFmpeg
+      # the server ships rather than whatever the runner's Ubuntu carries
+      # (8.0 on 26.04, where the external subtitle burn-in tests time out).
       - name: Install FFmpeg
-        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends ffmpeg
+        run: |
+          . /etc/os-release
+          sudo mkdir -p /etc/apt/keyrings
+          curl -fsSL https://repo.jellyfin.org/jellyfin_team.gpg.key | sudo gpg --dearmor -o /etc/apt/keyrings/jellyfin.gpg
+          echo "deb [signed-by=/etc/apt/keyrings/jellyfin.gpg] https://repo.jellyfin.org/${ID} ${VERSION_CODENAME} main" | sudo tee /etc/apt/sources.list.d/jellyfin.list
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends jellyfin-ffmpeg7
+          sudo ln -sf /usr/lib/jellyfin-ffmpeg/ffmpeg /usr/local/bin/ffmpeg
+          sudo ln -sf /usr/lib/jellyfin-ffmpeg/ffprobe /usr/local/bin/ffprobe
+          ffmpeg -hide_banner -version | head -n 1
 
       - name: Test
         run: dotnet test Vora.slnx --no-restore --configuration "$BUILD_CONFIGURATION" --verbosity minimal
