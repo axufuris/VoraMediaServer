@@ -10,7 +10,7 @@ self-contained enough to load on its own while working on that part.
 | [`02-server-and-web.md`](02-server-and-web.md) | Every change in **this** repo (`Vora.Api` + `Vora.Web`) |
 | [`03-shell.md`](03-shell.md) | The Electron shell in the new `Vora.Desktop` repo |
 | [`04-player.md`](04-player.md) | mpv playback, the Lua player chrome, web-player parity list |
-| [`05-installers-and-releases.md`](05-installers-and-releases.md) | Installers, signing, auto-update, QA + prod GitHub releases |
+| [`05-installers-and-releases.md`](05-installers-and-releases.md) | Installers, auto-update, QA + prod GitHub releases |
 | [`06-qa-plan.md`](06-qa-plan.md) | The test matrix a build must pass before a prod release |
 
 ## The decision

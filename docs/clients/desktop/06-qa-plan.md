@@ -29,7 +29,8 @@ release. Record results in the PR or release notes as a filled-in copy of this t
 
 ## Install and update
 
-- [ ] Windows installer: SmartScreen behaviour as expected (prod signed = no warning)
+- [ ] Windows installer: SmartScreen's "Windows protected your PC" → More info → Run anyway
+      installs it; an update later installs with no prompt
 - [ ] Prod and QA installed side by side; separate settings; separate Start-menu entries
 - [ ] AppImage runs on L1/L2 (note any FUSE / sandbox steps); `.deb` on L3, `.rpm` on L4
       pull in mpv automatically
