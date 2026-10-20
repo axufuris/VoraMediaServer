@@ -1,5 +1,7 @@
 using System.Globalization;
+using Vora.Application.Analysis;
 using Vora.Application.Analysis.Results;
+using Vora.Application.Media;
 using Vora.Application.Streaming.Dtos;
 using Vora.Application.Streaming.ViewModels;
 using Vora.Domain.Entities.Media;
@@ -13,7 +15,7 @@ public static class PlaybackStats
     public static PlaybackStatsVM Build(StreamSession session, MediaPart? part, IReadOnlyList<MediaStreamFacts> facts, TranscodeStatusDto? transcode)
     {
         var directPlay = session.Strategy == nameof(StreamStrategy.DirectPlay);
-        var video = part?.VideoTracks.FirstOrDefault(t => t.Id == session.VideoTrackId) ?? part?.VideoTracks.FirstOrDefault();
+        var video = part?.VideoTracks.FirstOrDefault(t => t.Id == session.VideoTrackId) ?? CoverImageTracks.MainVideoTrack(part?.VideoTracks);
         var audio = part?.AudioTracks.FirstOrDefault(t => t.Id == session.AudioTrackId);
         var subtitle = session.SubtitleTrackId is Guid subtitleId ? part?.SubtitleTracks.FirstOrDefault(t => t.Id == subtitleId) : null;
         var videoFacts = video == null ? null : facts.FirstOrDefault(f => f.StreamIndex == video.StreamIndex && f.Kind == "video");
@@ -36,7 +38,7 @@ public static class PlaybackStats
                 Width = video?.Width,
                 Height = video?.Height,
                 FrameRate = video?.FrameRate,
-                BitrateKbps = Kilobits(video?.Bitrate ?? videoFacts?.BitRate),
+                BitrateKbps = Kilobits(StreamBitrates.Within(video?.Bitrate ?? videoFacts?.BitRate, part?.OverallBitrate)),
                 Strategy = session.VideoStrategy,
                 OutputCodec = string.IsNullOrEmpty(session.VideoCodec) ? null : session.VideoCodec,
                 OutputWidth = session.OutputWidth,

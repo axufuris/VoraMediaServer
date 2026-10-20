@@ -52,6 +52,11 @@ UPDATE ""UserMediaStates"" SET ""ResumePositionSeconds"" = 0
 WHERE ""ResumePositionSeconds"" > 0 AND ""ResumePositionSeconds"" < 30;");
 
             migrationBuilder.Sql(@"
+UPDATE ""MediaVideoTracks"" AS video SET ""Bitrate"" = NULL
+FROM ""MediaParts"" AS part
+WHERE video.""MediaPartId"" = part.""Id"" AND part.""OverallBitrate"" > 0 AND video.""Bitrate"" > part.""OverallBitrate"";");
+
+            migrationBuilder.Sql(@"
 DO $$
 BEGIN
     IF NOT EXISTS (

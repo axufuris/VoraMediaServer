@@ -534,6 +534,49 @@ public class PostgresMigrationHistoryTests(PostgresDatabase database) : IClassFi
         kept.MaxVideoBitDepth.Should().Be(10);
     }
 
+    [Fact]
+    public async Task A_database_on_the_image_subtitles_migration_forgets_video_bitrates_above_their_whole_file()
+    {
+        Assert.SkipUnless(PostgresDatabase.IsConfigured, PostgresDatabase.SkipReason);
+        var cancellationToken = TestContext.Current.CancellationToken;
+        await using var legacy = new LegacyDatabase();
+        var reencoded = Guid.NewGuid();
+        var remux = Guid.NewGuid();
+        var unmeasured = Guid.NewGuid();
+        await legacy.BuildImageSubtitlesStateAsync(async db =>
+        {
+            var library = new MediaLibrary { Name = "Shows", Type = LibraryType.TvShow, FolderPaths = ["/tv"] };
+            db.Add(library);
+            db.Add(Film(library.Id, "Shatter the Moon", 3_706_601, new MediaVideoTrack { Id = reencoded, Codec = "hevc", Bitrate = 23_986_068 }));
+            db.Add(Film(library.Id, "Heat", 35_000_000, new MediaVideoTrack { Id = remux, Codec = "h264", Bitrate = 29_800_000 }));
+            db.Add(Film(library.Id, "Unprobed", null, new MediaVideoTrack { Id = unmeasured, Codec = "h264", Bitrate = 8_000_000 }));
+            await db.SaveChangesAsync(cancellationToken);
+        }, cancellationToken);
+
+        await using (var before = legacy.NewContext())
+        {
+            (await before.Database.GetPendingMigrationsAsync(cancellationToken)).Should().Equal(MigrationHistoryTests.ChangesSinceInitial);
+        }
+
+        await legacy.MigrateAsync(cancellationToken);
+
+        await using var after = legacy.NewContext();
+        (await after.Database.GetPendingMigrationsAsync(cancellationToken)).Should().BeEmpty();
+        var bitrates = await after.MediaVideoTracks.AsNoTracking().ToDictionaryAsync(t => t.Id, t => t.Bitrate, cancellationToken);
+        bitrates[reencoded].Should().BeNull();
+        bitrates[remux].Should().Be(29_800_000);
+        bitrates[unmeasured].Should().Be(8_000_000);
+    }
+
+    private static Movie Film(Guid libraryId, string title, long? overallBitrate, MediaVideoTrack video)
+    {
+        var film = new Movie { Title = title, LibraryId = libraryId };
+        var part = new MediaPart { FilePath = $"/tv/{title}.mkv", Container = "mkv", OverallBitrate = overallBitrate, MediaItemId = film.Id };
+        part.VideoTracks.Add(video);
+        film.MediaParts.Add(part);
+        return film;
+    }
+
     private static Task<List<string>> ColumnsAsync(VoraDbContext db, string table, CancellationToken cancellationToken) =>
         db.Database
             .SqlQueryRaw<string>("SELECT column_name AS \"Value\" FROM information_schema.columns WHERE table_schema = current_schema() AND table_name = {0}", table)

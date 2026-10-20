@@ -140,6 +140,8 @@ public sealed class LegacyDatabase : IAsyncDisposable
 
     public const string UpNextOrderMigration = "20261018072825_ChangesSinceInitial";
 
+    public const string ImageSubtitlesMigration = "20261018192130_ChangesSinceInitial";
+
     private const string ColumnsSinceUpNextOrder = """
         ALTER TABLE "ClientDevices" DROP COLUMN "RendersImageSubtitles";
         """;
@@ -341,6 +343,14 @@ public sealed class LegacyDatabase : IAsyncDisposable
         await seed(db);
         await db.Database.ExecuteSqlRawAsync(ColumnsSinceHdrTranscode, cancellationToken);
         await ReplaceCombinedMigrationAsync(db, HdrTranscodeMigration, "10.0.9", cancellationToken);
+    }
+
+    public async Task BuildImageSubtitlesStateAsync(Func<VoraDbContext, Task> seed, CancellationToken cancellationToken)
+    {
+        await using var db = NewContext();
+        await db.Database.MigrateAsync(cancellationToken);
+        await seed(db);
+        await ReplaceCombinedMigrationAsync(db, ImageSubtitlesMigration, "10.0.9", cancellationToken);
     }
 
     private static async Task ReplaceCombinedMigrationAsync(VoraDbContext db, string migrationId, string productVersion, CancellationToken cancellationToken)
