@@ -84,9 +84,17 @@ the cheapest, is about US$9.99 a month). Publish `SHA256SUMS.txt` with every rel
 - Prod: `allowPrerelease = false`, default channel (`latest.yml`, `latest-linux.yml`).
 - QA: `channel = 'qa'`, `allowPrerelease = true` (`qa.yml`, `qa-linux.yml`). electron-builder
   does not take `qa` from the version, so the config sets the publish `channel`, and
-  `extraMetadata.name` (`vora-desktop-qa`) so QA has its own updater cache.
-- Check on launch and every 6 h; download in the background; when ready, show a
-  non-blocking "Restart to update" notice. **Never restart or prompt during playback.**
+  `extraMetadata.name` (`vora-desktop-qa`) so QA has its own updater cache, and
+  `extraMetadata.productName` ("Vora QA") so it has its own data folder; electron-builder's
+  `productName` alone doesn't reach the packaged `package.json`. The ids, names and icons
+  live in `src/main/appIdentity.ts`, which the builder config and the app both read.
+- Check 30 s after launch, then hourly, and when the window comes back into focus 15 min
+  after the last check; download in the background; when ready, show a non-blocking
+  "Restart to update" notice and a menu item. **Never restart or prompt during playback.**
+- Windows shows a notification only for an app id a Start menu shortcut carries. The app
+  sets its id and a fixed toast activator CLSID, and writes both onto its shortcut at
+  startup (`notificationRegistration.ts`). Left to Electron, the shortcut is rewritten
+  when the first notification is shown, and Windows drops that notification.
 - `.deb`/`.rpm` installs can't self-update: show "Version X is available" with a button
   that opens the release page.
 - Upload every `*.yml` and `*.blockmap` electron-builder produces, or updates break.
