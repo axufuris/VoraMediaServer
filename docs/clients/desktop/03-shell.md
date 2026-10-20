@@ -54,11 +54,16 @@ Vora.Desktop/
 
 Many self-hosted servers use self-signed or LAN certificates.
 
-- Handle `app.on('certificate-error')` for the configured server origin only: show a
+- Handle `app.on('certificate-error')` for a saved Vora server's host only: show a
   bundled trust prompt with the certificate's SHA-256 fingerprint. On "Trust", pin the
-  fingerprint for that origin in `certTrust.json` and accept only that fingerprint
-  afterwards (fingerprint change → prompt again, clearly worded).
-- Never accept cert errors for any other origin.
+  fingerprint for that host name in `certTrust.json` (the connect page's check only
+  sees host names) and accept only that fingerprint afterwards (fingerprint change →
+  prompt again, clearly worded).
+- The connect page's check (`net.fetch` from main, which `certificate-error` doesn't
+  cover) runs in its own in-memory session with `setCertificateVerifyProc`, replaced
+  after a trust: Chromium caches a certificate check, and the same session would keep
+  refusing a certificate that was trusted since.
+- Never accept cert errors for any other host.
 - mpv must see the same decision: when the server origin is pinned, launch mpv with
   `--tls-verify=no` **for that session only**; otherwise `--tls-verify=yes
   --tls-ca-file=<system bundle>` where mpv needs it. Verify mpv's default on the
@@ -72,13 +77,15 @@ The renderer runs code served by a network server, so lock it down:
 - `BrowserWindow` `webPreferences`: `contextIsolation: true`, `sandbox: true`,
   `nodeIntegration: false`, `webviewTag: false`, `backgroundThrottling: false`
   (pings must keep running while the window is hidden during playback), `spellcheck: false`.
-- The preload exposes **only** `window.voraDesktop`, and only when
-  `location.origin` equals the configured server origin (or the Vite dev URL in dev).
+- The preload exposes `window.voraDesktop` only to the configured server's page (or
+  the Vora.Web dev URL in dev) and `window.voraShell` only to the bundled pages. The
+  main process decides per page from the sender frame; any other page gets nothing.
 - `will-navigate` / `will-redirect`: allow the server origin; open anything else in
   the user's browser via `shell.openExternal` (https only); block the rest.
 - `setWindowOpenHandler`: same rule; never create new Electron windows from content.
 - Every `ipcMain.handle` validates its payload shape and checks `event.senderFrame.url`
-  is the server origin. Treat renderer input as untrusted (URLs passed to mpv must be
+  is the server origin (a bundled page, for the connect and error pages' calls). Treat
+  renderer input as untrusted (URLs passed to mpv must be
   `http(s)` on the server origin — mpv must never be told to open a local path or a
   third-party URL from the renderer).
 - Deny all permission requests (`setPermissionRequestHandler`) except fullscreen and
@@ -93,9 +100,8 @@ The renderer runs code served by a network server, so lock it down:
 - Remember window size/position/maximised; start maximised on first run.
 - Minimal menu: Switch server · Reload · Toggle fullscreen (F11) · About · (QA) DevTools.
   On Linux keep the menu bar hidden (Alt shows it); on Windows the same.
-- Linux: let Electron pick Wayland natively where it can (check the current Electron
-  default for `--ozone-platform-hint`; set `auto` explicitly if it isn't the default)
-  and fall back to X11.
+- Linux: Electron 38.2 and later pick Wayland where it's available and X11 otherwise
+  by default, so no ozone switch is set.
 - When playback starts, hide the main window; restore and focus it when mpv closes.
   If mpv crashes, restore the window and emit a `player-error` event so the renderer
   can offer the web-player fallback.
@@ -151,4 +157,6 @@ comment explaining it. `settings.openAdvancedFolder()` opens it with `shell.open
   server of Vora.Web (API in Docker as usual), so web + shell changes hot-reload together.
 - On Windows dev machines, `scripts/fetch-mpv-windows.ts` populates `resources/mpv/`
   (git-ignored) so dev playback uses the same mpv as the installer.
+- In a VS Code terminal, unset `ELECTRON_RUN_AS_NODE` first: VS Code sets it for its
+  own processes, and with it Electron starts as plain Node.
 - Linux testing: the Linux machine installs the QA AppImage/deb from GitHub (doc 05).
