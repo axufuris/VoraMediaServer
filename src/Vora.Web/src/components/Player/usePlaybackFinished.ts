@@ -24,6 +24,10 @@ export function usePlaybackFinished(videoRef: RefObject<HTMLVideoElement | null>
         if (playbackKey) setFinishedKey(playbackKey);
     }, [playbackKey]);
 
+    const clearFinished = useCallback(() => {
+        setFinishedKey(current => (current === playbackKey ? null : current));
+    }, [playbackKey]);
+
     useEffect(() => {
         const video = videoRef.current;
         if (!video || !playbackKey) return;
@@ -56,5 +60,5 @@ export function usePlaybackFinished(videoRef: RefObject<HTMLVideoElement | null>
         };
     }, [videoRef, playbackKey]);
 
-    return { finished: playbackKey !== undefined && finishedKey === playbackKey, markFinished };
+    return { finished: playbackKey !== undefined && finishedKey === playbackKey, markFinished, clearFinished };
 }

@@ -132,6 +132,9 @@ public class FFmpegAnalyzerService : IMediaAnalyzerService
             ? value.GetString()
             : null;
 
+    internal static long? VideoTrackBitrate(JsonElement stream, long? fileBitrate) =>
+        StreamBitrates.Within(StreamBitRate(stream), fileBitrate);
+
     private static long? StreamBitRate(JsonElement stream)
     {
         if (long.TryParse(Text(stream, "bit_rate"), NumberStyles.Integer, CultureInfo.InvariantCulture, out var bitRate) && bitRate > 0) return bitRate;
@@ -577,18 +580,7 @@ public class FFmpegAnalyzerService : IMediaAnalyzerService
                         videoTrack.Height = geometry.Height;
                         videoTrack.FrameRate = geometry.FrameRate;
 
-                        if (stream.TryGetProperty("bit_rate", out var vbrProp) && long.TryParse(vbrProp.GetString(), out var vbr))
-                        {
-                            videoTrack.Bitrate = vbr;
-                        }
-                        else if (stream.TryGetProperty("tags", out var vTags))
-                        {
-                            var bpsString = GetTagValue(vTags, "BPS");
-                            if (!string.IsNullOrEmpty(bpsString) && long.TryParse(bpsString, out var bps))
-                            {
-                                videoTrack.Bitrate = bps;
-                            }
-                        }
+                        videoTrack.Bitrate = VideoTrackBitrate(stream, result.OverallBitrate);
 
                         result.VideoTracks.Add(videoTrack);
                     }

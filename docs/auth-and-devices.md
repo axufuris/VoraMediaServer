@@ -107,6 +107,7 @@ These are the canonical keys. Don't invent new ones in a vacuum.
 | `audio_quality_preference`, `audio_crossfade_seconds`, `audio_eq_preset` | Music audio settings: stream quality, crossfade seconds (0–12), EQ preset. Device-local. | `NowPlayingFullscreen` (`utils/audioQuality.ts`) |
 | `calendar_view_mode_v2` | Release Calendar layout — `month`, `week`, or `day`. Device-local, not mirrored: it is a display preference, not a profile setting. Nothing saved, or an unrecognised value, opens on `week`. Renamed from `calendar_view_mode` when the default changed from Month, so a Month saved under the old default doesn't pin existing browsers there; the old key is simply ignored. | `CalendarPage` |
 | `sidebar_collapsed` | `"true"` while the client sidebar is folded to its icons (tablet width and up); anything else, or nothing, shows it in full. Device-local. | `MainLayout` (`layouts/parts/useSidebarCollapsed.ts`) |
+| `desktop_mpv_notice_dismissed` | `"true"` once a Vora Desktop user on Linux dismissed the notice that mpv is missing and videos play in the built-in player. Device-local. | `MainLayout` (`components/Desktop/MpvMissingBanner.tsx`) |
 | `vora_library_migration_job_id` | Active library-migration job id. Lets the admin reload `/admin/library-migration` and re-attach to the running job. Cleared on "Run again" / "Start over" or when the backend returns 404 (job evicted on server restart). | `LibraryMigrationPage` |
 | Server vault keys | Managed by `utils/serverVault.ts` (`VAULT_KEY`, `ACTIVE_SERVER_KEY`) | `serverVault` |
 
@@ -169,13 +170,12 @@ Every authenticated request goes through `Vora.Api/Middleware/DeviceTrackingMidd
    - `X-Vora-Client` → `ClientName` (≤64)
    - `X-Vora-Device` → `DeviceName` (≤128)
    - `X-Vora-Device-Type` → `DeviceType` (≤32)
-   - `X-Vora-OS` → `OperatingSystem` (≤64). The frontend sends a parsed short name (`Windows 10/11`, `macOS`, `iOS`, …) via `detectOs()` in `client.ts` — **never** the raw `navigator.userAgent` (overflows the column).
+   - `X-Vora-OS` → `OperatingSystem` (≤64). The frontend sends a parsed short name (`Windows 10/11`, `macOS`, `iOS`, …) from `DETECTED_OS` in `client.ts` — **never** the raw `navigator.userAgent` (overflows the column).
+   - Inside Vora Desktop (`window.voraDesktop`) the four are `Vora Desktop` (`Vora Desktop QA` on a QA build), `Vora Desktop (Windows)` or `Vora Desktop (Linux)`, `Desktop`, and `Windows` or `Linux`. The type is free text; the admin Devices page prints it as sent.
 4. Updates `LastConnectedAt`, `LastIpAddress`, `LastUserId`, `LastProfileId`. Geo-looks-up the IP (`ClientAddress`, ipwho.is over HTTPS, no key) via the named HttpClient `DeviceTrackingMiddleware.GeoLookupHttpClientName` when the IP changes or the device still has no location. Private and reserved addresses (incl. Docker's 172.16.0.0/12 and Tailscale's 100.64.0.0/10) are "Local Network" and never sent out. `X-Forwarded-For` is honoured **by default** from private-network peers (`ClientAddress.PrivateNetworks`, `ForwardLimit` 5, read right to left, so it can't be spoofed from the internet); `ForwardedHeaders:KnownProxies/KnownNetworks` narrow it and `Enabled=false` turns it off. 100.64/10 (Tailscale) is labelled VPN and counts as remote for streaming limits. `StreamManager` uses the same `ClientAddress.IsLocal`.
 5. Caches the device for 5 minutes to avoid re-upserting on every request.
 
-`DeviceEndpoints.UpdateCapabilitiesAsync` (`PUT /api/devices/capabilities`) reads the same `X-Vora-Device-Id` header to attach codec/container/audio-channel capabilities to the device row. `StreamingEndpoints` start-session does the same.
-
-**Header naming is universal: `X-Vora-Device-Id`.** Older code may reference `X-Device-Id`; treat any sighting as a bug and fix it.
+`DeviceEndpoints.UpdateCapabilitiesAsync` (`PUT /api/devices/capabilities`) reads the same `X-Vora-Device-Id` header to attach codec/container/audio-channel capabilities to the device row. `StreamingEndpoints` start-session does the same. **Header naming is universal: `X-Vora-Device-Id`.** Older code may reference `X-Device-Id`; treat any sighting as a bug and fix it.
 
 ### Device identity durability & native clients
 

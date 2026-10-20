@@ -77,7 +77,7 @@ Commands main issues for the renderer:
 | `play` / `pause` | `set_property pause false/true` |
 | `seek` | `seek <seconds> absolute+exact` (relative: `seek <delta> relative`) |
 | `tracks` (local switch) | `set_property aid/sid <mpv id>` — see mapping below |
-| `sub-add` (external sidecar) | set `http-header-fields` to the bearer header, then `sub-add <url> select <title>` |
+| `sub-add` (sidecar) | write the VTT text the renderer sent to `userData/tmp/`, then `sub-add <file> select <title>` (no token reaches mpv) |
 | `close` | `quit` (then kill after 3 s if still alive) |
 
 The renderer only ever sends server-origin `http(s)` URLs; `mpvHost` re-validates.
@@ -88,14 +88,13 @@ Use the same contract the TV apps use (`docs/track-selection.md`; the subtitle
 position is on `main` since PR #175): `/start` returns
 `audioTrackPosition` and `subtitleTrackPosition`, the zero-based position of the chosen
 track among the file's **embedded** streams of that type, in stream order. For switching
-mid-play, subtitle tracks carry it as `embeddedPosition`; audio tracks after doc 02 A.
+mid-play, audio and embedded subtitle tracks carry it as `embeddedPosition`.
 
-- mpv lists embedded tracks per type in file order (`track-list`, `type`, `id`,
-  `ff-index`, `lang`, `codec`). Pick the entry at that position, then check codec and
-  language against the details payload, the way Vora.Android's `audioGroupToSelect`
-  does, because a container can order streams differently from what a player keeps.
-- External sidecar subtitles (`isExternal` on the details payload) have no `ff-index`; load them with
-  `sub-add` from `GET /api/streaming/sessions/{sessionId}/subtitle/{trackId}.vtt`.
+- mpv lists embedded tracks per type in file order (`track-list`, `type`, `id`, `ff-index`,
+  `lang`, `codec`). Pick the entry at the `TrackRef`'s position, then check its codec and
+  language (null when unknown), the way Vora.Android's `audioGroupToSelect` does.
+- Sidecar subtitles (`isExternal` on the details payload) have no `ff-index`: the renderer
+  fetches `GET /api/streaming/sessions/{sessionId}/subtitle/{trackId}.vtt` and sends `sub-add`.
 - Text and image subtitles both render in mpv; ASS styling is preserved for embedded
   ASS. (Sidecar `.ass` arrives as VTT from that route and loses styling — acceptable
   for v1, note it in the QA results.)
@@ -111,8 +110,9 @@ A directory script: `main.lua` plus modules (`state.lua`, `layout.lua`, `draw.lu
   vector paths). Generate `icons.lua` at build time from the same SVG icons Vora.Web
   uses (`scripts/build-icons.ts` converts SVG paths to ASS `\p1` drawings) so the icon set
   matches.
-- Images (scrub thumbnails) via `overlay-add`: main decodes the server sprite once with
-  `nativeImage` to raw BGRA in `userData/tmp/sprite-<sessionId>.bgra`; Lua shows a cell
+- Images (scrub thumbnails) via `overlay-add`: main decodes the sprite the renderer
+  sends (`ScrubSpriteSpec.image`) once with `nativeImage` to raw BGRA in
+  `userData/tmp/sprite-<sessionId>.bgra`; Lua shows a cell
   with `overlay-add <id> <x> <y> <file> <offset> bgra <w> <h> <stride>`, where `offset`
   selects the cell inside the single sprite file. Thumbnails are server-generated —
   never generate them client-side.

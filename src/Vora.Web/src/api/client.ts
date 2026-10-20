@@ -2,6 +2,7 @@ import axios, { type AxiosInstance, type InternalAxiosRequestConfig, type AxiosR
 import { serverVault, type VoraServer } from '../utils/serverVault';
 import { StorageKeys, SessionKeys } from '../utils/storageKeys';
 import { defaultApiBaseUrl } from '../utils/apiBase';
+import { getDesktopBridge } from '../desktop/desktopPlayback';
 
 export interface VoraRequestConfig extends AxiosRequestConfig {
     serverId?: string;
@@ -48,15 +49,36 @@ const DETECTED_OS: string = (() => {
 // ride along on every request — including the login/setup/register calls made
 // through createDirectClient — so the server can stamp DeviceId on the refresh
 // token it issues and admins can later revoke a specific device.
+interface ClientIdentity {
+    client: string;
+    device: string;
+    deviceType: string;
+    os: string;
+}
+
+function clientIdentity(): ClientIdentity {
+    const desktop = getDesktopBridge();
+    if (!desktop) return { client: 'Vora Web', device: 'Web Browser', deviceType: 'Browser', os: DETECTED_OS };
+
+    const os = desktop.platform === 'windows' ? 'Windows' : 'Linux';
+    return {
+        client: desktop.channel === 'qa' ? 'Vora Desktop QA' : 'Vora Desktop',
+        device: `Vora Desktop (${os})`,
+        deviceType: 'Desktop',
+        os,
+    };
+}
+
 function deviceHeaders(): Record<string, string> {
     const deviceId = localStorage.getItem(StorageKeys.deviceId);
     if (!deviceId) return {};
+    const identity = clientIdentity();
     return {
         'X-Vora-Device-Id': deviceId,
-        'X-Vora-Client': 'Vora Web',
-        'X-Vora-Device': 'Web Browser',
-        'X-Vora-Device-Type': 'Browser',
-        'X-Vora-OS': DETECTED_OS,
+        'X-Vora-Client': identity.client,
+        'X-Vora-Device': identity.device,
+        'X-Vora-Device-Type': identity.deviceType,
+        'X-Vora-OS': identity.os,
     };
 }
 

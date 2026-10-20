@@ -1,19 +1,8 @@
 import { usePlayer, usePlayerTime } from '../../contexts/usePlayer';
-import { useEffect, useState, useRef, useMemo, useCallback } from 'react';
-import { useParams } from 'react-router-dom';
-import { mediaService, type MediaItem, type MediaPart, type UpNextItemVM, type UpNextResultVM, type MediaMarker } from '../../api/Media/mediaService';
-import { profileService, type PlaybackPreferencesVM } from '../../api/Users/profileService';
-import { streamingService, type RememberChoiceChange } from '../../api/Streaming/streamingService';
-import { useSignalREvent } from '../../hooks/useSignalREvent';
-import { getEffectiveCapabilities } from '../../utils/hardwareScanner';
-import { StorageKeys, getProfileIdFromToken } from '../../utils/storageKeys';
-import type Hls from 'hls.js';
-import { loadHls } from '../../utils/loadHls';
-import { useDialog } from '../../dialogs';
+import { useState, useRef, useCallback } from 'react';
+import type { MediaMarker } from '../../api/Media/mediaService';
 import { useAutoHideControls } from './Controls/useAutoHideControls';
 import { usePictureClick } from './Controls/usePictureClick';
-import { useUpNextEnding } from './useUpNextEnding';
-import { usePlaybackFinished } from './usePlaybackFinished';
 import { useFullscreen } from './Controls/useFullscreen';
 import { usePlayerKeyboard } from './Controls/usePlayerKeyboard';
 import PlayerKeyIndicator from './Controls/PlayerKeyIndicator';
@@ -22,19 +11,12 @@ import { PlayPauseButton, SkipButton, VolumeControl, FullscreenButton, MaximizeB
 import PlayerSettingsPanel from './Panels/PlayerSettingsPanel';
 import SubtitleTracksPanel from './Panels/SubtitleTracksPanel';
 import MediaInfoDialog from '../Media/MediaInfoDialog';
-import PlaybackStatsSections, { type PlayerReading } from './Panels/PlaybackStatsSections';
+import PlaybackStatsSections from './Panels/PlaybackStatsSections';
 import UpNextOverlay from './Panels/UpNextOverlay';
-import { useVideoThumbnails } from '../../hooks/useVideoThumbnails';
-import { isImageSubtitleCodec, isNoSubtitle, NoSubtitle } from '../../utils/subtitleKind';
-import { placeCues } from '../../utils/subtitleCuePlacement';
-import { useFeatureFlags } from '../../hooks/useFeatureFlags';
+import { isNoSubtitle, NoSubtitle } from '../../utils/subtitleKind';
 import { ScrubPreview } from './VideoScrubThumbnails';
-import { seasonEpisodeLabel } from '../../utils/seasonLabel';
-import { safeMediaUrl } from '../../utils/safeUrl';
-
-type VideoTrackType = NonNullable<MediaPart['videoTracks']>[number];
-type AudioTrackType = NonNullable<MediaPart['audioTracks']>[number];
-type SubtitleTrackType = NonNullable<MediaPart['subtitleTracks']>[number];
+import { WebVideoEngine } from './engine/WebVideoEngine';
+import { usePlaybackController } from './usePlaybackController';
 
 const chipStyle: React.CSSProperties = {
     background: 'color-mix(in srgb, var(--vora-bg-canvas) 72%, transparent)',
@@ -84,421 +66,26 @@ function MarkerBands({ markers, duration }: { markers: MediaMarker[]; duration: 
 }
 
 export default function GlobalVideoPlayer() {
-    const dialog = useDialog();
-    const { serverId } = useParams<{ serverId?: string }>();
     const {
         currentMedia, isPlaying, isMinimized, volume, sessionId,
-        togglePlayPause, seek, skipForward, skipBackward, setMinimized, closePlayer, setVolume, changeStreams, videoRef, playMedia,
+        togglePlayPause, seek, skipForward, skipBackward, setMinimized, closePlayer, setVolume, videoRef,
     } = usePlayer();
     const { currentTime, duration } = usePlayerTime();
 
-    const flags = useFeatureFlags();
     const playerContainerRef = useRef<HTMLDivElement>(null);
+    const [engine] = useState(() => new WebVideoEngine(videoRef));
+    const controller = usePlaybackController(engine);
+    const { upNextData, isEpisode, thumbnails, display, activeSubtitleTrack, visibleMarkers } = controller;
 
-    const [mediaDetails, setMediaDetails] = useState<MediaItem | null>(null);
     const [showSettings, setShowSettings] = useState(false);
     const [showSubtitles, setShowSubtitles] = useState(false);
     const [showInfo, setShowInfo] = useState(false);
     const closeInfo = useCallback(() => setShowInfo(false), []);
-    const hlsRef = useRef<Hls | null>(null);
-    const engineRef = useRef('');
-    const readPlayer = useCallback((): PlayerReading => {
-        const video = videoRef.current;
-        const quality = video && typeof video.getVideoPlaybackQuality === 'function' ? video.getVideoPlaybackQuality() : null;
-        let bufferedSeconds: number | null = null;
-        if (video) {
-            for (let index = 0; index < video.buffered.length; index++) {
-                if (video.buffered.start(index) <= video.currentTime && video.currentTime <= video.buffered.end(index)) {
-                    bufferedSeconds = Math.max(0, video.buffered.end(index) - video.currentTime);
-                }
-            }
-        }
-        const estimate = hlsRef.current?.bandwidthEstimate;
-        return {
-            engine: engineRef.current,
-            droppedFrames: quality ? quality.droppedVideoFrames : null,
-            totalFrames: quality ? quality.totalVideoFrames : null,
-            bufferedSeconds,
-            bandwidthKbps: estimate && Number.isFinite(estimate) ? estimate / 1000 : null,
-        };
-    }, [videoRef]);
-
-    const [selVideo, setSelVideo] = useState('');
-    const [selAudio, setSelAudio] = useState('');
-    const [selSub, setSelSub] = useState('');
-
-    // The text subtitle currently sideloaded onto the <video>, and the single
-    // <track> element carrying it. Exactly one is ever attached: switching
-    // subtitles replaces it rather than stacking a second cue source.
-    const [textSubtitleId, setTextSubtitleId] = useState<string | null>(null);
-    const [isLoadingSubtitle, setIsLoadingSubtitle] = useState(false);
-    const sideloadedTrackRef = useRef<HTMLTrackElement | null>(null);
-    const sideloadListenersRef = useRef<AbortController | null>(null);
-    // What the viewer wants showing, kept across the stream restarts that a
-    // video/audio change causes: the sidecar URL is per session, so the track
-    // has to be re-attached against the new one.
-    const desiredTextSubRef = useRef<string | null>(null);
-
-    const detachSideloadedTrack = useCallback(() => {
-        sideloadListenersRef.current?.abort();
-        sideloadListenersRef.current = null;
-
-        const track = sideloadedTrackRef.current;
-        sideloadedTrackRef.current = null;
-        if (!track) return;
-        if (track.track) track.track.mode = 'disabled';
-        track.remove();
-    }, []);
-
-    const sideloadSubtitle = useCallback(async (subtitleTrackId: string | null) => {
-        const video = videoRef.current;
-        if (!video) return;
-
-        detachSideloadedTrack();
-
-        if (!subtitleTrackId || isNoSubtitle(subtitleTrackId) || !sessionId) {
-            setTextSubtitleId(null);
-            return;
-        }
-
-        setIsLoadingSubtitle(true);
-        try {
-            const objectUrl = await streamingService.fetchSubtitleVtt(sessionId, subtitleTrackId, serverId);
-            // The media may have changed while the VTT was in flight.
-            if (!objectUrl || videoRef.current !== video || desiredTextSubRef.current !== subtitleTrackId) {
-                if (!objectUrl) setTextSubtitleId(null);
-                return;
-            }
-
-            const track = document.createElement('track');
-            track.kind = 'subtitles';
-            track.label = 'Subtitles';
-            track.default = true;
-            track.src = objectUrl;
-            video.appendChild(track);
-            sideloadedTrackRef.current = track;
-
-            // The browser parks a freshly attached track at 'disabled' until the
-            // cue file loads, so the mode is set again on load rather than only
-            // here — setting it once can be silently undone. The cues only exist
-            // once loaded, which is also the first moment they can be placed.
-            const listeners = new AbortController();
-            sideloadListenersRef.current = listeners;
-
-            track.addEventListener('load', () => {
-                track.track.mode = 'showing';
-                placeCues(track.track.cues);
-            }, { once: true, signal: listeners.signal });
-            if (track.track) track.track.mode = 'showing';
-
-            // A media element reset (a source swap inside the same session)
-            // parks every text track at 'disabled' again, which would drop the
-            // subtitle with nothing on screen to explain it. The <video> outlives
-            // every track attached to it, so this listener has to come off with
-            // the track rather than piling up one per subtitle change.
-            video.addEventListener('loadedmetadata', () => {
-                if (sideloadedTrackRef.current === track) track.track.mode = 'showing';
-            }, { signal: listeners.signal });
-
-            setTextSubtitleId(subtitleTrackId);
-        } finally {
-            setIsLoadingSubtitle(false);
-        }
-    }, [sessionId, serverId, videoRef, detachSideloadedTrack]);
-
-    const caps = useMemo(() => {
-        const profileToken = localStorage.getItem(StorageKeys.profileToken);
-        const profileId = (profileToken ? getProfileIdFromToken(profileToken) : null) || 'unknown';
-        const deviceId = localStorage.getItem(StorageKeys.deviceId) || 'unknown';
-        return getEffectiveCapabilities(profileId, deviceId);
-    }, []);
-
-    const [upNextData, setUpNextData] = useState<UpNextResultVM | null>(null);
-
-    const [hiddenCommercialId, setHiddenCommercialId] = useState<string | null>(null);
-
-    const activeCommercial = currentMedia?.commercialMarkers?.find(
-        m => currentTime >= m.start && currentTime < m.end
-    );
-
-    const activeCommId = activeCommercial ? `${activeCommercial.start}-${activeCommercial.end}` : null;
-
-    const showSkipButton = activeCommId !== null && activeCommId !== hiddenCommercialId;
-
-    useEffect(() => {
-        if (showSkipButton && activeCommId) {
-            const timer = setTimeout(() => {
-                setHiddenCommercialId(activeCommId);
-            }, 20000);
-
-            return () => clearTimeout(timer);
-        }
-    }, [showSkipButton, activeCommId]);
-
-    const [markers, setMarkers] = useState<MediaMarker[]>([]);
-    const [playbackPrefs, setPlaybackPrefs] = useState<PlaybackPreferencesVM>({
-        autoSkipIntro: false,
-        autoSkipCredits: false,
-        autoPlayNext: true,
-        minimumCreditsSceneSeconds: 15
-    });
-    const [autoPlayCancelledFor, setAutoPlayCancelledFor] = useState<string | null>(null);
-    const { finished, markFinished } = usePlaybackFinished(videoRef, currentMedia?.sessionId ?? currentMedia?.id);
-    const finishedRef = useRef({ finished, markFinished });
-    useEffect(() => {
-        finishedRef.current = { finished, markFinished };
-    }, [finished, markFinished]);
-
-    const setMarkersRef = useRef(setMarkers);
-    useEffect(() => {
-        setMarkersRef.current = setMarkers;
-    }, []);
-
-    useEffect(() => {
-        const mediaId = currentMedia?.id;
-        const apply = setMarkersRef.current;
-        if (!mediaId) { apply([]); return; }
-        if (currentMedia?.playbackContextType === 'LiveTv' || currentMedia?.playbackContextType === 'Dvr') {
-            apply([]);
-            return;
-        }
-        if (currentMedia?.skipMarkers && currentMedia.skipMarkers.length > 0) {
-            apply(currentMedia.skipMarkers);
-            return;
-        }
-        mediaService.getMarkers(mediaId, serverId)
-            .then(apply)
-            .catch(err => { console.error('Failed to load markers', err); apply([]); });
-    }, [currentMedia?.id, currentMedia?.skipMarkers, currentMedia?.playbackContextType, serverId]);
-
-    useEffect(() => {
-        profileService.getMyPlaybackPreferences(serverId)
-            .then(setPlaybackPrefs)
-            .catch(err => console.error('Failed to load playback preferences', err));
-    }, [serverId]);
-
-    useSignalREvent<string>('MediaAnalysisUpdated', (updatedId) => {
-        if (!currentMedia?.id || updatedId !== currentMedia.id) return;
-        mediaService.getMarkers(currentMedia.id, serverId)
-            .then(setMarkers)
-            .catch(err => console.error('Failed to refresh markers', err));
-    });
-
-    // Next-episode previews are always detected and stored; the per-library
-    // "preview detection" toggle only controls whether the player surfaces them.
-    // When it's off, hide Preview markers so no band or "Skip to Preview" button
-    // shows — instant, no re-analyze. The credits marker still covers that stretch.
-    const visibleMarkers = useMemo(
-        () => (mediaDetails?.enablePreviewDetection ? markers : markers.filter(m => m.type !== 'Preview')),
-        [markers, mediaDetails?.enablePreviewDetection]
-    );
-
-    const activeSkipPrompt = useMemo<{ label: string; target: number; kind: 'intro' | 'credits-to-scene' | 'credits-to-end' } | null>(() => {
-        if (!visibleMarkers.length || !duration || !isFinite(duration)) return null;
-
-        const introOrRecap = visibleMarkers.find(m =>
-            (m.type === 'Intro' || m.type === 'Recap') &&
-            currentTime >= m.startSeconds && currentTime < m.endSeconds
-        );
-        if (introOrRecap) {
-            return {
-                label: introOrRecap.type === 'Recap' ? 'Skip Recap' : 'Skip Intro',
-                target: introOrRecap.endSeconds,
-                kind: 'intro'
-            };
-        }
-
-        const inScene = visibleMarkers.some(m =>
-            (m.type === 'CreditsScene' || m.type === 'Preview') &&
-            currentTime >= m.startSeconds && currentTime < m.endSeconds
-        );
-        if (inScene) return null;
-
-        const credits = visibleMarkers.find(m =>
-            m.type === 'Credits' && currentTime >= m.startSeconds && currentTime < m.endSeconds
-        );
-        if (credits) {
-            const nextScene = visibleMarkers
-                .filter(m => (m.type === 'CreditsScene' || m.type === 'Preview') && m.startSeconds > currentTime)
-                .sort((a, b) => a.startSeconds - b.startSeconds)[0];
-
-            const minDelta = playbackPrefs.minimumCreditsSceneSeconds;
-            if (nextScene && (nextScene.startSeconds - currentTime) >= minDelta) {
-                return {
-                    label: nextScene.type === 'Preview' ? 'Skip to Preview' : 'Skip to Scene',
-                    target: nextScene.startSeconds,
-                    kind: 'credits-to-scene'
-                };
-            }
-            return {
-                label: 'Skip Credits',
-                target: Math.max(currentTime, duration - 2),
-                kind: 'credits-to-end'
-            };
-        }
-
-        return null;
-    }, [visibleMarkers, currentTime, duration, playbackPrefs.minimumCreditsSceneSeconds]);
-
-    const autoSkippedRef = useRef<string | null>(null);
-    useEffect(() => {
-        if (!activeSkipPrompt) {
-            autoSkippedRef.current = null;
-            return;
-        }
-        const key = `${activeSkipPrompt.kind}:${activeSkipPrompt.target.toFixed(2)}`;
-        if (autoSkippedRef.current === key) return;
-
-        const shouldAutoSkip =
-            (activeSkipPrompt.kind === 'intro' && playbackPrefs.autoSkipIntro) ||
-            (activeSkipPrompt.kind === 'credits-to-end' && playbackPrefs.autoSkipCredits);
-
-        if (shouldAutoSkip) {
-            autoSkippedRef.current = key;
-            seek(activeSkipPrompt.target);
-        }
-    }, [activeSkipPrompt, playbackPrefs.autoSkipIntro, playbackPrefs.autoSkipCredits, seek]);
-
-    useEffect(() => {
-        if (currentMedia?.id) {
-            if (currentMedia.playbackContextType !== 'LiveTv' && currentMedia.playbackContextType !== 'Dvr' && !currentMedia.isExtra) {
-                mediaService.getMediaItem(currentMedia.id, serverId).then(setMediaDetails).catch(console.error);
-                mediaService.getUpNext(currentMedia.id, currentMedia.playbackContextType, currentMedia.playbackContextId, serverId)
-                    .then(setUpNextData)
-                    .catch(console.error);
-            } else {
-                window.setTimeout(() => setMediaDetails(null), 0);
-            }
-
-            window.setTimeout(() => {
-                setSelVideo(currentMedia.videoTrackId || '');
-                setSelAudio(currentMedia.audioTrackId || '');
-                const committedText = currentMedia.textSubtitleTrackId ?? null;
-                desiredTextSubRef.current = committedText;
-                setSelSub(committedText || currentMedia.subtitleTrackId || NoSubtitle);
-            }, 0);
-        }
-    }, [currentMedia?.id, currentMedia?.videoTrackId, currentMedia?.audioTrackId, currentMedia?.subtitleTrackId, currentMedia?.textSubtitleTrackId, currentMedia?.isExtra, currentMedia?.playbackContextType, currentMedia?.playbackContextId, serverId]);
-
-    useEffect(() => {
-        const video = videoRef.current;
-        const streamUrl = safeMediaUrl(currentMedia?.streamUrl);
-        if (!video || !streamUrl || !currentMedia?.streamUrl) return;
-
-        let hls: Hls | null = null;
-        let cancelled = false;
-
-        if (currentMedia.container === 'hls' || currentMedia.strategy === 'Transcode' || streamUrl.includes('.m3u8')) {
-            (async () => {
-                const HlsClass = await loadHls();
-                if (cancelled) return;
-
-                if (HlsClass.isSupported()) {
-                    const instance = new HlsClass({
-                        enableWorker: true,
-                        lowLatencyMode: true,
-                    });
-                    if (cancelled) { instance.destroy(); return; }
-
-                    instance.loadSource(streamUrl);
-                    instance.attachMedia(video);
-                    hlsRef.current = instance;
-                    engineRef.current = 'hls.js';
-                    instance.on(HlsClass.Events.MANIFEST_PARSED, () => {
-                        video.play().catch(e => console.error('Auto-play blocked:', e));
-                    });
-
-                    // 410 is the server saying the segment is past the end of
-                    // the file: the video ends there, so stop asking for it.
-                    // Restarting the load on every fatal network error used to
-                    // ask for that segment forever, frozen on the last frame.
-                    let recoveredMediaError = false;
-                    instance.on(HlsClass.Events.ERROR, (_, data) => {
-                        if (data.response?.code === 410) {
-                            instance.stopLoad();
-                            finishedRef.current.markFinished();
-                            return;
-                        }
-                        if (!data.fatal) return;
-                        if (data.type === HlsClass.ErrorTypes.NETWORK_ERROR) {
-                            if (!finishedRef.current.finished) instance.startLoad();
-                        } else if (data.type === HlsClass.ErrorTypes.MEDIA_ERROR && !recoveredMediaError) {
-                            recoveredMediaError = true;
-                            instance.recoverMediaError();
-                        } else {
-                            instance.destroy();
-                        }
-                    });
-
-                    hls = instance;
-                } else if (video.canPlayType('application/vnd.apple.mpegurl')) {
-                    engineRef.current = 'Native HLS';
-                    video.src = streamUrl;
-                    video.addEventListener('loadedmetadata', () => {
-                        video.play().catch(e => console.error('Auto-play blocked:', e));
-                    });
-                }
-            })();
-        } else {
-            engineRef.current = 'The browser, from the file';
-            video.src = streamUrl;
-            video.play().catch(e => console.error('Auto-play blocked:', e));
-        }
-
-        return () => {
-            cancelled = true;
-            hlsRef.current = null;
-            engineRef.current = '';
-            if (hls) {
-                hls.destroy();
-            }
-            video.removeAttribute('src');
-            video.load();
-        };
-    }, [currentMedia?.streamUrl, currentMedia?.container, currentMedia?.strategy, videoRef]);
-
-    useEffect(() => {
-        if (!sessionId) return;
-        const desired = desiredTextSubRef.current;
-        if (!desired) return;
-
-        void sideloadSubtitle(desired);
-    }, [sessionId, sideloadSubtitle]);
-
-    // The blob URLs belong to the session that produced them; a session that has
-    // gone away can never be asked for them again.
-    useEffect(() => {
-        if (!sessionId) return;
-        return () => {
-            detachSideloadedTrack();
-            streamingService.releaseSubtitleUrls(sessionId);
-        };
-    }, [sessionId, detachSideloadedTrack]);
-
-    const refreshUpNext = useCallback(() => {
-        if (!currentMedia) return;
-        mediaService.getUpNext(currentMedia.id, currentMedia.playbackContextType, currentMedia.playbackContextId, serverId)
-            .then(setUpNextData)
-            .catch(console.error);
-    }, [currentMedia, serverId]);
-
-    const isEnding = useUpNextEnding({
-        mediaId: currentMedia?.id,
-        eligible: !!currentMedia
-            && !isMinimized
-            && !currentMedia.isExtra
-            && currentMedia.playbackContextType !== 'Dvr'
-            && currentMedia.playbackContextType !== 'LiveTv',
-        currentTime,
-        duration,
-        finished,
-        onEnterEnding: refreshUpNext,
-    });
 
     const showControls = useAutoHideControls({
         isMinimized,
         isPlaying,
-        keepVisibleWhen: isEnding || showSettings || showInfo || showSubtitles,
+        keepVisibleWhen: controller.isEnding || showSettings || showInfo || showSubtitles,
     });
 
     const toggleFullScreen = useFullscreen(playerContainerRef);
@@ -516,21 +103,10 @@ export default function GlobalVideoPlayer() {
 
     const picture = usePictureClick({ isPlaying, onPlayPause: togglePlayPause });
 
-    const thumbnailsEligible = currentMedia?.playbackContextType !== 'LiveTv' && currentMedia?.playbackContextType !== 'Dvr';
-    // Thumbnails are per media part (different cuts get their own sprite). Resolve
-    // the part being streamed from the active video track so scrubbing the 4K/1080p
-    // or an alternate cut shows the sprite for the file actually playing.
-    const activePartId = useMemo(() => {
-        if (!mediaDetails?.mediaParts || !currentMedia?.videoTrackId) return undefined;
-        return mediaDetails.mediaParts.find(p => p.videoTracks?.some(t => t.id === currentMedia.videoTrackId))?.id;
-    }, [mediaDetails?.mediaParts, currentMedia?.videoTrackId]);
-    const thumbnails = useVideoThumbnails(thumbnailsEligible ? currentMedia?.id : undefined, activePartId, serverId);
     const [hoverPercent, setHoverPercent] = useState<number | null>(null);
     const [hoverBarRect, setHoverBarRect] = useState<DOMRect | null>(null);
 
     if (!currentMedia) return null;
-
-    const isEpisode = mediaDetails?.type === 'Episode' || /^S\d+\s*E\d+/i.test(currentMedia.subtitle ?? '');
 
     const formatTime = (seconds: number) => {
         if (isNaN(seconds) || !isFinite(seconds)) return '0:00';
@@ -548,160 +124,13 @@ export default function GlobalVideoPlayer() {
 
     const hoverCue = hoverPercent !== null ? thumbnails.findCue(hoverPercent * duration) : null;
 
-    const handlePlayNext = async (item: UpNextItemVM) => {
-        const deviceId = localStorage.getItem('device_id') || 'unknown';
-
-        if (sessionId) {
-            try {
-                await streamingService.pingSession(sessionId, currentTime, duration, true, serverId);
-                await streamingService.stopSession(sessionId, serverId);
-            } catch (e) { console.error(e); }
-        }
-
-        try {
-            const sessionInfo = await streamingService.startSession(item.id, deviceId, 0, undefined, undefined, undefined, serverId);
-
-            playMedia({
-                id: item.id,
-                title: item.title,
-                subtitle: item.type === 'Episode' && item.seasonNumber != null && item.episodeNumber != null ? `${seasonEpisodeLabel(item.seasonNumber, item.episodeNumber)} - ${item.tvShowTitle}` : '',
-                posterUrl: item.posterUrl,
-                backgroundUrl: item.backgroundUrl,
-                ...sessionInfo,
-                serverId,
-                startPosition: 0,
-                playbackContextType: currentMedia.playbackContextType,
-                playbackContextId: currentMedia.playbackContextId,
-            });
-        } catch {
-            await dialog.alert('Failed to start next item.');
-        }
-    };
-
-    // A pick made while watching is remembered for the title on this device,
-    // like a pick on its page, so the next episode plays the same way.
-    const rememberPick = (change: RememberChoiceChange) => {
-        if (!currentMedia || currentMedia.isExtra || currentMedia.playbackContextType === 'LiveTv' || currentMedia.playbackContextType === 'Dvr') return;
-        if (!change.mediaPartId && !change.audioTrackId && !change.subtitleTrackId && !change.subtitlesOff) return;
-        streamingService.rememberChoice(currentMedia.id, change, serverId)
-            .catch((error: unknown) => console.error('Could not remember the playback choice', error));
-    };
-
-    const subtitlePick = (subtitleId: string): RememberChoiceChange =>
-        isNoSubtitle(subtitleId) ? { subtitlesOff: true } : { subtitleTrackId: subtitleId };
-
     const handleApplyStreams = async () => {
         setShowSettings(false);
-
-        const shownSubtitle = currentMedia.subtitleStrategy === 'BurnIn' ? currentMedia.subtitleTrackId : textSubtitleId;
-        rememberPick({
-            mediaPartId: selVideo !== currentMedia.videoTrackId
-                ? mediaDetails?.mediaParts?.find((p: MediaPart) => p.videoTracks?.some((vt: VideoTrackType) => vt.id === selVideo))?.id
-                : undefined,
-            audioTrackId: selAudio !== currentMedia.audioTrackId ? selAudio : undefined,
-            ...((isNoSubtitle(selSub) ? null : selSub) !== (shownSubtitle ?? null) ? subtitlePick(selSub) : {}),
-        });
-
-        const chosenTrack = mediaDetails?.mediaParts
-            ?.flatMap((p: MediaPart) => p.subtitleTracks ?? [])
-            .find((st: SubtitleTrackType) => st.id === selSub);
-        const wantsBurnIn = !!chosenTrack && isImageSubtitleCodec(chosenTrack.codec);
-        const streamChanged = selVideo !== currentMedia.videoTrackId || selAudio !== currentMedia.audioTrackId;
-        const hasBurnedInSub = currentMedia.subtitleStrategy === 'BurnIn';
-
-        desiredTextSubRef.current = wantsBurnIn || isNoSubtitle(selSub) ? null : selSub;
-
-        // Only a video/audio change, or adding or dropping a burned-in subtitle,
-        // needs a new stream — the server has to re-encode for those. A text
-        // subtitle is cues the client draws, so switching one (or turning
-        // subtitles off) leaves the stream alone and the video never reloads.
-        if (streamChanged || wantsBurnIn || hasBurnedInSub) {
-            detachSideloadedTrack();
-            setTextSubtitleId(null);
-            await changeStreams(selVideo, selAudio, wantsBurnIn ? selSub : NoSubtitle);
-            return;
-        }
-
-        await sideloadSubtitle(desiredTextSubRef.current);
+        await controller.applyStreams();
     };
 
-    const handleSelectSubtitle = async (subtitleTrackId: string) => {
-        const chosen = mediaDetails?.mediaParts
-            ?.flatMap((p: MediaPart) => p.subtitleTracks ?? [])
-            .find((st: SubtitleTrackType) => st.id === subtitleTrackId);
-
-        const wantsBurnIn = !!chosen && isImageSubtitleCodec(chosen.codec);
-        const hasBurnedInSub = currentMedia?.subtitleStrategy === 'BurnIn';
-
-        setSelSub(subtitleTrackId);
-        desiredTextSubRef.current = wantsBurnIn || isNoSubtitle(subtitleTrackId) ? null : subtitleTrackId;
-        rememberPick(subtitlePick(subtitleTrackId));
-
-        // Adding a burned-in subtitle, or dropping one that is already burned
-        // into the picture, both need a new encode — nothing the client can undo.
-        if (wantsBurnIn || hasBurnedInSub) {
-            setShowSubtitles(false);
-            detachSideloadedTrack();
-            setTextSubtitleId(null);
-            await changeStreams(selVideo, selAudio, wantsBurnIn ? subtitleTrackId : NoSubtitle);
-            return;
-        }
-
-        await sideloadSubtitle(desiredTextSubRef.current);
-    };
-
-    const handleSubtitleDownloaded = async (subtitleTrackId: string) => {
-        if (!currentMedia) return;
-
-        try {
-            setMediaDetails(await mediaService.getMediaItem(currentMedia.id, serverId));
-        } catch (e) {
-            console.error('Failed to refresh tracks after downloading a subtitle', e);
-        }
-
-        setSelSub(subtitleTrackId);
-        desiredTextSubRef.current = subtitleTrackId;
-        rememberPick({ subtitleTrackId });
-        await sideloadSubtitle(subtitleTrackId);
-    };
-
-    const canFindSubtitles = flags.subtitleSearch && !currentMedia.isExtra;
-
-    const activeStreamPart = mediaDetails?.mediaParts?.find((p: MediaPart) =>
-        p.videoTracks?.some((vt: VideoTrackType) => vt.id === currentMedia.videoTrackId)
-    );
-
-    const activeVideoTrack = activeStreamPart?.videoTracks?.find((vt: VideoTrackType) => vt.id === currentMedia.videoTrackId);
-    const activeAudioTrack = activeStreamPart?.audioTracks?.find((at: AudioTrackType) => at.id === currentMedia.audioTrackId);
-    const effectiveSubtitleId = textSubtitleId ?? currentMedia.subtitleTrackId;
-
-    // Nothing to open when the file carries no subtitles and no provider could
-    // fetch one — the control is hidden rather than shown leading nowhere.
-    const hasSubtitleOptions = (activeStreamPart?.subtitleTracks?.length ?? 0) > 0 || canFindSubtitles;
-    const activeSubtitleTrack = activeStreamPart?.subtitleTracks?.find((st: SubtitleTrackType) => st.id === effectiveSubtitleId);
-
-    // When a transcode is in play, the player gets WHAT THE SERVER
-    // DELIVERS, not the source. The badge has to reflect the output —
-    // otherwise it lies about a 4K HDR → 1080p SDR transcode. Prefer
-    // the session's outputResolution / outputHdrType (set from the
-    // StartStream response) when the video is being transcoded; fall
-    // back to source-side fields only when video strategy is
-    // DirectPlay / DirectStream (source flows through unchanged).
-    const isVideoTranscoded = currentMedia.videoStrategy === 'Transcode';
-    const rawDisplayRes = isVideoTranscoded && currentMedia.outputResolution
-        ? currentMedia.outputResolution
-        : (activeStreamPart ? activeStreamPart.resolution : currentMedia.resolution);
-    const displayRes = rawDisplayRes === '2160p' ? '4K' : rawDisplayRes;
-
-    const displayHdr = isVideoTranscoded && currentMedia.outputHdrType
-        ? currentMedia.outputHdrType
-        : (activeStreamPart ? activeVideoTrack?.hdrType : currentMedia.hdrType);
-
-    const displayVideoCodec = currentMedia.videoStrategy === 'Transcode' ? currentMedia.videoCodec : (activeVideoTrack?.codec || currentMedia.videoCodec);
-    const displayAudioCodec = currentMedia.audioStrategy === 'Transcode' ? currentMedia.audioCodec : (activeAudioTrack?.codec || currentMedia.audioCodec);
-    const displayAudioChannels = currentMedia.audioStrategy === 'Transcode' ? currentMedia.targetAudioChannels : (activeAudioTrack?.channels || currentMedia.audioChannels);
-
-    const displayContainer = currentMedia.container;
+    const handleSelectSubtitle = (subtitleTrackId: string) =>
+        controller.selectSubtitle(subtitleTrackId, { onStreamRestart: () => setShowSubtitles(false) });
 
     return (
         <div
@@ -719,21 +148,21 @@ export default function GlobalVideoPlayer() {
                 onClick={() => { if (isMinimized) setMinimized(false); }}
                 className={`absolute bg-[var(--vora-bg-canvas)] transition-all duration-700 ease-in-out
                     ${isMinimized ? 'bottom-4 left-6 z-20 h-16 w-16 cursor-pointer rounded-md object-cover shadow-[var(--vora-shadow-lg)] hover:ring-2 hover:ring-[var(--vora-accent-500)] max-md:left-3' :
-                        isEnding ? 'left-20 top-32 z-20 aspect-video w-96 cursor-pointer rounded-xl object-cover shadow-[var(--vora-shadow-overlay)] max-md:left-4 max-md:top-4 max-md:w-40' :
+                        controller.isEnding ? 'left-20 top-32 z-20 aspect-video w-96 cursor-pointer rounded-xl object-cover shadow-[var(--vora-shadow-overlay)] max-md:left-4 max-md:top-4 max-md:w-40' :
                             'absolute left-0 top-0 z-0 h-[100vh] w-full object-contain'}`}
-                style={isEnding && !isMinimized ? { border: '1px solid var(--vora-border-strong)' } : undefined}
+                style={controller.isEnding && !isMinimized ? { border: '1px solid var(--vora-border-strong)' } : undefined}
             />
 
-            {isEnding && !isMinimized && (
+            {controller.isEnding && !isMinimized && (
                 <UpNextOverlay
                     currentMedia={{ title: currentMedia.title, subtitle: currentMedia.subtitle }}
-                    upNextData={upNextData}
-                    onPlayNext={handlePlayNext}
+                    upNextData={controller.upNextData}
+                    onPlayNext={controller.playNext}
                     onClose={closePlayer}
-                    autoPlay={playbackPrefs.autoPlayNext !== false && autoPlayCancelledFor !== currentMedia.id}
-                    finished={finished}
-                    secondsLeft={finished || !isFinite(duration) ? 0 : Math.max(0, duration - currentTime)}
-                    onCancelAutoPlay={() => setAutoPlayCancelledFor(currentMedia.id)}
+                    autoPlay={controller.autoPlayNext}
+                    finished={controller.finished}
+                    secondsLeft={controller.finished || !isFinite(duration) ? 0 : Math.max(0, duration - currentTime)}
+                    onCancelAutoPlay={controller.cancelAutoPlay}
                 />
             )}
 
@@ -771,7 +200,7 @@ export default function GlobalVideoPlayer() {
                                         direction="previous"
                                         size="sm"
                                         disabled={!upNextData?.previousItem}
-                                        onClick={() => upNextData?.previousItem && handlePlayNext(upNextData.previousItem)}
+                                        onClick={() => upNextData?.previousItem && controller.playNext(upNextData.previousItem)}
                                         title={upNextData?.previousItem ? `Previous: ${upNextData.previousItem.title}` : 'No previous episode'}
                                     />
                                 )}
@@ -785,7 +214,7 @@ export default function GlobalVideoPlayer() {
                                         direction="next"
                                         size="sm"
                                         disabled={!upNextData?.nextItem}
-                                        onClick={() => upNextData?.nextItem && handlePlayNext(upNextData.nextItem)}
+                                        onClick={() => upNextData?.nextItem && controller.playNext(upNextData.nextItem)}
                                         title={upNextData?.nextItem ? `Next: ${upNextData.nextItem.title}` : 'No next episode'}
                                     />
                                 )}
@@ -807,14 +236,13 @@ export default function GlobalVideoPlayer() {
                 </div>
             )}
 
-            {showSkipButton && !isMinimized && !isEnding && (
+            {controller.showSkipCommercial && !isMinimized && !controller.isEnding && (
                 <div className="absolute bottom-32 right-12 z-[200] animate-fade-in-up">
                     <button
                         type="button"
                         onClick={(e) => {
                             e.stopPropagation();
-                            if (activeCommercial) seek(activeCommercial.end);
-                            if (activeCommId) setHiddenCommercialId(activeCommId);
+                            controller.skipCommercial();
                         }}
                         className="pointer-events-auto flex transform cursor-pointer items-center gap-3 rounded-md px-6 py-3 text-lg font-semibold shadow-[var(--vora-shadow-overlay)] backdrop-blur-md transition-all hover:scale-105"
                         style={{ background: 'color-mix(in srgb, var(--vora-bg-canvas) 85%, transparent)', border: '1px solid color-mix(in srgb, var(--vora-text-primary) 22%, transparent)', color: 'var(--vora-text-primary)' }}
@@ -825,24 +253,24 @@ export default function GlobalVideoPlayer() {
                 </div>
             )}
 
-            {activeSkipPrompt && !showSkipButton && !isMinimized && !isEnding && (
+            {controller.activeSkipPrompt && !controller.showSkipCommercial && !isMinimized && !controller.isEnding && (
                 <div className="absolute bottom-32 right-12 z-[200] animate-fade-in-up">
                     <button
                         type="button"
                         onClick={(e) => {
                             e.stopPropagation();
-                            seek(activeSkipPrompt.target);
+                            controller.skipToMarker();
                         }}
                         className="pointer-events-auto flex transform cursor-pointer items-center gap-3 rounded-md px-6 py-3 text-lg font-semibold shadow-[var(--vora-shadow-overlay)] backdrop-blur-md transition-all hover:scale-105"
                         style={{ background: 'var(--vora-accent-500)', border: '1px solid var(--vora-accent-500)', color: 'var(--vora-accent-contrast)' }}
                     >
-                        {activeSkipPrompt.label}
+                        {controller.activeSkipPrompt.label}
                         <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M4 18l8.5-6L4 6v12zm9-12v12l8.5-6L13 6z" /></svg>
                     </button>
                 </div>
             )}
 
-            {!isMinimized && !isEnding && (
+            {!isMinimized && !controller.isEnding && (
                 <div
                     data-testid="player-picture"
                     onPointerDown={picture.onPointerDown}
@@ -873,22 +301,22 @@ export default function GlobalVideoPlayer() {
                             )}
 
                             <div className="mt-3 flex flex-wrap items-center justify-center gap-1.5">
-                                {displayRes && <span className="rounded-md px-2 py-0.5 text-[11px] font-semibold" style={chipStyle}>{displayRes}</span>}
-                                {displayHdr && <span className="rounded-md px-2 py-0.5 text-[11px] font-semibold uppercase" style={{ ...chipStyle, color: 'var(--vora-warning-text)', borderColor: 'color-mix(in srgb, var(--vora-warning-500) 45%, transparent)' }}>{displayHdr}</span>}
-                                {displayVideoCodec && <span className="rounded-md px-2 py-0.5 text-[11px] font-semibold uppercase" style={chipStyle}>{displayVideoCodec}{currentMedia.videoStrategy === 'Transcode' ? ' (transcode)' : ''}</span>}
-                                {displayAudioCodec && <span className="rounded-md px-2 py-0.5 text-[11px] font-semibold uppercase" style={chipStyle}>{displayAudioCodec}{currentMedia.audioStrategy === 'Transcode' ? ' (transcode)' : ''}</span>}
-                                {displayAudioChannels !== undefined && <span className="rounded-md px-2 py-0.5 text-[11px] font-semibold" style={chipStyle}>{displayAudioChannels}ch</span>}
-                                {isLoadingSubtitle && (
+                                {display.resolution && <span className="rounded-md px-2 py-0.5 text-[11px] font-semibold" style={chipStyle}>{display.resolution}</span>}
+                                {display.hdr && <span className="rounded-md px-2 py-0.5 text-[11px] font-semibold uppercase" style={{ ...chipStyle, color: 'var(--vora-warning-text)', borderColor: 'color-mix(in srgb, var(--vora-warning-500) 45%, transparent)' }}>{display.hdr}</span>}
+                                {display.videoCodec && <span className="rounded-md px-2 py-0.5 text-[11px] font-semibold uppercase" style={chipStyle}>{display.videoCodec}{currentMedia.videoStrategy === 'Transcode' ? ' (transcode)' : ''}</span>}
+                                {display.audioCodec && <span className="rounded-md px-2 py-0.5 text-[11px] font-semibold uppercase" style={chipStyle}>{display.audioCodec}{currentMedia.audioStrategy === 'Transcode' ? ' (transcode)' : ''}</span>}
+                                {display.audioChannels !== undefined && <span className="rounded-md px-2 py-0.5 text-[11px] font-semibold" style={chipStyle}>{display.audioChannels}ch</span>}
+                                {controller.isLoadingSubtitle && (
                                     <span className="rounded-md px-2 py-0.5 text-[11px] font-semibold uppercase" style={chipStyle}>
                                         Loading subtitles…
                                     </span>
                                 )}
-                                {!isLoadingSubtitle && !isNoSubtitle(effectiveSubtitleId) && activeSubtitleTrack && (
+                                {!controller.isLoadingSubtitle && !isNoSubtitle(controller.effectiveSubtitleId) && activeSubtitleTrack && (
                                     <span className="rounded-md px-2 py-0.5 text-[11px] font-semibold uppercase" style={chipStyle}>
                                         SUB: {activeSubtitleTrack.language?.slice(0, 3) || 'UNK'} {currentMedia.subtitleStrategy === 'BurnIn' ? '(Burn-in)' : `(${activeSubtitleTrack.codec})`}
                                     </span>
                                 )}
-                                {displayContainer && <span className="rounded-md px-2 py-0.5 text-[11px] font-semibold uppercase" style={chipStyle}>{displayContainer}</span>}
+                                {display.container && <span className="rounded-md px-2 py-0.5 text-[11px] font-semibold uppercase" style={chipStyle}>{display.container}</span>}
                                 {currentMedia.bandwidthKbps ? <span className="rounded-md px-2 py-0.5 text-[11px] font-semibold" style={chipStyle}>{(currentMedia.bandwidthKbps / 1000).toFixed(1)} Mbps</span> : null}
                             </div>
                         </div>
@@ -922,7 +350,7 @@ export default function GlobalVideoPlayer() {
                                     <EpisodeNavButton
                                         direction="previous"
                                         disabled={!upNextData?.previousItem}
-                                        onClick={() => upNextData?.previousItem && handlePlayNext(upNextData.previousItem)}
+                                        onClick={() => upNextData?.previousItem && controller.playNext(upNextData.previousItem)}
                                         title={upNextData?.previousItem ? `Previous: ${upNextData.previousItem.title}` : 'No previous episode'}
                                     />
                                 )}
@@ -933,7 +361,7 @@ export default function GlobalVideoPlayer() {
                                     <EpisodeNavButton
                                         direction="next"
                                         disabled={!upNextData?.nextItem}
-                                        onClick={() => upNextData?.nextItem && handlePlayNext(upNextData.nextItem)}
+                                        onClick={() => upNextData?.nextItem && controller.playNext(upNextData.nextItem)}
                                         title={upNextData?.nextItem ? `Next: ${upNextData.nextItem.title}` : 'No next episode'}
                                     />
                                 )}
@@ -949,10 +377,10 @@ export default function GlobalVideoPlayer() {
                                 >
                                     <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75"><circle cx="12" cy="12" r="10" /><line x1="12" y1="16" x2="12" y2="12" /><line x1="12" y1="8" x2="12.01" y2="8" /></svg>
                                 </button>
-                                {hasSubtitleOptions && (
+                                {controller.hasSubtitleOptions && (
                                     <SubtitlesButton
                                         onClick={() => setShowSubtitles(true)}
-                                        isActive={!isNoSubtitle(effectiveSubtitleId)}
+                                        isActive={!isNoSubtitle(controller.effectiveSubtitleId)}
                                     />
                                 )}
                                 <button
@@ -979,12 +407,12 @@ export default function GlobalVideoPlayer() {
 
             {showSettings && (
                 <PlayerSettingsPanel
-                    mediaDetails={mediaDetails}
-                    selVideo={selVideo}
-                    selAudio={selAudio}
-                    setSelVideo={setSelVideo}
-                    setSelAudio={setSelAudio}
-                    caps={caps}
+                    mediaDetails={controller.mediaDetails}
+                    selVideo={controller.selVideo}
+                    selAudio={controller.selAudio}
+                    setSelVideo={controller.setSelVideo}
+                    setSelAudio={controller.setSelAudio}
+                    caps={controller.caps}
                     onVideoPartChanged={() => handleSelectSubtitle(NoSubtitle)}
                     onCancel={() => setShowSettings(false)}
                     onApply={handleApplyStreams}
@@ -993,14 +421,14 @@ export default function GlobalVideoPlayer() {
 
             {showSubtitles && (
                 <SubtitleTracksPanel
-                    mediaDetails={mediaDetails}
-                    activePart={activeStreamPart}
-                    selectedSubtitleId={selSub}
+                    mediaDetails={controller.mediaDetails}
+                    activePart={controller.activeStreamPart}
+                    selectedSubtitleId={controller.selSub}
                     mediaItemId={currentMedia.id}
-                    serverId={serverId}
-                    canFindSubtitles={canFindSubtitles}
+                    serverId={controller.serverId}
+                    canFindSubtitles={controller.canFindSubtitles}
                     onSelect={handleSelectSubtitle}
-                    onSubtitleDownloaded={handleSubtitleDownloaded}
+                    onSubtitleDownloaded={controller.subtitleDownloaded}
                     onClose={() => setShowSubtitles(false)}
                 />
             )}
@@ -1008,16 +436,16 @@ export default function GlobalVideoPlayer() {
             {showInfo && (
                 <MediaInfoDialog
                     title="Playback info"
-                    parts={activeStreamPart ? [activeStreamPart] : []}
+                    parts={controller.activeStreamPart ? [controller.activeStreamPart] : []}
                     placement="absolute"
                     onClose={closeInfo}
                     lead={(
                         <PlaybackStatsSections
                             sessionId={sessionId}
-                            serverId={serverId}
+                            serverId={controller.serverId}
                             reasons={currentMedia.reasons}
-                            readPlayer={readPlayer}
-                            sideloadedSubtitle={currentMedia.subtitleStrategy !== 'BurnIn' && !isNoSubtitle(effectiveSubtitleId) && activeSubtitleTrack
+                            readPlayer={controller.readPlayer}
+                            sideloadedSubtitle={currentMedia.subtitleStrategy !== 'BurnIn' && !isNoSubtitle(controller.effectiveSubtitleId) && activeSubtitleTrack
                                 ? { language: activeSubtitleTrack.language, title: activeSubtitleTrack.title, codec: activeSubtitleTrack.codec }
                                 : null}
                         />

@@ -48,46 +48,50 @@ the up-next card shows, which subtitle is default), it lives in the shared contr
 
 ## The engine abstraction (in Vora.Web)
 
-`GlobalVideoPlayer` today owns both the logic and the `<video>` element. Doc 02 splits
-it into:
+`GlobalVideoPlayer` owned both the logic and the `<video>` element. Doc 02 split it
+(`components/Player/engine/PlaybackEngine.ts`) into two roles:
 
 ```ts
-interface PlaybackEngine {
+interface PlaybackEngine {          // what usePlaybackController drives
   readonly kind: 'web' | 'desktop';
   load(source: EngineSource): Promise<void>;   // url, startPosition, strategy, tracks
-  play(): void;
-  pause(): void;
-  seek(seconds: number): void;
+  unload(): void;                              // mpv keeps its window for the next load
   selectLocalTracks(sel: LocalTrackSelection): boolean; // false → controller restarts the session
+  showTextSubtitle(sub: TextSubtitleSource, stillWanted: () => boolean): Promise<TextSubtitleResult>;
+  hideTextSubtitle(): void;
   setChromeState(state: PlayerChromeState): void;      // no-op for the web engine
+  setScrubSprite(spec: ScrubSpriteSpec | null): void;  // no-op for the web engine
+  read(): EngineReading;                               // Playback info
+  on(handler: (event: EngineEvent) => void): () => void;
+}
+interface PlaybackTransport {       // what PlayerContext drives
+  play(): void; pause(): void; seek(seconds: number): void;
+  snapshot(): { position: number; duration: number; paused: boolean };
   stop(): Promise<void>;
-  on<E extends keyof EngineEvents>(event: E, handler: EngineEvents[E]): () => void;
+  on(handler: (event: EngineEvent) => void): () => void;
 }
-
-interface EngineEvents {
-  time: (positionSeconds: number, durationSeconds: number) => void;
-  paused: (isPaused: boolean) => void;
-  buffering: (isBuffering: boolean) => void;
-  ended: () => void;
-  error: (error: EngineError) => void;
-  intent: (intent: ChromeIntent) => void;   // desktop only: user acted in the mpv chrome
-}
+// EngineEvent: time | paused | buffering | ended | error (beforeFirstFrame) | intent | info
 ```
 
-- `WebVideoEngine` wraps the current `<video>` + `loadHls` code. Behaviour for browser
-  users must be byte-for-byte the same; the existing player tests must keep passing.
-- `DesktopMpvEngine` forwards each call to `window.voraDesktop.player.*` and turns
-  bridge events into `EngineEvents`.
-- `usePlaybackController(engine, …)` is the extracted logic. `GlobalVideoPlayer`
-  renders the web chrome from it; `DesktopPlaybackHost` renders **nothing** visible
-  and instead pushes a `PlayerChromeState` to the engine on every change.
+- `PlayerContext` keeps the session as it always has: pings every 10 s, close,
+  `changeStreams`, play/pause/seek. In a browser it drives the `<video>` itself (music
+  shares that element), so browsers behave exactly as before.
+- `WebVideoEngine` is the `<video>` + `loadHls` code, moved unchanged. It never switches
+  tracks inside the file.
+- `DesktopMpvEngine` is both roles: it forwards to `window.voraDesktop.player.*`, turns
+  bridge events into `EngineEvent`s, and `DesktopPlaybackHost` attaches it to
+  `PlayerContext` as the transport (`usePlaybackTransportHost`).
+- `usePlaybackController(engine)` is the extracted logic. `GlobalVideoPlayer` renders
+  the web chrome from it; `DesktopPlaybackHost` shows only a small bar and pushes a
+  `PlayerChromeState` to the engine when it changes.
 
 ## The bridge contract
 
 Exposed by the shell's preload via `contextBridge.exposeInMainWorld('voraDesktop', …)`.
 The TypeScript declaration lives in **Vora.Web** (`src/desktop/desktopBridge.ts`), since
-the web client is the consumer; the shell repo keeps an identical copy under
-`src/shared/bridge.ts` and CI in `Vora.Desktop` diffs the two (doc 05).
+the web client is the consumer. It holds only the contract and imports nothing, so the
+shell repo keeps a byte-identical copy under `src/shared/bridge.ts` and CI in
+`Vora.Desktop` diffs the two (doc 05). Every type named below is defined there.
 
 ```ts
 interface VoraDesktopBridge {
@@ -96,6 +100,7 @@ interface VoraDesktopBridge {
   channel: 'qa' | 'prod';
   platform: 'windows' | 'linux';
   mpv: { available: boolean; version: string | null; reason: string | null };
+  onMpvChanged(handler: (status: MpvStatus) => void): () => void;
   capabilities(): Promise<DesktopCapabilities>;
   player: {
     open(req: OpenRequest): Promise<void>;  // spawns/reuses mpv, loads url at start
@@ -105,10 +110,21 @@ interface VoraDesktopBridge {
     close(): Promise<void>;
     onEvent(handler: (e: PlayerEvent) => void): () => void;
   };
-  settings: { get(): Promise<DesktopSettings>; set(patch: Partial<DesktopSettings>): Promise<DesktopSettings> };
+  settings: { get(): Promise<DesktopSettings>; set(patch: Partial<DesktopSettings>): Promise<DesktopSettings>;
+              openAdvancedFolder(): Promise<void> };
   servers: { switchServer(): void };        // returns to the shell's connect page
 }
+// OpenRequest   { url, startSeconds, title, audioTrack: TrackRef | null, subtitleTrack: TrackRef | null }
+// TrackRef      { position, codec, language }: position among the file's streams of that type
+// PlayerCommand play | pause | seek | tracks (subtitleTrack null = off) | sub-add { title, vtt } | load-next
+// PlayerEvent   loaded | time | paused | buffering | ended | error { message } | intent | info | closed
+// ScrubSpriteSpec { image: ArrayBuffer (the JPEG), cueWidth, cueHeight, cues: { start, end, x, y }[] }
 ```
+
+The renderer hands mpv the sidecar subtitle as VTT text and the scrub sprite as bytes,
+so no bearer token ever leaves the page. `mpv` is copied when the page loads
+(`contextBridge` copies values), so the shell reports a later change through
+`onMpvChanged`.
 
 Compatibility rules — the web client and shell ship independently (server upgrade vs
 app update), so they **will** be mismatched in the field:

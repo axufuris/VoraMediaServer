@@ -24,6 +24,7 @@ export interface DeviceCapabilities {
     measuredBandwidthKbps: number;
     supportedHdrFormats: string[];
     maxVideoBitDepth: number;
+    rendersImageSubtitles?: boolean;
 }
 
 interface ExtendedWindow extends Window {
@@ -127,21 +128,12 @@ const probeHdrFormats = async (): Promise<string[]> => {
     return formats;
 };
 
-export const scanDeviceCapabilitiesSync = (): DeviceCapabilities => {
-    const videoCodecs: string[] = [];
-    const audioCodecs: string[] = [];
-    const containers: string[] = [];
-    const maxAudioChannels = detectAudioOutputChannels();
-    let clientBandwidthKbps = 100000;
-
+// Only the bitrate preference is folded into the raw scan (it's a plain
+// request, not a device capability). The Max Resolution / Max Audio
+// Channels caps are applied separately via applyUserCaps so the raw
+// auto-detected device values stay intact.
+export function readRequestedBitrateKbps(): number {
     let requestedClientBitrateKbps = 0;
-    const requestedMaxResolution = 0;
-    const requestedMaxWidth = 0;
-
-    // Only the bitrate preference is folded into the raw scan (it's a plain
-    // request, not a device capability). The Max Resolution / Max Audio
-    // Channels caps are applied separately via applyUserCaps so the raw
-    // auto-detected device values stay intact.
     try {
         const { profileId, deviceId } = getCurrentProfileDeviceIds();
         const savedPref = localStorage.getItem(`playback_prefs_${profileId}_${deviceId}`);
@@ -158,7 +150,11 @@ export const scanDeviceCapabilitiesSync = (): DeviceCapabilities => {
     } catch (error: unknown) {
         console.warn("Could not read client playback preferences.", error);
     }
+    return requestedClientBitrateKbps;
+}
 
+export function readClientBandwidthKbps(): number {
+    let clientBandwidthKbps = 100000;
     try {
         const nav = window.navigator as ExtendedNavigator;
         if (nav.connection?.downlink) {
@@ -167,6 +163,18 @@ export const scanDeviceCapabilitiesSync = (): DeviceCapabilities => {
     } catch (error: unknown) {
         console.warn("Could not check client bandwidth.", error);
     }
+    return clientBandwidthKbps;
+}
+
+export const scanDeviceCapabilitiesSync = (): DeviceCapabilities => {
+    const videoCodecs: string[] = [];
+    const audioCodecs: string[] = [];
+    const containers: string[] = [];
+    const maxAudioChannels = detectAudioOutputChannels();
+    const requestedClientBitrateKbps = readRequestedBitrateKbps();
+    const clientBandwidthKbps = readClientBandwidthKbps();
+    const requestedMaxResolution = 0;
+    const requestedMaxWidth = 0;
 
     const videoTests = {
         'h264': 'video/mp4; codecs="avc1.42E01E"',

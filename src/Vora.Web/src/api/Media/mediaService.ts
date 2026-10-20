@@ -34,6 +34,7 @@ export interface AudioTrack {
     channels?: number;
     title?: string;
     isDefault?: boolean;
+    embeddedPosition?: number;
 }
 
 export interface SubtitleTrack {
@@ -46,6 +47,7 @@ export interface SubtitleTrack {
     isDefault?: boolean;
     isExternal?: boolean;
     isDownloaded?: boolean;
+    embeddedPosition?: number | null;
 }
 
 export interface MediaPart {

@@ -24,7 +24,9 @@ export interface PlayableMedia {
     audioChannels?: number;
     videoTrackId?: string;
     audioTrackId?: string;
+    audioTrackPosition?: number;
     subtitleTrackId?: string | null;
+    subtitleTrackPosition?: number | null;
     // A text subtitle the viewer picked before playback started. It is NOT sent
     // to /streaming/start — the server would have nothing to do with it and a
     // cold extraction would delay the play request — so the player sideloads it

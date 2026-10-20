@@ -4,6 +4,8 @@ import { StorageKeys } from '../../../utils/storageKeys';
 import { detectAudioOutputChannels } from '../../../utils/hardwareScanner';
 import { DEFAULT_PLAYER_KEY_STEPS, SEEK_STEP_CHOICES, VOLUME_STEP_CHOICES, readPlayerKeySteps } from '../../../utils/playerKeys';
 import AudioSubtitleSection from './AudioSubtitleSection';
+import { announcePlaybackPrefsChanged } from '../../../utils/playbackPrefsEvents';
+import DesktopPlayerSection from './DesktopPlayerSection';
 
 export default function PlaybackTab({ activeProfileId, serverId, onSaved }: { activeProfileId: string, serverId?: string, onSaved: () => void }) {
     const [clientBitrateLimit, setClientBitrateLimit] = useState(0);
@@ -44,6 +46,7 @@ export default function PlaybackTab({ activeProfileId, serverId, onSaved }: { ac
         const prefsKey = StorageKeys.playbackPrefs(activeProfileId, deviceId);
         const prefsString = JSON.stringify({ bitrate: clientBitrateLimit, maxResolution, maxAudioChannels, seekStepSeconds, volumeStepPercent });
         localStorage.setItem(prefsKey, prefsString);
+        announcePlaybackPrefsChanged();
 
         if (activeProfileId) {
             try {
@@ -60,6 +63,8 @@ export default function PlaybackTab({ activeProfileId, serverId, onSaved }: { ac
     return (
         <div className="space-y-6">
             <AudioSubtitleSection serverId={serverId} />
+
+            <DesktopPlayerSection />
 
             <section className="vora-card p-6">
                 <h2 className="m-0 mb-1 text-base font-semibold" style={{ color: 'var(--vora-text-primary)' }}>Bandwidth &amp; quality</h2>
