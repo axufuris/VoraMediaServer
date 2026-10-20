@@ -1,5 +1,6 @@
 using Microsoft.Extensions.DependencyInjection;
 using Vora.Application.Analysis;
+using Vora.Application.Libraries;
 using Vora.Application.Media;
 using Vora.Application.Metadata;
 using Vora.Application.Posters;
@@ -40,6 +41,7 @@ public class ResumableTaskTests
             .AddSingleton(_analyzer).AddSingleton(_thumbnails).AddSingleton(_metadata)
             .AddSingleton(Substitute.For<IPosterOverlayManager>())
             .AddSingleton(Substitute.For<IMusicManager>())
+            .AddSingleton(Substitute.For<ILibraryRepository>())
             .AddSingleton<ITaskProgressReporter>(new NullTaskProgressReporter())
             .BuildServiceProvider();
         using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(3));

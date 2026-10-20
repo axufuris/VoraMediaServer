@@ -32,6 +32,8 @@ export interface CroppedTrack {
 
 export const NoCrop: PictureCrop = { top: 0, right: 0, bottom: 0, left: 0 };
 
+export const FillTrimsAtMost = 0.2;
+
 export function isNoCrop(crop: PictureCrop): boolean {
     return crop.top === 0 && crop.right === 0 && crop.bottom === 0 && crop.left === 0;
 }
@@ -58,7 +60,10 @@ export function pictureLayout(viewport: Size, frame: Size, crop: PictureCrop, fi
 
     const widthScale = viewport.width / pictureWidth;
     const heightScale = viewport.height / pictureHeight;
-    const scale = fit === 'fill' ? Math.max(widthScale, heightScale) : Math.min(widthScale, heightScale);
+    const fitScale = Math.min(widthScale, heightScale);
+    const fillScale = Math.max(widthScale, heightScale);
+    const fills = fit === 'fill' && 1 - fitScale / fillScale <= FillTrimsAtMost;
+    const scale = fills ? fillScale : fitScale;
     const width = frame.width * scale;
     const height = frame.height * scale;
 
@@ -78,9 +83,9 @@ export function sameLayout(a: PictureLayout | null, b: PictureLayout | null): bo
 
 export function readPictureFit(): PictureFit {
     try {
-        return localStorage.getItem(StorageKeys.playerPictureFit) === 'fill' ? 'fill' : 'fit';
+        return localStorage.getItem(StorageKeys.playerPictureFit) === 'fit' ? 'fit' : 'fill';
     } catch {
-        return 'fit';
+        return 'fill';
     }
 }
 

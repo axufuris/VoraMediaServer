@@ -1,5 +1,6 @@
 using Microsoft.Extensions.Logging;
 using Vora.Application.Media;
+using Vora.Application.Streaming;
 using Vora.Plugins.Interfaces;
 
 namespace Vora.Application.Analysis;
@@ -12,17 +13,29 @@ public interface IPictureAreaManager
 
 public class PictureAreaManager : IPictureAreaManager
 {
+    private static readonly TimeSpan PlaybackBackoff = TimeSpan.FromSeconds(15);
+    private static readonly TimeSpan LongestWaitForPlayback = TimeSpan.FromMinutes(30);
+
     private readonly IMediaRepository _mediaRepository;
     private readonly IPictureAreaDetector _detector;
+    private readonly ITranscodeService _transcodes;
     private readonly ITaskProgressReporter _progress;
     private readonly ILogger<PictureAreaManager> _logger;
+    private readonly TimeSpan _backoff;
 
-    public PictureAreaManager(IMediaRepository mediaRepository, IPictureAreaDetector detector, ITaskProgressReporter progress, ILogger<PictureAreaManager> logger)
+    public PictureAreaManager(IMediaRepository mediaRepository, IPictureAreaDetector detector, ITranscodeService transcodes, ITaskProgressReporter progress, ILogger<PictureAreaManager> logger)
+        : this(mediaRepository, detector, transcodes, progress, logger, PlaybackBackoff)
+    {
+    }
+
+    internal PictureAreaManager(IMediaRepository mediaRepository, IPictureAreaDetector detector, ITranscodeService transcodes, ITaskProgressReporter progress, ILogger<PictureAreaManager> logger, TimeSpan backoff)
     {
         _mediaRepository = mediaRepository;
         _detector = detector;
+        _transcodes = transcodes;
         _progress = progress;
         _logger = logger;
+        _backoff = backoff;
     }
 
     public async Task DetectForItemAsync(Guid mediaItemId, CancellationToken cancellationToken = default) =>
@@ -37,7 +50,9 @@ public class PictureAreaManager : IPictureAreaManager
         foreach (var target in targets)
         {
             cancellationToken.ThrowIfCancellationRequested();
-            _progress.Report($"Finding black bars ({++done}/{targets.Count})");
+            done++;
+            await WaitForPlaybackToFinishAsync(done, targets.Count, cancellationToken);
+            _progress.Report($"Finding black bars ({done}/{targets.Count})");
 
             PictureCrop? crop;
             try
@@ -69,5 +84,21 @@ public class PictureAreaManager : IPictureAreaManager
         }
 
         if (targets.Count > 0) _progress.Report(null);
+    }
+
+    private async Task WaitForPlaybackToFinishAsync(int done, int total, CancellationToken cancellationToken)
+    {
+        var deadline = DateTime.UtcNow + LongestWaitForPlayback;
+        while (_transcodes.GetActiveTranscodeCount() > 0)
+        {
+            if (DateTime.UtcNow >= deadline)
+            {
+                _logger.LogInformation("Finding black bars goes on after waiting {Minutes} minutes for playback to finish.", LongestWaitForPlayback.TotalMinutes);
+                return;
+            }
+
+            _progress.Report($"Finding black bars ({done}/{total}, waiting for playback to finish)");
+            await Task.Delay(_backoff, cancellationToken);
+        }
     }
 }

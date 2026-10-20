@@ -197,4 +197,4 @@ that choice in the checklist. At minimum:
 - [ ] Extras/trailers play in the same player without touching the parent's watch state
 - [ ] Buffering indicator; friendly error with "play with the built-in player" fallback
 - [ ] Desktop-only: volume + mute, windowed/fullscreen toggle
-- [ ] Fit / Fill over the stored crop (`docs/picture-bars.md`): mpv `video-crop`, `panscan=1` for Fill; the crop rides on `OpenRequest` (bridge change on the server first)
+- [ ] Fit / Fill over the stored crop (`docs/picture-bars.md`, Fill by default, trimming at most a fifth): mpv `video-crop` + `panscan`; the crop rides on `OpenRequest` (bridge change on the server first)

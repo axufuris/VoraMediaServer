@@ -45,11 +45,18 @@ describe('laying out the picture', () => {
     });
 
     it('fills with a whole frame like object-cover when nothing is known about bars', () => {
-        const layout = pictureLayout({ width: 2560, height: 1080 }, frame1080, NoCrop, 'fill');
+        const layout = pictureLayout({ width: 1920, height: 960 }, frame1080, NoCrop, 'fill');
 
-        expect(layout?.width).toBeCloseTo(2560);
-        expect(layout?.height).toBeCloseTo(1440);
-        expect(layout?.top).toBeCloseTo(-180);
+        expect(layout).toEqual({ width: 1920, height: 1080, left: 0, top: -60 });
+    });
+
+    it('shows a picture whole rather than cutting more than a fifth of it off to fill', () => {
+        const fourByThree = cropOf({ width: 1920, height: 1080, cropTop: 0, cropRight: 240, cropBottom: 0, cropLeft: 240 });
+        const scope = cropOf({ width: 1920, height: 1080, cropTop: 138, cropRight: 0, cropBottom: 138, cropLeft: 0 });
+
+        expect(pictureLayout(window16x9, frame1080, fourByThree, 'fill')).toEqual(pictureLayout(window16x9, frame1080, fourByThree, 'fit'));
+        expect(pictureLayout(window16x9, frame1080, scope, 'fill')).toEqual(pictureLayout(window16x9, frame1080, scope, 'fit'));
+        expect(pictureLayout({ width: 2560, height: 1080 }, frame1080, NoCrop, 'fill')).toEqual(pictureLayout({ width: 2560, height: 1080 }, frame1080, NoCrop, 'fit'));
     });
 
     it('centres a picture whose bars are uneven', () => {
@@ -79,19 +86,19 @@ describe('laying out the picture', () => {
 describe('the remembered fit', () => {
     afterEach(() => localStorage.clear());
 
-    it('starts on fit and keeps fill once picked', () => {
-        expect(readPictureFit()).toBe('fit');
-
-        savePictureFit('fill');
+    it('starts on fill and keeps fit once picked', () => {
         expect(readPictureFit()).toBe('fill');
 
         savePictureFit('fit');
         expect(readPictureFit()).toBe('fit');
+
+        savePictureFit('fill');
+        expect(readPictureFit()).toBe('fill');
     });
 
-    it('reads anything else as fit', () => {
+    it('reads anything else as fill', () => {
         localStorage.setItem('player_picture_fit', 'zoom');
 
-        expect(readPictureFit()).toBe('fit');
+        expect(readPictureFit()).toBe('fill');
     });
 });

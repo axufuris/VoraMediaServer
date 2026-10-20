@@ -29,7 +29,7 @@ public class FFmpegPictureAreaDetector : IPictureAreaDetector
     public const int Samples = 10;
     private const double FirstSample = 0.08;
     private const double LastSample = 0.92;
-    private const int KeyframesPerSample = 5;
+    private const int KeyframesPerSample = 2;
     private static readonly TimeSpan SampleTimeout = TimeSpan.FromSeconds(60);
 
     private readonly ILogger<FFmpegPictureAreaDetector> _logger;
@@ -48,12 +48,13 @@ public class FFmpegPictureAreaDetector : IPictureAreaDetector
     [
         "-hide_banner",
         "-nostats",
+        "-threads", "1",
         "-skip_frame", "nokey",
         "-ss", seconds.ToString("0.###", CultureInfo.InvariantCulture),
         "-i", target.FilePath,
         "-map", $"0:{target.StreamIndex}",
         "-frames:v", KeyframesPerSample.ToString(CultureInfo.InvariantCulture),
-        "-vf", "cropdetect=limit=0.094:round=2:reset=0",
+        "-vf", "cropdetect=limit=0.094:round=2:reset=0:skip=0",
         "-an", "-sn", "-dn",
         "-f", "null", "-",
     ];

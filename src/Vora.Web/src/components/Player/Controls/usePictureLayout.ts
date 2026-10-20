@@ -1,11 +1,11 @@
 import { type RefObject, useEffect, useMemo, useState } from 'react';
-import { isNoCrop, pictureLayout, sameLayout, type PictureCrop, type PictureFit, type PictureLayout, type Size } from '../../../utils/pictureLayout';
+import { isNoCrop, NoCrop, pictureLayout, sameLayout, type PictureCrop, type PictureFit, type PictureLayout, type Size } from '../../../utils/pictureLayout';
 
 interface PictureLayoutOptions {
     containerRef: RefObject<HTMLElement | null>;
     videoRef: RefObject<HTMLVideoElement | null>;
     videoKey: string | undefined;
-    crop: PictureCrop;
+    crop: PictureCrop | null;
     fit: PictureFit;
     enabled: boolean;
 }
@@ -58,10 +58,11 @@ export function usePictureLayout({ containerRef, videoRef, videoKey, crop, fit, 
         };
     }, [videoRef, videoKey]);
 
-    const { top, right, bottom, left } = crop;
+    const wholeFrame = crop === null;
+    const { top, right, bottom, left } = crop ?? NoCrop;
 
     return useMemo(() => {
-        if (!enabled) return { layout: null, viewport, canFill: false };
+        if (!enabled || wholeFrame) return { layout: null, viewport, canFill: false };
 
         const area = { top, right, bottom, left };
         const fitted = pictureLayout(viewport, frame, area, 'fit');
@@ -71,5 +72,5 @@ export function usePictureLayout({ containerRef, videoRef, videoKey, crop, fit, 
         const browserDoesIt = fit === 'fit' && isNoCrop(area);
 
         return { layout: browserDoesIt ? null : chosen, viewport, canFill };
-    }, [enabled, viewport, frame, top, right, bottom, left, fit]);
+    }, [enabled, wholeFrame, viewport, frame, top, right, bottom, left, fit]);
 }

@@ -31,12 +31,12 @@ public class FFmpegPictureAreaDetectorTests
     }
 
     [Fact]
-    public void Each_sample_seeks_to_a_keyframe_and_reads_only_the_main_video_stream()
+    public void Each_sample_decodes_two_keyframes_of_the_main_video_stream_on_one_thread()
     {
         var arguments = FFmpegPictureAreaDetector.Arguments(Target("/movies/Heat.mkv", streamIndex: 2), 754.5);
 
-        arguments.Should().ContainInOrder("-skip_frame", "nokey", "-ss", "754.5", "-i", "/movies/Heat.mkv", "-map", "0:2", "-frames:v", "5");
-        arguments.Should().Contain("cropdetect=limit=0.094:round=2:reset=0");
+        arguments.Should().ContainInOrder("-threads", "1", "-skip_frame", "nokey", "-ss", "754.5", "-i", "/movies/Heat.mkv", "-map", "0:2", "-frames:v", "2");
+        arguments.Should().Contain("cropdetect=limit=0.094:round=2:reset=0:skip=0");
         arguments.Should().ContainInOrder("-f", "null", "-");
     }
 

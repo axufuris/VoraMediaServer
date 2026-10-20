@@ -1373,7 +1373,7 @@ public class TaskQueueManager : ITaskQueueManager
         progress.Report(null);
     }
 
-    private static async Task RunLibraryAnalysisAsync(IServiceProvider sp, Guid libraryId, string? libraryName, LibraryAnalysisReason reasons, DateTime? since, CancellationToken ct = default)
+    internal static async Task RunLibraryAnalysisAsync(IServiceProvider sp, Guid libraryId, string? libraryName, LibraryAnalysisReason reasons, DateTime? since, CancellationToken ct = default)
     {
         if (reasons == LibraryAnalysisReason.None) return;
         var afterScan = reasons.HasFlag(LibraryAnalysisReason.Addition);
@@ -1412,6 +1412,8 @@ public class TaskQueueManager : ITaskQueueManager
                 await RunStepAsync("Detecting intro/credit markers…", () => analyzerManager.TriggerLibrarySilenceDetectionAsync(libraryId, libraryName, isScheduleTrigger: true, cancellationToken: ct));
             }
         }
+
+        await QueuePictureAreaIfVideoLibraryAsync(sp, libraryId, libraryName);
 
         if (!afterScan)
         {
@@ -1454,12 +1456,18 @@ public class TaskQueueManager : ITaskQueueManager
             sp.GetRequiredService<ITaskQueueManager>().QueuePreExtractLibrarySubtitles(libraryId, libraryName);
         }
 
-        if (subtitleLibraryType.HasValue && subtitleLibraryType.Value.HasVideoContent())
+        progress.Report(null);
+    }
+
+    private static async Task QueuePictureAreaIfVideoLibraryAsync(IServiceProvider sp, Guid libraryId, string? libraryName)
+    {
+        var libraryType = await sp.GetRequiredService<ILibraryRepository>()
+            .GetProjectedByIdAsync(libraryId, l => (LibraryType?)l.Type);
+
+        if (libraryType is LibraryType type && type.HasVideoContent())
         {
             sp.GetRequiredService<ITaskQueueManager>().QueueDetectLibraryPictureArea(libraryId, libraryName);
         }
-
-        progress.Report(null);
     }
 
     private static async Task RunWorkflowStepAsync(ITaskProgressReporter progress, ILogger<TaskQueueManager>? logger, Guid libraryId, string label, Func<Task> step, CancellationToken ct)

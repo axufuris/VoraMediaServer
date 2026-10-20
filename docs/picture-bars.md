@@ -21,14 +21,19 @@ The columns were added by the folded `ChangesSinceInitial` migration (`docs/data
 
 `IPictureAreaDetector` is implemented by `FFmpegPictureAreaDetector`.
 
-It reads 10 samples, spread evenly between 8% and 92% of the duration, so opening titles and end credits don't count. Each sample is one FFmpeg run that decodes only keyframes:
+It reads 10 samples, spread evenly between 8% and 92% of the duration, so opening titles and end credits don't count. Each sample is one FFmpeg run that decodes two keyframes on one thread:
 
 ```
--hide_banner -nostats -skip_frame nokey -ss {t} -i {file} -map 0:{StreamIndex} -frames:v 5
--vf cropdetect=limit=0.094:round=2:reset=0 -an -sn -dn -f null -
+-hide_banner -nostats -threads 1 -skip_frame nokey -ss {t} -i {file} -map 0:{StreamIndex} -frames:v 2
+-vf cropdetect=limit=0.094:round=2:reset=0:skip=0 -an -sn -dn -f null -
 ```
 
 The last `crop=w:h:x:y` line of a run is that sample's box. Each run may take up to 60 s (`WaitForExitWithTimeoutAsync`).
+
+- `skip=0` is needed because `cropdetect` skips its first 2 frames by default, and with two frames it would report nothing.
+- One thread is no slower here: the time goes on starting FFmpeg and seeking, not on decoding.
+- Measured on 2-second-GOP HEVC 10-bit with jellyfin-ffmpeg 7: a 1080p file at 12 Mbps takes 1.8 s for all 10 samples, and a 4K file at 40 Mbps takes 5 s.
+- What a sample reads from disk is the stretch between its two keyframes, about one GOP. For a whole title that is roughly 10 to 100 MB: little for a web encode, the most for a 4K remux.
 
 - The stream is mapped by its absolute index, so a cover image stored in the file is never measured (CLAUDE.md, "A cover image is not a video track").
 - The detector returns `null` when the file is missing or fewer than 3 samples ran. `null` means "try again later", and nothing is saved.
@@ -56,10 +61,12 @@ Two tasks run them, named **Find Black Bars: …**:
 
 Both share the resource key `picture-area`, so only one FFmpeg reader runs at a time. A library pass drops the pending item tasks for its library. An item request is skipped while its library's pass is pending. Both tasks save a recipe (`docs/task-resume.md`).
 
+Before each file, the pass waits while anything is transcoding (`ITranscodeService.GetActiveTranscodeCount`), checking every 15 s and showing `waiting for playback to finish`. After 30 minutes of waiting it reads that one file and waits again, the same as subtitle pre-extraction.
+
 Detection is queued:
 
 - after a new file's analysis (`QueueScanNewFile`) and after a title's **Analyze**;
-- at the end of every library analysis for a library that holds video, so the nightly schedule and the library **Analyze** button cover a server that existed before this;
+- by every **Analyze Library** run of a library that holds video (`QueuePictureAreaIfVideoLibraryAsync`, called before the scan-only steps): the one a library scan ends with, the nightly schedule and the library's **Analyze** button. A scan of an existing library therefore checks every title in it once;
 - when a movie or episode whose main track is unchecked is opened (`MediaManager.GetMediaItemAsync`). The player on that first open still shows the whole frame; the next open uses the stored crop.
 
 ## Keeping it
@@ -79,14 +86,16 @@ The layout code is split across three places:
 
 There are two modes:
 
-- **Fit** (the default) shows the whole picture as large as the window allows. On a window shaped like the picture there are no bars at all. On a window of another shape, the bars that remain are the window's, not the file's. A 2:1 film in a 16:9 window therefore looks as it did before.
-- **Fill** covers the window and trims whatever doesn't fit, usually the sides.
+- **Fill** (the default) covers the window and trims what doesn't fit, usually a little of the sides. It never trims more than a fifth of the picture (`FillTrimsAtMost`). A 4:3 show, or a 2.39:1 film on a 16:9 screen, would lose a quarter, so those are shown whole instead.
+- **Fit** shows the whole picture as large as the window allows. On a window shaped like the picture there are no bars at all. On a window of another shape, the bars that remain are the window's, not the file's.
+
+Until a title has been checked, Fill works on the whole frame, so a letterboxed file in a wider window loses its bars that way too.
 
 `PictureFitButton` (`Controls/PlayerButtons.tsx`) sits beside fullscreen. It shows only when Fit and Fill would differ. The choice is remembered per browser in `player_picture_fit` (`fit` / `fill`, see `docs/auth-and-devices.md`).
 
-With no crop and Fit, the player keeps the old `object-contain` classes and nothing changes. The mini player and the up-next card always show the whole frame.
+With no crop and Fit, the player keeps the old `object-contain` classes. The mini player and the up-next card always show the whole frame.
 
-The controller leaves the crop out (`pictureCrop` is `NoCrop`) while a subtitle is burned in (`subtitleStrategy === 'BurnIn'`): an image subtitle can sit in the bar, and cropping would cut it off.
+While a subtitle is burned in (`subtitleStrategy === 'BurnIn'`), the controller's `pictureCrop` is `null`. The player then shows the whole frame and offers no Fill, because an image subtitle can sit in the bar or at the edge, and trimming would cut it off.
 
 ## Subtitles over an enlarged picture
 

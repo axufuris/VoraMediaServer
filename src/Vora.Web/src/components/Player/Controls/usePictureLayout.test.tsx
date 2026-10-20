@@ -18,7 +18,7 @@ const playing = (video: HTMLVideoElement | null, width: number, height: number) 
     Object.defineProperty(video, 'videoHeight', { configurable: true, value: height });
 };
 
-function Harness({ crop, fit, enabled = true }: { crop: PictureCrop; fit: PictureFit; enabled?: boolean }) {
+function Harness({ crop, fit, enabled = true }: { crop: PictureCrop | null; fit: PictureFit; enabled?: boolean }) {
     const containerRef = useRef<HTMLDivElement>(null);
     const videoRef = useRef<HTMLVideoElement>(null);
     const framing = usePictureLayout({ containerRef, videoRef, videoKey: 'session', crop, fit, enabled });
@@ -70,6 +70,13 @@ describe('laying out the playing picture', () => {
             video.dispatchEvent(new Event('resize'));
         });
         expect(layout()?.height).toBeCloseTo(1080 * 720 / 640);
+    });
+
+    it('shows the whole frame, with no Fill to offer, while a subtitle is burned into it', () => {
+        render(<Harness crop={null} fit="fill" />);
+
+        expect(layout()).toBeNull();
+        expect(screen.getByTestId('can-fill').textContent).toBe('false');
     });
 
     it('lays out nothing while the player is minimized or ending', () => {

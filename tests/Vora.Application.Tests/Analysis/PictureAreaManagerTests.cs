@@ -1,6 +1,7 @@
 using Microsoft.Extensions.Logging.Abstractions;
 using Vora.Application.Analysis;
 using Vora.Application.Media;
+using Vora.Application.Streaming;
 using Vora.Plugins.Interfaces;
 
 namespace Vora.Application.Tests.Analysis;
@@ -10,8 +11,10 @@ public class PictureAreaManagerTests
     private static readonly Guid Library = Guid.NewGuid();
     private readonly IMediaRepository _media = Substitute.For<IMediaRepository>();
     private readonly IPictureAreaDetector _detector = Substitute.For<IPictureAreaDetector>();
+    private readonly ITranscodeService _transcodes = Substitute.For<ITranscodeService>();
 
-    private PictureAreaManager Manager() => new(_media, _detector, new NullTaskProgressReporter(), NullLogger<PictureAreaManager>.Instance);
+    private PictureAreaManager Manager() =>
+        new(_media, _detector, _transcodes, new NullTaskProgressReporter(), NullLogger<PictureAreaManager>.Instance, TimeSpan.FromMilliseconds(10));
 
     private static PictureAreaTarget Target(string file) => new(Guid.NewGuid(), Guid.NewGuid(), file, 0, 1920, 1080, 2750);
 
@@ -57,5 +60,24 @@ public class PictureAreaManagerTests
         await Manager().DetectForLibraryAsync(Library, TestContext.Current.CancellationToken);
 
         await _media.Received(1).SavePictureCropAsync(fine.VideoTrackId, new PictureCrop(0, 240, 0, 240));
+    }
+
+    [Fact]
+    public async Task Nothing_is_read_while_someone_is_watching_a_transcode()
+    {
+        var episode = Target("/tv/Lioness/S02E05.mkv");
+        _media.GetPictureAreaTargetsForLibraryAsync(Library).Returns([episode]);
+        var transcoding = 3;
+        _transcodes.GetActiveTranscodeCount().Returns(_ => transcoding-- > 0 ? 1 : 0);
+        _detector.DetectAsync(episode, Arg.Any<CancellationToken>()).Returns(_ =>
+        {
+            transcoding.Should().BeNegative();
+            return new PictureCrop(60, 0, 60, 0);
+        });
+
+        await Manager().DetectForLibraryAsync(Library, TestContext.Current.CancellationToken);
+
+        _transcodes.Received(4).GetActiveTranscodeCount();
+        await _media.Received(1).SavePictureCropAsync(episode.VideoTrackId, new PictureCrop(60, 0, 60, 0));
     }
 }
