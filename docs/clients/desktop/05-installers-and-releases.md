@@ -50,14 +50,15 @@ Linux notes the CLI must verify and document in the release notes template:
 
 ## Windows: bundled mpv
 
-- `scripts/mpv-windows.json` pins the mpv build: source (the shinchiro
-  `mpv-winbuild-cmake` GitHub releases are the usual choice — pick the generic
-  `x86_64` build, not `x86_64-v3`, for older CPUs), file name, URL, **SHA-256**.
-- `scripts/fetch-mpv-windows.ts` downloads, verifies the hash (fail the build on
-  mismatch), extracts `mpv.exe` (+ its DLLs, if any) to `resources/mpv/`.
-  `extraResources` copies it into the installer.
-- Licensing: mpv is GPL-2.0+ (FFmpeg components LGPL/GPL); Vora is AGPL-3.0. Ship
-  `resources/mpv/LICENSE*` and a `THIRD-PARTY-NOTICES.md` naming the exact upstream
+- `scripts/mpv-windows.json` pins the mpv build: mpv's own tagged release from
+  `mpv-player/mpv` (`mpv-vX.Y.Z-x86_64-w64-mingw32.zip`, generic x86_64, Lua and
+  gpu-next included, no 7-Zip needed), file name, URL, **SHA-256**, source tag.
+- `scripts/fetch-mpv-windows.mts` (`npm run fetch-mpv`) downloads, verifies the hash
+  (fails on mismatch), unpacks the zip and the zip inside it, and copies `mpv.exe` with
+  its DLLs to `resources/mpv/`. `extraResources` copies it into the installer.
+- Licensing: mpv is GPL-2.0+ (FFmpeg components LGPL/GPL); Vora is AGPL-3.0. The zip
+  has no licence files, so fetch mpv's `LICENSE.GPL`, `LICENSE.LGPL` and `Copyright`
+  from the same tag, and ship them with a `THIRD-PARTY-NOTICES.md` naming the exact upstream
   release/commit with a link to its source. Flag anything unclear to Andy rather than
   guessing; this is not legal advice.
 - Updating mpv = change the pin in a PR; QA tests it like any other change.

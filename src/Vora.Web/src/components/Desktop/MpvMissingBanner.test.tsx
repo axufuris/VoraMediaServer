@@ -4,12 +4,14 @@ import userEvent from '@testing-library/user-event';
 import { fakeDesktopBridge } from '../../test/fakeDesktopBridge';
 import type { DesktopPlatform } from '../../desktop/desktopBridge';
 
-async function renderBanner(platform: DesktopPlatform | null, available = false) {
+const MISSING = "The Vora player needs mpv, which isn't installed. Install it with sudo apt install mpv.";
+
+async function renderBanner(platform: DesktopPlatform | null, available = false, reason = MISSING) {
     vi.resetModules();
     if (platform) {
         window.voraDesktop = fakeDesktopBridge({
             platform,
-            mpv: { available, version: available ? '0.39.0' : null, reason: available ? null : 'Install it with: sudo apt install mpv' },
+            mpv: { available, version: available ? '0.39.0' : null, reason: available ? null : reason },
         }).bridge;
     }
     const { default: MpvMissingBanner } = await import('./MpvMissingBanner');
@@ -30,6 +32,13 @@ describe('the mpv missing notice', () => {
 
         expect(await screen.findByText('Videos play in the built-in player')).toBeInTheDocument();
         expect(screen.getByText(/sudo apt install mpv/)).toBeInTheDocument();
+    });
+
+    it('shows why the mpv on the computer cannot be used, in the words of the shell', async () => {
+        await renderBanner('linux', false, 'This computer has mpv 0.35.1, and the Vora player needs 0.37 or newer. Update it with sudo apt install mpv, or install a newer mpv from your distribution.');
+
+        expect(await screen.findByText(/needs 0\.37 or newer/)).toBeInTheDocument();
+        expect(screen.queryByText(/isn't installed/)).not.toBeInTheDocument();
     });
 
     it('stays away once dismissed', async () => {

@@ -144,7 +144,7 @@ app update), so they **will** be mismatched in the field:
 2. Server returns `strategy: "DirectPlay"` and `streamUrl: /api/streaming/play/{id}?t=…`.
 3. Controller → `engine.load({ url: absolute(streamUrl), startPosition, … })` →
    bridge `player.open` → `MpvHost` starts mpv (or reuses the running one) and sends
-   `loadfile <url> replace -1 start=<pos>`.
+   `set_property start <pos>`, then `loadfile <url> replace`.
 4. Electron hides its window (renderer keeps running — `backgroundThrottling: false`).
 5. mpv emits `time-pos` / `pause` / `eof-reached` → main → renderer events → the
    controller pings the server exactly as the browser player does.

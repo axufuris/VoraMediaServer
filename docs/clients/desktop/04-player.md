@@ -23,7 +23,7 @@ Vora default `mpv.conf` (the CLI should verify each option against the pinned mp
 `--list-options` and drop/rename any that changed):
 
 ```
-# chrome
+# chrome (with the Lua chrome; until it lands, mpv's own OSC and default keys are used)
 osc=no
 osd-bar=no
 input-default-bindings=no
@@ -66,14 +66,14 @@ Observe: `time-pos`, `duration`, `pause`, `paused-for-cache`, `core-idle`,
 
 Forward to the renderer as `PlayerEvent`s: `time` (throttled to 4/s), `paused`,
 `buffering`, `ended` (`eof-reached` true), `error` (`end-file` reason `error`, or the
-process dying before `file-loaded`), `intent`, `info` (video/audio params for the Info
-panel). mpv process exit → `closed`.
+process dying on its own), `intent`, `info` (video/audio params for the Info
+panel). mpv process exit → `closed`. Track and `sub-add` commands wait for `file-loaded`.
 
 Commands main issues for the renderer:
 
 | Bridge command | mpv |
 | --- | --- |
-| `open` / `load-next` | `loadfile <url> replace -1 start=<seconds>` (+ `set_property force-media-title <title>`) |
+| `open` / `load-next` | `set_property force-media-title <title>`, `set_property start <seconds>`, `loadfile <url> replace` (no 0.38-only index argument) |
 | `play` / `pause` | `set_property pause false/true` |
 | `seek` | `seek <seconds> absolute+exact` (relative: `seek <delta> relative`) |
 | `tracks` (local switch) | `set_property aid/sid <mpv id>` — see mapping below |
