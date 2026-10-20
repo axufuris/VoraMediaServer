@@ -11,7 +11,7 @@ public interface IDeviceManager
     Task<bool> BlockDeviceAsync(Guid id);
     Task<bool> UnblockDeviceAsync(Guid id);
     Task<bool> DeleteDeviceAsync(Guid id);
-    Task UpdateDeviceCapabilitiesAsync(string deviceId, DeviceCapabilitiesDto dto);
+    Task UpdateDeviceCapabilitiesAsync(string deviceId, DeviceIdentity identity, DeviceCapabilitiesDto dto);
 }
 
 public class DeviceManager : IDeviceManager
@@ -81,14 +81,15 @@ public class DeviceManager : IDeviceManager
         return false;
     }
 
-    public async Task UpdateDeviceCapabilitiesAsync(string deviceId, DeviceCapabilitiesDto dto)
+    public async Task UpdateDeviceCapabilitiesAsync(string deviceId, DeviceIdentity identity, DeviceCapabilitiesDto dto)
     {
         var device = new ClientDevice
         {
             DeviceId = deviceId,
-            ClientName = "Vora Web",
-            DeviceName = "Web Browser",
-            DeviceType = "Browser",
+            ClientName = identity.ClientName ?? DeviceIdentity.UnknownClient,
+            DeviceName = identity.DeviceName ?? DeviceIdentity.UnknownDevice,
+            DeviceType = identity.DeviceType ?? DeviceIdentity.UnknownType,
+            OperatingSystem = identity.OperatingSystem ?? DeviceIdentity.UnknownOperatingSystem,
             LastConnectedAt = DateTime.UtcNow,
             SupportedVideoCodecs = dto.VideoCodecs,
             SupportedAudioCodecs = dto.AudioCodecs,

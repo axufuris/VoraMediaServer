@@ -51,7 +51,7 @@ release. Record results in the PR or release notes as a filled-in copy of this t
 - [ ] External links open in the system browser; nothing else navigates the window
 - [ ] Admin is visible for an admin and every admin page works in the window, same as
       a browser; a non-admin profile doesn't see it
-- [ ] Devices / Now Playing show "Vora Desktop (Windows|Linux)", type Desktop
+- [ ] Devices / Now Playing show "Vora Desktop QA (Windows|Linux)" on a QA build ("Vora Desktop (…)" on prod), type Desktop
 - [ ] Music, radio, podcasts, Live TV (incl. guide and timeshift) play in the web player
 
 ## Playback (run each medium on W1, W2, L1, L2)
