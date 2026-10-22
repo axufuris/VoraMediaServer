@@ -577,6 +577,38 @@ public class PostgresMigrationHistoryTests(PostgresDatabase database) : IClassFi
         return film;
     }
 
+    [Fact]
+    public async Task A_database_on_the_migration_1_2_shipped_with_keeps_its_channels_and_gains_their_video_format_empty()
+    {
+        Assert.SkipUnless(PostgresDatabase.IsConfigured, PostgresDatabase.SkipReason);
+        var cancellationToken = TestContext.Current.CancellationToken;
+        await using var legacy = new LegacyDatabase();
+        var channelId = Guid.NewGuid();
+        await legacy.BuildThirdReleaseStateAsync(async db =>
+        {
+            var playlist = new IptvPlaylist { Name = "Provider", M3uUrl = "https://iptv.example.com/list.m3u" };
+            playlist.Channels.Add(new IptvChannel { Id = channelId, ExternalChannelId = "action24", Name = "Action 24 Not 24/7", StreamUrl = "https://iptv.example.com/action24.ts", PlaylistId = playlist.Id });
+            db.Add(playlist);
+            await db.SaveChangesAsync(cancellationToken);
+        }, cancellationToken);
+
+        await using (var before = legacy.NewContext())
+        {
+            (await before.Database.GetPendingMigrationsAsync(cancellationToken)).Should().Equal(MigrationHistoryTests.ChangesSinceInitial);
+            (await ColumnsAsync(before, "IptvChannels", cancellationToken)).Should().NotContain("VideoCodec");
+        }
+
+        await legacy.MigrateAsync(cancellationToken);
+
+        await using var after = legacy.NewContext();
+        (await after.Database.GetPendingMigrationsAsync(cancellationToken)).Should().BeEmpty();
+        var channel = await after.IptvChannels.AsNoTracking().SingleAsync(c => c.Id == channelId, cancellationToken);
+        channel.Name.Should().Be("Action 24 Not 24/7");
+        channel.VideoCodec.Should().BeNull();
+        channel.VideoLevel.Should().BeNull();
+        channel.VideoFormatSeenAt.Should().BeNull();
+    }
+
     private static Task<List<string>> ColumnsAsync(VoraDbContext db, string table, CancellationToken cancellationToken) =>
         db.Database
             .SqlQueryRaw<string>("SELECT column_name AS \"Value\" FROM information_schema.columns WHERE table_schema = current_schema() AND table_name = {0}", table)

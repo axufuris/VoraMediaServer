@@ -116,9 +116,7 @@ public class DvrPostProcessingWorker : BackgroundService
     private async Task<bool> TranscodeRecordingAsync(string inputPath, string outputPath, ISystemSettingsRepository settingsRepo)
     {
         var settings = await settingsRepo.GetSettingsAsync();
-        var encoder = !settings.DisableVideoTranscoding && settings.UseHardwareAcceleration && settings.UseHardwareEncoding
-            ? await _hardware.ResolveAsync(settings.HardwareAccelerationType, settings.HardwareTranscodingDevice)
-            : null;
+        var encoder = await HardwareEncoderChoice.ResolveAsync(settings, _hardware);
 
         if (settings.DisableVideoTranscoding)
         {

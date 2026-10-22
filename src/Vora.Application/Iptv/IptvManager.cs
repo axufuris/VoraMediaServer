@@ -28,7 +28,7 @@ public interface IIptvManager
     Task<Dictionary<string, List<IptvProgramDto>>> GetFilteredGuideAsync(Guid userId, Guid profileId, List<string> requestedChannelIds, DateTime startTime, DateTime endTime);
     Task ToggleChannelVisibilityAsync(Guid channelId);
     Task SetChannelKindAsync(Guid channelId, Vora.Domain.Enums.IptvChannelKind kind);
-    Task<string?> StartTimeshiftSessionAsync(Guid channelId, Guid userId, Guid profileId);
+    Task<string?> StartTimeshiftSessionAsync(Guid channelId, Guid userId, Guid profileId, LiveVideoLimits? limits);
     Task StopTimeshiftSessionAsync(Guid profileId);
     void PingTimeshiftSession(Guid profileId);
 }
@@ -41,10 +41,11 @@ public class IptvManager : IIptvManager
     private const string TimeshiftSubdirectory = TimeshiftCoordinator.TimeshiftSubdirectory;
     private const string PlaylistFileName = "index.m3u8";
     private const string SegmentFilePattern = "seg_%03d.ts";
+    private const string FirstSegmentFileName = "seg_000.ts";
     private const string SecondSegmentFileName = "seg_001.ts";
     private const string TimeshiftTokenScope = "timeshift";
-    private const int InitializationRetryLimit = 40;
     private const int InitializationRetryDelayMs = 500;
+    private static readonly TimeSpan InitializationTimeout = TimeSpan.FromSeconds(20);
     private static readonly TimeSpan TimeshiftTokenTtl = TimeSpan.FromHours(4);
 
     private readonly IIptvRepository _repository;
@@ -55,6 +56,7 @@ public class IptvManager : IIptvManager
     private readonly ITunerRegistry _tunerRegistry;
     private readonly IHttpClientFactory _httpClientFactory;
     private readonly IStreamingTokenSigner _tokenSigner;
+    private readonly ITimeshiftVideo _timeshiftVideo;
     private readonly ILogger<IptvManager> _logger;
 
     public IptvManager(
@@ -66,6 +68,7 @@ public class IptvManager : IIptvManager
         ITunerRegistry tunerRegistry,
         IHttpClientFactory httpClientFactory,
         IStreamingTokenSigner tokenSigner,
+        ITimeshiftVideo timeshiftVideo,
         ILogger<IptvManager> logger)
     {
         _repository = repository;
@@ -76,6 +79,7 @@ public class IptvManager : IIptvManager
         _tunerRegistry = tunerRegistry;
         _httpClientFactory = httpClientFactory;
         _tokenSigner = tokenSigner;
+        _timeshiftVideo = timeshiftVideo;
         _logger = logger;
     }
 
@@ -329,7 +333,7 @@ public class IptvManager : IIptvManager
     public Task SetChannelKindAsync(Guid channelId, Vora.Domain.Enums.IptvChannelKind kind) =>
         _repository.SetChannelKindAsync(channelId, kind);
 
-    public async Task<string?> StartTimeshiftSessionAsync(Guid channelId, Guid userId, Guid profileId)
+    public async Task<string?> StartTimeshiftSessionAsync(Guid channelId, Guid userId, Guid profileId, LiveVideoLimits? limits)
     {
         var channel = await _repository.GetChannelByIdAsync(channelId);
         if (channel == null) throw new InvalidOperationException("Channel not found.");
@@ -348,25 +352,59 @@ public class IptvManager : IIptvManager
 
         try
         {
-            var sessionPath = await PrepareTimeshiftDirectoryAsync(profileId);
-            var sessionId = Path.GetFileName(sessionPath);
-
-            var outputPath = Path.Combine(sessionPath, PlaylistFileName).Replace("\\", "/");
-            var segmentPath = Path.Combine(sessionPath, SegmentFilePattern).Replace("\\", "/");
-
-            var process = BuildTimeshiftProcess(channel.StreamUrl, outputPath, segmentPath);
-
-            await _timeshiftCoordinator.StopAsync(profileId);
-            if (!_timeshiftCoordinator.TryRegister(profileId, process, sessionPath))
+            var clientLimits = limits is { IsEmpty: false } ? limits : null;
+            var known = StoredVideoFormat(channel);
+            var encode = clientLimits is not null && known is not null && !LiveVideoDecision.Plays(known, clientLimits)
+                ? LiveVideoDecision.EncodeFor(known, clientLimits)
+                : null;
+            var video = encode is null ? TimeshiftVideoArguments.Copy : await _timeshiftVideo.EncodeArgumentsAsync(encode, onCpu: false);
+            if (video.Encodes && known is not null && clientLimits is not null)
             {
-                process.Dispose();
-                TryDeleteDirectory(sessionPath);
+                _logger.LogInformation("Timeshift of {Channel} encodes with {Encoder}: {Reason}.",
+                    channel.Name, video.Encoder, LiveVideoDecision.Mismatch(known, clientLimits));
+            }
+
+            var run = await LaunchTimeshiftAsync(profileId, channel.StreamUrl, video);
+            if (run is null)
+            {
                 _tunerRegistry.Release(leaseKey);
                 return null;
             }
-            process.Start();
 
-            await WaitForBufferAsync(profileId, sessionPath);
+            if (!video.Encodes)
+            {
+                var seen = await LearnVideoFormatAsync(channel, known, profileId, run);
+                if (encode is null && clientLimits is not null && seen is not null && LiveVideoDecision.Mismatch(seen, clientLimits) is { } reason)
+                {
+                    encode = LiveVideoDecision.EncodeFor(seen, clientLimits);
+                    video = await _timeshiftVideo.EncodeArgumentsAsync(encode, onCpu: false);
+                    if (video.Encodes)
+                    {
+                        _logger.LogInformation("Timeshift of {Channel} restarts to encode with {Encoder}: {Reason}.", channel.Name, video.Encoder, reason);
+                        run = await LaunchTimeshiftAsync(profileId, channel.StreamUrl, video);
+                        if (run is null)
+                        {
+                            _tunerRegistry.Release(leaseKey);
+                            return null;
+                        }
+                    }
+                }
+            }
+
+            await WaitForFileAsync(profileId, run, SecondSegmentFileName);
+
+            if (encode is not null && video.OnGpu && HasExited(run.Process) && !File.Exists(run.PlaylistPath))
+            {
+                _logger.LogWarning("Timeshift of {Channel} failed to encode with {Encoder}; retrying on the CPU.", channel.Name, video.Encoder);
+                video = await _timeshiftVideo.EncodeArgumentsAsync(encode, onCpu: true);
+                run = await LaunchTimeshiftAsync(profileId, channel.StreamUrl, video);
+                if (run is null)
+                {
+                    _tunerRegistry.Release(leaseKey);
+                    return null;
+                }
+                await WaitForFileAsync(profileId, run, SecondSegmentFileName);
+            }
 
             if (!_timeshiftCoordinator.IsActive(profileId))
             {
@@ -374,13 +412,14 @@ public class IptvManager : IIptvManager
                 return null;
             }
 
-            if (!File.Exists(outputPath))
+            if (!File.Exists(run.PlaylistPath))
             {
                 await _timeshiftCoordinator.StopAsync(profileId);
                 _tunerRegistry.Release(leaseKey);
                 throw new InvalidOperationException("FFmpeg failed to generate the stream playlist in time. The stream source may be dead or incompatible.");
             }
 
+            var sessionId = Path.GetFileName(run.SessionPath);
             var token = _tokenSigner.Sign(TimeshiftTokenScope, $"{profileId}:{sessionId}", TimeshiftTokenTtl);
             return $"/api/streaming/hls/timeshift/{token}/{profileId}/{sessionId}/{PlaylistFileName}";
         }
@@ -400,6 +439,73 @@ public class IptvManager : IIptvManager
 
     public void PingTimeshiftSession(Guid profileId) =>
         _timeshiftCoordinator.Heartbeat(profileId);
+
+    internal static LiveVideoFormat? StoredVideoFormat(IptvChannel channel) =>
+        channel.VideoCodec is { } codec
+            ? new LiveVideoFormat(codec, channel.VideoProfile, channel.VideoLevel, channel.VideoHeight, channel.VideoFrameRate, channel.VideoInterlaced ?? false)
+            : null;
+
+    private sealed record TimeshiftRun(Process Process, string SessionPath, string PlaylistPath, DateTime ReadyBy);
+
+    private async Task<TimeshiftRun?> LaunchTimeshiftAsync(Guid profileId, string streamUrl, TimeshiftVideoArguments video)
+    {
+        var sessionPath = await PrepareTimeshiftDirectoryAsync(profileId);
+        var outputPath = Path.Combine(sessionPath, PlaylistFileName).Replace("\\", "/");
+        var segmentPath = Path.Combine(sessionPath, SegmentFilePattern).Replace("\\", "/");
+
+        var process = BuildTimeshiftProcess(streamUrl, outputPath, segmentPath, video);
+
+        await _timeshiftCoordinator.StopAsync(profileId);
+        if (!_timeshiftCoordinator.TryRegister(profileId, process, sessionPath))
+        {
+            process.Dispose();
+            TryDeleteDirectory(sessionPath);
+            return null;
+        }
+        process.Start();
+        return new TimeshiftRun(process, sessionPath, outputPath, DateTime.UtcNow + InitializationTimeout);
+    }
+
+    private async Task<LiveVideoFormat?> LearnVideoFormatAsync(IptvChannel channel, LiveVideoFormat? known, Guid profileId, TimeshiftRun run)
+    {
+        if (!await WaitForFileAsync(profileId, run, FirstSegmentFileName)) return null;
+
+        var seen = await _timeshiftVideo.ReadFormatAsync(Path.Combine(run.SessionPath, FirstSegmentFileName));
+        if (seen is null || seen == known) return seen;
+
+        try
+        {
+            await _repository.UpdateChannelVideoFormatAsync(channel.Id, seen, DateTime.UtcNow);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Could not save the video format of {Channel}.", channel.Name);
+        }
+        return seen;
+    }
+
+    private async Task<bool> WaitForFileAsync(Guid profileId, TimeshiftRun run, string fileName)
+    {
+        var path = Path.Combine(run.SessionPath, fileName);
+        while (!File.Exists(path))
+        {
+            if (DateTime.UtcNow >= run.ReadyBy || !_timeshiftCoordinator.IsActive(profileId) || HasExited(run.Process)) return File.Exists(path);
+            await Task.Delay(InitializationRetryDelayMs);
+        }
+        return true;
+    }
+
+    private static bool HasExited(Process process)
+    {
+        try
+        {
+            return process.HasExited;
+        }
+        catch (InvalidOperationException)
+        {
+            return true;
+        }
+    }
 
     private async Task<string> PrepareTimeshiftDirectoryAsync(Guid profileId)
     {
@@ -455,7 +561,7 @@ public class IptvManager : IIptvManager
         }
     }
 
-    private static Process BuildTimeshiftProcess(string streamUrl, string outputPath, string segmentPath)
+    internal static Process BuildTimeshiftProcess(string streamUrl, string outputPath, string segmentPath, TimeshiftVideoArguments video)
     {
         var process = new Process
         {
@@ -469,11 +575,12 @@ public class IptvManager : IIptvManager
         };
 
         var args = process.StartInfo.ArgumentList;
+        foreach (var argument in video.BeforeInput) args.Add(argument);
         args.Add("-reconnect"); args.Add("1");
         args.Add("-reconnect_streamed"); args.Add("1");
         args.Add("-reconnect_delay_max"); args.Add("5");
         args.Add("-i"); args.Add(streamUrl);
-        args.Add("-c:v"); args.Add("copy");
+        foreach (var argument in video.Video) args.Add(argument);
         args.Add("-c:a"); args.Add("aac");
         args.Add("-b:a"); args.Add("128k");
         args.Add("-f"); args.Add("hls");
@@ -484,18 +591,6 @@ public class IptvManager : IIptvManager
         args.Add(outputPath);
 
         return process;
-    }
-
-    private async Task WaitForBufferAsync(Guid profileId, string sessionPath)
-    {
-        var secondChunk = Path.Combine(sessionPath, SecondSegmentFileName);
-        var retries = 0;
-
-        while (!File.Exists(secondChunk) && retries < InitializationRetryLimit && _timeshiftCoordinator.IsActive(profileId))
-        {
-            await Task.Delay(InitializationRetryDelayMs);
-            retries++;
-        }
     }
 
     private async Task SyncM3uChannelsAsync(IptvPlaylist playlist)

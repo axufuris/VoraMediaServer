@@ -138,13 +138,35 @@ public sealed class LegacyDatabase : IAsyncDisposable
         ALTER TABLE "ClientDevices" ADD COLUMN IF NOT EXISTS "RendersImageSubtitles" boolean;
         """;
 
+    private const string LiveVideoChannelColumns = """
+        ALTER TABLE "IptvChannels" ADD COLUMN IF NOT EXISTS "VideoCodec" character varying(32);
+        ALTER TABLE "IptvChannels" ADD COLUMN IF NOT EXISTS "VideoProfile" character varying(32);
+        ALTER TABLE "IptvChannels" ADD COLUMN IF NOT EXISTS "VideoLevel" integer;
+        ALTER TABLE "IptvChannels" ADD COLUMN IF NOT EXISTS "VideoHeight" integer;
+        ALTER TABLE "IptvChannels" ADD COLUMN IF NOT EXISTS "VideoFrameRate" double precision;
+        ALTER TABLE "IptvChannels" ADD COLUMN IF NOT EXISTS "VideoInterlaced" boolean;
+        ALTER TABLE "IptvChannels" ADD COLUMN IF NOT EXISTS "VideoFormatSeenAt" timestamp with time zone;
+        """;
+
     public const string UpNextOrderMigration = "20261018072825_ChangesSinceInitial";
 
     public const string ImageSubtitlesMigration = "20261018192130_ChangesSinceInitial";
 
+    public const string ThirdReleaseMigration = "20261020021843_ChangesSinceInitial";
+
+    private const string ColumnsSinceThirdRelease = """
+        ALTER TABLE "IptvChannels" DROP COLUMN "VideoCodec";
+        ALTER TABLE "IptvChannels" DROP COLUMN "VideoProfile";
+        ALTER TABLE "IptvChannels" DROP COLUMN "VideoLevel";
+        ALTER TABLE "IptvChannels" DROP COLUMN "VideoHeight";
+        ALTER TABLE "IptvChannels" DROP COLUMN "VideoFrameRate";
+        ALTER TABLE "IptvChannels" DROP COLUMN "VideoInterlaced";
+        ALTER TABLE "IptvChannels" DROP COLUMN "VideoFormatSeenAt";
+        """;
+
     private const string ColumnsSinceUpNextOrder = """
         ALTER TABLE "ClientDevices" DROP COLUMN "RendersImageSubtitles";
-        """;
+        """ + ColumnsSinceThirdRelease;
 
     private const string ColumnsSinceAutoPlay = """
         ALTER TABLE "UserProfiles" DROP COLUMN "UpNextOrder";
@@ -268,7 +290,7 @@ public sealed class LegacyDatabase : IAsyncDisposable
     public async Task SeedAsync(Func<VoraDbContext, Task> seed, CancellationToken cancellationToken)
     {
         await using var db = NewContext();
-        await db.Database.ExecuteSqlRawAsync(RememberedChoicesProfileColumns + LibrarySortProfileColumns + KeepHdrSettingColumns + AutoPlayProfileColumns + UpNextProfileColumns + ImageSubtitleDeviceColumns, cancellationToken);
+        await db.Database.ExecuteSqlRawAsync(RememberedChoicesProfileColumns + LibrarySortProfileColumns + KeepHdrSettingColumns + AutoPlayProfileColumns + UpNextProfileColumns + ImageSubtitleDeviceColumns + LiveVideoChannelColumns, cancellationToken);
         await seed(db);
         await db.Database.ExecuteSqlRawAsync(ColumnsSinceRememberedChoices + ColumnsSinceVideoDimensions, cancellationToken);
     }
@@ -350,7 +372,17 @@ public sealed class LegacyDatabase : IAsyncDisposable
         await using var db = NewContext();
         await db.Database.MigrateAsync(cancellationToken);
         await seed(db);
+        await db.Database.ExecuteSqlRawAsync(ColumnsSinceThirdRelease, cancellationToken);
         await ReplaceCombinedMigrationAsync(db, ImageSubtitlesMigration, "10.0.9", cancellationToken);
+    }
+
+    public async Task BuildThirdReleaseStateAsync(Func<VoraDbContext, Task> seed, CancellationToken cancellationToken)
+    {
+        await using var db = NewContext();
+        await db.Database.MigrateAsync(cancellationToken);
+        await seed(db);
+        await db.Database.ExecuteSqlRawAsync(ColumnsSinceThirdRelease, cancellationToken);
+        await ReplaceCombinedMigrationAsync(db, ThirdReleaseMigration, "10.0.9", cancellationToken);
     }
 
     private static async Task ReplaceCombinedMigrationAsync(VoraDbContext db, string migrationId, string productVersion, CancellationToken cancellationToken)

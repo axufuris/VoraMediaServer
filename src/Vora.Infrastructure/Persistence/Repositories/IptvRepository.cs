@@ -156,6 +156,7 @@ public class IptvRepository : IIptvRepository
                 {
                     existing.IsHealthy = null;
                     existing.LastHealthCheckAt = null;
+                    ForgetVideoFormat(existing);
                 }
 
                 existing.Name = newChan.Name;
@@ -210,6 +211,36 @@ public class IptvRepository : IIptvRepository
             }
         }
         await _context.SaveChangesAsync();
+    }
+
+    public async Task UpdateChannelVideoFormatAsync(Guid channelId, LiveVideoFormat format, DateTime seenAt)
+    {
+        var channel = await _context.IptvChannels.FirstOrDefaultAsync(c => c.Id == channelId);
+        if (channel == null) return;
+
+        channel.VideoCodec = Clip(format.Codec);
+        channel.VideoProfile = format.Profile is { } profile ? Clip(profile) : null;
+        channel.VideoLevel = format.Level;
+        channel.VideoHeight = format.Height;
+        channel.VideoFrameRate = format.FrameRate;
+        channel.VideoInterlaced = format.Interlaced;
+        channel.VideoFormatSeenAt = seenAt;
+        await _context.SaveChangesAsync();
+    }
+
+    private const int VideoFormatTextLength = 32;
+
+    private static string Clip(string text) => text.Length <= VideoFormatTextLength ? text : text[..VideoFormatTextLength];
+
+    private static void ForgetVideoFormat(IptvChannel channel)
+    {
+        channel.VideoCodec = null;
+        channel.VideoProfile = null;
+        channel.VideoLevel = null;
+        channel.VideoHeight = null;
+        channel.VideoFrameRate = null;
+        channel.VideoInterlaced = null;
+        channel.VideoFormatSeenAt = null;
     }
 
     public async Task ToggleChannelVisibilityAsync(Guid channelId)

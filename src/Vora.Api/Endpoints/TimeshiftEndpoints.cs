@@ -9,6 +9,9 @@ namespace Vora.Api.Endpoints;
 public class StartTimeshiftRequestDto
 {
     public Guid ChannelId { get; set; }
+    public List<string>? VideoCodecs { get; set; }
+    public int? MaxH264Level { get; set; }
+    public List<string>? H264Profiles { get; set; }
 }
 
 public static class TimeshiftEndpoints
@@ -43,7 +46,8 @@ public static class TimeshiftEndpoints
             return Results.Forbid();
         }
 
-        var url = await manager.StartTimeshiftSessionAsync(request.ChannelId, accountId.Value, profileId.Value);
+        var limits = new LiveVideoLimits(request.VideoCodecs, request.MaxH264Level, request.H264Profiles);
+        var url = await manager.StartTimeshiftSessionAsync(request.ChannelId, accountId.Value, profileId.Value, limits);
         if (url == null)
         {
             return Results.StatusCode(StatusCodes.Status409Conflict);

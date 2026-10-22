@@ -14,7 +14,7 @@ using Vora.Infrastructure.Persistence;
 namespace Vora.Infrastructure.Migrations
 {
     [DbContext(typeof(VoraDbContext))]
-    [Migration("20261020021843_ChangesSinceInitial")]
+    [Migration("20261022014009_ChangesSinceInitial")]
     partial class ChangesSinceInitial
     {
         /// <inheritdoc />
@@ -521,6 +521,29 @@ namespace Vora.Infrastructure.Migrations
                         .IsRequired()
                         .HasMaxLength(1024)
                         .HasColumnType("character varying(1024)");
+
+                    b.Property<string>("VideoCodec")
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)");
+
+                    b.Property<DateTime?>("VideoFormatSeenAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<double?>("VideoFrameRate")
+                        .HasColumnType("double precision");
+
+                    b.Property<int?>("VideoHeight")
+                        .HasColumnType("integer");
+
+                    b.Property<bool?>("VideoInterlaced")
+                        .HasColumnType("boolean");
+
+                    b.Property<int?>("VideoLevel")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("VideoProfile")
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)");
 
                     b.HasKey("Id");
 
