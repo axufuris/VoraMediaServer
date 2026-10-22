@@ -506,6 +506,7 @@ public static class ServiceRegistrationExtensions
         services.AddSingleton<IFileSystemBrowserService, FileSystemBrowserService>();
         services.AddSingleton<IFolderWatcherService, FolderWatcherService>();
         services.AddSingleton<ITimeshiftCoordinator, TimeshiftCoordinator>();
+        services.AddScoped<ITimeshiftVideo, TimeshiftVideo>();
         services.AddSingleton<ITunerRegistry, TunerRegistry>();
         services.AddSingleton<ITranscodeService, FFmpegTranscodeService>();
         services.AddSingleton<ISubtitleExtractionService, FFmpegSubtitleExtractionService>();

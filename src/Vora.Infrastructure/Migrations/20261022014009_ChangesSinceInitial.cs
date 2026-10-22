@@ -45,7 +45,14 @@ ALTER TABLE ""ServerSettings"" ADD COLUMN IF NOT EXISTS ""PreserveHdrInTranscode
 ALTER TABLE ""UserProfiles"" ADD COLUMN IF NOT EXISTS ""AutoPlayNext"" boolean NOT NULL DEFAULT TRUE;
 ALTER TABLE ""UserProfiles"" ADD COLUMN IF NOT EXISTS ""UpNextOrder"" integer NOT NULL DEFAULT 0;
 ALTER TABLE ""UserProfiles"" ADD COLUMN IF NOT EXISTS ""EpisodeLayout"" integer NOT NULL DEFAULT 0;
-ALTER TABLE ""ClientDevices"" ADD COLUMN IF NOT EXISTS ""RendersImageSubtitles"" boolean;");
+ALTER TABLE ""ClientDevices"" ADD COLUMN IF NOT EXISTS ""RendersImageSubtitles"" boolean;
+ALTER TABLE ""IptvChannels"" ADD COLUMN IF NOT EXISTS ""VideoCodec"" character varying(32);
+ALTER TABLE ""IptvChannels"" ADD COLUMN IF NOT EXISTS ""VideoProfile"" character varying(32);
+ALTER TABLE ""IptvChannels"" ADD COLUMN IF NOT EXISTS ""VideoLevel"" integer;
+ALTER TABLE ""IptvChannels"" ADD COLUMN IF NOT EXISTS ""VideoHeight"" integer;
+ALTER TABLE ""IptvChannels"" ADD COLUMN IF NOT EXISTS ""VideoFrameRate"" double precision;
+ALTER TABLE ""IptvChannels"" ADD COLUMN IF NOT EXISTS ""VideoInterlaced"" boolean;
+ALTER TABLE ""IptvChannels"" ADD COLUMN IF NOT EXISTS ""VideoFormatSeenAt"" timestamp with time zone;");
 
             migrationBuilder.Sql(@"
 UPDATE ""UserMediaStates"" SET ""ResumePositionSeconds"" = 0
@@ -208,6 +215,34 @@ CREATE INDEX ""IX_Albums_ArtistId_Title"" ON ""Albums"" (""ArtistId"", ""Title""
         /// <inheritdoc />
         protected override void Down(MigrationBuilder migrationBuilder)
         {
+            migrationBuilder.DropColumn(
+                name: "VideoCodec",
+                table: "IptvChannels");
+
+            migrationBuilder.DropColumn(
+                name: "VideoProfile",
+                table: "IptvChannels");
+
+            migrationBuilder.DropColumn(
+                name: "VideoLevel",
+                table: "IptvChannels");
+
+            migrationBuilder.DropColumn(
+                name: "VideoHeight",
+                table: "IptvChannels");
+
+            migrationBuilder.DropColumn(
+                name: "VideoFrameRate",
+                table: "IptvChannels");
+
+            migrationBuilder.DropColumn(
+                name: "VideoInterlaced",
+                table: "IptvChannels");
+
+            migrationBuilder.DropColumn(
+                name: "VideoFormatSeenAt",
+                table: "IptvChannels");
+
             migrationBuilder.DropColumn(
                 name: "RendersImageSubtitles",
                 table: "ClientDevices");

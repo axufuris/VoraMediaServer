@@ -1136,6 +1136,8 @@ public class VoraDbContext : DbContext
             entity.Property(e => e.GroupTitle).HasMaxLength(128);
             entity.Property(e => e.Resolution).HasMaxLength(16);
             entity.Property(e => e.CountryCode).HasMaxLength(8);
+            entity.Property(e => e.VideoCodec).HasMaxLength(32);
+            entity.Property(e => e.VideoProfile).HasMaxLength(32);
 
             entity.HasIndex(e => new { e.PlaylistId, e.ExternalChannelId }).IsUnique();
 

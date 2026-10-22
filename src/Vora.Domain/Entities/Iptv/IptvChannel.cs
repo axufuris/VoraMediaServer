@@ -22,6 +22,14 @@ public class IptvChannel
     public bool? IsHealthy { get; set; }
     public DateTime? LastHealthCheckAt { get; set; }
 
+    public string? VideoCodec { get; set; }
+    public string? VideoProfile { get; set; }
+    public int? VideoLevel { get; set; }
+    public int? VideoHeight { get; set; }
+    public double? VideoFrameRate { get; set; }
+    public bool? VideoInterlaced { get; set; }
+    public DateTime? VideoFormatSeenAt { get; set; }
+
     public IptvChannelKind Kind { get; set; }
     public bool KindOverriddenByAdmin { get; set; }
 

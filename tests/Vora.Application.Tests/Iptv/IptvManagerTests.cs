@@ -36,7 +36,7 @@ public class IptvManagerTests
         _httpFactory = Substitute.For<IHttpClientFactory>();
         _signer = Substitute.For<IStreamingTokenSigner>();
 
-        _manager = new IptvManager(_repo, _epg, _users, _tasks, _timeshift, _tunerRegistry, _httpFactory, _signer,
+        _manager = new IptvManager(_repo, _epg, _users, _tasks, _timeshift, _tunerRegistry, _httpFactory, _signer, Substitute.For<ITimeshiftVideo>(),
             NullLogger<IptvManager>.Instance);
     }
 
