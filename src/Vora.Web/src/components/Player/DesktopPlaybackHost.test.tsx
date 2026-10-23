@@ -128,7 +128,7 @@ describe('the desktop playback host', () => {
 
         act(() => fake.emit({ type: 'error', message: 'vo/gpu-next: could not create a Vulkan device' }));
 
-        await waitFor(() => expect(context.changeStreams).toHaveBeenCalledWith('video-1', 'audio-1', 'none'));
+        await waitFor(() => expect(context.changeStreams).toHaveBeenCalledWith('video-1', 'audio-1', 'none', undefined));
         expect(confirm).toHaveBeenCalledWith(expect.objectContaining({ message: "Couldn't start the Vora player — play with the built-in player instead?" }));
         expect(getDesktopPlaybackState().builtInPlayerForced).toBe(true);
         expect(fake.bridge.player.close).toHaveBeenCalled();

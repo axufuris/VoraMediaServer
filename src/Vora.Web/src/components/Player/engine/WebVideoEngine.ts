@@ -18,6 +18,27 @@ interface WebStream {
     video: HTMLVideoElement;
     hls: Hls | null;
     cancelled: boolean;
+    played: boolean;
+    failed: boolean;
+    retriedWithoutAnswer: boolean;
+    listeners: AbortController;
+}
+
+const MEDIA_ERR_ABORTED = 1;
+const MEDIA_ERR_NETWORK = 2;
+const MEDIA_ERR_DECODE = 3;
+
+function describeMediaError(code: number | undefined): string {
+    switch (code) {
+        case MEDIA_ERR_ABORTED:
+            return 'Loading the video was stopped.';
+        case MEDIA_ERR_NETWORK:
+            return 'The connection to the server was lost while loading the video.';
+        case MEDIA_ERR_DECODE:
+            return "The browser couldn't decode the video.";
+        default:
+            return "The browser couldn't load the video.";
+    }
 }
 
 export class WebVideoEngine implements PlaybackEngine {
@@ -39,8 +60,17 @@ export class WebVideoEngine implements PlaybackEngine {
         const streamUrl = safeMediaUrl(source.url);
         if (!video || !streamUrl) return;
 
-        const stream: WebStream = { video, hls: null, cancelled: false };
+        const stream: WebStream = {
+            video,
+            hls: null,
+            cancelled: false,
+            played: false,
+            failed: false,
+            retriedWithoutAnswer: false,
+            listeners: new AbortController(),
+        };
         this.stream = stream;
+        video.addEventListener('playing', () => { stream.played = true; }, { signal: stream.listeners.signal });
 
         if (source.container === 'hls' || source.strategy === 'Transcode' || streamUrl.includes('.m3u8')) {
             const HlsClass = await loadHls();
@@ -67,25 +97,37 @@ export class WebVideoEngine implements PlaybackEngine {
                 // ask for that segment forever, frozen on the last frame.
                 let recoveredMediaError = false;
                 instance.on(HlsClass.Events.ERROR, (_, data) => {
-                    if (data.response?.code === 410) {
+                    const status = data.response?.code;
+                    if (status === 410) {
                         instance.stopLoad();
                         this.events.emit({ type: 'ended' });
                         return;
                     }
-                    if (!data.fatal) return;
+                    if (!data.fatal || source.isFinished()) return;
                     if (data.type === HlsClass.ErrorTypes.NETWORK_ERROR) {
-                        if (!source.isFinished()) instance.startLoad();
+                        if (!status && !stream.retriedWithoutAnswer) {
+                            stream.retriedWithoutAnswer = true;
+                            instance.startLoad();
+                            return;
+                        }
+                        instance.stopLoad();
+                        this.fail(stream, status
+                            ? `The server answered ${status} when the player asked for more of the video.`
+                            : "The server didn't answer when the player asked for more of the video.");
                     } else if (data.type === HlsClass.ErrorTypes.MEDIA_ERROR && !recoveredMediaError) {
                         recoveredMediaError = true;
                         instance.recoverMediaError();
                     } else {
+                        console.error('hls.js gave up:', data.details);
                         instance.destroy();
+                        this.fail(stream, "The browser couldn't play the video.");
                     }
                 });
 
                 stream.hls = instance;
             } else if (video.canPlayType('application/vnd.apple.mpegurl')) {
                 this.label = 'Native HLS';
+                this.reportElementErrors(stream);
                 video.src = streamUrl;
                 video.addEventListener('loadedmetadata', () => {
                     video.play().catch(e => console.error('Auto-play blocked:', e));
@@ -93,6 +135,7 @@ export class WebVideoEngine implements PlaybackEngine {
             }
         } else {
             this.label = 'The browser, from the file';
+            this.reportElementErrors(stream);
             video.src = streamUrl;
             video.play().catch(e => console.error('Auto-play blocked:', e));
         }
@@ -105,11 +148,22 @@ export class WebVideoEngine implements PlaybackEngine {
         this.label = '';
         if (!stream) return;
         stream.cancelled = true;
+        stream.listeners.abort();
         if (stream.hls) {
             stream.hls.destroy();
         }
         stream.video.removeAttribute('src');
         stream.video.load();
+    }
+
+    private reportElementErrors(stream: WebStream): void {
+        stream.video.addEventListener('error', () => this.fail(stream, describeMediaError(stream.video.error?.code)), { signal: stream.listeners.signal });
+    }
+
+    private fail(stream: WebStream, message: string): void {
+        if (this.stream !== stream || stream.cancelled || stream.failed) return;
+        stream.failed = true;
+        this.events.emit({ type: 'error', error: { message, beforeFirstFrame: !stream.played } });
     }
 
     selectLocalTracks(): boolean {

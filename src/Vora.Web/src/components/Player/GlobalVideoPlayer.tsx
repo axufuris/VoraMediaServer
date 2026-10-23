@@ -17,6 +17,7 @@ import { isNoSubtitle, NoSubtitle } from '../../utils/subtitleKind';
 import { ScrubPreview } from './VideoScrubThumbnails';
 import { WebVideoEngine } from './engine/WebVideoEngine';
 import { usePlaybackController } from './usePlaybackController';
+import { useStreamRecovery } from './useStreamRecovery';
 
 const chipStyle: React.CSSProperties = {
     background: 'color-mix(in srgb, var(--vora-bg-canvas) 72%, transparent)',
@@ -75,6 +76,13 @@ export default function GlobalVideoPlayer() {
     const playerContainerRef = useRef<HTMLDivElement>(null);
     const [engine] = useState(() => new WebVideoEngine(videoRef));
     const controller = usePlaybackController(engine);
+    useStreamRecovery({
+        engine,
+        videoRef,
+        stream: { key: currentMedia?.streamUrl ?? null, startPosition: currentMedia?.startPosition ?? 0 },
+        restartStream: controller.restartStream,
+        closePlayer,
+    });
     const { upNextData, isEpisode, thumbnails, display, activeSubtitleTrack, visibleMarkers } = controller;
 
     const [showSettings, setShowSettings] = useState(false);

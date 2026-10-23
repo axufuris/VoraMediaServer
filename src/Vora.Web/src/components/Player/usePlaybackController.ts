@@ -515,11 +515,11 @@ export function usePlaybackController(engine: PlaybackEngine) {
         });
     };
 
-    const restartStream = () => {
+    const restartStream = (position?: number) => {
         if (!currentMedia) return Promise.resolve();
         const track = activeStreamPart?.subtitleTracks?.find((st: SubtitleTrackType) => st.id === selSub);
         const burnIn = !!track && isImageSubtitleCodec(track.codec);
-        return changeStreams(currentMedia.videoTrackId ?? '', playingAudioId ?? '', burnIn ? selSub : NoSubtitle);
+        return changeStreams(currentMedia.videoTrackId ?? '', playingAudioId ?? '', burnIn ? selSub : NoSubtitle, position);
     };
 
     const subtitleDownloaded = async (subtitleTrackId: string) => {
