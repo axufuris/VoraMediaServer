@@ -95,6 +95,7 @@ export default function SmartListRow({ list, serverId }: SmartListRowProps) {
                     item={media}
                     imageUrl={media.posterUrl}
                     isPlayed={media.isPlayed}
+                    unplayedCount={media.unplayedItemCount}
                     onClick={() => openMedia(media.id)}
                     menu={mediaMenuTarget(media, serverId, { onChanged: () => fetchEntries(true) })}
                 />

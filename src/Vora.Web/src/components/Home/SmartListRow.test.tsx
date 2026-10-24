@@ -105,6 +105,18 @@ describe('SmartListRow', () => {
         expect(await screen.findByText('Details page')).toBeInTheDocument();
     });
 
+    it('a show with episodes left shows how many', async () => {
+        mocks.getListEntries.mockResolvedValue([{
+            kind: 'Media', id: 's1', title: 'Agents of S.H.I.E.L.D.',
+            media: { id: 's1', title: 'Agents of S.H.I.E.L.D.', type: 'TvShow', libraryId: 'lib', unplayedItemCount: 7 },
+        } satisfies SmartListEntry]);
+
+        renderRow(row('Library'));
+
+        expect(await screen.findByRole('button', { name: /Agents of S\.H\.I\.E\.L\.D\./ })).toBeInTheDocument();
+        expect(screen.getByText('7')).toBeInTheDocument();
+    });
+
     it('an album opens the Music page on that album', async () => {
         mocks.getListEntries.mockResolvedValue([{
             kind: 'Album', id: 'a1', title: 'Elephunk',

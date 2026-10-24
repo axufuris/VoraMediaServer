@@ -46,6 +46,8 @@ All sources share `Title`, `SortBy`, `MaxItems` (clamped 1–100 by `SmartListMa
 
 Library entries carry `Type = "Track"` for songs (they were `"Unknown"`), with the artist on `LibraryItemVM.Artist` and the album cover as the poster.
 
+A library entry's watched state comes from the same place as the library page's: `IUserMediaStateRepository.AttachLibraryItemUserStatesAsync` (`SmartListManager`, and `RecommendationManager` for the "Because you watched" rows). A movie or episode gets `IsPlayed`; a show or a season gets `UnplayedItemCount` and `IsPlayed` once every episode is watched, not counting episodes in Media Trash; every item gets the profile's `MyRating`. `SmartListRepository` once had its own copy that skipped seasons and counted trashed episodes, so a finished season never showed its ✓ on Home.
+
 ## Access
 
 `SmartListEndpoints.Viewer` turns the caller's claims into a `SmartListViewer`. Library rows apply the library, rating and unrated filters like every other library read. Favorites check the account's and the profile's IPTV playlist allowlists (the `IptvManager.GetClientPlaylistsAsync` rule) and drop inactive playlists, admin-hidden channels, channels that failed their health check and channels outside the playlist's country filter. Music uses `GetMusicAccessFilter()`. Podcasts and recordings are the profile's own.
@@ -56,4 +58,4 @@ Library entries carry `Type = "Track"` for songs (they were `"Unknown"`), with t
 
 ## Clients
 
-The web row is `components/Home/SmartListRow.tsx`: posters for library titles (open details, songs play), 16:9 logo tiles for channels and recordings, square tiles for stations, episodes and albums. Channel, station, episode and recording tiles play in place (`utils/playables.ts`); an album opens the Music page on that album. **A row with no entries is not drawn**, and personal rows show no loading skeleton so an empty one never flashes. Rows refresh on `ChannelFavoritesUpdated`, `PodcastEpisodesUpdated`, `DvrSessionsUpdated`, `MusicAlbumUpdated` and `LibraryUpdated` as relevant, and the home page refetches the row list on `SmartListsUpdated`.
+The web row is `components/Home/SmartListRow.tsx`: posters for library titles (open details, songs play; the ✓ or the episodes-left count through `MediaCard`'s `isPlayed` / `unplayedCount`, as in the library grid), 16:9 logo tiles for channels and recordings, square tiles for stations, episodes and albums. Channel, station, episode and recording tiles play in place (`utils/playables.ts`); an album opens the Music page on that album. **A row with no entries is not drawn**, and personal rows show no loading skeleton so an empty one never flashes. Rows refresh on `ChannelFavoritesUpdated`, `PodcastEpisodesUpdated`, `DvrSessionsUpdated`, `MusicAlbumUpdated` and `LibraryUpdated` as relevant, and the home page refetches the row list on `SmartListsUpdated`.

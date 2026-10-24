@@ -1,6 +1,6 @@
-﻿using Vora.Application.Recommendations.ViewModels;
+﻿using Vora.Application.Media;
+using Vora.Application.Recommendations.ViewModels;
 using Vora.Application.Settings;
-using Vora.Application.SmartLists;
 using Vora.Plugins.Interfaces;
 
 namespace Vora.Application.Recommendations;
@@ -15,14 +15,14 @@ public class RecommendationManager : IRecommendationManager
 {
     private readonly IEnumerable<IRecommendationProvider> _providers;
     private readonly ISystemSettingsRepository _settingsRepo;
-    private readonly ISmartListRepository _smartListRepo;
+    private readonly IUserMediaStateRepository _userMediaStates;
     private readonly IRecommendationRepository _recommendationRepo;
 
-    public RecommendationManager(IEnumerable<IRecommendationProvider> providers, ISystemSettingsRepository settingsRepo, ISmartListRepository smartListRepo, IRecommendationRepository recommendationRepo)
+    public RecommendationManager(IEnumerable<IRecommendationProvider> providers, ISystemSettingsRepository settingsRepo, IUserMediaStateRepository userMediaStates, IRecommendationRepository recommendationRepo)
     {
         _providers = providers;
         _settingsRepo = settingsRepo;
-        _smartListRepo = smartListRepo;
+        _userMediaStates = userMediaStates;
         _recommendationRepo = recommendationRepo;
     }
 
@@ -53,7 +53,7 @@ public class RecommendationManager : IRecommendationManager
 
                     if (matchedItems.Any())
                     {
-                        await _smartListRepo.AttachLibraryItemUserStatesAsync(matchedItems, profileId);
+                        await _userMediaStates.AttachLibraryItemUserStatesAsync(matchedItems, profileId);
 
                         allLists.Add(new RecommendationListVM
                         {

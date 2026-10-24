@@ -243,30 +243,6 @@ public class SmartListRepository(VoraDbContext context) : ISmartListRepository
             ? await context.SmartLists.MaxAsync(l => l.DisplayOrder)
             : -1;
 
-    public async Task AttachLibraryItemUserStatesAsync(IEnumerable<LibraryItemVM> items, Guid profileId)
-    {
-        var itemList = items.ToList();
-        if (itemList.Count == 0)
-        {
-            return;
-        }
-
-        var itemIds = itemList.Select(i => i.Id).ToList();
-
-        var directStates = await context.Set<UserMediaState>()
-            .AsNoTracking()
-            .Where(s => s.ProfileId == profileId && itemIds.Contains(s.MediaItemId))
-            .ToDictionaryAsync(s => s.MediaItemId, s => s.IsPlayed);
-
-        var tvShowIds = itemList.Where(i => i.Type == "TvShow").Select(i => i.Id).ToList();
-        var tvStats = await ResolveTvShowPlayStatsAsync(tvShowIds, profileId);
-
-        foreach (var item in itemList)
-        {
-            ApplyUserState(item, directStates, tvStats);
-        }
-    }
-
     private IQueryable<MediaItem> ApplyContentFilter(IQueryable<MediaItem> query, SmartListRulesDto? rules, Guid? collectionId, Guid? profileId)
     {
         if (collectionId.HasValue)
@@ -367,57 +343,6 @@ public class SmartListRepository(VoraDbContext context) : ISmartListRepository
                         .Count());
             default:
                 return query.OrderByDescending(m => m.LastContentAddedAt ?? m.AddedAt);
-        }
-    }
-
-    private async Task<Dictionary<Guid, (int Total, int Played)>> ResolveTvShowPlayStatsAsync(List<Guid> tvShowIds, Guid profileId)
-    {
-        if (tvShowIds.Count == 0)
-        {
-            return new Dictionary<Guid, (int, int)>();
-        }
-
-        var episodeMappings = await context.Set<Episode>()
-            .AsNoTracking()
-            .Where(e => tvShowIds.Contains(e.Season.TvShowId))
-            .Select(e => new { e.Id, TvShowId = e.Season.TvShowId })
-            .ToListAsync();
-
-        if (episodeMappings.Count == 0)
-        {
-            return new Dictionary<Guid, (int, int)>();
-        }
-
-        var allEpisodeIds = episodeMappings.Select(e => e.Id).ToList();
-
-        var playedEpisodeIds = await context.Set<UserMediaState>()
-            .AsNoTracking()
-            .Where(s => s.ProfileId == profileId && s.IsPlayed && allEpisodeIds.Contains(s.MediaItemId))
-            .Select(s => s.MediaItemId)
-            .ToListAsync();
-
-        var playedSet = playedEpisodeIds.ToHashSet();
-
-        return episodeMappings
-            .GroupBy(x => x.TvShowId)
-            .ToDictionary(g => g.Key, g => (Total: g.Count(), Played: g.Count(x => playedSet.Contains(x.Id))));
-    }
-
-    private static void ApplyUserState(LibraryItemVM item, Dictionary<Guid, bool> directStates, Dictionary<Guid, (int Total, int Played)> tvStats)
-    {
-        if (item.Type == "Movie" || item.Type == "Episode")
-        {
-            if (directStates.TryGetValue(item.Id, out var played))
-            {
-                item.IsPlayed = played;
-            }
-            return;
-        }
-
-        if (item.Type == "TvShow" && tvStats.TryGetValue(item.Id, out var stats))
-        {
-            item.UnplayedItemCount = stats.Total - stats.Played;
-            item.IsPlayed = stats.Total > 0 && stats.Total == stats.Played;
         }
     }
 
