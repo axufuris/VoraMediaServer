@@ -4,6 +4,7 @@ using Microsoft.Extensions.Options;
 using Vora.Application.Analysis.Results;
 using Vora.Application.Media;
 using Vora.Application.Settings;
+using Vora.Application.Subtitles;
 using Vora.Application.Tasks;
 using Vora.Domain.Entities.Library;
 using Vora.Domain.Entities.Media;
@@ -587,12 +588,17 @@ public class MediaAnalyzerManager : IMediaAnalyzerManager
             return;
         }
 
-        // The season fingerprint pass already found this episode's intro, so the
-        // head decode (intro/recap region) has nothing left to contribute — its
-        // silence/black intro would just be superseded. Skip it and decode only the
-        // tail for credits/preview. This is the fingerprint tier's performance win:
-        // the head video decode is replaced by the far cheaper audio fingerprint.
+        // The season fingerprint pass already found this episode's intro, so its
+        // silence/black intro would just be superseded. The head is skipped and only
+        // the tail decoded for credits/preview — unless a "Previously on" subtitle
+        // line was found, when only the stretch before the intro is decoded to find
+        // where the recap ends.
         var useFingerprintIntro = detectIntro && fingerprintIntro != null;
+        var knownIntro = useFingerprintIntro ? fingerprintIntro : null;
+        var recapCueStart = isEpisode && detectIntro && !chapterResult.Markers.Any(m => m.Type == MarkerType.Recap)
+            ? await FindRecapCueAsync(mediaItemId, primaryPath, knownIntro, cancellationToken)
+            : null;
+        var decodeBeforeIntro = knownIntro is not null && recapCueStart is not null;
 
         var meanDb = await _analyzerService.ProbeMeanVolumeDbAsync(primaryPath, cancellationToken);
         var threshold = meanDb.HasValue
@@ -607,9 +613,9 @@ public class MediaAnalyzerManager : IMediaAnalyzerManager
             NoiseThresholdDb = threshold,
             MinSilenceDurationSec = minSilence,
             MinBlackFrameDurationSec = settings.BlackFrameMinDurationSec,
-            HeadWindowEndSeconds = headEnd,
+            HeadWindowEndSeconds = decodeBeforeIntro && knownIntro is { } intro && headEnd is { } end ? Math.Min(end, intro.Start.TotalSeconds) : headEnd,
             TailWindowStartSeconds = tailStart,
-            SkipHeadWindow = useFingerprintIntro,
+            SkipHeadWindow = useFingerprintIntro && !decodeBeforeIntro,
             SamplePictureInTail = !isEpisode,
             HardwareDecoder = settings.UseHardwareAcceleration && settings.AnalyzeUseHardwareDecode
                 ? await _hardware.ResolveAsync(settings.HardwareAccelerationType, settings.HardwareTranscodingDevice, cancellationToken)
@@ -633,7 +639,9 @@ public class MediaAnalyzerManager : IMediaAnalyzerManager
             DetectIntro = detectIntro && !useFingerprintIntro,
             DetectCredits = detectCredits,
             PictureSamples = detection.PictureSamples,
-            ChapterStarts = chapterResult.ChapterStarts
+            ChapterStarts = chapterResult.ChapterStarts,
+            RecapCueStart = recapCueStart,
+            KnownIntroStart = knownIntro?.Start
         });
 
         // Precedence: chapters (already resolved above when they fully covered) win
@@ -642,6 +650,25 @@ public class MediaAnalyzerManager : IMediaAnalyzerManager
         // still come from chapters or silence/black.
         var merged = MarkerMerge.Resolve(chapterResult.Markers, fingerprintIntro, assembled, detectIntro);
         await PersistMarkersAsync(mediaItemId, merged);
+    }
+
+    private async Task<TimeSpan?> FindRecapCueAsync(Guid mediaItemId, string primaryPath, DetectedMarker? knownIntro, CancellationToken cancellationToken)
+    {
+        var targets = await _mediaRepository.GetSubtitleExtractionTargetsForItemAsync(mediaItemId) ?? new List<SubtitleExtractionTargetDto>();
+        var track = RecapCues.PickTrack(targets.Where(t => t.FilePath == primaryPath).SelectMany(t => t.Tracks));
+        if (track == null) return null;
+
+        var window = knownIntro is { } intro && intro.Start < RecapCues.SearchWindow ? intro.Start : RecapCues.SearchWindow;
+        if (window <= TimeSpan.Zero) return null;
+
+        var cues = await _analyzerService.ReadSubtitleCuesAsync(primaryPath, track.ExternalFilePath, track.StreamIndex, window.TotalSeconds, cancellationToken)
+            ?? Array.Empty<SubtitleCue>();
+        var cueStart = RecapCues.FirstRecapCueStart(cues, window);
+        if (cueStart is { } found)
+        {
+            _logger.LogInformation("Found a recap line at {Seconds:0.0}s in the subtitles of {MediaItemId}.", found.TotalSeconds, mediaItemId);
+        }
+        return cueStart;
     }
 
     private async Task<IReadOnlyDictionary<Guid, DetectedMarker>> ComputeSeasonFingerprintIntrosAsync(Guid seasonId, CancellationToken cancellationToken)

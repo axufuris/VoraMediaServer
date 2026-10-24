@@ -14,4 +14,6 @@ public class SubtitleTrackTargetDto
     public int StreamIndex { get; set; }
     public string? Codec { get; set; }
     public string? ExternalFilePath { get; set; }
+    public string? Language { get; set; }
+    public bool IsForced { get; set; }
 }
