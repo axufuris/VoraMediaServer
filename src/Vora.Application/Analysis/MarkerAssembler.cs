@@ -23,6 +23,8 @@ public class MarkerAssemblerInput
     public bool DetectCredits { get; init; } = true;
     public List<PictureSample> PictureSamples { get; init; } = new();
     public List<TimeSpan> ChapterStarts { get; init; } = new();
+    public TimeSpan? RecapCueStart { get; init; }
+    public TimeSpan? KnownIntroStart { get; init; }
 }
 
 public interface IMarkerAssembler
@@ -65,6 +67,11 @@ public class MarkerAssembler : IMarkerAssembler
     // an intro — emitting it just flashes a "Skip Intro" button at 0:00.
     private static readonly TimeSpan MinIntroDuration = TimeSpan.FromSeconds(10);
     private static readonly TimeSpan MinRecapDuration = TimeSpan.FromSeconds(5);
+    public static readonly TimeSpan MinSubtitleRecapDuration = TimeSpan.FromSeconds(15);
+    public static readonly TimeSpan MaxSubtitleRecapDuration = TimeSpan.FromSeconds(120);
+    public static readonly TimeSpan RecapEndingBlack = TimeSpan.FromSeconds(2);
+    private static readonly TimeSpan RecapOpensEpisode = TimeSpan.FromSeconds(5);
+    private static readonly TimeSpan ColdOpenLeadIn = TimeSpan.FromSeconds(10);
     // An intro (recap + title sequence) is never longer than this. A joint gap that
     // would push the intro past it is a mid-episode scene fade, not the end of the
     // opening — the old "last gap within 8 minutes" logic grabbed those and marked
@@ -98,10 +105,11 @@ public class MarkerAssembler : IMarkerAssembler
         {
             introMarker = FindIntroMarker(jointGaps, input);
             if (introMarker != null) markers.Add(introMarker);
-
-            var recapMarker = FindRecapMarker(jointGaps, input, introMarker);
-            if (recapMarker != null) markers.Add(recapMarker);
         }
+
+        var recapMarker = FindSubtitleRecapMarker(input, introMarker)
+            ?? (input.DetectIntro ? FindRecapMarker(jointGaps, input, introMarker) : null);
+        if (recapMarker != null) markers.Add(recapMarker);
 
         var crawl = input.DetectCredits && !input.IsEpisode ? FindCreditsCrawl(input) : null;
         var creditsRollStart = crawl?.CreditsStart ?? (input.DetectCredits ? FindCreditsRollStart(input) : null);
@@ -202,6 +210,40 @@ public class MarkerAssembler : IMarkerAssembler
             End = earlyGap.End
         };
     }
+
+    private static DetectedMarker? FindSubtitleRecapMarker(MarkerAssemblerInput input, DetectedMarker? intro)
+    {
+        if (!input.IsEpisode || input.RecapCueStart is not { } cue) return null;
+
+        var start = cue <= RecapOpensEpisode ? TimeSpan.Zero : ColdOpenEnd(input.BlackIntervals, cue);
+        var earliestEnd = start + MinSubtitleRecapDuration;
+        var latestEnd = cue + MaxSubtitleRecapDuration;
+        var endsBy = input.KnownIntroStart ?? intro?.End;
+        if (endsBy is { } introBoundary && introBoundary < latestEnd) latestEnd = introBoundary;
+
+        var end = input.BlackIntervals
+            .Where(black => black.End - black.Start >= RecapEndingBlack && black.Start >= earliestEnd && black.End <= latestEnd)
+            .OrderBy(black => black.Start)
+            .Select(black => (TimeSpan?)black.End)
+            .FirstOrDefault()
+            ?? input.ChapterStarts
+                .Where(chapter => chapter >= earliestEnd && chapter <= latestEnd)
+                .OrderBy(chapter => chapter)
+                .Select(chapter => (TimeSpan?)chapter)
+                .FirstOrDefault();
+
+        return end is { } recapEnd
+            ? new DetectedMarker { Type = MarkerType.Recap, Start = start, End = recapEnd }
+            : null;
+    }
+
+    private static TimeSpan ColdOpenEnd(List<DetectedInterval> blackIntervals, TimeSpan cue) =>
+        blackIntervals
+            .Where(black => black.End <= cue && black.End >= cue - ColdOpenLeadIn)
+            .OrderByDescending(black => black.End)
+            .Select(black => black.End)
+            .DefaultIfEmpty(cue)
+            .First();
 
     private static TimeSpan? FindCreditsRollStart(MarkerAssemblerInput input)
     {

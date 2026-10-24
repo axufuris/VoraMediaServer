@@ -331,6 +331,84 @@ public class MediaAnalyzerManagerDetectionTests
             ms.Any(m => m.Type == MarkerType.Intro && m.Start == TimeSpan.FromSeconds(90) && m.End == TimeSpan.FromSeconds(150))));
     }
 
+    private void StubSubtitles(Guid id, string filePath, Vora.Application.Subtitles.SubtitleTrackTargetDto track) =>
+        _media.GetSubtitleExtractionTargetsForItemAsync(id).Returns(new List<Vora.Application.Subtitles.SubtitleExtractionTargetDto>
+        {
+            new() { MediaItemId = id, FilePath = filePath, Tracks = [track] }
+        });
+
+    private static readonly DetectedMarker FingerprintIntro = new()
+    {
+        Type = MarkerType.Intro,
+        Start = TimeSpan.FromSeconds(90),
+        End = TimeSpan.FromSeconds(150)
+    };
+
+    [Fact]
+    public async Task A_previously_on_line_decodes_the_start_up_to_the_fingerprint_intro_and_hands_the_recap_to_the_assembler()
+    {
+        var id = Guid.NewGuid();
+        StubMovieReady(id, "/tv/ep.mkv", TimeSpan.FromMinutes(45), meanDb: -20);
+        StubSubtitles(id, "/tv/ep.mkv", new() { StreamIndex = 3, Codec = "subrip", Language = "eng" });
+        _analyzer.ReadSubtitleCuesAsync("/tv/ep.mkv", null, 3, 90, Arg.Any<CancellationToken>()).Returns(new List<SubtitleCue>
+        {
+            new(TimeSpan.FromSeconds(1), TimeSpan.FromSeconds(3), "Previously on The Terminal List..."),
+        });
+
+        await _manager.AnalyzeMediaItemMarkersAsync(id, isEpisode: true, forceOverride: true, FingerprintIntro, cancellationToken: TestContext.Current.CancellationToken);
+
+        await _analyzer.Received(1).AnalyzeSilenceDetectionsAsync("/tv/ep.mkv",
+            Arg.Is<SilenceDetectionParameters>(p => !p.SkipHeadWindow && p.HeadWindowEndSeconds == 90), Arg.Any<CancellationToken>());
+        _assembler.Received(1).Assemble(Arg.Is<MarkerAssemblerInput>(input =>
+            input.RecapCueStart == TimeSpan.FromSeconds(1) && input.KnownIntroStart == TimeSpan.FromSeconds(90) && !input.DetectIntro));
+    }
+
+    [Fact]
+    public async Task Subtitles_without_a_recap_line_keep_the_fingerprint_episodes_start_undecoded()
+    {
+        var id = Guid.NewGuid();
+        StubMovieReady(id, "/tv/ep.mkv", TimeSpan.FromMinutes(45), meanDb: -20);
+        StubSubtitles(id, "/tv/ep.mkv", new() { StreamIndex = 3, Codec = "subrip", Language = "eng" });
+        _analyzer.ReadSubtitleCuesAsync("/tv/ep.mkv", null, 3, 90, Arg.Any<CancellationToken>()).Returns(new List<SubtitleCue>
+        {
+            new(TimeSpan.FromSeconds(4), TimeSpan.FromSeconds(6), "We go in at dawn."),
+        });
+
+        await _manager.AnalyzeMediaItemMarkersAsync(id, isEpisode: true, forceOverride: true, FingerprintIntro, cancellationToken: TestContext.Current.CancellationToken);
+
+        await _analyzer.Received(1).AnalyzeSilenceDetectionsAsync("/tv/ep.mkv",
+            Arg.Is<SilenceDetectionParameters>(p => p.SkipHeadWindow), Arg.Any<CancellationToken>());
+        _assembler.Received(1).Assemble(Arg.Is<MarkerAssemblerInput>(input => input.RecapCueStart == null));
+    }
+
+    [Fact]
+    public async Task Only_the_episodes_own_file_and_a_text_track_are_read_for_a_recap_line()
+    {
+        var id = Guid.NewGuid();
+        StubMovieReady(id, "/tv/ep.mkv", TimeSpan.FromMinutes(45), meanDb: -20);
+        _media.GetSubtitleExtractionTargetsForItemAsync(id).Returns(new List<Vora.Application.Subtitles.SubtitleExtractionTargetDto>
+        {
+            new() { MediaItemId = id, FilePath = "/tv/ep.mkv", Tracks = [new() { StreamIndex = 2, Codec = "hdmv_pgs_subtitle", Language = "eng" }] },
+            new() { MediaItemId = id, FilePath = "/tv/ep.2160p.mkv", Tracks = [new() { StreamIndex = 3, Codec = "subrip", Language = "eng" }] },
+        });
+
+        await _manager.AnalyzeMediaItemMarkersAsync(id, isEpisode: true, forceOverride: true, FingerprintIntro, cancellationToken: TestContext.Current.CancellationToken);
+
+        await _analyzer.DidNotReceive().ReadSubtitleCuesAsync(Arg.Any<string>(), Arg.Any<string?>(), Arg.Any<int>(), Arg.Any<double>(), Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task A_movie_is_never_searched_for_a_recap_line()
+    {
+        var id = Guid.NewGuid();
+        StubMovieReady(id, "/movies/film.mkv", TimeSpan.FromMinutes(120), meanDb: -20);
+        StubSubtitles(id, "/movies/film.mkv", new() { StreamIndex = 3, Codec = "subrip", Language = "eng" });
+
+        await _manager.AnalyzeMediaItemMarkersAsync(id, isEpisode: false, forceOverride: true, fingerprintIntro: null, cancellationToken: TestContext.Current.CancellationToken);
+
+        await _analyzer.DidNotReceive().ReadSubtitleCuesAsync(Arg.Any<string>(), Arg.Any<string?>(), Arg.Any<int>(), Arg.Any<double>(), Arg.Any<CancellationToken>());
+    }
+
     [Fact]
     public async Task No_fingerprint_intro_keeps_the_head_decode()
     {

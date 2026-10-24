@@ -16,6 +16,7 @@ public class FFmpegAnalyzerService : IMediaAnalyzerService
 {
     private static readonly TimeSpan ProcessTimeout = TimeSpan.FromHours(2);
     private static readonly TimeSpan VideoStreamProbeTimeout = TimeSpan.FromSeconds(30);
+    private static readonly TimeSpan SubtitleCueReadTimeout = TimeSpan.FromSeconds(60);
     private const int MeanVolumeSampleSeconds = 600;
     // Black-frame detection only needs to know a frame is (nearly) all black, which
     // is resolution-independent. Downscaling to this height on the GPU before
@@ -299,6 +300,41 @@ public class FFmpegAnalyzerService : IMediaAnalyzerService
         seconds = 0;
         if (!element.TryGetProperty(propertyName, out var property)) return false;
         return double.TryParse(property.GetString(), NumberStyles.Float, CultureInfo.InvariantCulture, out seconds);
+    }
+
+    public async Task<IReadOnlyList<SubtitleCue>> ReadSubtitleCuesAsync(string filePath, string? externalFilePath, int streamIndex, double windowSeconds, CancellationToken cancellationToken = default)
+    {
+        var processInfo = new ProcessStartInfo
+        {
+            FileName = "ffmpeg",
+            RedirectStandardOutput = true,
+            UseShellExecute = false,
+            CreateNoWindow = true
+        };
+        foreach (var argument in SubtitleCueArguments(filePath, externalFilePath, streamIndex, windowSeconds)) processInfo.ArgumentList.Add(argument);
+
+        try
+        {
+            using var process = Process.Start(processInfo);
+            if (process == null) return [];
+
+            var output = process.StandardOutput.ReadToEndAsync(cancellationToken);
+            if (!await process.WaitForExitWithTimeoutAsync(SubtitleCueReadTimeout, _logger, cancellationToken) || process.ExitCode != 0) return [];
+            return WebVttCues.Parse(await output);
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            _logger.LogWarning(ex, "Could not read the subtitle lines of {FilePath}.", externalFilePath ?? filePath);
+            return [];
+        }
+    }
+
+    internal static IReadOnlyList<string> SubtitleCueArguments(string filePath, string? externalFilePath, int streamIndex, double windowSeconds)
+    {
+        var window = windowSeconds.ToString("0.###", CultureInfo.InvariantCulture);
+        return string.IsNullOrEmpty(externalFilePath)
+            ? ["-v", "error", "-i", filePath, "-map", $"0:{streamIndex.ToString(CultureInfo.InvariantCulture)}", "-t", window, "-f", "webvtt", "pipe:1"]
+            : ["-v", "error", "-i", externalFilePath, "-map", "0:s:0", "-t", window, "-f", "webvtt", "pipe:1"];
     }
 
     public async Task<AudioFingerprintResult?> ExtractAudioFingerprintAsync(string filePath, double startSeconds, double lengthSeconds, string workingDirectory, CancellationToken cancellationToken = default)
