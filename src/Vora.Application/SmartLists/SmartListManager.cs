@@ -2,6 +2,7 @@
 using Microsoft.Extensions.Logging;
 using Vora.Application.Analysis;
 using Vora.Application.Libraries.ViewModels;
+using Vora.Application.Media;
 using Vora.Application.Settings;
 using Vora.Application.SmartLists.Dtos;
 using Vora.Application.SmartLists.Requests;
@@ -28,6 +29,7 @@ public interface ISmartListManager
 
 public class SmartListManager(
     ISmartListRepository repository,
+    IUserMediaStateRepository userMediaStates,
     ISmartListSourceResolver sourceResolver,
     ISystemSettingsRepository settingsRepository,
     IClientNotifier notifier,
@@ -225,7 +227,7 @@ public class SmartListManager(
 
         if (viewer.ProfileId is { } profileId)
         {
-            await repository.AttachLibraryItemUserStatesAsync(items, profileId);
+            await userMediaStates.AttachLibraryItemUserStatesAsync(items, profileId);
         }
 
         return items;

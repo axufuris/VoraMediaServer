@@ -30,5 +30,4 @@ public interface ISmartListRepository
     Task ReorderListsAsync(List<Guid> orderedListIds);
     Task<HashSet<string>> GetDefaultKeysAsync();
     Task<int> GetMaxDisplayOrderAsync();
-    Task AttachLibraryItemUserStatesAsync(IEnumerable<LibraryItemVM> items, Guid profileId);
 }
