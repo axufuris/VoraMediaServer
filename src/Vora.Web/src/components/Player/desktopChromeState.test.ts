@@ -22,7 +22,6 @@ function controller(overrides: Partial<ChromeSource> = {}): ChromeSource {
         activeSkipPrompt: null,
         showSkipCommercial: false,
         isEnding: false,
-        finished: false,
         autoPlayNext: true,
         isEpisode: true,
         playingAudioId: 'audio-en',
@@ -40,7 +39,7 @@ function controller(overrides: Partial<ChromeSource> = {}): ChromeSource {
 
 describe('the state the Vora player chrome draws', () => {
     it('carries the title, the markers and the tracks', () => {
-        const state = buildChromeState({ controller: controller(), theme, status: { status: 'playing' }, output: null, secondsLeft: 900 });
+        const state = buildChromeState({ controller: controller(), theme, status: { status: 'playing' }, output: null, countdown: { secondsLeft: 900, starting: false } });
 
         expect(state.title).toBe('Pilot');
         expect(state.subtitle).toBe('S1 E1 - The Show');
@@ -55,16 +54,23 @@ describe('the state the Vora player chrome draws', () => {
 
     it('shows the skip chip the web player would, and none while Up Next is up', () => {
         const skipping = controller({ activeSkipPrompt: { label: 'Skip Intro', target: 150, kind: 'intro' } });
-        expect(buildChromeState({ controller: skipping, theme, status: { status: 'playing' }, output: null, secondsLeft: 900 }).skip).toEqual({ label: 'Skip Intro' });
+        expect(buildChromeState({ controller: skipping, theme, status: { status: 'playing' }, output: null, countdown: { secondsLeft: 900, starting: false } }).skip).toEqual({ label: 'Skip Intro' });
 
         const ending = controller({ activeSkipPrompt: { label: 'Skip Credits', target: 2698, kind: 'credits-to-end' }, isEnding: true });
-        const state = buildChromeState({ controller: ending, theme, status: { status: 'playing' }, output: null, secondsLeft: 11.2 });
+        const state = buildChromeState({ controller: ending, theme, status: { status: 'playing' }, output: null, countdown: { secondsLeft: 11.2, starting: false } });
         expect(state.skip).toBeNull();
         expect(state.upNext).toEqual({ title: 'Second', subtitle: 'S1 E2 - The Show', countdownSeconds: 12 });
     });
 
+    it('counts to zero only when the next episode is starting', () => {
+        const ending = controller({ isEnding: true });
+
+        expect(buildChromeState({ controller: ending, theme, status: { status: 'playing' }, output: null, countdown: { secondsLeft: 7.4, starting: false } }).upNext?.countdownSeconds).toBe(8);
+        expect(buildChromeState({ controller: ending, theme, status: { status: 'playing' }, output: null, countdown: { secondsLeft: 0, starting: true } }).upNext?.countdownSeconds).toBe(0);
+    });
+
     it('drops the countdown when autoplay is off', () => {
-        const state = buildChromeState({ controller: controller({ isEnding: true, autoPlayNext: false }), theme, status: { status: 'playing' }, output: null, secondsLeft: 5 });
+        const state = buildChromeState({ controller: controller({ isEnding: true, autoPlayNext: false }), theme, status: { status: 'playing' }, output: null, countdown: { secondsLeft: 5, starting: false } });
 
         expect(state.upNext?.countdownSeconds).toBeNull();
     });
@@ -75,7 +81,7 @@ describe('the state the Vora player chrome draws', () => {
             theme,
             status: { status: 'error', message: 'Connection lost' },
             output: { videoCodec: 'hevc', width: 3840, height: 2160, outputTransfer: 'pq', hardwareDecoder: 'd3d11va', audioCodec: 'truehd', audioChannels: 8 },
-            secondsLeft: 900,
+            countdown: { secondsLeft: 900, starting: false },
         });
 
         expect(state.status).toBe('error');
