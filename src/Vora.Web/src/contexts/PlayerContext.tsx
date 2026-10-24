@@ -798,10 +798,10 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
     const hasNext = queue.length > 0 && queueIndex < queue.length - 1;
     const hasPrevious = queue.length > 0 && queueIndex > 0;
 
-    const changeStreams = useCallback(async (videoTrackId: string, audioTrackId: string, subtitleTrackId: string) => {
+    const changeStreams = useCallback(async (videoTrackId: string, audioTrackId: string, subtitleTrackId: string, startAt?: number) => {
         const media = currentMediaRef.current;
         if (!media) return;
-        const currentPos = readPlayback().position;
+        const currentPos = startAt ?? readPlayback().position;
         const sourceServerId = media.serverId;
 
         if (sessionId) {

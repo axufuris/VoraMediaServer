@@ -87,7 +87,7 @@ export interface PlayerContextType {
     setFullscreen: (full: boolean) => void;
     closePlayer: () => void;
     setVolume: (vol: number) => void;
-    changeStreams: (videoTrackId: string, audioTrackId: string, subtitleTrackId: string) => Promise<void>;
+    changeStreams: (videoTrackId: string, audioTrackId: string, subtitleTrackId: string, startAt?: number) => Promise<void>;
     videoRef: React.RefObject<HTMLVideoElement | null>;
     radioSeed: RadioSeed | null;
     radioLabel: string | null;
