@@ -18,6 +18,8 @@ import { ScrubPreview } from './VideoScrubThumbnails';
 import { WebVideoEngine } from './engine/WebVideoEngine';
 import { usePlaybackController } from './usePlaybackController';
 import { useStreamRecovery } from './useStreamRecovery';
+import { useMsSinceShown } from './useMsSinceShown';
+import { SKIP_PROMPT_SHOWN_MS, skipPromptKey, skipPromptVisible } from './playerPromptTiming';
 
 const chipStyle: React.CSSProperties = {
     background: 'color-mix(in srgb, var(--vora-bg-canvas) 72%, transparent)',
@@ -95,6 +97,12 @@ export default function GlobalVideoPlayer() {
         isPlaying,
         keepVisibleWhen: controller.isEnding || showSettings || showInfo || showSubtitles,
     });
+
+    const skipShownMs = useMsSinceShown(
+        skipPromptKey(controller.activeSkipPrompt, controller.showSkipCommercial ? controller.activeCommercialId : null),
+        SKIP_PROMPT_SHOWN_MS,
+    );
+    const skipVisible = !isMinimized && !controller.isEnding && skipPromptVisible(skipShownMs, showControls);
 
     const toggleFullScreen = useFullscreen(playerContainerRef);
 
@@ -244,7 +252,7 @@ export default function GlobalVideoPlayer() {
                 </div>
             )}
 
-            {controller.showSkipCommercial && !isMinimized && !controller.isEnding && (
+            {controller.showSkipCommercial && skipVisible && (
                 <div className="absolute bottom-32 right-12 z-[200] animate-fade-in-up">
                     <button
                         type="button"
@@ -261,7 +269,7 @@ export default function GlobalVideoPlayer() {
                 </div>
             )}
 
-            {controller.activeSkipPrompt && !controller.showSkipCommercial && !isMinimized && !controller.isEnding && (
+            {controller.activeSkipPrompt && !controller.showSkipCommercial && skipVisible && (
                 <div className="absolute bottom-32 right-12 z-[200] animate-fade-in-up">
                     <button
                         type="button"

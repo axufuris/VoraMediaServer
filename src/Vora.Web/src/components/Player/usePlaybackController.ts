@@ -123,16 +123,6 @@ export function usePlaybackController(engine: PlaybackEngine) {
 
     const showSkipCommercial = activeCommId !== null && activeCommId !== hiddenCommercialId;
 
-    useEffect(() => {
-        if (showSkipCommercial && activeCommId) {
-            const timer = setTimeout(() => {
-                setHiddenCommercialId(activeCommId);
-            }, 20000);
-
-            return () => clearTimeout(timer);
-        }
-    }, [showSkipCommercial, activeCommId]);
-
     const skipCommercial = () => {
         if (activeCommercial) seek(activeCommercial.end);
         if (activeCommId) setHiddenCommercialId(activeCommId);
@@ -581,6 +571,7 @@ export function usePlaybackController(engine: PlaybackEngine) {
         activeSkipPrompt,
         skipToMarker,
         showSkipCommercial,
+        activeCommercialId: activeCommId,
         skipCommercial,
         isEnding,
         finished,

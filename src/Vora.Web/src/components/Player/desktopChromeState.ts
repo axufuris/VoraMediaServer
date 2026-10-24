@@ -5,6 +5,7 @@ import { methodLabel, rateText } from '../../utils/playbackStats';
 import { seasonEpisodeLabel } from '../../utils/seasonLabel';
 import { audioLayout, languageName } from '../../utils/trackLabels';
 import type { PlaybackController } from './usePlaybackController';
+import type { UpNextCountdown } from './useUpNextAutoPlay';
 
 export type ChromeTheme = PlayerChromeState['theme'];
 
@@ -12,7 +13,7 @@ export type ChromeStatus = { status: 'loading' | 'playing' } | { status: 'error'
 
 export type ChromeSource = Pick<PlaybackController,
     'currentMedia' | 'mediaDetails' | 'upNextData' | 'visibleMarkers' | 'activeSkipPrompt' | 'showSkipCommercial' | 'isEnding'
-    | 'finished' | 'autoPlayNext' | 'isEpisode' | 'playingAudioId' | 'effectiveSubtitleId' | 'activeStreamPart' | 'display'>;
+    | 'autoPlayNext' | 'isEpisode' | 'playingAudioId' | 'effectiveSubtitleId' | 'activeStreamPart' | 'display'>;
 
 const THEME_TOKENS: Record<keyof ChromeTheme, string> = {
     accent: '--vora-accent-500',
@@ -105,10 +106,10 @@ export interface ChromeStateInput {
     theme: ChromeTheme;
     status: ChromeStatus;
     output: PlayerOutputInfo | null;
-    secondsLeft: number;
+    countdown: UpNextCountdown;
 }
 
-export function buildChromeState({ controller, theme, status, output, secondsLeft }: ChromeStateInput): PlayerChromeState {
+export function buildChromeState({ controller, theme, status, output, countdown }: ChromeStateInput): PlayerChromeState {
     const media = controller.currentMedia;
     const nextItem = controller.upNextData?.nextItem ?? null;
     const previousItem = controller.upNextData?.previousItem ?? null;
@@ -134,7 +135,7 @@ export function buildChromeState({ controller, theme, status, output, secondsLef
             ? {
                 title: nextItem.title,
                 subtitle: episodeLine(nextItem),
-                countdownSeconds: countingDown ? (controller.finished ? 0 : Math.ceil(secondsLeft)) : null,
+                countdownSeconds: countingDown ? (countdown.starting ? 0 : Math.ceil(countdown.secondsLeft)) : null,
             }
             : null,
         audio: audioOptions(controller),

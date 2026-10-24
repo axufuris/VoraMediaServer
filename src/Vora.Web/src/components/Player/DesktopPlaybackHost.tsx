@@ -34,9 +34,10 @@ export default function DesktopPlaybackHost({ bridge }: { bridge: VoraDesktopBri
     const previousItem = controller.upNextData?.previousItem ?? null;
     const secondsLeft = controller.finished || !isFinite(duration) ? 0 : Math.max(0, duration - currentTime);
 
-    useUpNextAutoPlay({
+    const countdown = useUpNextAutoPlay({
         countingDown: controller.isEnding && controller.autoPlayNext && !!nextItem,
         finished: controller.finished,
+        secondsLeft,
         nextItem,
         onPlayNext: controller.playNext,
     });
@@ -144,7 +145,7 @@ export default function DesktopPlaybackHost({ bridge }: { bridge: VoraDesktopBri
         if (!themeRef.current || themeRef.current.mediaId !== currentMedia.id) {
             themeRef.current = { mediaId: currentMedia.id, theme: readChromeTheme(barRef.current ?? document.body) };
         }
-        const state = buildChromeState({ controller, theme: themeRef.current.theme, status, output, secondsLeft });
+        const state = buildChromeState({ controller, theme: themeRef.current.theme, status, output, countdown });
         const json = JSON.stringify(state);
         if (json === lastSentRef.current) return;
         lastSentRef.current = json;

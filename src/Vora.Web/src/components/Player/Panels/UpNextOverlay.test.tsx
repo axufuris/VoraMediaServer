@@ -1,8 +1,8 @@
-import { describe, expect, it, vi } from 'vitest';
-import { fireEvent, render, screen } from '@testing-library/react';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { act, fireEvent, render, screen } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import UpNextOverlay from './UpNextOverlay';
-import type { UpNextResultVM } from '../../../api/Media/mediaService';
+import type { UpNextItemVM, UpNextResultVM } from '../../../api/Media/mediaService';
 
 const data: UpNextResultVM = {
     relatedLists: [
@@ -59,32 +59,55 @@ function renderOverlay(props: { autoPlay?: boolean; finished?: boolean; secondsL
 }
 
 describe('UpNextOverlay autoplay', () => {
+    beforeEach(() => { vi.useFakeTimers(); });
+    afterEach(() => { vi.useRealTimers(); });
+
+    function finishedOverlay(onPlayNext: (item: UpNextItemVM) => Promise<void>, onCancelAutoPlay: () => void) {
+        return (
+            <MemoryRouter>
+                <UpNextOverlay currentMedia={{ title: 'The First One' }} upNextData={nextEpisode} onPlayNext={onPlayNext} onClose={vi.fn()} autoPlay finished secondsLeft={0} onCancelAutoPlay={onCancelAutoPlay} />
+            </MemoryRouter>
+        );
+    }
+
     it('counts down to the next episode while this one ends, and starts it when it finishes', () => {
         const { onPlayNext, rerender, onCancelAutoPlay } = renderOverlay({ autoPlay: true, secondsLeft: 11.2 });
 
         expect(screen.getByRole('status')).toHaveTextContent('Playing in 12s');
         expect(onPlayNext).not.toHaveBeenCalled();
 
-        rerender(
-            <MemoryRouter>
-                <UpNextOverlay currentMedia={{ title: 'The First One' }} upNextData={nextEpisode} onPlayNext={onPlayNext} onClose={vi.fn()} autoPlay finished secondsLeft={0} onCancelAutoPlay={onCancelAutoPlay} />
-            </MemoryRouter>,
-        );
+        act(() => { vi.advanceTimersByTime(11_200); });
+        rerender(finishedOverlay(onPlayNext, onCancelAutoPlay));
 
         expect(screen.getByRole('status')).toHaveTextContent('Starting…');
         expect(onPlayNext).toHaveBeenCalledTimes(1);
         expect(onPlayNext).toHaveBeenCalledWith(expect.objectContaining({ id: 'ep-2' }));
     });
 
+    it('counts down from ten after Skip Credits, and only then starts the next episode', () => {
+        const { onPlayNext, rerender, onCancelAutoPlay } = renderOverlay({ autoPlay: true, secondsLeft: 2 });
+        expect(screen.getByRole('status')).toHaveTextContent('Playing in 10s');
+
+        act(() => { vi.advanceTimersByTime(2_000); });
+        rerender(finishedOverlay(onPlayNext, onCancelAutoPlay));
+
+        expect(screen.getByRole('status')).toHaveTextContent('Playing in 8s');
+        expect(screen.getByRole('button', { name: 'Cancel' })).toBeInTheDocument();
+        expect(onPlayNext).not.toHaveBeenCalled();
+
+        act(() => { vi.advanceTimersByTime(8_000); });
+
+        expect(screen.getByRole('status')).toHaveTextContent('Starting…');
+        expect(screen.queryByRole('button', { name: 'Cancel' })).toBeNull();
+        expect(onPlayNext).toHaveBeenCalledTimes(1);
+    });
+
     it('starts the next episode once, however often the player redraws', () => {
         const { onPlayNext, rerender, onCancelAutoPlay } = renderOverlay({ autoPlay: true, finished: true });
+        act(() => { vi.advanceTimersByTime(10_000); });
 
         for (let i = 0; i < 3; i++) {
-            rerender(
-                <MemoryRouter>
-                    <UpNextOverlay currentMedia={{ title: 'The First One' }} upNextData={nextEpisode} onPlayNext={onPlayNext} onClose={vi.fn()} autoPlay finished secondsLeft={0} onCancelAutoPlay={onCancelAutoPlay} />
-                </MemoryRouter>,
-            );
+            rerender(finishedOverlay(onPlayNext, onCancelAutoPlay));
         }
 
         expect(onPlayNext).toHaveBeenCalledTimes(1);

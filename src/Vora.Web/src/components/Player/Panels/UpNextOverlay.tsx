@@ -16,7 +16,8 @@ interface UpNextOverlayProps {
     // The profile plays the next episode by itself, and the viewer has not
     // cancelled it for this one.
     autoPlay?: boolean;
-    // The item has finished; with autoPlay on, the next one starts now.
+    // The item has finished; with autoPlay on, the next one starts once the
+    // card has been up for ten seconds.
     finished?: boolean;
     secondsLeft?: number;
     onCancelAutoPlay?: () => void;
@@ -25,7 +26,7 @@ interface UpNextOverlayProps {
 export default function UpNextOverlay({ currentMedia, upNextData, onPlayNext, onClose, autoPlay = false, finished = false, secondsLeft = 0, onCancelAutoPlay }: UpNextOverlayProps) {
     const nextItem = upNextData?.nextItem;
     const countingDown = autoPlay && !!nextItem;
-    useUpNextAutoPlay({ countingDown, finished, nextItem, onPlayNext });
+    const countdown = useUpNextAutoPlay({ countingDown, finished, secondsLeft, nextItem, onPlayNext });
 
     return (
         <div
@@ -53,9 +54,9 @@ export default function UpNextOverlay({ currentMedia, upNextData, onPlayNext, on
                             {countingDown && (
                                 <div className="flex items-center gap-3">
                                     <span role="status" className="text-sm font-medium tabular-nums" style={{ color: 'var(--vora-text-secondary)' }}>
-                                        {finished ? 'Starting…' : `Playing in ${Math.ceil(secondsLeft)}s`}
+                                        {countdown.starting ? 'Starting…' : `Playing in ${Math.ceil(countdown.secondsLeft)}s`}
                                     </span>
-                                    {!finished && onCancelAutoPlay && (
+                                    {!countdown.starting && onCancelAutoPlay && (
                                         <button type="button" onClick={onCancelAutoPlay} className="vora-button-secondary cursor-pointer">
                                             Cancel
                                         </button>
