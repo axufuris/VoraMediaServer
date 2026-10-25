@@ -42,6 +42,25 @@ describe('the overlay editor', () => {
         expect(screen.getByRole('button', { name: 'Card' })).toHaveAttribute('aria-pressed', 'true');
     });
 
+    it('opens with the corner box a viewer would see, so badges are placed clear of it', async () => {
+        renderEditor();
+        await waitFor(() => expect(mocks.getTemplateByMediaType).toHaveBeenCalled());
+        const canvas = screen.getByTestId('overlay-canvas');
+
+        expect(screen.getByLabelText('Watched Checkmark')).toBeChecked();
+        expect(canvas.querySelector('svg path')).not.toBeNull();
+
+        fireEvent.change(screen.getByDisplayValue('Movie Poster (2:3)'), { target: { value: 'Season' } });
+
+        expect(screen.getByLabelText('Unplayed Count')).toBeChecked();
+        expect(canvas).toHaveTextContent('3');
+
+        fireEvent.change(screen.getByDisplayValue('Season Poster (2:3)'), { target: { value: 'Episode' } });
+
+        expect(screen.getByLabelText('Watched Checkmark')).toBeChecked();
+        expect(canvas).toHaveTextContent('E1');
+    });
+
     it("draws the watched box with the client's own corner, measured from the canvas", async () => {
         renderEditor();
         await waitFor(() => expect(mocks.getTemplateByMediaType).toHaveBeenCalled());

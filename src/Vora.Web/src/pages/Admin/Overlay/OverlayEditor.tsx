@@ -12,6 +12,13 @@ type BadgeType = 'resolution' | 'content_rating' | 'audio_codec' | 'stinger' | '
 type MockType = 'none' | 'watched' | 'unplayed';
 type PreviewSize = 'large' | 'card' | 'small';
 
+// The corner box a viewer sees on most of these posters, shown from the start
+// so badges are never placed under it: a show or season has episodes left, a
+// film or an episode has been watched.
+function defaultMock(mediaType: MediaType): MockType {
+    return mediaType === 'TvShow' || mediaType === 'Season' ? 'unplayed' : 'watched';
+}
+
 const PREVIEW_SIZES: { value: PreviewSize; label: string; detail: string; width: number | null }[] = [
     { value: 'large', label: 'Large', detail: 'Drag and resize badges here.', width: null },
     { value: 'card', label: 'Card', detail: 'Actual size of the largest web card, 192px wide.', width: 192 },
@@ -182,7 +189,7 @@ export default function OverlayEditor() {
     const [activeTemplateId, setActiveTemplateId] = useState<string | null>(null);
     const [mediaType, setMediaType] = useState<MediaType>('Movie');
     const [elements, setElements] = useState<OverlayElement[]>([]);
-    const [mockUI, setMockUI] = useState<MockType>('none');
+    const [mockUI, setMockUI] = useState<MockType>(defaultMock('Movie'));
     const [previewSize, setPreviewSize] = useState<PreviewSize>('large');
     const preview = PREVIEW_SIZES.find(size => size.value === previewSize) ?? PREVIEW_SIZES[0];
     const editable = preview.width === null;
@@ -398,7 +405,11 @@ export default function OverlayEditor() {
                         <label className="block text-xs font-bold uppercase tracking-widest text-[var(--vora-text-muted)] mb-1.5">Target Canvas</label>
                         <select
                             value={mediaType}
-                            onChange={(e) => setMediaType(e.target.value as MediaType)}
+                            onChange={(e) => {
+                                const next = e.target.value as MediaType;
+                                setMediaType(next);
+                                setMockUI(defaultMock(next));
+                            }}
                             className="vora-input cursor-pointer"
                         >
                             <option value="Movie">Movie Poster (2:3)</option>
