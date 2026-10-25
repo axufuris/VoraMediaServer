@@ -195,12 +195,18 @@ public class FFmpegTranscodeService : ITranscodeService
 
         await ResumeAsync(mediaItemId, "the player asked for a segment it has not written yet");
 
+        bool hasActiveProcess = IsEncoding(mediaItemId);
+        if (!hasActiveProcess)
+        {
+            if (IsSegmentSealed(mediaItemId, segmentIndex, ctx)) return SegmentAvailability.Ready;
+            if (IsPastTheEnd(ctx, segmentIndex)) return SegmentAvailability.PastTheEnd;
+        }
+
         // What range is the current FFmpeg encoder targeting? It started at
         // ctx.CurrentStartSegment and is producing segments sequentially.
         // The leading edge on disk tells us where it's gotten to.
         int currentStart = ctx.CurrentStartSegment;
         int leadingEdge = ComputeLeadingEdge(mediaItemId, ctx.TargetDir);
-        bool hasActiveProcess = IsEncoding(mediaItemId);
 
         // If the requested segment is within the range the current encoder
         // will reach soon (start ≤ requested ≤ start+60, ≈4min of buffer),
