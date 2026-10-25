@@ -436,6 +436,21 @@ describe('the menu on a poster', () => {
         expect(markAsPlayed).toHaveBeenCalledWith('show-1', true, 'srv1');
     });
 
+    it('names only the episodes left when a season is nearly watched', async () => {
+        const nearlyWatched = title({
+            ...season,
+            episodes: [...Array.from({ length: 7 }, (_, i) => ({ id: `e${i + 1}`, isPlayed: true })), { id: 'e8', isPlayed: false }] as MediaItem['episodes'],
+        });
+        await openMenuFor(nearlyWatched, mediaMenuTarget(nearlyWatched, 'srv1'));
+
+        fireEvent.click(screen.getByRole('menuitem', { name: 'Mark as watched' }));
+        const question = await screen.findByRole('dialog', { name: 'Mark 1 episode as watched?' });
+
+        expect(question).toHaveTextContent("The 1 episode in this season you haven't watched will be marked watched, and any playback progress on it will be cleared.");
+        fireEvent.click(within(question).getByRole('button', { name: 'Mark watched' }));
+        await waitFor(() => expect(markAsPlayed).toHaveBeenCalledWith('season-3', true, 'srv1'));
+    });
+
     it('leaves a show as it was when that question is cancelled', async () => {
         const onChanged = vi.fn();
         await openMenuFor(longShow, mediaMenuTarget(longShow, 'srv1', { onChanged }));
