@@ -1,2 +1,8 @@
 @import "tailwindcss";
+
+/* Tailwind 4 applies hover styles only under `(hover: hover)`, which a
+   browser reporting a touch screen answers no even with a mouse attached:
+   every hover in the app went dead there. A hover style follows the
+   pointer, whatever the device says it is. */
+@custom-variant hover (&:hover);
 @import "./styles/tokens.css";

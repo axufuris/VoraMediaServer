@@ -264,6 +264,17 @@
     outline-offset: 2px;
 }
 
+/* A media tile's focus ring goes round its picture, never round the picture
+   and the title under it. */
+[data-vora-client] .vora-media-card:focus-visible {
+    outline: none;
+}
+
+[data-vora-client] .vora-media-card:focus-visible > .vora-media-card-art {
+    outline: 2px solid var(--vora-accent-500);
+    outline-offset: 2px;
+}
+
 .vora-glass {
     background: var(--vora-bg-glass);
     backdrop-filter: blur(18px) saturate(140%);
