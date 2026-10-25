@@ -192,17 +192,25 @@ describe('MediaCard', () => {
             expect(onPlay).toHaveBeenCalledTimes(1);
         });
 
-        // A touch-screen computer with a mouse matches both `hover: none` and,
-        // in Chromium, `any-hover: none`, so either showed every play button at
-        // once there. Only "no input can hover" means a phone or a tablet.
-        it('shows its play button on hover, and always only where nothing can hover', () => {
-            render(<MediaCard title="Anjin" onClick={vi.fn()} onPlay={vi.fn()} playLabel="Play Anjin" />);
+        // Each media query about the device (hover: none, any-hover: none, and
+        // "no input can hover") lit every play button on some computers with a
+        // mouse, so the button answers only to this card: hovered, or reached
+        // by keyboard or remote. A click's leftover focus and a `group` around
+        // the card don't count.
+        it('shows its play button only while the card is hovered or reached by keyboard', () => {
+            const { container } = render(<MediaCard title="Anjin" onClick={vi.fn()} onPlay={vi.fn()} playLabel="Play Anjin" />);
 
+            const card = container.querySelector('[role="button"]') as HTMLElement;
             const overlay = screen.getByRole('button', { name: 'Play Anjin' }).parentElement as HTMLElement;
+            const showsWhen = overlay.className.split(/\s+/).filter(name => name.endsWith(':opacity-100'));
+
+            expect(card.className.split(/\s+/)).toContain('group/card');
             expect(overlay.className).toContain('opacity-0');
-            expect(overlay.className).toContain('group-hover:opacity-100');
-            expect(overlay.className).toContain('[@media_not_all_and_(any-hover:hover)]:opacity-100');
-            expect(overlay.className).not.toMatch(/\[@media\((any-)?hover:none\)\]/);
+            expect(showsWhen.sort()).toEqual([
+                'group-focus-visible/card:opacity-100',
+                'group-hover/card:opacity-100',
+                'has-[:focus-visible]:opacity-100',
+            ]);
         });
 
         it('does not select when Enter is pressed on its play button', () => {

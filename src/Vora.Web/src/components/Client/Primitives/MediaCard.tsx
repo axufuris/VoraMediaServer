@@ -137,7 +137,7 @@ export default function MediaCard({
             onKeyDown={handleKeyDown}
             onFocus={onFocus ? (e: React.FocusEvent<HTMLDivElement>) => { if (e.target === e.currentTarget) onFocus(); } : undefined}
             {...menuTrigger}
-            className={`group block text-left ${onClick ? 'cursor-pointer' : ''} ${className ?? ''}`}
+            className={`group group/card block text-left ${onClick ? 'cursor-pointer' : ''} ${className ?? ''}`}
             style={{ ...menuTrigger?.style, width: fill ? '100%' : WIDTH_VAR[size], background: 'transparent', border: 'none', padding: 0 }}
         >
             <div
@@ -206,13 +206,13 @@ export default function MediaCard({
                     </button>
                 )}
 
-                {/* Always shown only where nothing can hover (a phone or a
-                    tablet). Not `hover: none` (the primary input alone) or
-                    `any-hover: none`, which Chromium matches when any input
-                    can't hover: both are true on a touch-screen computer with
-                    a mouse, and lit every play button on the page there. */}
+                {/* Shown only while this card is hovered, or reached by
+                    keyboard or remote. Never by a media query about the
+                    device (each one we tried lit every button on some
+                    computers with a mouse), never by focus a click left
+                    behind, and never by a `group` around the card. */}
                 {onPlay && (
-                    <div className="absolute inset-0 z-20 flex items-center justify-center opacity-0 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100 [@media_not_all_and_(any-hover:hover)]:opacity-100">
+                    <div className="absolute inset-0 z-20 flex items-center justify-center opacity-0 transition-opacity group-hover/card:opacity-100 group-focus-visible/card:opacity-100 has-[:focus-visible]:opacity-100">
                         <button
                             type="button"
                             aria-label={playLabel ?? `Play ${displayTitle}`}
