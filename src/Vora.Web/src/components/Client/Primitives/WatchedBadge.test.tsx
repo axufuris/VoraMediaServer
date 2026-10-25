@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { render } from '@testing-library/react';
-import { CheckGlyph, CornerChip, PosterCorner, WatchedBadge } from './WatchedBadge';
+import { CheckGlyph, CornerChip, PosterCorner, UnplayedCountBadge, WatchedBadge } from './WatchedBadge';
+import { cornerLength } from './posterCornerLength';
 import { episodeCornerLabel } from '../../../utils/posterCaption';
 
 // The check is the same path the Android client rasterises. If these two ever
@@ -8,9 +9,18 @@ import { episodeCornerLabel } from '../../../utils/posterCaption';
 // drift this component exists to stop.
 const CHECK_PATH = 'M5 13l4 4L19 7';
 
+// The value a style holds once the browser has read it, which simplifies calc().
+function css(property: string, value: string): string {
+    const probe = document.createElement('div');
+    probe.style.setProperty(property, value);
+    const read = probe.style.getPropertyValue(property);
+    if (!read) throw new Error(`${property}: ${value} is not a length the browser keeps`);
+    return read;
+}
+
 describe('watched badge', () => {
     it('draws the same check path the Android client uses', () => {
-        const { container } = render(<CheckGlyph size={12} />);
+        const { container } = render(<CheckGlyph size="12px" />);
 
         expect(container.querySelector('path')?.getAttribute('d')).toBe(CHECK_PATH);
     });
@@ -61,14 +71,46 @@ describe('watched badge', () => {
 
     // The wrapper is a flex box so the chip hugs the corner; as a plain block
     // the chip sat on a text baseline several pixels below it.
-    it('pins the badge 6px into the corner, scaled with the canvas', () => {
-        const card = render(<PosterCorner><WatchedBadge /></PosterCorner>).container.firstElementChild as HTMLElement;
-        expect(card.className).toContain('flex');
-        expect(card.style.top).toBe('6px');
-        expect(card.style.right).toBe('6px');
+    it('pins the badge 6 in from the corner of a 192-wide tile', () => {
+        const tile = render(<PosterCorner><WatchedBadge /></PosterCorner>).container.firstElementChild as HTMLElement;
+        const corner = tile.firstElementChild as HTMLElement;
 
-        const editor = render(<PosterCorner scale={2.5}><WatchedBadge scale={2.5} /></PosterCorner>).container.firstElementChild as HTMLElement;
-        expect(editor.style.top).toBe('15px');
+        expect(corner.className).toContain('flex');
+        expect(corner.style.top).toBe(css('top', cornerLength(6)));
+        expect(corner.style.right).toBe(css('right', cornerLength(6)));
+    });
+
+    // The overlay icons are part of the artwork and shrink with it, so a box
+    // held at a fixed size grew over them on every tile smaller than the
+    // editor's: the TV's posters drew it nearly twice as large.
+    it('measures every length from the tile it sits on, at any size', () => {
+        const tile = render(<PosterCorner><CornerChip label="E1" watched /></PosterCorner>).container.firstElementChild as HTMLElement;
+        const chip = tile.querySelector('span') as HTMLElement;
+        const check = tile.querySelector('svg') as SVGElement;
+
+        expect(tile.style.getPropertyValue('container-type')).toBe('inline-size');
+        expect(tile.className).toContain('inset-0');
+        expect(chip.style.fontSize).toBe(css('font-size', cornerLength(10)));
+        expect(chip.style.padding).toBe(css('padding', `${cornerLength(2)} ${cornerLength(6)}`));
+        expect(chip.style.gap).toBe(css('gap', cornerLength(4)));
+        expect(chip.style.borderRadius).toBe(css('border-radius', cornerLength(4)));
+        expect(check.style.width).toBe(css('width', cornerLength(10)));
+    });
+
+    it('sizes the check alone and the episode count the same way', () => {
+        const check = render(<WatchedBadge />).container.firstElementChild as HTMLElement;
+        const count = render(<UnplayedCountBadge count={3} />).container.firstElementChild as HTMLElement;
+
+        expect(check.style.padding).toBe(css('padding', `${cornerLength(2)} ${cornerLength(4)}`));
+        expect((check.querySelector('svg') as SVGElement).style.width).toBe(css('width', cornerLength(12)));
+        expect(count.style.fontSize).toBe(css('font-size', cornerLength(10)));
+        expect(count.style.minWidth).toBe(css('min-width', cornerLength(18)));
+        expect(count.style.padding).toBe(css('padding', `${cornerLength(2)} ${cornerLength(5)}`));
+    });
+
+    it('states its lengths as shares of a 192-wide tile', () => {
+        expect(cornerLength(6)).toBe('calc(100cqw * 6 / 192)');
+        expect(cornerLength(192)).toBe('calc(100cqw * 192 / 192)');
     });
 });
 
