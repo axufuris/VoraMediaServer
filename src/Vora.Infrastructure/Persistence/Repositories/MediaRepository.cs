@@ -34,6 +34,13 @@ public partial class MediaRepository : IMediaRepository
     public async Task<List<Guid>> GetEpisodeIdsForSeasonAsync(Guid seasonId) =>
         await _context.Set<Episode>().AsNoTracking().Where(e => e.SeasonId == seasonId).Select(e => e.Id).ToListAsync();
 
+    public Task<List<HeldEpisode>> GetHeldEpisodesForShowAsync(Guid tvShowId) =>
+        _context.Set<Episode>()
+            .AsNoTracking()
+            .Where(e => e.Season.TvShowId == tvShowId && e.MissingSince == null)
+            .Select(e => new HeldEpisode(e.Season.SeasonNumber, e.EpisodeNumber, e.EndEpisodeNumber))
+            .ToListAsync();
+
     public async Task<List<Guid>> GetEpisodeIdsForShowAsync(Guid tvShowId) =>
         await _context.Set<Episode>().AsNoTracking().Where(e => e.Season != null && e.Season.TvShowId == tvShowId).Select(e => e.Id).ToListAsync();
 

@@ -379,7 +379,11 @@ export default function MediaDetailsPage() {
     const resumeClock = `${Math.floor(resumePos / 60)}:${String(Math.floor(resumePos % 60)).padStart(2, '0')}`;
     const isFullyPlayed = isFullyWatched(described);
 
+    // The server has already left out every episode the library holds, so this
+    // is the next one still to come: the soonest yet to air, else one that has
+    // aired but isn't here yet.
     let nextEpisode: UpcomingEpisodeParsed | null = null;
+    let nextEpisodeAired = false;
     if (media.upcomingEpisodesJson && media.upcomingEpisodesJson !== '[]') {
         try {
             const upcoming: UpcomingEpisodeParsed[] = JSON.parse(media.upcomingEpisodesJson);
@@ -388,6 +392,7 @@ export default function MediaDetailsPage() {
                 nextEpisode = futureEps.sort((a, b) => serverTimeMs(a.AirDate) - serverTimeMs(b.AirDate))[0];
             } else if (upcoming.length > 0) {
                 nextEpisode = upcoming[0];
+                nextEpisodeAired = true;
             }
         } catch (e: unknown) {
             console.error('Failed to parse upcoming episodes:', e);
@@ -560,7 +565,7 @@ export default function MediaDetailsPage() {
                             Season {nextEpisode.SeasonNumber} · Episode {nextEpisode.EpisodeNumber} — {nextEpisode.Title}
                         </p>
                         <p className="m-0 mt-0.5 text-xs" style={{ color: 'var(--vora-info-text)' }}>
-                            Airs {formatDate(nextEpisode.AirDate, { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
+                            {nextEpisodeAired ? 'Aired' : 'Airs'} {formatDate(nextEpisode.AirDate, { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
                         </p>
                     </div>
                 </div>

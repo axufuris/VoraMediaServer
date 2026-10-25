@@ -12,6 +12,7 @@ public interface IMediaRepository
 {
     Task<MediaMatchInfoDto?> GetMediaMatchInfoAsync(Guid mediaItemId);
     Task<List<Guid>> GetEpisodeIdsForSeasonAsync(Guid seasonId);
+    Task<List<HeldEpisode>> GetHeldEpisodesForShowAsync(Guid tvShowId);
     Task<List<Guid>> GetEpisodeIdsForShowAsync(Guid tvShowId);
     Task<List<string>> GetEpisodeFilePathsForShowAsync(Guid tvShowId);
     Task<Guid?> GetMovieIdByTitleAndYearAsync(string title, int? year, Guid libraryId, string? tmdbId = null, string? imdbId = null);

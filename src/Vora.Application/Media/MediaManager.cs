@@ -79,7 +79,7 @@ public class MediaManager : IMediaManager
 
     public async Task<MediaDetailsVM?> GetMediaItemAsync(Guid id, Guid? profileId, bool hasAllAccess, List<Guid> allowedLibs, List<string> allowedMovieRatings, List<string> allowedTvRatings, bool blockUnrated)
     {
-        var vm = ReadyForDisplay(await _repository.GetProjectedAsync(id, MediaDetailsVM.Projection, hasAllAccess, allowedLibs, allowedMovieRatings, allowedTvRatings, blockUnrated));
+        var vm = await WithoutHeldUpcomingAsync(ReadyForDisplay(await _repository.GetProjectedAsync(id, MediaDetailsVM.Projection, hasAllAccess, allowedLibs, allowedMovieRatings, allowedTvRatings, blockUnrated)));
 
         if (vm == null || !profileId.HasValue) return vm;
 
@@ -98,7 +98,21 @@ public class MediaManager : IMediaManager
     }
 
     public async Task<MediaDetailsVM?> GetMediaItemAsync(Guid id) =>
-        ReadyForDisplay(await _repository.GetProjectedAsync(id, MediaDetailsVM.Projection));
+        await WithoutHeldUpcomingAsync(ReadyForDisplay(await _repository.GetProjectedAsync(id, MediaDetailsVM.Projection)));
+
+    private async Task<MediaDetailsVM?> WithoutHeldUpcomingAsync(MediaDetailsVM? details)
+    {
+        var showId = details?.Type == "TvShow" ? details.Id : details?.TvShowId;
+        if (details == null || showId is not Guid tvShowId) return details;
+
+        details.UpcomingEpisodesJson = await WithoutHeldUpcomingAsync(details.UpcomingEpisodesJson, tvShowId);
+        return details;
+    }
+
+    private async Task<string?> WithoutHeldUpcomingAsync(string? upcomingJson, Guid tvShowId) =>
+        string.IsNullOrWhiteSpace(upcomingJson) || upcomingJson == "[]"
+            ? upcomingJson
+            : UpcomingEpisodes.WithoutHeld(upcomingJson, await _repository.GetHeldEpisodesForShowAsync(tvShowId));
 
     private static MediaDetailsVM? ReadyForDisplay(MediaDetailsVM? details)
     {
@@ -118,8 +132,12 @@ public class MediaManager : IMediaManager
         return items.GroupBy(e => $"{e.Title.ToLower().Trim()}_{e.ReleaseDate?.Year}").Select(g => g.First()).ToList();
     }
 
-    public Task<SeasonDetailsVM?> GetSeasonDetailsAsync(Guid seasonId) =>
-        _repository.GetProjectedAsync(seasonId, SeasonDetailsVM.Projection);
+    public async Task<SeasonDetailsVM?> GetSeasonDetailsAsync(Guid seasonId)
+    {
+        var season = await _repository.GetProjectedAsync(seasonId, SeasonDetailsVM.Projection);
+        if (season != null) season.UpcomingEpisodesJson = await WithoutHeldUpcomingAsync(season.UpcomingEpisodesJson, season.TvShowId);
+        return season;
+    }
 
     public async Task<List<MediaMarkerVM>> GetMarkersAsync(Guid mediaItemId)
     {

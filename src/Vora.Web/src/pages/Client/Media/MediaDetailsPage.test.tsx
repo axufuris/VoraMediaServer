@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { afterEach, describe, it, expect, vi, beforeEach } from 'vitest';
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom';
 import MediaDetailsPage from './MediaDetailsPage';
@@ -287,6 +287,39 @@ describe('a show page', () => {
 
         expect(await screen.findByText('Seasons')).toBeInTheDocument();
         expect(screen.queryByText('Episodes')).toBeNull();
+    });
+});
+
+describe("a show's next episode", () => {
+    beforeEach(() => { vi.useFakeTimers({ toFake: ['Date'] }); vi.setSystemTime(new Date('2026-10-25T12:00:00')); });
+    afterEach(() => { vi.useRealTimers(); });
+
+    const upcoming = (airDate: string) => JSON.stringify([{ SeasonNumber: 3, EpisodeNumber: 1, Title: 'Crimson Sky', AirDate: airDate }]);
+
+    it('says when the next one airs', async () => {
+        items.shogun = { ...show(2), upcomingEpisodesJson: upcoming('2026-11-04') };
+        openPage('/media/shogun');
+
+        expect(await screen.findByText(/Season 3 · Episode 1 — Crimson Sky/)).toBeInTheDocument();
+        expect(screen.getByText(/^Airs /)).toBeInTheDocument();
+    });
+
+    // The server leaves out every episode the library holds, so one that has
+    // aired is still to come here: it aired, it isn't in the library yet.
+    it('says one that has already aired aired', async () => {
+        items.shogun = { ...show(2), upcomingEpisodesJson: upcoming('2026-10-21') };
+        openPage('/media/shogun');
+
+        expect(await screen.findByText(/Season 3 · Episode 1 — Crimson Sky/)).toBeInTheDocument();
+        expect(screen.getByText(/^Aired /)).toBeInTheDocument();
+    });
+
+    it('shows nothing once the library holds every episode it knew of', async () => {
+        items.shogun = { ...show(2), upcomingEpisodesJson: '[]' };
+        openPage('/media/shogun');
+
+        expect(await screen.findByText('Seasons')).toBeInTheDocument();
+        expect(screen.queryByText(/Next/)).toBeNull();
     });
 });
 
