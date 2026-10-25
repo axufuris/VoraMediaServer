@@ -71,7 +71,7 @@ describe('watched badge', () => {
 
     // The wrapper is a flex box so the chip hugs the corner; as a plain block
     // the chip sat on a text baseline several pixels below it.
-    it('pins the badge 6 in from the corner of a 192-wide tile', () => {
+    it('pins the badge 6 in from the corner of a 128-wide tile', () => {
         const tile = render(<PosterCorner><WatchedBadge /></PosterCorner>).container.firstElementChild as HTMLElement;
         const corner = tile.firstElementChild as HTMLElement;
 
@@ -108,9 +108,9 @@ describe('watched badge', () => {
         expect(count.style.padding).toBe(css('padding', `${cornerLength(2)} ${cornerLength(5)}`));
     });
 
-    it('states its lengths as shares of a 192-wide tile', () => {
-        expect(cornerLength(6)).toBe('calc(100cqw * 6 / 192)');
-        expect(cornerLength(192)).toBe('calc(100cqw * 192 / 192)');
+    it('states its lengths as shares of a 128-wide tile', () => {
+        expect(cornerLength(6)).toBe('calc(100cqw * 6 / 128)');
+        expect(cornerLength(128)).toBe('calc(100cqw * 128 / 128)');
     });
 });
 

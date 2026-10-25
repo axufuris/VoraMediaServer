@@ -5,12 +5,13 @@ import { overlayService } from '../../../api/Streaming/overlayService';
 import { useDialog } from '../../../dialogs';
 import PageHeader from '../../../components/Admin/Primitives/PageHeader';
 import { CornerChip, PosterCorner, UnplayedCountBadge, WatchedBadge } from '../../../components/Client/Primitives/WatchedBadge';
-import { POSTER_CORNER_REFERENCE_WIDTH } from '../../../components/Client/Primitives/posterCornerLength';
 
 type MediaType = 'Movie' | 'Season' | 'TvShow' | 'Episode';
 type BadgeType = 'resolution' | 'content_rating' | 'audio_codec' | 'stinger' | 'edition' | 'composite_ratings' | 'critic_rating';
 type MockType = 'none' | 'watched' | 'unplayed';
 type PreviewSize = 'large' | 'card' | 'small';
+
+const LARGEST_CARD_WIDTH = 192;
 
 // The corner box a viewer sees on most of these posters, shown from the start
 // so badges are never placed under it: a show or season has episodes left, a
@@ -21,7 +22,7 @@ function defaultMock(mediaType: MediaType): MockType {
 
 const PREVIEW_SIZES: { value: PreviewSize; label: string; detail: string; width: number | null }[] = [
     { value: 'large', label: 'Large', detail: 'Drag and resize badges here.', width: null },
-    { value: 'card', label: 'Card', detail: 'Actual size of the largest web card, 192px wide.', width: 192 },
+    { value: 'card', label: 'Card', detail: 'Actual size of the largest web card, 192px wide.', width: LARGEST_CARD_WIDTH },
     { value: 'small', label: 'Small', detail: 'Actual size of a TV poster or a phone card, 104px wide.', width: 104 },
 ];
 
@@ -198,7 +199,7 @@ export default function OverlayEditor() {
     const [canvasSize, setCanvasSize] = useState({ width: 0, height: 0 });
     // A card's corners keep their radius at any width the client draws them;
     // only the enlarged canvas grows them, as a card blown up to its size.
-    const cornerRadiusScale = Math.max(1, canvasSize.width / POSTER_CORNER_REFERENCE_WIDTH);
+    const cornerRadiusScale = Math.max(1, canvasSize.width / LARGEST_CARD_WIDTH);
     const elementIdCounter = useRef(0);
     const nextElementId = () => `el-${++elementIdCounter.current}`;
 

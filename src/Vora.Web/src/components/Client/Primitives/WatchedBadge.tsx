@@ -11,7 +11,7 @@ import { cornerLength } from './posterCornerLength';
 // for movies and a box for episodes, which read as two different badges.
 //
 // Every size is a share of the tile's width: the numbers below are the box on a
-// tile 192 wide, and it grows and shrinks with the tile, never held at a
+// tile 128 wide, and it grows and shrinks with the tile, never held at a
 // minimum (not even its border). The overlay icons baked into the artwork
 // scale with it the same way, so the box sits where the overlay editor shows
 // it on every client and at every size. The editor draws its canvas with these
@@ -37,7 +37,7 @@ export function CheckGlyph({ size, className, color }: { size: string; className
 }
 
 // Measures the tile (a container the size of its artwork) and places the badge
-// in its top-right corner, 6 in on a 192-wide tile. A flex box rather than a
+// in its top-right corner, 6 in on a 128-wide tile. A flex box rather than a
 // plain block: an inline-flex chip inside a block sits on the block's text
 // baseline, which pushed it several pixels below the corner.
 export function PosterCorner({ children, zIndex = 10 }: { children: ReactNode; zIndex?: number }) {
