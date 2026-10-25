@@ -5,12 +5,25 @@ import { overlayService } from '../../../api/Streaming/overlayService';
 import { useDialog } from '../../../dialogs';
 import PageHeader from '../../../components/Admin/Primitives/PageHeader';
 import { CornerChip, PosterCorner, UnplayedCountBadge, WatchedBadge } from '../../../components/Client/Primitives/WatchedBadge';
-
-const CARD_WIDTH_PX = 192;
+import { POSTER_CORNER_REFERENCE_WIDTH } from '../../../components/Client/Primitives/posterCornerLength';
 
 type MediaType = 'Movie' | 'Season' | 'TvShow' | 'Episode';
 type BadgeType = 'resolution' | 'content_rating' | 'audio_codec' | 'stinger' | 'edition' | 'composite_ratings' | 'critic_rating';
 type MockType = 'none' | 'watched' | 'unplayed';
+type PreviewSize = 'large' | 'card' | 'small';
+
+// The corner box a viewer sees on most of these posters, shown from the start
+// so badges are never placed under it: a show or season has episodes left, a
+// film or an episode has been watched.
+function defaultMock(mediaType: MediaType): MockType {
+    return mediaType === 'TvShow' || mediaType === 'Season' ? 'unplayed' : 'watched';
+}
+
+const PREVIEW_SIZES: { value: PreviewSize; label: string; detail: string; width: number | null }[] = [
+    { value: 'large', label: 'Large', detail: 'Drag and resize badges here.', width: null },
+    { value: 'card', label: 'Card', detail: 'Actual size of the largest web card, 192px wide.', width: 192 },
+    { value: 'small', label: 'Small', detail: 'Actual size of a TV poster or a phone card, 104px wide.', width: 104 },
+];
 
 interface OverlayElement {
     id: string;
@@ -176,15 +189,16 @@ export default function OverlayEditor() {
     const [activeTemplateId, setActiveTemplateId] = useState<string | null>(null);
     const [mediaType, setMediaType] = useState<MediaType>('Movie');
     const [elements, setElements] = useState<OverlayElement[]>([]);
-    const [mockUI, setMockUI] = useState<MockType>('none');
-
+    const [mockUI, setMockUI] = useState<MockType>(defaultMock('Movie'));
+    const [previewSize, setPreviewSize] = useState<PreviewSize>('large');
+    const preview = PREVIEW_SIZES.find(size => size.value === previewSize) ?? PREVIEW_SIZES[0];
+    const editable = preview.width === null;
 
     const canvasRef = useRef<HTMLDivElement>(null);
     const [canvasSize, setCanvasSize] = useState({ width: 0, height: 0 });
-    // The canvas drawn as a card blown up to its size: a card is at most 12rem
-    // wide, so the corners and the watched box scale by the same factor and the
-    // preview keeps the proportions viewers see.
-    const cardScale = canvasSize.width > 0 ? canvasSize.width / CARD_WIDTH_PX : 1;
+    // A card's corners keep their radius at any width the client draws them;
+    // only the enlarged canvas grows them, as a card blown up to its size.
+    const cornerRadiusScale = Math.max(1, canvasSize.width / POSTER_CORNER_REFERENCE_WIDTH);
     const elementIdCounter = useRef(0);
     const nextElementId = () => `el-${++elementIdCounter.current}`;
 
@@ -391,7 +405,11 @@ export default function OverlayEditor() {
                         <label className="block text-xs font-bold uppercase tracking-widest text-[var(--vora-text-muted)] mb-1.5">Target Canvas</label>
                         <select
                             value={mediaType}
-                            onChange={(e) => setMediaType(e.target.value as MediaType)}
+                            onChange={(e) => {
+                                const next = e.target.value as MediaType;
+                                setMediaType(next);
+                                setMockUI(defaultMock(next));
+                            }}
                             className="vora-input cursor-pointer"
                         >
                             <option value="Movie">Movie Poster (2:3)</option>
@@ -499,32 +517,53 @@ export default function OverlayEditor() {
 
                 <div className="flex-1 flex flex-col items-center justify-center relative bg-[var(--vora-bg-sunken)] rounded-[var(--vora-radius-lg)] border border-[var(--vora-border-subtle)] p-6 lg:min-h-0">
 
+                <div className="mb-4 flex shrink-0 flex-col items-center gap-1.5">
+                    <div role="group" aria-label="Preview size" className="flex overflow-hidden rounded-[var(--vora-radius-md)] border border-[var(--vora-border-strong)]">
+                        {PREVIEW_SIZES.map(size => (
+                            <button
+                                key={size.value}
+                                type="button"
+                                aria-pressed={previewSize === size.value}
+                                onClick={() => setPreviewSize(size.value)}
+                                className={`cursor-pointer border-r border-[var(--vora-border-strong)] px-3 py-1.5 text-xs font-semibold transition-colors last:border-r-0 ${previewSize === size.value ? 'bg-[var(--vora-accent-500)] text-[var(--vora-accent-contrast)]' : 'bg-[var(--vora-bg-surface)] text-[var(--vora-text-secondary)] hover:bg-[var(--vora-bg-sunken)]'}`}
+                            >
+                                {size.label}
+                            </button>
+                        ))}
+                    </div>
+                    <p className="m-0 text-xs text-[var(--vora-text-muted)]">{preview.detail}</p>
+                </div>
+
                 <div className="flex-1 min-h-0 w-full flex items-center justify-center">
                 <div
                     ref={canvasRef}
+                    data-testid="overlay-canvas"
                     className={`relative overflow-hidden bg-[var(--vora-bg-raised)] border border-[var(--vora-border-subtle)] shadow-[var(--vora-shadow-overlay)]
-                        ${mediaType === 'Episode' ? 'aspect-video w-full max-w-4xl max-h-full' : 'aspect-[2/3] h-full max-h-full max-w-full'}`}
-                    style={{ borderRadius: `calc(var(--vora-radius-md) * ${cardScale})` }}
+                        ${mediaType === 'Episode' ? 'aspect-video' : 'aspect-[2/3]'}
+                        ${preview.width !== null ? 'shrink-0' : mediaType === 'Episode' ? 'w-full max-w-4xl max-h-full' : 'h-full max-h-full max-w-full'}`}
+                    style={{
+                        borderRadius: `calc(var(--vora-radius-md) * ${cornerRadiusScale})`,
+                        ...(preview.width !== null ? { width: preview.width } : {}),
+                    }}
                 >
                     <img src={BACKGROUNDS[mediaType]} className="absolute inset-0 w-full h-full object-cover" alt="Canvas Mockup" />
                     <div className="absolute inset-0 bg-[color-mix(in_srgb,var(--vora-bg-canvas)_20%,transparent)] pointer-events-none"></div>
 
-                    {/* The client's real watched treatment, so the collision an
-                        admin is judging is the one their viewers will see. An
-                        episode folds the check into its number chip; every
-                        other canvas gets the standalone circular badge. The
-                        episode number is a sample — E1 stands in for whatever
-                        the episode actually is. */}
+                    {/* The client's own corner box, sized from this canvas's
+                        width exactly as every client sizes it from its
+                        poster's, so the collision judged here is the one
+                        viewers see at every size. An episode folds the check
+                        into its number chip, E1 standing in for its number. */}
                     {mockUI === 'watched' && (
-                        <PosterCorner scale={cardScale}>
+                        <PosterCorner>
                             {mediaType === 'Episode'
-                                ? <CornerChip label="E1" watched scale={cardScale} />
-                                : <WatchedBadge scale={cardScale} />}
+                                ? <CornerChip label="E1" watched />
+                                : <WatchedBadge />}
                         </PosterCorner>
                     )}
                     {mockUI === 'unplayed' && (
-                        <PosterCorner scale={cardScale}>
-                            <UnplayedCountBadge count={3} scale={cardScale} />
+                        <PosterCorner>
+                            <UnplayedCountBadge count={3} />
                         </PosterCorner>
                     )}
 
@@ -541,6 +580,8 @@ export default function OverlayEditor() {
                             <Rnd
                                 key={el.id}
                                 bounds="parent"
+                                disableDragging={!editable}
+                                enableResizing={editable}
                                 size={{ width: boxW, height: boxH }}
                                 position={{ x: el.xPct * canvasSize.width, y: el.yPct * canvasSize.height }}
                                 onDragStop={(_e, d) => {
@@ -557,7 +598,7 @@ export default function OverlayEditor() {
                                     newEls[index].yPct = position.y / canvasSize.height;
                                     setElements(newEls);
                                 }}
-                                className="group cursor-move absolute"
+                                className={`group absolute ${editable ? 'cursor-move' : ''}`}
                             >
                                 {el.type === 'composite_ratings' ? (() => {
                                     const gap = Math.max(2 * scale, boxH * 0.04);
@@ -596,7 +637,7 @@ export default function OverlayEditor() {
                                     );
                                 })()}
 
-                                <div className="absolute inset-0 border-2 border-dashed border-[var(--vora-accent-500)] opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none"></div>
+                                {editable && <div className="absolute inset-0 border-2 border-dashed border-[var(--vora-accent-500)] opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none"></div>}
                             </Rnd>
                         );
                     })}

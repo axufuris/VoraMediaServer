@@ -68,7 +68,21 @@ The single media tile. One primitive covers every aspect ratio rather than a sep
 - If `mediaItem.progress > 0`, a progress bar overlays the bottom of the artwork — height 3px (web/phone) or 4px (TV), color `accent500`, full-width track at `accentSoft`.
 - Status affordances render in the artwork's corners: watchlist flag top-left, unplayed count or played check top-right, provider/quality badge bottom-left.
 - **Secondary action.** A tile for a movie, show, season or episode opens that title's menu: right-click or the menu key on web, long press (500 ms, cancelled by 10 px of movement) on touch, and the platform's context gesture elsewhere (long press of select on a TV remote). It leads with mark as watched / unwatched and add to / remove from watchlist, which the title page shows as buttons. The rest are the title page's own entries: media info, go to season / show, add to playlist, add to collection, and for admins edit metadata, fix match, refresh, scan, analyze, thumbnails, markers and delete. Marking a show or a season asks first and says how many episodes it covers, and the tile's watched state updates in place afterwards. A long press must not also activate the tile. Tiles for anything else have no menu. Web: `MediaCard`'s `menu` prop, `docs/frontend-client-ui.md` → The title menu.
-- **One top-right box on every tile**, inset 6px from the top and right edges: a 4px-radius chip on `bg-overlay` with a 1px `border-subtle`, 10px bold text, 2px × 6px padding. An episode's box holds its number (`E1`, `E1-E2`) with the accent check to its left once watched; any other watched tile gets the same box holding just the check (2px × 4px padding, 12px check). Never a circle. The unplayed count uses the same box shape on `accent-500`. Web: `WatchedBadge.tsx` (`PosterCorner`, `CornerChip`).
+- **One top-right box on every tile**: an episode's box holds its number (`E1`, `E1-E2`) with the accent check to its left once watched; any other watched tile gets the same box holding just the check. Never a circle. A show or season with episodes left shows their count in the same box shape on `accent-500`. Web: `WatchedBadge.tsx` (`PosterCorner`, `CornerChip`); Android: `MediaPoster.kt`; Roku: `PosterCard.bs`.
+- **The box is a share of the tile's width, at every size, on every client.** Its measurements on a tile 192 wide are below; on any other tile, multiply each by *tile width ÷ 192*, smaller tiles included, with no minimum and no maximum (not even for the border or the text). The overlay icons are baked into the artwork and shrink and grow with it, and the overlay editor draws this same box on its canvas by the same rule, so a box held at a fixed size lands somewhere else on every tile that isn't 192 wide. The TV apps once kept it at full size on their 104dp posters, which drew it nearly twice as large as the editor showed, over the overlays. The editor's **Card** (192px) and **Small** (104px) previews show it at those sizes.
+
+  | On a 192-wide tile | Chip (number, or the check alone) | Count |
+  | --- | --- | --- |
+  | Inset from top and right | 6 | 6 |
+  | Text | 10, bold, line height 1.2 | 10, bold, line height 1.2 |
+  | Padding (vertical × horizontal) | 2 × 6 with a number, 2 × 4 for the check alone | 2 × 5 |
+  | Check | 10 beside a number, 12 alone, 4 before the number | — |
+  | Corner radius | 4 | 4 |
+  | Border | 1, `border-subtle`, outside the padding | none |
+  | Minimum width | — | 18 |
+  | Fill | `bg-overlay`, text `text-primary`, check `accent-500` | `accent-500`, text `accent-contrast` |
+
+  The units are web CSS pixels, Android dp and Roku 1080p UI pixels ÷ 2 (192dp = 384 Roku pixels). Text is sized with the box, never by the system font size. Web: every length is `cornerLength(n)` (`posterCornerLength.ts`) = `calc(100cqw * n / 192)`, measured from `PosterCorner`, which is a container the size of the artwork.
 
 **Sizing:** widths are relative, not fixed pixels. Web reads the `--vora-card-w-*` tokens (`clamp(rem, vw, rem)`); native clients scale the equivalent values by the platform's dynamic-type / display-size setting.
 
