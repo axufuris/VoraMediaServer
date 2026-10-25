@@ -1,5 +1,5 @@
 import { type ReactNode } from 'react';
-import { cornerLength } from './posterCornerLength';
+import { cornerLength, LANDSCAPE_CORNER_SHARE } from './posterCornerLength';
 
 // The top-right corner of every tile in the client, and the mirror of
 // `MediaPoster.kt` in the Android client and `PosterCard.bs` on the Roku, so a
@@ -37,12 +37,17 @@ export function CheckGlyph({ size, className, color }: { size: string; className
 }
 
 // Measures the tile (a container the size of its artwork) and places the badge
-// in its top-right corner, 6 in on a 128-wide tile. A flex box rather than a
-// plain block: an inline-flex chip inside a block sits on the block's text
-// baseline, which pushed it several pixels below the corner.
-export function PosterCorner({ children, zIndex = 10 }: { children: ReactNode; zIndex?: number }) {
+// in its top-right corner, 6 in on a 128-wide tile. A landscape tile measures
+// the right-hand LANDSCAPE_CORNER_SHARE of itself, so its box is that much
+// smaller. A flex box rather than a plain block: an inline-flex chip inside a
+// block sits on the block's text baseline, which pushed it several pixels
+// below the corner.
+export function PosterCorner({ children, landscape = false, zIndex = 10 }: { children: ReactNode; landscape?: boolean; zIndex?: number }) {
     return (
-        <div className="pointer-events-none absolute inset-0" style={{ containerType: 'inline-size', zIndex }}>
+        <div
+            className="pointer-events-none absolute inset-0"
+            style={{ containerType: 'inline-size', zIndex, ...(landscape ? { left: `${(1 - LANDSCAPE_CORNER_SHARE) * 100}%` } : {}) }}
+        >
             <div className="absolute flex items-start justify-end" style={{ top: cornerLength(6), right: cornerLength(6) }}>
                 {children}
             </div>

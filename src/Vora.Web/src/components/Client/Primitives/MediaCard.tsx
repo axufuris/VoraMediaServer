@@ -174,7 +174,7 @@ export default function MediaCard({
                     </div>
                 )}
 
-                {statusBadge && <PosterCorner>{statusBadge}</PosterCorner>}
+                {statusBadge && <PosterCorner landscape={shape === 'still'}>{statusBadge}</PosterCorner>}
 
                 {hoverBadge && (
                     <div className="absolute right-2 top-2 z-20 opacity-0 transition-opacity group-hover:opacity-100">
