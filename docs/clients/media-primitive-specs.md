@@ -60,7 +60,7 @@ The single media tile. One primitive covers every aspect ratio rather than a sep
 - `imageFit: 'cover' | 'contain' = 'cover'` — `contain` insets the whole image on the card surface instead of cropping it. Used for channel and station logos.
 - `uncachedImage: boolean = false` — load the artwork URL directly instead of through the server's resize cache (`/api/artwork/thumb`), which only fetches from known artwork hosts. Podcast feeds and IPTV playlists point at any host, so their art must load directly.
 - `selected: boolean` — the one tile a page has chosen, such as the episode a season page describes: a 2px `accent500` ring and the current state for assistive tech. TV apps show it as focus.
-- `onPlay: (() => void) | null` — a round `accent500` play button centred on the artwork, for a tile whose activation selects it. Shown on hover and focus, always on touch; it never also activates the tile.
+- `onPlay: (() => void) | null` — a round `accent500` play button centred on the artwork, for a tile whose activation selects it. Shown on hover and focus; always shown only on a device that cannot hover at all (a phone or a tablet, web `any-hover: none`; a touch-screen laptop with a mouse reports `hover: none` and must not light every button); it never also activates the tile.
 
 **Behavior:**
 - Artwork renders at the shape's aspect ratio, lazy-loaded, with a low-contrast skeleton placeholder using `misc.skeletonShimmer` while loading, falling back to the branded placeholder if the source is missing or fails.
