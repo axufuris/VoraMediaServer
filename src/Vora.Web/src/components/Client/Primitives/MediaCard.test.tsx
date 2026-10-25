@@ -182,6 +182,18 @@ describe('MediaCard', () => {
             expect(onPlay).toHaveBeenCalledTimes(1);
         });
 
+        // A touch-screen laptop reports `hover: none` for its primary input even
+        // with a mouse, so that query showed every play button at once there.
+        it('shows its play button on hover, and always only where nothing can hover', () => {
+            render(<MediaCard title="Anjin" onClick={vi.fn()} onPlay={vi.fn()} playLabel="Play Anjin" />);
+
+            const overlay = screen.getByRole('button', { name: 'Play Anjin' }).parentElement as HTMLElement;
+            expect(overlay.className).toContain('opacity-0');
+            expect(overlay.className).toContain('group-hover:opacity-100');
+            expect(overlay.className).toContain('[@media(any-hover:none)]:opacity-100');
+            expect(overlay.className).not.toContain('[@media(hover:none)]');
+        });
+
         it('does not select when Enter is pressed on its play button', () => {
             const onClick = vi.fn();
             const onPlay = vi.fn();

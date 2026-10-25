@@ -206,8 +206,12 @@ export default function MediaCard({
                     </button>
                 )}
 
+                {/* Always shown only where nothing can hover (a phone or a
+                    tablet): `hover: none` asks about the primary input alone,
+                    which a touch-screen laptop reports even with its mouse,
+                    and lit every play button on the page there. */}
                 {onPlay && (
-                    <div className="absolute inset-0 z-20 flex items-center justify-center opacity-0 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100 [@media(hover:none)]:opacity-100">
+                    <div className="absolute inset-0 z-20 flex items-center justify-center opacity-0 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100 [@media(any-hover:none)]:opacity-100">
                         <button
                             type="button"
                             aria-label={playLabel ?? `Play ${displayTitle}`}
