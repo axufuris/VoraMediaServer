@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { isFullyWatched, affectedEpisodeCount } from './watchState';
+import { isFullyWatched, affectedEpisodeCount, changedEpisodeCount } from './watchState';
 
 describe('isFullyWatched', () => {
     it('trusts the server for a movie', () => {
@@ -58,5 +58,38 @@ describe('affectedEpisodeCount', () => {
 
     it('ignores seasons with an unknown episode count', () => {
         expect(affectedEpisodeCount({ type: 'TvShow', seasons: [{ episodeCount: 10 }, {}] })).toBe(10);
+    });
+});
+
+describe('changedEpisodeCount', () => {
+    const seasonOfEight = {
+        type: 'Season',
+        episodes: [...Array.from({ length: 7 }, () => ({ isPlayed: true })), { isPlayed: false }],
+    };
+
+    it('counts only the season episodes a toggle changes', () => {
+        expect(changedEpisodeCount(seasonOfEight, true)).toBe(1);
+        expect(changedEpisodeCount(seasonOfEight, false)).toBe(7);
+    });
+
+    it('counts a show by its episodes left', () => {
+        const show = { type: 'TvShow', unplayedItemCount: 2, seasons: [{ episodeCount: 10 }, { episodeCount: 12 }] };
+
+        expect(changedEpisodeCount(show, true)).toBe(2);
+        expect(changedEpisodeCount(show, false)).toBe(20);
+    });
+
+    it('falls back to every episode when the show has no count', () => {
+        expect(changedEpisodeCount({ type: 'TvShow', seasons: [{ episodeCount: 10 }, { episodeCount: 12 }] }, true)).toBe(22);
+    });
+
+    it('falls back to every episode when the count does not fit', () => {
+        expect(changedEpisodeCount({ type: 'TvShow', unplayedItemCount: 0, seasons: [{ episodeCount: 10 }] }, true)).toBe(10);
+        expect(changedEpisodeCount({ type: 'TvShow', unplayedItemCount: 40, seasons: [{ episodeCount: 10 }] }, true)).toBe(10);
+        expect(changedEpisodeCount({ type: 'Season', episodes: [{ isPlayed: true }, { isPlayed: true }] }, true)).toBe(2);
+    });
+
+    it('treats an episode with no state as unwatched', () => {
+        expect(changedEpisodeCount({ type: 'Season', episodes: [{}, { isPlayed: true }, {}] }, true)).toBe(2);
     });
 });

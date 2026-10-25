@@ -14,7 +14,8 @@
 export interface WatchStateItem {
     type: string;
     isPlayed?: boolean;
-    episodes?: unknown[];
+    unplayedItemCount?: number;
+    episodes?: { isPlayed?: boolean }[];
     seasons?: { episodeCount?: number }[];
 }
 
@@ -32,4 +33,18 @@ export function affectedEpisodeCount(item: WatchStateItem): number {
         return item.episodes?.length ?? 0;
     }
     return 0;
+}
+
+// How many of those episodes the toggle changes: marking a season watched with
+// one episode left changes one, not all eight. A season knows each episode's
+// state; a show only its count left. Anything else, or a count that doesn't
+// fit, falls back to every episode, as Android and the Roku do.
+export function changedEpisodeCount(item: WatchStateItem, markWatched: boolean): number {
+    const total = affectedEpisodeCount(item);
+    const changed = item.type === 'Season'
+        ? (item.episodes ?? []).filter(episode => (episode.isPlayed === true) !== markWatched).length
+        : item.type === 'TvShow' && item.unplayedItemCount != null
+            ? (markWatched ? item.unplayedItemCount : total - item.unplayedItemCount)
+            : total;
+    return changed < 1 || changed > total ? total : changed;
 }
