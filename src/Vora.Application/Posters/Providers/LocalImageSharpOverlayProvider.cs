@@ -142,7 +142,7 @@ public class LocalImageSharpOverlayProvider(ILogger<LocalImageSharpOverlayProvid
         image.Mutate(x => x.Crop(new Rectangle(cropX, cropY, cropWidth, cropHeight)));
     }
 
-    private const string CacheKeyVersion = "v10-vora-mark-for-the-server-rating";
+    private const string CacheKeyVersion = "v11-ratings-keep-their-slots";
 
     // Derived from CacheKeyVersion's leading "vN" so a single bump (which authors
     // already do when the compositing output changes) both busts the cached files
@@ -261,8 +261,8 @@ public class LocalImageSharpOverlayProvider(ILogger<LocalImageSharpOverlayProvid
 
     private async Task DrawCompositeRatingsAsync(Image<Rgba32> baseImage, OverlayMediaDto item, OverlayElementDto element, string basePath, CancellationToken cancellationToken = default)
     {
-        var validRatings = ResolveValidRatings(item, basePath);
-        if (validRatings.Count == 0)
+        var ratings = ResolveRatingSlots(item, basePath);
+        if (ratings.Count == 0)
         {
             return;
         }
@@ -281,30 +281,32 @@ public class LocalImageSharpOverlayProvider(ILogger<LocalImageSharpOverlayProvid
 
         var font = TryLoadCompositeFont(boxHeight, innerWidth);
 
-        for (var i = 0; i < validRatings.Count; i++)
+        foreach (var (slot, rating) in ratings)
         {
-            await DrawCompositeRatingRowAsync(baseImage, validRatings[i], targetX, targetY, containerWidth, boxHeight, gap, radius, innerWidth, i, font, cancellationToken);
+            await DrawCompositeRatingRowAsync(baseImage, rating, targetX, targetY, containerWidth, boxHeight, gap, radius, innerWidth, slot, font, cancellationToken);
         }
     }
 
-    private static List<(string ImagePath, decimal Score)> ResolveValidRatings(OverlayMediaDto item, string basePath)
+    private static List<(int Slot, (string ImagePath, decimal Score) Rating)> ResolveRatingSlots(OverlayMediaDto item, string basePath)
     {
-        var path1 = BadgeResolver.GetPlatformLogoPath("Vora", item.ServerAdminRating, basePath);
-        var path2 = BadgeResolver.GetPlatformLogoPath(item.ThirdPartyRating1Name, item.ThirdPartyRating1, basePath);
-        var path3 = BadgeResolver.GetPlatformLogoPath(item.ThirdPartyRating2Name, item.ThirdPartyRating2, basePath);
+        var sources = new[]
+        {
+            (Path: BadgeResolver.GetPlatformLogoPath("Vora", item.ServerAdminRating, basePath), Score: item.ServerAdminRating),
+            (Path: BadgeResolver.GetPlatformLogoPath(item.ThirdPartyRating1Name, item.ThirdPartyRating1, basePath), Score: item.ThirdPartyRating1),
+            (Path: BadgeResolver.GetPlatformLogoPath(item.ThirdPartyRating2Name, item.ThirdPartyRating2, basePath), Score: item.ThirdPartyRating2),
+        };
 
-        var validRatings = new List<(string ImagePath, decimal Score)>();
+        var ratings = new List<(int Slot, (string ImagePath, decimal Score) Rating)>();
+        for (var slot = 0; slot < sources.Length; slot++)
+        {
+            var (path, score) = sources[slot];
+            if (!string.IsNullOrEmpty(path) && File.Exists(path) && score is decimal value)
+            {
+                ratings.Add((slot, (path, value)));
+            }
+        }
 
-        if (!string.IsNullOrEmpty(path1) && File.Exists(path1) && item.ServerAdminRating.HasValue)
-            validRatings.Add((path1, item.ServerAdminRating.Value));
-
-        if (!string.IsNullOrEmpty(path2) && File.Exists(path2) && item.ThirdPartyRating1.HasValue)
-            validRatings.Add((path2, item.ThirdPartyRating1.Value));
-
-        if (!string.IsNullOrEmpty(path3) && File.Exists(path3) && item.ThirdPartyRating2.HasValue)
-            validRatings.Add((path3, item.ThirdPartyRating2.Value));
-
-        return validRatings;
+        return ratings;
     }
 
     private Font? TryLoadCompositeFont(int boxHeight, int innerWidth)
