@@ -80,4 +80,75 @@ public class LocalImageSharpOverlayRenderingTests : IDisposable
             brightest.Should().BeGreaterThan(200);
         }
     }
+
+    private static readonly OverlayElementDto Ratings = new() { Type = "composite_ratings", XPct = 0.6, YPct = 0.4, WidthPct = 0.3, HeightPct = 0.45 };
+
+    private static int SlotTop(int slot)
+    {
+        var containerHeight = (int)(Height * Ratings.HeightPct);
+        var gap = (int)Math.Max(2, containerHeight * 0.04f);
+        var boxHeight = (containerHeight - (gap * 2)) / 3;
+        return (int)(Height * Ratings.YPct) + (slot * (boxHeight + gap));
+    }
+
+    private static bool SlotIsDrawn(Image<Rgba32> poster, int slot) =>
+        poster[(int)(Width * Ratings.XPct) + 4, SlotTop(slot) + 40].R < 120;
+
+    [Fact]
+    public async Task A_missing_server_rating_leaves_its_slot_empty_and_the_library_ratings_where_they_always_are()
+    {
+        var item = new OverlayMediaDto
+        {
+            Id = Guid.NewGuid(),
+            MediaType = "Movie",
+            ThirdPartyRating1Name = "TMDb",
+            ThirdPartyRating1 = 6.5m,
+            ThirdPartyRating2Name = "Rotten Tomatoes",
+            ThirdPartyRating2 = 53m,
+        };
+
+        using var poster = await RenderAsync(item, Ratings);
+
+        SlotIsDrawn(poster, 0).Should().BeFalse();
+        SlotIsDrawn(poster, 1).Should().BeTrue();
+        SlotIsDrawn(poster, 2).Should().BeTrue();
+    }
+
+    [Fact]
+    public async Task Each_rating_keeps_its_own_slot_whichever_ones_a_title_has()
+    {
+        var item = new OverlayMediaDto
+        {
+            Id = Guid.NewGuid(),
+            MediaType = "Movie",
+            ServerAdminRating = 8m,
+            ThirdPartyRating2Name = "Rotten Tomatoes",
+            ThirdPartyRating2 = 86m,
+        };
+
+        using var poster = await RenderAsync(item, Ratings);
+
+        SlotIsDrawn(poster, 0).Should().BeTrue();
+        SlotIsDrawn(poster, 1).Should().BeFalse();
+        SlotIsDrawn(poster, 2).Should().BeTrue();
+    }
+
+    [Fact]
+    public async Task A_title_with_every_rating_fills_the_three_slots()
+    {
+        var item = new OverlayMediaDto
+        {
+            Id = Guid.NewGuid(),
+            MediaType = "Movie",
+            ServerAdminRating = 5m,
+            ThirdPartyRating1Name = "TMDb",
+            ThirdPartyRating1 = 7.1m,
+            ThirdPartyRating2Name = "Rotten Tomatoes",
+            ThirdPartyRating2 = 86m,
+        };
+
+        using var poster = await RenderAsync(item, Ratings);
+
+        Enumerable.Range(0, 3).Select(slot => SlotIsDrawn(poster, slot)).Should().AllBeEquivalentTo(true);
+    }
 }
