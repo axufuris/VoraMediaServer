@@ -207,11 +207,12 @@ export default function MediaCard({
                 )}
 
                 {/* Always shown only where nothing can hover (a phone or a
-                    tablet): `hover: none` asks about the primary input alone,
-                    which a touch-screen laptop reports even with its mouse,
-                    and lit every play button on the page there. */}
+                    tablet). Not `hover: none` (the primary input alone) or
+                    `any-hover: none`, which Chromium matches when any input
+                    can't hover: both are true on a touch-screen computer with
+                    a mouse, and lit every play button on the page there. */}
                 {onPlay && (
-                    <div className="absolute inset-0 z-20 flex items-center justify-center opacity-0 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100 [@media(any-hover:none)]:opacity-100">
+                    <div className="absolute inset-0 z-20 flex items-center justify-center opacity-0 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100 [@media_not_all_and_(any-hover:hover)]:opacity-100">
                         <button
                             type="button"
                             aria-label={playLabel ?? `Play ${displayTitle}`}
