@@ -1,6 +1,10 @@
 import { describe, it, expect, vi } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import MediaCard from './MediaCard';
+import { readFileSync } from 'node:fs';
+
+const appCss = readFileSync('src/index.css', 'utf8');
+const tokensCss = readFileSync('src/styles/tokens.css', 'utf8');
 
 describe('MediaCard', () => {
     const defaults = { title: 'Test Title' };
@@ -194,10 +198,10 @@ describe('MediaCard', () => {
 
         // Each media query about the device (hover: none, any-hover: none, and
         // "no input can hover") lit every play button on some computers with a
-        // mouse, so the button answers only to this card: hovered, or reached
-        // by keyboard or remote. A click's leftover focus and a `group` around
-        // the card don't count.
-        it('shows its play button only while the card is hovered or reached by keyboard', () => {
+        // mouse, so the button answers only to this card being hovered, or to
+        // the button itself having keyboard focus. Focus on the card, a click's
+        // leftover focus, and a `group` around the card don't count.
+        it('shows its play button only while the card is hovered or the button has keyboard focus', () => {
             const { container } = render(<MediaCard title="Anjin" onClick={vi.fn()} onPlay={vi.fn()} playLabel="Play Anjin" />);
 
             const card = container.querySelector('[role="button"]') as HTMLElement;
@@ -206,11 +210,26 @@ describe('MediaCard', () => {
 
             expect(card.className.split(/\s+/)).toContain('group/card');
             expect(overlay.className).toContain('opacity-0');
-            expect(showsWhen.sort()).toEqual([
-                'group-focus-visible/card:opacity-100',
-                'group-hover/card:opacity-100',
-                'has-[:focus-visible]:opacity-100',
-            ]);
+            expect(showsWhen.sort()).toEqual(['group-hover/card:opacity-100', 'has-[:focus-visible]:opacity-100']);
+        });
+
+        // Tailwind 4 gates hover styles on `(hover: hover)`, which a browser
+        // reporting a touch screen answers no even with a mouse: every hover
+        // in the app, this button's included, was dead there.
+        it('follows the pointer for hover, whatever the device reports', () => {
+            expect(appCss).toContain('@custom-variant hover (&:hover);');
+        });
+
+        // The tile's focus ring goes round its picture, never round the picture
+        // and the title together.
+        it('marks its picture for the focus ring', () => {
+            const { container } = render(<MediaCard title="Anjin" onClick={vi.fn()} />);
+            const card = container.querySelector('[role="button"]') as HTMLElement;
+
+            expect(card.className.split(/\s+/)).toContain('vora-media-card');
+            expect((card.firstElementChild as HTMLElement).className.split(/\s+/)).toContain('vora-media-card-art');
+            expect(tokensCss).toMatch(/\.vora-media-card:focus-visible\s*\{\s*outline:\s*none;/);
+            expect(tokensCss).toMatch(/\.vora-media-card:focus-visible > \.vora-media-card-art\s*\{\s*outline:\s*2px solid/);
         });
 
         it('does not select when Enter is pressed on its play button', () => {

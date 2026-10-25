@@ -137,11 +137,11 @@ export default function MediaCard({
             onKeyDown={handleKeyDown}
             onFocus={onFocus ? (e: React.FocusEvent<HTMLDivElement>) => { if (e.target === e.currentTarget) onFocus(); } : undefined}
             {...menuTrigger}
-            className={`group group/card block text-left ${onClick ? 'cursor-pointer' : ''} ${className ?? ''}`}
+            className={`vora-media-card group group/card block text-left ${onClick ? 'cursor-pointer' : ''} ${className ?? ''}`}
             style={{ ...menuTrigger?.style, width: fill ? '100%' : WIDTH_VAR[size], background: 'transparent', border: 'none', padding: 0 }}
         >
             <div
-                className={`relative isolate overflow-hidden border ${selected ? 'border-[var(--vora-accent-500)]' : 'border-[var(--vora-border-subtle)] group-hover:border-[var(--vora-accent-500)]'}`}
+                className={`vora-media-card-art relative isolate overflow-hidden border ${selected ? 'border-[var(--vora-accent-500)]' : 'border-[var(--vora-border-subtle)] group-hover:border-[var(--vora-accent-500)]'}`}
                 style={{
                     aspectRatio: ASPECT[shape],
                     borderRadius: round ? '50%' : 'var(--vora-radius-md)',
@@ -206,13 +206,13 @@ export default function MediaCard({
                     </button>
                 )}
 
-                {/* Shown only while this card is hovered, or reached by
-                    keyboard or remote. Never by a media query about the
-                    device (each one we tried lit every button on some
-                    computers with a mouse), never by focus a click left
-                    behind, and never by a `group` around the card. */}
+                {/* Shown only while this card is hovered, or while the button
+                    itself has keyboard focus. Never by a media query about the
+                    device (each one we tried lit every button on some computers
+                    with a mouse), never by focus on the card, and never by a
+                    `group` around it. */}
                 {onPlay && (
-                    <div className="absolute inset-0 z-20 flex items-center justify-center opacity-0 transition-opacity group-hover/card:opacity-100 group-focus-visible/card:opacity-100 has-[:focus-visible]:opacity-100">
+                    <div className="absolute inset-0 z-20 flex items-center justify-center opacity-0 transition-opacity group-hover/card:opacity-100 has-[:focus-visible]:opacity-100">
                         <button
                             type="button"
                             aria-label={playLabel ?? `Play ${displayTitle}`}
