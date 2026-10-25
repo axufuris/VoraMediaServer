@@ -97,6 +97,18 @@ describe('watched badge', () => {
         expect(check.style.width).toBe(css('width', cornerLength(10)));
     });
 
+    // A 16:9 still is barely half as tall as it is wide, so the box measured on
+    // its whole width stood taller than the badges baked into the artwork.
+    it('measures a landscape tile on the right-hand three quarters of it', () => {
+        const poster = render(<PosterCorner><WatchedBadge /></PosterCorner>).container.firstElementChild as HTMLElement;
+        const still = render(<PosterCorner landscape><WatchedBadge /></PosterCorner>).container.firstElementChild as HTMLElement;
+
+        expect(poster.style.left).toBe('');
+        expect(still.style.left).toBe('25%');
+        expect(still.className).toContain('inset-0');
+        expect(still.style.getPropertyValue('container-type')).toBe('inline-size');
+    });
+
     it('sizes the check alone and the episode count the same way', () => {
         const check = render(<WatchedBadge />).container.firstElementChild as HTMLElement;
         const count = render(<UnplayedCountBadge count={3} />).container.firstElementChild as HTMLElement;

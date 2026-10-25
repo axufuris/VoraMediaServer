@@ -61,6 +61,18 @@ describe('the overlay editor', () => {
         expect(canvas).toHaveTextContent('E1');
     });
 
+    it('draws the episode canvas box at three quarters, as a still card does', async () => {
+        renderEditor();
+        await waitFor(() => expect(mocks.getTemplateByMediaType).toHaveBeenCalled());
+        const corner = () => screen.getByTestId('overlay-canvas').querySelector('svg path')?.closest('div[style*="container-type"]') as HTMLElement | null;
+
+        expect(corner()?.style.left).toBe('');
+
+        fireEvent.change(screen.getByDisplayValue('Movie Poster (2:3)'), { target: { value: 'Episode' } });
+
+        expect(corner()?.style.left).toBe('25%');
+    });
+
     it("draws the watched box with the client's own corner, measured from the canvas", async () => {
         renderEditor();
         await waitFor(() => expect(mocks.getTemplateByMediaType).toHaveBeenCalled());

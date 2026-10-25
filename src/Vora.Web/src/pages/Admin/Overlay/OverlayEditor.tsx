@@ -556,14 +556,14 @@ export default function OverlayEditor() {
                         viewers see at every size. An episode folds the check
                         into its number chip, E1 standing in for its number. */}
                     {mockUI === 'watched' && (
-                        <PosterCorner>
+                        <PosterCorner landscape={mediaType === 'Episode'}>
                             {mediaType === 'Episode'
                                 ? <CornerChip label="E1" watched />
                                 : <WatchedBadge />}
                         </PosterCorner>
                     )}
                     {mockUI === 'unplayed' && (
-                        <PosterCorner>
+                        <PosterCorner landscape={mediaType === 'Episode'}>
                             <UnplayedCountBadge count={3} />
                         </PosterCorner>
                     )}

@@ -167,6 +167,16 @@ describe('MediaCard', () => {
         });
     });
 
+    it('draws the corner box at three quarters on a still, and in full on a poster', () => {
+        const still = render(<MediaCard title="Pilot" shape="still" isPlayed />).container;
+        const poster = render(<MediaCard title="Arrival" isPlayed />).container;
+        const cornerOf = (container: HTMLElement) => container.querySelector('div[style*="container-type"]') as HTMLElement | null;
+
+        expect(cornerOf(still)?.style.left).toBe('25%');
+        expect(cornerOf(poster)).not.toBeNull();
+        expect(cornerOf(poster)?.style.left).toBe('');
+    });
+
     describe('a selectable card with its own play button', () => {
         it('selects on a click and plays only from its round button', () => {
             const onClick = vi.fn();
