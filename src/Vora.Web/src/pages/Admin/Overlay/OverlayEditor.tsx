@@ -4,12 +4,22 @@ import { useParams } from 'react-router-dom';
 import { overlayService } from '../../../api/Streaming/overlayService';
 import { useDialog } from '../../../dialogs';
 import PageHeader from '../../../components/Admin/Primitives/PageHeader';
+import { Modal, ModalBody, ModalFooter, ModalHeader } from '../../../components/Common/Modal';
 import { CornerChip, PosterCorner, UnplayedCountBadge, WatchedBadge } from '../../../components/Client/Primitives/WatchedBadge';
 
 type MediaType = 'Movie' | 'Season' | 'TvShow' | 'Episode';
 type BadgeType = 'resolution' | 'content_rating' | 'audio_codec' | 'stinger' | 'edition' | 'composite_ratings' | 'critic_rating';
 type MockType = 'none' | 'watched' | 'unplayed';
 type PreviewSize = 'large' | 'card' | 'small';
+
+// The canvases a layout can be copied between: they share the 2:3 shape, so a
+// badge at the same share of the canvas lands in the same place on each. The
+// episode thumbnail is 16:9 and keeps its own.
+const PORTRAIT_CANVASES: { value: MediaType; label: string; inSentence: string }[] = [
+    { value: 'Movie', label: 'Movie posters', inSentence: 'movie posters' },
+    { value: 'TvShow', label: 'TV show posters', inSentence: 'TV show posters' },
+    { value: 'Season', label: 'Season posters', inSentence: 'season posters' },
+];
 
 const LARGEST_CARD_WIDTH = 192;
 
@@ -334,23 +344,65 @@ export default function OverlayEditor() {
         setElements(elements.filter(el => el.id !== id));
     };
 
+    const layoutJson = () => JSON.stringify(elements.map(e => ({
+        type: e.type,
+        xPct: e.xPct,
+        yPct: e.yPct,
+        widthPct: e.widthPct,
+        heightPct: e.heightPct
+    })));
+
+    const askToUpdateLibraryNow = () => dialog.confirm({
+        title: 'Save Template',
+        message: 'Your template has been saved. Would you like to process the entire library now, or wait for the nightly schedule?',
+        confirmText: 'Update Library Now',
+        cancelText: 'Wait for Schedule'
+    });
+
+    const isPortrait = PORTRAIT_CANVASES.some(canvas => canvas.value === mediaType);
+    const copyCandidates = PORTRAIT_CANVASES.filter(canvas => canvas.value !== mediaType);
+    const [copyTargets, setCopyTargets] = useState<MediaType[] | null>(null);
+    const [copying, setCopying] = useState(false);
+
+    const openCopy = () => setCopyTargets(copyCandidates.map(canvas => canvas.value));
+    const toggleCopyTarget = (target: MediaType) => setCopyTargets(current =>
+        current && (current.includes(target) ? current.filter(value => value !== target) : [...current, target]));
+
+    const handleCopy = async () => {
+        if (!copyTargets || copyTargets.length === 0) return;
+        const configurationJson = layoutJson();
+        const targets = copyTargets;
+        setCopying(true);
+        try {
+            for (const targetMediaType of [mediaType, ...targets]) {
+                await overlayService.saveTemplate({ targetMediaType, configurationJson }, serverId);
+            }
+        } catch (error) {
+            console.error('Error copying the overlay layout:', error);
+            setCopying(false);
+            await dialog.alert('An error occurred while copying the layout.');
+            return;
+        }
+        setCopying(false);
+        setCopyTargets(null);
+
+        if (await askToUpdateLibraryNow()) {
+            try {
+                await overlayService.triggerGlobalSync(serverId);
+            } catch (error) {
+                console.error('Error starting the overlay update:', error);
+            }
+        }
+        const names = targets.map(target => PORTRAIT_CANVASES.find(canvas => canvas.value === target)?.inSentence ?? target);
+        await dialog.alert(`Layout copied to ${names.join(' and ')}.`);
+    };
+
     const handleSave = async () => {
-        const runNow = await dialog.confirm({
-            title: 'Save Template',
-            message: 'Your template has been saved. Would you like to process the entire library now, or wait for the nightly schedule?',
-            confirmText: 'Update Library Now',
-            cancelText: 'Wait for Schedule'
-        });
+        const runNow = await askToUpdateLibraryNow();
 
         const payload = {
             targetMediaType: mediaType,
-            configurationJson: JSON.stringify(elements.map(e => ({
-                type: e.type,
-                xPct: e.xPct,
-                yPct: e.yPct,
-                widthPct: e.widthPct,
-                heightPct: e.heightPct
-            })))
+            configurationJson: layoutJson()
         };
 
         try {
@@ -649,6 +701,11 @@ export default function OverlayEditor() {
                         <button type="button" onClick={handleSave} className="vora-button-primary px-8">
                             Save Template
                         </button>
+                        {isPortrait && elements.length > 0 && (
+                            <button type="button" onClick={openCopy} className="vora-button-secondary">
+                                Copy layout…
+                            </button>
+                        )}
                         {activeTemplateId && (
                             <button
                                 type="button"
@@ -662,6 +719,42 @@ export default function OverlayEditor() {
                 </div>
 
             </div>
+
+            <Modal isOpen={copyTargets !== null} onClose={() => { if (!copying) setCopyTargets(null); }} size="md" surface="light">
+                <ModalHeader
+                    surface="light"
+                    title="Copy layout to portrait posters"
+                    subtitle="Saves this canvas, then gives the posters you pick the same badges in the same places, so they line up side by side. Their current badges are replaced. Episode thumbnails are landscape and keep their own layout."
+                    onClose={() => setCopyTargets(null)}
+                    closeDisabled={copying}
+                />
+                <ModalBody>
+                    <fieldset className="space-y-3">
+                        <legend className="mb-3 block text-xs font-bold uppercase tracking-widest text-[var(--vora-text-muted)]">Copy to</legend>
+                        {copyCandidates.map(canvas => (
+                            <label key={canvas.value} className="flex cursor-pointer items-center gap-3 select-none">
+                                <input
+                                    type="checkbox"
+                                    checked={copyTargets?.includes(canvas.value) ?? false}
+                                    onChange={() => toggleCopyTarget(canvas.value)}
+                                    className="h-4 w-4 cursor-pointer accent-[var(--vora-accent-500)]"
+                                />
+                                <span className="text-sm text-[var(--vora-text-primary)]">{canvas.label}</span>
+                            </label>
+                        ))}
+                    </fieldset>
+                </ModalBody>
+                <ModalFooter surface="light">
+                    <div className="flex justify-end gap-2">
+                        <button type="button" onClick={() => setCopyTargets(null)} disabled={copying} className="vora-button-secondary">
+                            Cancel
+                        </button>
+                        <button type="button" onClick={() => { void handleCopy(); }} disabled={copying || !copyTargets || copyTargets.length === 0} className="vora-button-primary px-6">
+                            {copying ? 'Copying…' : 'Copy layout'}
+                        </button>
+                    </div>
+                </ModalFooter>
+            </Modal>
         </div>
     );
 }
