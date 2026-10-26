@@ -7,6 +7,7 @@ using Vora.Application.Iptv;
 using Vora.Application.Libraries;
 using Vora.Application.Media;
 using Vora.Application.Metadata;
+using Vora.Application.Posters;
 using Vora.Application.Settings;
 using Vora.Application.Tasks;
 using Vora.Application.Thumbnails;
@@ -32,6 +33,7 @@ public class ScheduledJobWorker : BackgroundService
     private readonly DailyScheduleGate _musicPopularity = new();
 
     private int _scannerFrequency = 5;
+    private bool _overlayLayoutChecked;
 
     public ScheduledJobWorker(IServiceScopeFactory scopeFactory, ILogger<ScheduledJobWorker> logger)
     {
@@ -65,6 +67,14 @@ public class ScheduledJobWorker : BackgroundService
         }
     }
 
+    private async Task RedrawOverlaysFromAnOlderLayoutAsync(IPosterOverlayManager overlayManager, ITaskQueueManager taskQueue)
+    {
+        if (!await overlayManager.HasOverlaysFromAnOlderLayoutAsync()) return;
+
+        _logger.LogInformation("Poster overlays drawn with an older layout were found; redrawing them in every library.");
+        taskQueue.QueueGenerateLibraryPosterOverlays(Guid.Empty);
+    }
+
     private static bool IsCollectionSyncDue(DateTime? lastSyncedAt, int intervalDays)
     {
         var interval = Math.Max(1, intervalDays);
@@ -81,6 +91,12 @@ public class ScheduledJobWorker : BackgroundService
         var analyzerManager = scope.ServiceProvider.GetRequiredService<IMediaAnalyzerManager>();
         var taskQueue = scope.ServiceProvider.GetRequiredService<ITaskQueueManager>();
         var collectionManager = scope.ServiceProvider.GetRequiredService<ICollectionManager>();
+
+        if (!_overlayLayoutChecked)
+        {
+            _overlayLayoutChecked = true;
+            await RedrawOverlaysFromAnOlderLayoutAsync(scope.ServiceProvider.GetRequiredService<IPosterOverlayManager>(), taskQueue);
+        }
 
         var settings = await settingsRepo.GetSettingsAsync();
 

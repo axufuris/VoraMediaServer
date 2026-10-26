@@ -1856,6 +1856,11 @@ public partial class MediaRepository : IMediaRepository
             .ToListAsync();
     }
 
+    public Task<bool> AnyOverlayFromAnotherLayoutAsync(int currentLayoutVersion) =>
+        _context.MediaItems
+            .AsNoTracking()
+            .AnyAsync(m => m.LastOverlayGeneratedAt != null && (m.OverlayLayoutVersion == null || m.OverlayLayoutVersion != currentLayoutVersion));
+
     public async Task<bool> AnyItemHasOverlayAppliedAsync(Guid libraryId)
     {
         var query = _context.MediaItems
