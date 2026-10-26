@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useRef, type KeyboardEvent, type MouseEvent } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState, type KeyboardEvent, type MouseEvent } from 'react';
 import { useIsPhone } from '../../../hooks/useIsPhone';
 import type { MenuEntry, MenuPoint } from './menuEntries';
 
@@ -13,17 +13,90 @@ interface ActionMenuListProps {
     roomy?: boolean;
 }
 
-// The rows of a menu, without the box around them. The title page's "more"
-// button and the menu on a poster both draw their entries with this.
-export function ActionMenuList({ entries, onSelected, roomy }: ActionMenuListProps) {
+type SubmenuEntry = Extract<MenuEntry, { kind: 'submenu' }>;
+
+function Chevron({ back }: { back?: boolean }) {
     return (
-        <>
-            {entries.map(entry => entry.kind === 'separator' ? (
+        <svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.25" strokeLinecap="round" strokeLinejoin="round" className="shrink-0">
+            <path d={back ? 'M15 18l-6-6 6-6' : 'M9 18l6-6-6-6'} />
+        </svg>
+    );
+}
+
+// The rows of a menu, without the box around them. The title page's "more"
+// button and the menu on a poster both draw their entries with this. A submenu
+// row swaps the rows for its own, under a Back row, and Back (or Left) swaps
+// them back; the menu stays open meanwhile.
+export function ActionMenuList({ entries, onSelected, roomy }: ActionMenuListProps) {
+    const [openKey, setOpenKey] = useState<string | null>(null);
+    const listRef = useRef<HTMLDivElement>(null);
+    const switched = useRef(false);
+    const opened = entries.find((entry): entry is SubmenuEntry => entry.kind === 'submenu' && entry.key === openKey);
+    const rows = opened ? opened.entries : entries;
+    const rowPadding = roomy ? 'py-3.5' : 'py-2.5';
+
+    useEffect(() => {
+        if (!switched.current) return;
+        listRef.current?.querySelector<HTMLButtonElement>('button[role="menuitem"], button[role="menuitemradio"]')?.focus();
+    }, [openKey]);
+
+    const show = (key: string | null) => {
+        switched.current = true;
+        setOpenKey(key);
+    };
+
+    const handleKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
+        if (event.key === 'ArrowLeft' && opened) {
+            event.preventDefault();
+            show(null);
+            return;
+        }
+        const row = (event.target as HTMLElement).closest<HTMLElement>('[data-submenu]');
+        if (event.key === 'ArrowRight' && row?.dataset.submenu) {
+            event.preventDefault();
+            show(row.dataset.submenu);
+        }
+    };
+
+    return (
+        <div ref={listRef} role="none" onKeyDown={handleKeyDown}>
+            {opened && (
+                <>
+                    <button
+                        type="button"
+                        role="menuitem"
+                        onClick={() => show(null)}
+                        className={`vora-row-interactive flex w-full cursor-pointer items-center gap-2 px-4 text-left text-sm ${rowPadding}`}
+                        style={{ color: 'var(--vora-text-secondary)' }}
+                    >
+                        <Chevron back />
+                        Back
+                    </button>
+                    <div role="presentation" className="px-4 pb-1 pt-3 text-[11px] font-semibold uppercase tracking-wider" style={{ color: 'var(--vora-text-muted)' }}>
+                        {opened.label.replace(/…$/, '')}
+                    </div>
+                </>
+            )}
+            {rows.map(entry => entry.kind === 'separator' ? (
                 <div key={entry.key} role="separator" className="border-t" style={{ borderColor: 'var(--vora-border-subtle)' }} />
             ) : entry.kind === 'heading' ? (
                 <div key={entry.key} role="presentation" className="px-4 pb-1 pt-3 text-[11px] font-semibold uppercase tracking-wider" style={{ color: 'var(--vora-text-muted)' }}>
                     {entry.label}
                 </div>
+            ) : entry.kind === 'submenu' ? (
+                <button
+                    key={entry.key}
+                    type="button"
+                    role="menuitem"
+                    aria-haspopup="menu"
+                    data-submenu={entry.key}
+                    onClick={() => show(entry.key)}
+                    className={`vora-row-interactive flex w-full cursor-pointer items-center justify-between gap-2 px-4 text-left text-sm ${rowPadding}`}
+                    style={{ color: 'var(--vora-text-primary)' }}
+                >
+                    {entry.label}
+                    <span style={{ color: 'var(--vora-text-muted)' }}><Chevron /></span>
+                </button>
             ) : entry.kind === 'choice' ? (
                 <button
                     key={entry.key}
@@ -31,7 +104,7 @@ export function ActionMenuList({ entries, onSelected, roomy }: ActionMenuListPro
                     role="menuitemradio"
                     aria-checked={entry.selected}
                     onClick={() => { onSelected(); entry.onSelect(); }}
-                    className={`vora-row-interactive flex w-full cursor-pointer items-start gap-2.5 px-4 text-left text-sm ${roomy ? 'py-3.5' : 'py-2.5'}`}
+                    className={`vora-row-interactive flex w-full cursor-pointer items-start gap-2.5 px-4 text-left text-sm ${rowPadding}`}
                     style={{ color: 'var(--vora-text-primary)' }}
                 >
                     <svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"
@@ -49,13 +122,13 @@ export function ActionMenuList({ entries, onSelected, roomy }: ActionMenuListPro
                     type="button"
                     role="menuitem"
                     onClick={() => { onSelected(); entry.onSelect(); }}
-                    className={`vora-row-interactive block w-full cursor-pointer px-4 text-left text-sm ${roomy ? 'py-3.5' : 'py-2.5'} ${entry.tone === 'danger' ? 'font-medium' : ''}`}
+                    className={`vora-row-interactive block w-full cursor-pointer px-4 text-left text-sm ${rowPadding} ${entry.tone === 'danger' ? 'font-medium' : ''}`}
                     style={{ color: entry.tone === 'danger' ? 'var(--vora-danger-text)' : 'var(--vora-text-primary)' }}
                 >
                     {entry.label}
                 </button>
             ))}
-        </>
+        </div>
     );
 }
 

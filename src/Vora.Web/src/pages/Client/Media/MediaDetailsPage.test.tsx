@@ -42,7 +42,10 @@ vi.mock('../../../hooks/useTitleTrackChoices', () => ({
 vi.mock('../../../components/Media/TrackChoiceChips', () => ({ default: () => null }));
 vi.mock('../../../components/Media/ItemMenu/useMediaItemActions', () => ({
     useMediaItemActions: (media: MediaItem | null) => ({
-        entries: media ? [{ kind: 'action', key: `edit-${media.id}`, label: `Edit ${media.title}`, onSelect: () => undefined }] : [],
+        entries: media ? [
+            { kind: 'action', key: `edit-${media.id}`, label: `Edit ${media.title}`, onSelect: () => undefined },
+            { kind: 'submenu', key: 'manage', label: `Manage ${media.title}…`, entries: [{ kind: 'action', key: 'refresh', label: `Refresh ${media.title}`, onSelect: () => undefined }] },
+        ] : [],
         dialogs: null,
     }),
 }));
@@ -248,12 +251,40 @@ describe('a season page', () => {
         expect(await screen.findByRole('button', { name: 'Play S2 E1' })).toBeInTheDocument();
     });
 
-    it('shows no pills for a show with one season', async () => {
+    // The title menu no longer offers "Go to show": the Show pill, first in
+    // the row, is the way there.
+    it('opens the show from the Show pill before the seasons', async () => {
+        openPage('/media/season-1');
+
+        const pills = await screen.findByRole('navigation', { name: 'Seasons' });
+        const names = within(pills).getAllByRole('button').map(pill => pill.textContent);
+        expect(names).toEqual(['Show', 'Season 1', 'Season 2']);
+        fireEvent.click(within(pills).getByRole('button', { name: 'Show: Shōgun' }));
+
+        await waitFor(() => expect(screen.getByTestId('address')).toHaveTextContent('/media/shogun'));
+    });
+
+    it("keeps the Show pill on a one-season show's season page", async () => {
         items.shogun = show(1);
         openPage('/media/season-1');
 
+        const pills = await screen.findByRole('navigation', { name: 'Seasons' });
+        expect(within(pills).getAllByRole('button').map(pill => pill.textContent)).toEqual(['Show', 'Season 1']);
+    });
+
+    // Both halves of the menu come from the same actions, so both have a
+    // "manage" row; each must open its own title's rows.
+    it("opens the season's own Manage rows, not the episode's", async () => {
+        openPage('/media/season-1');
+
         await screen.findByRole('button', { name: 'Resume S1 E2 20:50' });
-        expect(screen.queryByRole('navigation', { name: 'Seasons' })).toBeNull();
+        fireEvent.click(screen.getByRole('button', { name: 'More actions' }));
+        const menu = screen.getByRole('menu');
+        fireEvent.click(within(menu).getByRole('menuitem', { name: 'Manage Season 1…' }));
+
+        expect(within(menu).getByRole('menuitem', { name: 'Refresh Season 1' })).toBeInTheDocument();
+        expect(within(menu).queryByRole('menuitem', { name: 'Refresh Servants of Two Masters' })).toBeNull();
+        expect(within(menu).getByRole('menuitem', { name: 'Back' })).toBeInTheDocument();
     });
 });
 

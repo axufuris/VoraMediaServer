@@ -32,7 +32,7 @@ import { formatDate, serverTimeMs, yearOf } from '../../../utils/serverTime';
 import { seasonEpisodeLabel, seasonName } from '../../../utils/seasonLabel';
 import { errorDetail, isMissingOrForbidden } from '../../../utils/apiError';
 import { ActionMenuList } from '../../../components/Client/Primitives/ActionMenu';
-import { menuAction, menuHeading, menuSeparator, tidyMenu } from '../../../components/Client/Primitives/menuEntries';
+import { menuAction, menuHeading, menuSeparator, tidyMenu, withKeyPrefix } from '../../../components/Client/Primitives/menuEntries';
 import { mediaPath } from '../../../utils/mediaPath';
 import SeasonPills from '../../../components/Media/SeasonPills';
 import { useSeasonEpisodeSelection, useSiblingSeasons } from './useSeasonEpisodeSelection';
@@ -411,12 +411,12 @@ export default function MediaDetailsPage() {
     const thisSeason = seasonName(media.seasonNumber, media.title);
     const moreEntries = heroEpisode ? tidyMenu([
         menuHeading('episode-heading', heroSuffix ? `${heroSuffix} · ${heroEpisode.title}` : heroEpisode.title),
-        ...episodeActions.entries,
+        ...withKeyPrefix('episode', episodeActions.entries),
         menuSeparator('season-separator'),
         menuHeading('season-heading', thisSeason),
         menuAction('season-watched', isFullyWatched(media) ? `Mark ${thisSeason} as unwatched` : `Mark ${thisSeason} as watched`, () => { void handleTogglePlayed(); }),
         menuAction('season-rate', media.myRating != null ? `Change your rating of ${thisSeason}` : `Rate ${thisSeason}`, () => setRating('title')),
-        ...itemActions.entries,
+        ...withKeyPrefix('season', itemActions.entries),
     ]) : tidyMenu(itemActions.entries);
     const playLabel = playButton.label;
     const playRuntime = formatRuntime(described.durationMinutes);
@@ -469,8 +469,17 @@ export default function MediaDetailsPage() {
         </>
     );
 
-    const seasonPills = isSeason && siblingSeasons.length > 1 ? (
-        <SeasonPills seasons={siblingSeasons} currentId={media.id} onPick={season => navigate(mediaPath({ id: season.id, type: 'Season' }, serverId), { replace: true })} />
+    // On every season page, a one-season show's too: the Show pill is the way
+    // back to the show, which the title menu no longer offers.
+    const showId = isSeason ? media.tvShowId : undefined;
+    const seasonPills = showId && siblingSeasons.length > 0 ? (
+        <SeasonPills
+            seasons={siblingSeasons}
+            currentId={media.id}
+            onPick={season => navigate(mediaPath({ id: season.id, type: 'Season' }, serverId), { replace: true })}
+            showTitle={media.tvShowTitle}
+            onPickShow={() => navigate(mediaPath({ id: showId, type: 'TvShow' }, serverId))}
+        />
     ) : null;
 
     const heroActions = (

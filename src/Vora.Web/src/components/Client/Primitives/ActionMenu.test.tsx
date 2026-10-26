@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, afterEach } from 'vitest';
 import { fireEvent, render, screen } from '@testing-library/react';
 import ActionMenu, { ActionMenuList } from './ActionMenu';
-import { menuAction, menuChoice, menuSeparator, tidyMenu, type MenuEntry } from './menuEntries';
+import { menuAction, menuChoice, menuSeparator, menuSubmenu, tidyMenu, type MenuEntry } from './menuEntries';
 import { PHONE_MEDIA_QUERY } from '../../../hooks/useIsPhone';
 
 const onPhone = (matches: boolean) => {
@@ -21,6 +21,37 @@ const entries = (calls: string[] = []): MenuEntry[] => [
 ];
 
 describe('ActionMenuList', () => {
+    it('swaps a submenu in under a Back row without closing, and back again', () => {
+        const calls: string[] = [];
+        render(<ActionMenuList entries={[
+            menuAction('info', 'Media info', () => calls.push('info')),
+            menuSubmenu('manage', 'Manage movie…', [menuAction('refresh', 'Refresh metadata', () => calls.push('refresh'))]),
+        ]} onSelected={() => calls.push('closed')} />);
+
+        fireEvent.click(screen.getByRole('menuitem', { name: 'Manage movie…' }));
+
+        expect(calls).toEqual([]);
+        expect(screen.getByText('Manage movie')).toBeInTheDocument();
+        expect(screen.queryByRole('menuitem', { name: 'Media info' })).toBeNull();
+        expect(screen.getByRole('menuitem', { name: 'Back' })).toHaveFocus();
+
+        fireEvent.click(screen.getByRole('menuitem', { name: 'Refresh metadata' }));
+        expect(calls).toEqual(['closed', 'refresh']);
+    });
+
+    it('returns from a submenu with Back', () => {
+        render(<ActionMenuList entries={[
+            menuAction('info', 'Media info', () => undefined),
+            menuSubmenu('manage', 'Manage movie…', [menuAction('refresh', 'Refresh metadata', () => undefined)]),
+        ]} onSelected={() => undefined} />);
+
+        fireEvent.click(screen.getByRole('menuitem', { name: 'Manage movie…' }));
+        fireEvent.click(screen.getByRole('menuitem', { name: 'Back' }));
+
+        expect(screen.getByRole('menuitem', { name: 'Media info' })).toHaveFocus();
+        expect(screen.queryByRole('menuitem', { name: 'Refresh metadata' })).toBeNull();
+    });
+
     it('marks the choice in use and shows what each one is', () => {
         const calls: string[] = [];
         render(<ActionMenuList entries={[

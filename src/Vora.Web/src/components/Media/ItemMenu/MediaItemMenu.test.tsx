@@ -143,6 +143,9 @@ function renderPoster(props: PosterProps = {}) {
 
 const labels = () => within(screen.getByRole('menu')).getAllByRole('menuitem').map(item => item.textContent);
 
+// The admin's maintenance actions sit behind one "Manage …" row.
+const openManage = () => fireEvent.click(screen.getByRole('menuitem', { name: /^Manage / }));
+
 async function openMenuFor(media: MediaItem, target?: MediaMenuTarget) {
     getMediaItem.mockResolvedValue(media);
     const poster = renderPoster({ target: target ?? mediaMenuTarget(media, 'srv1') });
@@ -185,9 +188,41 @@ describe('the menu on a poster', () => {
         expect(labels()).toEqual([
             'Mark as watched', 'Add to watchlist',
             'Media info', 'Edit metadata', 'Add to playlist', 'Add to collection',
+            'Manage movie…',
+        ]);
+
+        openManage();
+
+        expect(screen.getByRole('menu')).toBeInTheDocument();
+        expect(labels()).toEqual([
+            'Back',
             'Fix match…', 'Remove metadata…', 'Refresh metadata', 'Scan files', 'Analyze media',
             'Regenerate thumbnails', 'Lock thumbnails', 'Edit markers', 'Delete item',
         ]);
+    });
+
+    it('goes back from Manage to the rest of the menu without closing it', async () => {
+        await openMenuFor(movie);
+        openManage();
+
+        expect(screen.getByRole('menuitem', { name: 'Back' })).toHaveFocus();
+        fireEvent.click(screen.getByRole('menuitem', { name: 'Back' }));
+
+        expect(labels()).toContain('Manage movie…');
+        expect(labels()).not.toContain('Refresh metadata');
+        expect(screen.getByRole('menuitem', { name: 'Mark as watched' })).toHaveFocus();
+    });
+
+    it('goes into Manage with Right and back with Left', async () => {
+        await openMenuFor(movie);
+        const manage = screen.getByRole('menuitem', { name: 'Manage movie…' });
+        manage.focus();
+
+        fireEvent.keyDown(manage, { key: 'ArrowRight' });
+        expect(labels()).toContain('Refresh metadata');
+
+        fireEvent.keyDown(screen.getByRole('menuitem', { name: 'Back' }), { key: 'ArrowLeft' });
+        expect(labels()).toContain('Manage movie…');
     });
 
     it('says it is loading until the title arrives', async () => {
@@ -223,35 +258,33 @@ describe('the menu on a poster', () => {
     it('offers a show a match fix but nothing about files or thumbnails', async () => {
         await openMenuFor(show);
 
-        expect(labels()).toEqual([
-            'Mark as watched', 'Add to watchlist',
-            'Edit metadata', 'Add to playlist', 'Add to collection',
-            'Fix match…', 'Remove metadata…', 'Refresh metadata', 'Scan files', 'Analyze media', 'Delete item',
-        ]);
+        expect(labels()).toEqual(['Mark as watched', 'Add to watchlist', 'Edit metadata', 'Add to playlist', 'Add to collection', 'Manage show…']);
+        openManage();
+        expect(labels()).toEqual(['Back', 'Fix match…', 'Remove metadata…', 'Refresh metadata', 'Scan files', 'Analyze media', 'Delete item']);
     });
 
-    it('offers a season the way to its show', async () => {
+    // Opening a season or an episode already lands on its season page, whose
+    // Show pill opens the show, so the menu no longer repeats either.
+    it('offers a season no way to its show, which its page has', async () => {
         await openMenuFor(season);
 
         expect(screen.getByRole('menu')).toHaveTextContent('Top Gear · Season 3');
-        expect(labels().slice(0, 4)).toEqual(['Mark as watched', 'Add to watchlist', 'Go to show', 'Edit metadata']);
+        expect(labels()).toEqual(['Mark as watched', 'Add to watchlist', 'Edit metadata', 'Add to playlist', 'Add to collection', 'Manage season…']);
+        openManage();
         expect(labels()).not.toContain('Fix match…');
     });
 
-    it('offers an episode the way to its season and its show', async () => {
+    it('offers an episode no way to its season or show, which its page has', async () => {
         await openMenuFor(episode);
 
-        expect(labels().slice(0, 5)).toEqual(['Mark as watched', 'Add to watchlist', 'Media info', 'Go to season', 'Go to show']);
-        fireEvent.click(screen.getByRole('menuitem', { name: 'Go to season' }));
-
-        expect(screen.getByTestId('where')).toHaveTextContent('/server/srv1/media/season-3');
-        expect(screen.queryByRole('menu')).not.toBeInTheDocument();
+        expect(labels()).toEqual(['Mark as watched', 'Add to watchlist', 'Media info', 'Edit metadata', 'Add to playlist', 'Add to collection', 'Manage episode…']);
     });
 
     it('shows the lock as it is', async () => {
         admin.getThumbnailsLock.mockResolvedValue({ locked: true });
 
         await openMenuFor(movie);
+        openManage();
 
         expect(await screen.findByRole('menuitem', { name: 'Unlock thumbnails' })).toBeInTheDocument();
     });
@@ -279,6 +312,7 @@ describe('the menu on a poster', () => {
 
     it('queues a refresh on that server and says so', async () => {
         await openMenuFor(movie);
+        openManage();
 
         fireEvent.click(screen.getByRole('menuitem', { name: 'Refresh metadata' }));
 
@@ -289,6 +323,7 @@ describe('the menu on a poster', () => {
     it('deletes only after being confirmed, then tells the page', async () => {
         const onDeleted = vi.fn();
         await openMenuFor(movie, mediaMenuTarget(movie, 'srv1', { onDeleted }));
+        openManage();
 
         fireEvent.click(screen.getByRole('menuitem', { name: 'Delete item' }));
         expect(admin.deleteMediaItem).not.toHaveBeenCalled();
@@ -300,6 +335,7 @@ describe('the menu on a poster', () => {
 
     it('offers to clear a manual match only on a title that was matched by hand', async () => {
         await openMenuFor(title({ lockedFields: ['Title', 'Match'] }));
+        openManage();
 
         expect(labels()).toContain('Clear manual match');
         expect(labels().indexOf('Clear manual match')).toBe(labels().indexOf('Fix match…') + 1);
@@ -307,11 +343,13 @@ describe('the menu on a poster', () => {
 
     it('does not offer it on a title whose match was automatic', async () => {
         await openMenuFor(title({ lockedFields: ['Title'] }));
+        openManage();
         expect(labels()).not.toContain('Clear manual match');
     });
 
     it('does not offer it on an episode', async () => {
         await openMenuFor(title({ ...episode, lockedFields: ['Match'] }));
+        openManage();
         expect(labels()).not.toContain('Clear manual match');
     });
 
@@ -319,6 +357,7 @@ describe('the menu on a poster', () => {
         const onChanged = vi.fn();
         const matched = title({ lockedFields: ['Match'] });
         await openMenuFor(matched, mediaMenuTarget(matched, 'srv1', { onChanged }));
+        openManage();
 
         fireEvent.click(screen.getByRole('menuitem', { name: 'Clear manual match' }));
         expect(admin.clearMatch).not.toHaveBeenCalled();
@@ -330,6 +369,7 @@ describe('the menu on a poster', () => {
 
     it('keeps the match when the question is cancelled', async () => {
         await openMenuFor(title({ lockedFields: ['Match'] }));
+        openManage();
 
         fireEvent.click(screen.getByRole('menuitem', { name: 'Clear manual match' }));
         fireEvent.click(within(await screen.findByRole('dialog')).getByRole('button', { name: 'Cancel' }));
@@ -341,6 +381,7 @@ describe('the menu on a poster', () => {
     it('removes the metadata of a title on that server once confirmed, and tells the page', async () => {
         const onChanged = vi.fn();
         await openMenuFor(movie, mediaMenuTarget(movie, 'srv1', { onChanged }));
+        openManage();
 
         fireEvent.click(screen.getByRole('menuitem', { name: 'Remove metadata…' }));
         expect(admin.removeMetadata).not.toHaveBeenCalled();
@@ -354,6 +395,7 @@ describe('the menu on a poster', () => {
 
     it('keeps the metadata when that question is cancelled', async () => {
         await openMenuFor(movie);
+        openManage();
 
         fireEvent.click(screen.getByRole('menuitem', { name: 'Remove metadata…' }));
         fireEvent.click(within(await screen.findByRole('dialog')).getByRole('button', { name: 'Cancel' }));
@@ -364,6 +406,7 @@ describe('the menu on a poster', () => {
 
     it('offers a title with no metadata a way to match it again instead', async () => {
         await openMenuFor(title({ lockedFields: ['Unmatched'] }));
+        openManage();
 
         expect(labels()).not.toContain('Remove metadata…');
         expect(labels().indexOf('Match automatically')).toBe(labels().indexOf('Fix match…') + 1);
@@ -372,6 +415,7 @@ describe('the menu on a poster', () => {
     it('matches a title with no metadata again on that server once confirmed', async () => {
         const unmatched = title({ lockedFields: ['Unmatched'] });
         await openMenuFor(unmatched, mediaMenuTarget(unmatched, 'srv1', {}));
+        openManage();
 
         fireEvent.click(screen.getByRole('menuitem', { name: 'Match automatically' }));
         fireEvent.click(within(await screen.findByRole('dialog')).getByRole('button', { name: 'Match' }));
@@ -383,6 +427,7 @@ describe('the menu on a poster', () => {
     it('leaves the title alone when the delete is cancelled', async () => {
         const onDeleted = vi.fn();
         await openMenuFor(movie, mediaMenuTarget(movie, 'srv1', { onDeleted }));
+        openManage();
 
         fireEvent.click(screen.getByRole('menuitem', { name: 'Delete item' }));
         fireEvent.click(within(await screen.findByRole('dialog')).getByRole('button', { name: 'Cancel' }));
@@ -597,7 +642,7 @@ describe('the menu on a poster', () => {
 
         fireEvent.contextMenu(screen.getByTestId('episode-row'), { clientX: 10, clientY: 10 });
 
-        expect(await screen.findByRole('menuitem', { name: 'Go to show' })).toBeInTheDocument();
+        expect(await screen.findByRole('menuitem', { name: 'Manage episode…' })).toBeInTheDocument();
         expect(screen.getByTestId('episode-row')).toHaveClass('row');
     });
 });

@@ -1,5 +1,4 @@
 import { useEffect, useState, type ReactNode } from 'react';
-import { useNavigate } from 'react-router-dom';
 import type { MediaItem } from '../../../api/Media/mediaService';
 import { libraryAdminService, type MediaMatchResult } from '../../../api/Media/libraryAdminService';
 import { watchlistService } from '../../../api/Watchlist/watchlistService';
@@ -13,7 +12,7 @@ import MediaInfoDialog from '../MediaInfoDialog';
 import MarkerEditorModal from '../../Admin/MarkerEditorModal';
 import AddToCollectionModal from '../../Collections/AddToCollectionModal';
 import AddToPlaylistModal from '../../Collections/AddToPlaylistModal';
-import { menuAction, menuSeparator, tidyMenu, type MenuEntry } from '../../Client/Primitives/menuEntries';
+import { menuAction, menuSeparator, menuSubmenu, tidyMenu, type MenuEntry } from '../../Client/Primitives/menuEntries';
 import { toggleWatched, toggleWatchlist } from './watchActions';
 
 type OpenDialog = 'info' | 'edit' | 'playlist' | 'collection' | 'match' | 'markers';
@@ -44,13 +43,15 @@ export interface MediaItemActions {
     dialogs: ReactNode;
 }
 
+// What "Manage …" calls each kind of title in its row.
+const MANAGED_NOUN: Partial<Record<string, string>> = { Movie: 'movie', TvShow: 'show', Season: 'season', Episode: 'episode' };
+
 // The actions a title offers, and the dialogs they open. The title page's "more"
 // menu and the menu on a poster both come from here, so the two cannot drift.
 // Whoever shows the menu renders `dialogs` somewhere that outlives the menu.
 export function useMediaItemActions(media: MediaItem | null, options: MediaItemActionsOptions): MediaItemActions {
     const { serverId, withWatchActions = false, onChanged, onDeleted, onMatched } = options;
     const dialog = useDialog();
-    const navigate = useNavigate();
     const [openDialog, setOpenDialog] = useState<OpenDialog | null>(null);
     const [thumbnailsLock, setThumbnailsLock] = useState<{ id: string; locked: boolean } | null>(null);
     const [watchlist, setWatchlist] = useState<{ id: string; saved: boolean } | null>(null);
@@ -83,15 +84,12 @@ export function useMediaItemActions(media: MediaItem | null, options: MediaItemA
 
     if (!media) return { entries: [], dialogs: null };
 
-    const isEpisode = media.type === 'Episode';
-    const isSeason = media.type === 'Season';
     const thumbnailsLocked = thumbnailsLock?.id === media.id ? thumbnailsLock.locked : false;
     const inWatchlist = watchlist?.id === media.id ? watchlist.saved : false;
     const hasFileInfo = hasThumbnails && (media.mediaParts?.length ?? 0) > 0;
     const canFixMatch = media.type === 'Movie' || media.type === 'TvShow';
     const matchedByHand = canFixMatch && (media.lockedFields ?? []).some(field => field.toLowerCase() === MATCH_LOCK);
     const unmatched = canFixMatch && (media.lockedFields ?? []).some(field => field.toLowerCase() === UNMATCHED_LOCK);
-    const pathTo = (id: string) => serverId ? `/server/${serverId}/media/${id}` : `/media/${id}`;
     const close = () => setOpenDialog(null);
 
     const scan = async () => {
@@ -235,36 +233,29 @@ export function useMediaItemActions(media: MediaItem | null, options: MediaItemA
     }
     if (hasFileInfo) entries.push(menuAction('info', 'Media info', () => setOpenDialog('info')));
 
-    entries.push(menuSeparator('before-parents'));
-    if (isEpisode && media.seasonId) {
-        const seasonId = media.seasonId;
-        entries.push(menuAction('season', 'Go to season', () => navigate(pathTo(seasonId))));
-    }
-    if ((isEpisode || isSeason) && media.tvShowId) {
-        const showId = media.tvShowId;
-        entries.push(menuAction('show', 'Go to show', () => navigate(pathTo(showId))));
-    }
-
     entries.push(menuSeparator('before-organise'));
     if (isAdmin) entries.push(menuAction('edit', 'Edit metadata', () => setOpenDialog('edit')));
     entries.push(menuAction('playlist', 'Add to playlist', () => setOpenDialog('playlist')));
     entries.push(menuAction('collection', 'Add to collection', () => setOpenDialog('collection')));
 
     if (isAdmin) {
-        entries.push(menuSeparator('before-admin'));
-        if (canFixMatch) entries.push(menuAction('match', 'Fix match…', () => setOpenDialog('match')));
-        if (matchedByHand) entries.push(menuAction('clear-match', 'Clear manual match', clearMatch));
-        if (unmatched) entries.push(menuAction('match-automatically', 'Match automatically', matchAutomatically));
-        if (canFixMatch && !unmatched) entries.push(menuAction('remove-metadata', 'Remove metadata…', removeMetadata));
-        entries.push(menuAction('refresh', 'Refresh metadata', refresh));
-        entries.push(menuAction('scan', 'Scan files', scan));
-        entries.push(menuAction('analyze', 'Analyze media', analyze));
+        const manage: MenuEntry[] = [];
+        if (canFixMatch) manage.push(menuAction('match', 'Fix match…', () => setOpenDialog('match')));
+        if (matchedByHand) manage.push(menuAction('clear-match', 'Clear manual match', clearMatch));
+        if (unmatched) manage.push(menuAction('match-automatically', 'Match automatically', matchAutomatically));
+        if (canFixMatch && !unmatched) manage.push(menuAction('remove-metadata', 'Remove metadata…', removeMetadata));
+        manage.push(menuSeparator('before-maintenance'));
+        manage.push(menuAction('refresh', 'Refresh metadata', refresh));
+        manage.push(menuAction('scan', 'Scan files', scan));
+        manage.push(menuAction('analyze', 'Analyze media', analyze));
         if (hasThumbnails) {
-            entries.push(menuAction('thumbnails', 'Regenerate thumbnails', regenerateThumbnails));
-            entries.push(menuAction('thumbnails-lock', thumbnailsLocked ? 'Unlock thumbnails' : 'Lock thumbnails', toggleThumbnailsLock));
-            entries.push(menuAction('markers', 'Edit markers', () => setOpenDialog('markers')));
+            manage.push(menuAction('thumbnails', 'Regenerate thumbnails', regenerateThumbnails));
+            manage.push(menuAction('thumbnails-lock', thumbnailsLocked ? 'Unlock thumbnails' : 'Lock thumbnails', toggleThumbnailsLock));
+            manage.push(menuAction('markers', 'Edit markers', () => setOpenDialog('markers')));
         }
-        entries.push(menuAction('delete', 'Delete item', remove, 'danger'));
+        manage.push(menuSeparator('before-delete'));
+        manage.push(menuAction('delete', 'Delete item', remove, 'danger'));
+        entries.push(menuSubmenu('manage', `Manage ${MANAGED_NOUN[media.type] ?? 'title'}…`, manage));
     }
 
     const dialogs = (
