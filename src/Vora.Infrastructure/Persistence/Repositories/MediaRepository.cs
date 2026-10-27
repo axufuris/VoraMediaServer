@@ -98,6 +98,19 @@ public partial class MediaRepository : IMediaRepository
         });
     }
 
+    public async Task<Dictionary<Guid, string>> GetPosterUrlsByIdsAsync(IReadOnlyCollection<Guid> ids)
+    {
+        if (ids.Count == 0) return new Dictionary<Guid, string>();
+
+        var rows = await _context.MediaItems
+            .AsNoTracking()
+            .Where(m => ids.Contains(m.Id) && m.PosterUrl != null && m.PosterUrl != string.Empty)
+            .Select(m => new { m.Id, m.PosterUrl })
+            .ToListAsync();
+
+        return rows.ToDictionary(r => r.Id, r => r.PosterUrl ?? string.Empty);
+    }
+
     public async Task<Guid?> GetMovieIdByTitleAndYearAsync(string title, int? year, Guid libraryId, string? tmdbId = null, string? imdbId = null)
     {
         // Match on a normalized title (lowercased, punctuation stripped) so a

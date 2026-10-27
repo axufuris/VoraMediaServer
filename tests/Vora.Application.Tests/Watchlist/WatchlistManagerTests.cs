@@ -17,6 +17,8 @@ public class WatchlistManagerTests
     {
         _media.GetLocalIdsByExternalIdsAsync(Arg.Any<IEnumerable<string>>(), Arg.Any<string>())
             .Returns(new Dictionary<string, Guid>());
+        _media.GetPosterUrlsByIdsAsync(Arg.Any<IReadOnlyCollection<Guid>>())
+            .Returns(new Dictionary<Guid, string>());
         _manager = new WatchlistManager(_repo, _media, NullLogger<WatchlistManager>.Instance);
     }
 
@@ -172,5 +174,46 @@ public class WatchlistManagerTests
         var result = await _manager.GetWatchlistAsync(profileId);
 
         result.Should().ContainSingle().Which.MediaItemId.Should().BeNull();
+    }
+
+    [Fact]
+    public async Task GetWatchlist_shows_a_library_title_with_its_current_poster_not_the_one_saved_when_added()
+    {
+        var profileId = Guid.NewGuid();
+        var mediaId = Guid.NewGuid();
+        var resolvedId = Guid.NewGuid();
+        _repo.GetWatchlistAsync(profileId).Returns(new List<UserWatchlistItem>
+        {
+            new() { Id = Guid.NewGuid(), ProfileId = profileId, MediaItemId = mediaId, Type = "Movie", Title = "Pitch Perfect 2", PosterUrl = "/api/artwork/custom/pp2_overlay_old.jpg" },
+            new() { Id = Guid.NewGuid(), ProfileId = profileId, ExternalId = "603", ProviderId = Tmdb, Type = "Movie", Title = "The Matrix", PosterUrl = "https://image.tmdb.org/t/p/w500/matrix.jpg" },
+        });
+        _media.GetLocalIdsByExternalIdsAsync(Arg.Any<IEnumerable<string>>(), "Movie")
+            .Returns(new Dictionary<string, Guid> { ["603"] = resolvedId });
+        _media.GetPosterUrlsByIdsAsync(Arg.Is<IReadOnlyCollection<Guid>>(ids => ids.Count == 2 && ids.Contains(mediaId) && ids.Contains(resolvedId)))
+            .Returns(new Dictionary<Guid, string>
+            {
+                [mediaId] = "/api/artwork/custom/pp2_overlay_new.jpg",
+                [resolvedId] = "/api/artwork/custom/matrix_overlay.jpg",
+            });
+
+        var result = await _manager.GetWatchlistAsync(profileId);
+
+        result.Select(r => r.PosterUrl).Should().Equal("/api/artwork/custom/pp2_overlay_new.jpg", "/api/artwork/custom/matrix_overlay.jpg");
+    }
+
+    [Fact]
+    public async Task GetWatchlist_keeps_the_saved_poster_when_the_title_is_not_in_the_library_or_has_none()
+    {
+        var profileId = Guid.NewGuid();
+        var posterless = Guid.NewGuid();
+        _repo.GetWatchlistAsync(profileId).Returns(new List<UserWatchlistItem>
+        {
+            new() { Id = Guid.NewGuid(), ProfileId = profileId, ExternalId = "999", ProviderId = Tmdb, Type = "Movie", Title = "Unowned", PosterUrl = "https://image.tmdb.org/t/p/w500/unowned.jpg" },
+            new() { Id = Guid.NewGuid(), ProfileId = profileId, MediaItemId = posterless, Type = "Movie", Title = "Holiday 2019", PosterUrl = "/api/artwork/custom/holiday.jpg" },
+        });
+
+        var result = await _manager.GetWatchlistAsync(profileId);
+
+        result.Select(r => r.PosterUrl).Should().Equal("https://image.tmdb.org/t/p/w500/unowned.jpg", "/api/artwork/custom/holiday.jpg");
     }
 }
