@@ -561,6 +561,7 @@ public class PodcastManager : IPodcastManager
         {
             Id = sub.Id,
             ShowId = sub.PodcastShowId,
+            FeedUrl = sub.Show.FeedUrl,
             Title = sub.Show.Title,
             Author = sub.Show.Author,
             Description = sub.Show.Description,

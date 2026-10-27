@@ -213,11 +213,9 @@ export default function MainLayout() {
 
             const savedPrefs: NavItem[] | null = savedPrefsJson ? JSON.parse(savedPrefsJson) : null;
 
-            const primaryServerName = connectedServers[0]?.name;
-
             const baseItems: NavItem[] = [
                 { id: 'music', title: 'Music', path: '/music', type: 'system', isPinned: true, order: 0 },
-                { id: 'podcasts', title: 'Podcasts', path: '/podcasts', type: 'system', serverName: primaryServerName, isPinned: true, order: 1 },
+                { id: 'podcasts', title: 'Podcasts', path: '/podcasts', type: 'system', isPinned: true, order: 1 },
                 { id: 'livetv', title: 'Live TV', path: '/livetv', type: 'system', isPinned: true, order: 2 },
                 { id: 'radio', title: 'Radio', path: '/radio', type: 'system', isPinned: true, order: 3 },
                 { id: 'discovery', title: 'Discover', path: '/discovery', type: 'system', isPinned: true, order: 5 },

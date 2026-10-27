@@ -1,6 +1,6 @@
 import { useEffect, useState, useCallback, useRef, useMemo } from 'react';
 import { useParams } from 'react-router-dom';
-import { podcastService, type PodcastSubscriptionVM, type PodcastEpisodeVM, type DiscoveredPodcastVM, type PodcastFeedEpisodeVM, type AggregatedCatalogPodcastVM, type CatalogServerAvailability } from '../../../api/Podcasts/podcastService';
+import { podcastService, type ServerPodcastSubscription, type PodcastEpisodeVM, type DiscoveredPodcastVM, type ServerPodcastFeedEpisode, type AggregatedCatalogPodcastVM, type CatalogServerAvailability } from '../../../api/Podcasts/podcastService';
 import { serverVault } from '../../../utils/serverVault';
 import { StorageKeys, decodeJwtPayload } from '../../../utils/storageKeys';
 import { usePlayer } from '../../../contexts/usePlayer';
@@ -8,6 +8,7 @@ import { useDialog } from '../../../dialogs';
 import { useSignalREvent } from '../../../hooks/useSignalREvent';
 import { calendarDaysBetween, parseServerDate } from '../../../utils/serverTime';
 import { secureImageUrl } from '../../../utils/secureImageUrl';
+import { podcastPlayable } from '../../../utils/playables';
 
 const SELECTED_SUB_STORAGE_KEY = 'podcast_selected_sub';
 const VIEW_MODE_STORAGE_KEY = 'podcast_view_mode';
@@ -20,12 +21,25 @@ interface EpisodeStateChange {
     isPlayed: boolean;
 }
 
+const serverNames = new Intl.ListFormat('en', { style: 'long', type: 'conjunction' });
+
+function UnreachableServersNote({ count }: { count: number }) {
+    if (count === 0) return null;
+    return (
+        <div className="mb-4 px-3 py-2 bg-[var(--vora-accent-soft)] border border-[var(--vora-accent-soft-hover)] text-[var(--vora-accent-text)] text-xs rounded">
+            Couldn't reach {count} server{count === 1 ? '' : 's'} — showing partial results.
+        </div>
+    );
+}
+
 export default function PodcastsTab() {
     const { serverId } = useParams<{ serverId?: string }>();
+    const homeServerId = serverId ?? serverVault.getActiveServerId() ?? undefined;
     const { playMedia } = usePlayer();
     const dialog = useDialog();
 
-    const [subscriptions, setSubscriptions] = useState<PodcastSubscriptionVM[]>([]);
+    const [subscriptions, setSubscriptions] = useState<ServerPodcastSubscription[]>([]);
+    const [subscriptionsFailedServerIds, setSubscriptionsFailedServerIds] = useState<string[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [searchQuery, setSearchQuery] = useState('');
     const [searchResults, setSearchResults] = useState<DiscoveredPodcastVM[]>([]);
@@ -34,7 +48,7 @@ export default function PodcastsTab() {
     const [subscribingFeedUrl, setSubscribingFeedUrl] = useState<string | null>(null);
     const [subscribeError, setSubscribeError] = useState<string | null>(null);
 
-    const [selectedSub, setSelectedSub] = useState<PodcastSubscriptionVM | null>(null);
+    const [selectedSub, setSelectedSub] = useState<ServerPodcastSubscription | null>(null);
     const [episodes, setEpisodes] = useState<PodcastEpisodeVM[]>([]);
     const [isLoadingEpisodes, setIsLoadingEpisodes] = useState(false);
     const [isRefreshing, setIsRefreshing] = useState(false);
@@ -55,7 +69,8 @@ export default function PodcastsTab() {
         if (stored === 'recent' || stored === 'subscriptions' || stored === 'catalog') return stored;
         return canAddCustomFeeds ? 'subscriptions' : 'catalog';
     });
-    const [recentEpisodes, setRecentEpisodes] = useState<PodcastFeedEpisodeVM[]>([]);
+    const [recentEpisodes, setRecentEpisodes] = useState<ServerPodcastFeedEpisode[]>([]);
+    const [recentFailedServerIds, setRecentFailedServerIds] = useState<string[]>([]);
     const [isLoadingRecent, setIsLoadingRecent] = useState(false);
 
     const [catalog, setCatalog] = useState<AggregatedCatalogPodcastVM[]>([]);
@@ -82,7 +97,7 @@ export default function PodcastsTab() {
         }
     }, [viewMode, loadCatalog]);
 
-    const [contextMenu, setContextMenu] = useState<{ x: number; y: number; episodeId: string; isPlayed: boolean; hasProgress: boolean } | null>(null);
+    const [contextMenu, setContextMenu] = useState<{ x: number; y: number; episodeId: string; serverId: string; isPlayed: boolean; hasProgress: boolean } | null>(null);
 
     useEffect(() => {
         const close = () => setContextMenu(null);
@@ -96,9 +111,9 @@ export default function PodcastsTab() {
         return () => document.removeEventListener('click', close);
     }, []);
 
-    const applyEpisodeStateChange = useCallback(async (episodeId: string, positionSeconds: number, isPlayed: boolean) => {
+    const applyEpisodeStateChange = useCallback(async (episodeId: string, episodeServerId: string, positionSeconds: number, isPlayed: boolean) => {
         try {
-            await podcastService.saveEpisodeState(episodeId, positionSeconds, isPlayed, serverId);
+            await podcastService.saveEpisodeState(episodeId, positionSeconds, isPlayed, episodeServerId);
             window.dispatchEvent(new CustomEvent<EpisodeStateChange>('podcast:episode-state-changed', {
                 detail: { episodeId, positionSeconds, isPlayed }
             }));
@@ -106,10 +121,10 @@ export default function PodcastsTab() {
             console.error("Failed to update episode state", error);
             dialog.alert("Failed to update episode.");
         }
-    }, [serverId, dialog]);
+    }, [dialog]);
 
-    const handleMarkPlayed = (episodeId: string) => applyEpisodeStateChange(episodeId, 0, true);
-    const handleMarkUnplayed = (episodeId: string) => applyEpisodeStateChange(episodeId, 0, false);
+    const handleMarkPlayed = (episodeId: string, episodeServerId: string) => applyEpisodeStateChange(episodeId, episodeServerId, 0, true);
+    const handleMarkUnplayed = (episodeId: string, episodeServerId: string) => applyEpisodeStateChange(episodeId, episodeServerId, 0, false);
 
     const subscribeFromCatalog = async (feedUrl: string, targetServerId: string) => {
         setSubscribingFeedUrl(feedUrl);
@@ -120,9 +135,7 @@ export default function PodcastsTab() {
                 ...c,
                 availableOn: c.availableOn.map(a => a.serverId === targetServerId ? { ...a, isSubscribed: true } : a)
             } : c));
-            if (targetServerId === (serverId ?? serverVault.getActiveServerId())) {
-                await loadSubscriptions();
-            }
+            await loadSubscriptions();
         } catch (error) {
             console.error('Failed to subscribe from catalog', error);
             await dialog.alert('Failed to subscribe.');
@@ -132,10 +145,9 @@ export default function PodcastsTab() {
     };
 
     const pickDefaultTargetServer = (item: AggregatedCatalogPodcastVM): CatalogServerAvailability | null => {
-        const activeId = serverId ?? serverVault.getActiveServerId() ?? null;
         const unsubscribed = item.availableOn.filter(a => !a.isSubscribed);
         if (unsubscribed.length === 0) return null;
-        const activeMatch = unsubscribed.find(a => a.serverId === activeId);
+        const activeMatch = unsubscribed.find(a => a.serverId === homeServerId);
         if (activeMatch) return activeMatch;
         return unsubscribed[0];
     };
@@ -145,14 +157,15 @@ export default function PodcastsTab() {
     const loadRecentEpisodes = useCallback(async () => {
         setIsLoadingRecent(true);
         try {
-            const eps = await podcastService.getRecentEpisodes(50, 60, serverId);
-            setRecentEpisodes(eps);
+            const result = await podcastService.getRecentEpisodesOnEveryServer(50, 60, homeServerId);
+            setRecentEpisodes(result.items);
+            setRecentFailedServerIds(result.failedServerIds);
         } catch (error) {
             console.error("Failed to load recent episodes", error);
         } finally {
             setIsLoadingRecent(false);
         }
-    }, [serverId]);
+    }, [homeServerId]);
 
     useEffect(() => {
         if (viewMode === 'recent') {
@@ -167,38 +180,39 @@ export default function PodcastsTab() {
 
     const loadSubscriptions = useCallback(async () => {
         try {
-            const subs = await podcastService.getSubscriptions(serverId);
-            setSubscriptions(subs);
+            const result = await podcastService.getSubscriptionsOnEveryServer(homeServerId);
+            setSubscriptions(result.items);
+            setSubscriptionsFailedServerIds(result.failedServerIds);
         } catch (error) {
             console.error("Failed to load podcast subscriptions", error);
         } finally {
             setIsLoading(false);
         }
-    }, [serverId]);
+    }, [homeServerId]);
 
     useEffect(() => {
         loadSubscriptions();
     }, [loadSubscriptions]);
 
-    const loadEpisodes = useCallback(async (subscription: PodcastSubscriptionVM) => {
+    const loadEpisodes = useCallback(async (subscription: ServerPodcastSubscription) => {
         setSelectedSub(subscription);
         sessionStorage.setItem(SELECTED_SUB_STORAGE_KEY, subscription.id);
         setIsLoadingEpisodes(true);
         setEpisodes([]);
         try {
-            const eps = await podcastService.getEpisodes(subscription.id, 100, serverId);
+            const eps = await podcastService.getEpisodes(subscription.id, 100, subscription.serverId);
             setEpisodes(eps);
         } catch (error) {
             console.error("Failed to load episodes", error);
         } finally {
             setIsLoadingEpisodes(false);
         }
-    }, [serverId]);
+    }, []);
 
     useEffect(() => {
         const restoredId = restoredSubIdRef.current;
         if (!restoredId || subscriptions.length === 0 || selectedSub) return;
-        const match = subscriptions.find(s => s.id === restoredId);
+        const match = subscriptions.find(s => s.subscribedOn.some(copy => copy.subscriptionId === restoredId));
         if (match) {
             loadEpisodes(match);
         } else {
@@ -230,7 +244,7 @@ export default function PodcastsTab() {
         if (!showId) return;
         loadSubscriptions();
         if (selectedSub && selectedSub.showId === showId) {
-            podcastService.getEpisodes(selectedSub.id, 100, serverId)
+            podcastService.getEpisodes(selectedSub.id, 100, selectedSub.serverId)
                 .then(setEpisodes)
                 .catch(err => console.error("Failed to refresh episodes from SignalR", err));
         }
@@ -240,7 +254,7 @@ export default function PodcastsTab() {
         if (viewMode === 'catalog') {
             loadCatalog();
         }
-    }, [selectedSub, serverId, loadSubscriptions, viewMode, loadRecentEpisodes, loadCatalog]));
+    }, [selectedSub, loadSubscriptions, viewMode, loadRecentEpisodes, loadCatalog]));
 
     const isUrlLike = (value: string): boolean => /^(https?:|feed:)/i.test(value.trim());
 
@@ -301,21 +315,24 @@ export default function PodcastsTab() {
     }, [searchQuery, serverId]);
 
 
-    const handleUnsubscribe = async (sub: PodcastSubscriptionVM) => {
-        const confirmed = await dialog.confirm(`Unsubscribe from "${sub.title}"?`);
+    const handleUnsubscribe = async (sub: ServerPodcastSubscription) => {
+        const onServers = sub.subscribedOn.length > 1 ? ` on ${serverNames.format(sub.subscribedOn.map(copy => copy.serverName))}` : '';
+        const confirmed = await dialog.confirm(`Unsubscribe from "${sub.title}"${onServers}?`);
         if (!confirmed) return;
 
-        try {
-            await podcastService.unsubscribe(sub.id, serverId);
-            if (selectedSub?.id === sub.id) {
-                setSelectedSub(null);
-                setEpisodes([]);
-                sessionStorage.removeItem(SELECTED_SUB_STORAGE_KEY);
-            }
-            await loadSubscriptions();
-        } catch (error) {
-            console.error("Failed to unsubscribe", error);
-            await dialog.alert("Failed to unsubscribe.");
+        const results = await Promise.allSettled(sub.subscribedOn.map(copy => podcastService.unsubscribe(copy.subscriptionId, copy.serverId)));
+        const stillOn = sub.subscribedOn.filter((_, i) => results[i].status === 'rejected');
+        if (selectedSub?.id === sub.id) {
+            setSelectedSub(null);
+            setEpisodes([]);
+            sessionStorage.removeItem(SELECTED_SUB_STORAGE_KEY);
+        }
+        await loadSubscriptions();
+        if (stillOn.length > 0) {
+            console.error("Failed to unsubscribe", results);
+            await dialog.alert(stillOn.length === sub.subscribedOn.length
+                ? "Failed to unsubscribe."
+                : `Couldn't unsubscribe on ${serverNames.format(stillOn.map(copy => copy.serverName))}.`);
         }
     };
 
@@ -323,8 +340,8 @@ export default function PodcastsTab() {
         if (!selectedSub) return;
         setIsRefreshing(true);
         try {
-            await podcastService.refreshSubscription(selectedSub.id, serverId);
-            const eps = await podcastService.getEpisodes(selectedSub.id, 100, serverId);
+            await podcastService.refreshSubscription(selectedSub.id, selectedSub.serverId);
+            const eps = await podcastService.getEpisodes(selectedSub.id, 100, selectedSub.serverId);
             setEpisodes(eps);
             await loadSubscriptions();
         } catch (error) {
@@ -344,27 +361,14 @@ export default function PodcastsTab() {
             subtitle: selectedSub.title,
             posterUrl: secureImageUrl(episode.artworkUrl || selectedSub.artworkUrl, 'poster'),
             streamUrl: episode.audioUrl,
-            serverId: serverId ?? serverVault.getActiveServerId() ?? undefined,
+            serverId: selectedSub.serverId,
             container: 'audio',
             playbackContextType: 'Podcast',
             startPosition: resumeFrom
         });
     };
 
-    const handlePlayRecent = (episode: PodcastFeedEpisodeVM) => {
-        const resumeFrom = episode.isPlayed ? 0 : (episode.positionSeconds > 5 ? episode.positionSeconds : 0);
-        playMedia({
-            id: episode.id,
-            title: episode.title,
-            subtitle: episode.showTitle,
-            posterUrl: secureImageUrl(episode.artworkUrl || episode.showArtworkUrl, 'poster'),
-            streamUrl: episode.audioUrl,
-            serverId: serverId ?? serverVault.getActiveServerId() ?? undefined,
-            container: 'audio',
-            playbackContextType: 'Podcast',
-            startPosition: resumeFrom
-        });
-    };
+    const handlePlayRecent = (episode: ServerPodcastFeedEpisode) => playMedia(podcastPlayable(episode, episode.serverId));
 
     const formatDuration = (seconds?: number): string => {
         if (!seconds || seconds <= 0) return '';
@@ -403,7 +407,7 @@ export default function PodcastsTab() {
                 >
                     {!contextMenu.isPlayed && (
                         <button
-                            onClick={() => { handleMarkPlayed(contextMenu.episodeId); setContextMenu(null); }}
+                            onClick={() => { handleMarkPlayed(contextMenu.episodeId, contextMenu.serverId); setContextMenu(null); }}
                             className="w-full text-left px-4 py-2 hover:bg-[var(--vora-bg-surface)] text-[var(--vora-text-primary)]"
                         >
                             Mark as played
@@ -411,7 +415,7 @@ export default function PodcastsTab() {
                     )}
                     {(contextMenu.isPlayed || contextMenu.hasProgress) && (
                         <button
-                            onClick={() => { handleMarkUnplayed(contextMenu.episodeId); setContextMenu(null); }}
+                            onClick={() => { handleMarkUnplayed(contextMenu.episodeId, contextMenu.serverId); setContextMenu(null); }}
                             className="w-full text-left px-4 py-2 hover:bg-[var(--vora-bg-surface)] text-[var(--vora-text-primary)]"
                         >
                             {contextMenu.isPlayed ? 'Mark as unplayed' : 'Reset progress'}
@@ -521,6 +525,9 @@ export default function PodcastsTab() {
                         )}
                     </div>
 
+                {viewMode === 'subscriptions' && <UnreachableServersNote count={subscriptionsFailedServerIds.length} />}
+                {viewMode === 'recent' && !isLoadingRecent && <UnreachableServersNote count={recentFailedServerIds.length} />}
+
                 {viewMode === 'recent' ? (
                     isLoadingRecent ? (
                         <div className="text-[var(--vora-text-muted)] py-12 text-center">Loading new episodes...</div>
@@ -544,7 +551,7 @@ export default function PodcastsTab() {
                                         onClick={() => handlePlayRecent(ep)}
                                         onContextMenu={(e) => {
                                             e.preventDefault();
-                                            setContextMenu({ x: e.pageX, y: e.pageY, episodeId: ep.id, isPlayed: ep.isPlayed, hasProgress: !ep.isPlayed && ep.positionSeconds > 5 });
+                                            setContextMenu({ x: e.pageX, y: e.pageY, episodeId: ep.id, serverId: ep.serverId, isPlayed: ep.isPlayed, hasProgress: !ep.isPlayed && ep.positionSeconds > 5 });
                                         }}
                                         className={`w-full text-left flex items-center gap-4 p-3 bg-[var(--vora-bg-sunken)] hover:bg-[var(--vora-bg-sunken)]/80 border rounded transition-all cursor-pointer group ${ep.isPlayed ? 'border-[var(--vora-border-subtle)]/50 opacity-60' : 'border-[var(--vora-border-subtle)] hover:border-[var(--vora-accent-500)]'}`}
                                     >
@@ -593,11 +600,7 @@ export default function PodcastsTab() {
                         </div>
                     ) : (
                         <>
-                            {catalogFailedServerIds.length > 0 && (
-                                <div className="mb-4 px-3 py-2 bg-[var(--vora-accent-soft)] border border-[var(--vora-accent-soft-hover)] text-[var(--vora-accent-text)] text-xs rounded">
-                                    Couldn't reach {catalogFailedServerIds.length} server{catalogFailedServerIds.length === 1 ? '' : 's'} — showing partial results.
-                                </div>
-                            )}
+                            <UnreachableServersNote count={catalogFailedServerIds.length} />
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                                 {catalog.map(item => {
                                     const isAdding = subscribingFeedUrl === item.feedUrl;
@@ -766,7 +769,7 @@ export default function PodcastsTab() {
                                                     onClick={() => handlePlay(ep)}
                                                     onContextMenu={(e) => {
                                                         e.preventDefault();
-                                                        setContextMenu({ x: e.pageX, y: e.pageY, episodeId: ep.id, isPlayed: ep.isPlayed, hasProgress: !ep.isPlayed && ep.positionSeconds > 5 });
+                                                        setContextMenu({ x: e.pageX, y: e.pageY, episodeId: ep.id, serverId: selectedSub.serverId, isPlayed: ep.isPlayed, hasProgress: !ep.isPlayed && ep.positionSeconds > 5 });
                                                     }}
                                                     className={`w-full text-left flex items-center gap-4 p-3 bg-[var(--vora-bg-sunken)] hover:bg-[var(--vora-bg-sunken)]/80 border rounded transition-all cursor-pointer group ${ep.isPlayed ? 'border-[var(--vora-border-subtle)]/50 opacity-60' : 'border-[var(--vora-border-subtle)] hover:border-[var(--vora-accent-500)]'}`}
                                                 >

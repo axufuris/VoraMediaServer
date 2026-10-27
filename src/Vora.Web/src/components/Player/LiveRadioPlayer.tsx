@@ -245,7 +245,7 @@ export default function LiveRadioPlayer() {
     useEffect(() => {
         if (!isPodcast || !currentMedia?.id) return;
         const episodeId = currentMedia.id;
-        const activeServer = serverVault.getActiveServer();
+        const episodeServerId = currentMedia.serverId ?? serverVault.getActiveServer()?.id;
 
         const computeIsPlayed = (video: HTMLVideoElement): boolean => {
             if (!video.duration || !isFinite(video.duration)) return false;
@@ -254,7 +254,7 @@ export default function LiveRadioPlayer() {
 
         const saveAndBroadcast = (position: number, isPlayed: boolean, explicit?: boolean) => {
             podcastService
-                .saveEpisodeState(episodeId, position, explicit ? isPlayed : undefined, activeServer?.id)
+                .saveEpisodeState(episodeId, position, explicit ? isPlayed : undefined, episodeServerId)
                 .catch(err => console.warn("Failed to save episode state", err));
             window.dispatchEvent(new CustomEvent('podcast:episode-state-changed', {
                 detail: { episodeId, positionSeconds: position, isPlayed }
@@ -295,7 +295,7 @@ export default function LiveRadioPlayer() {
                 saveAndBroadcast(pos, computeIsPlayed(video));
             }
         };
-    }, [isPodcast, currentMedia?.id, videoRef]);
+    }, [isPodcast, currentMedia?.id, currentMedia?.serverId, videoRef]);
 
     const playStation = (channel: IptvChannelVM) => {
         if (!currentMedia || channel.id === currentMedia.id) return;
