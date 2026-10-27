@@ -103,7 +103,7 @@ public static class StreamingEndpoints
             .Produces(StatusCodes.Status404NotFound)
             .RequireAuthorization();
 
-        group.MapGet("/play/{sessionId:guid}", PlaySessionAsync);
+        group.MapMethods("/play/{sessionId:guid}", [HttpMethods.Get, HttpMethods.Head], PlaySessionAsync);
         group.MapGet("/hls/s/{token}/{fileName}", ServeHlsChunkAsync);
 
         return group;
@@ -407,6 +407,7 @@ public static class StreamingEndpoints
     private static async Task<IResult> PlaySessionAsync(
         Guid sessionId,
         [FromQuery] string? t,
+        HttpContext http,
         IStreamManager streamManager,
         IStreamRepository streamRepo,
         ITranscodeService transcodeService,
@@ -445,6 +446,12 @@ public static class StreamingEndpoints
         if (session.Strategy == "DirectPlay")
         {
             return Results.File(filePath, enableRangeProcessing: true);
+        }
+
+        if (HttpMethods.IsHead(http.Request.Method))
+        {
+            http.Response.Headers.Allow = HttpMethods.Get;
+            return Results.StatusCode(StatusCodes.Status405MethodNotAllowed);
         }
 
         // Load the picked part's tracks so we can resolve the session's

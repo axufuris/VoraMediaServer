@@ -166,6 +166,8 @@ public static class WebApplicationExtensions
 
         app.MapHub<VoraHub>("/hubs/Vora").RequireAuthorization();
         app.MapHealthChecks("/health").AllowAnonymous();
+        app.MapFallback("/api/{**rest}", () => Results.NotFound()).AllowAnonymous();
+        app.MapFallback("/hubs/{**rest}", () => Results.NotFound()).AllowAnonymous();
         app.MapFallbackToFile("index.html", WebClientFileCaching.Options());
 
         return app;
