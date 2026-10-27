@@ -250,8 +250,15 @@ public class MetadataMappingService : IMetadataMappingService
         if (!item.IsLocked(nameof(item.TvdbId)) || forceOverride) item.TvdbId = metadata.TvdbId ?? item.TvdbId;
         if (!item.IsLocked(nameof(item.IsAdult)) || forceOverride) item.IsAdult = metadata.IsAdult;
 
+        var stingersChanged = item.HasMidCreditsStinger != metadata.HasMidCreditsStinger
+            || item.HasPostCreditsStinger != metadata.HasPostCreditsStinger;
         item.HasMidCreditsStinger = metadata.HasMidCreditsStinger;
         item.HasPostCreditsStinger = metadata.HasPostCreditsStinger;
+        if (stingersChanged)
+        {
+            item.LastOverlayGeneratedAt = null;
+            if (item is Movie) item.MarkersAnalyzedAt = null;
+        }
 
         var keepsLocalArtwork = item.Library?.PreferLocalArtwork == true;
         var keepsLocalPoster = keepsLocalArtwork && LocalArtworkAddress.Is(item.OriginalPosterUrl);
