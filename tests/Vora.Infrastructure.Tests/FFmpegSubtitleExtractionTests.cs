@@ -20,7 +20,7 @@ public class FFmpegSubtitleExtractionTests : IDisposable
     private readonly string _root = Path.Combine(Path.GetTempPath(), "vora-subs-" + Guid.NewGuid().ToString("N"));
 
     private static FFmpegSubtitleExtractionService NewService() =>
-        new(NullLogger<FFmpegSubtitleExtractionService>.Instance);
+        new(NullLogger<FFmpegSubtitleExtractionService>.Instance, new TestLifetime());
 
     public void Dispose()
     {
@@ -429,7 +429,7 @@ public class FFmpegSubtitleExtractionTests : IDisposable
     public async Task An_empty_sidecar_is_not_handed_to_ffmpeg_and_is_remembered()
     {
         var logger = new RecordingLogger();
-        var service = new FFmpegSubtitleExtractionService(logger);
+        var service = new FFmpegSubtitleExtractionService(logger, new TestLifetime());
         var video = WriteSource();
         var sidecar = Path.Combine(_root, "movie.en.srt");
         File.WriteAllBytes(sidecar, []);
