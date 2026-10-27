@@ -4,7 +4,6 @@ import { MemoryRouter } from 'react-router-dom';
 import CollectionsPage from './CollectionsPage';
 import { DialogProvider } from '../../../dialogs';
 import type { LibrarySummary } from '../../../api/Media/libraryService';
-import type { CollectionSummary } from '../../../api/Collections/collectionService';
 import { StorageKeys } from '../../../utils/storageKeys';
 import type { NavItem } from '../../../layouts/MainLayout';
 import { SidebarItemsContext, type SidebarItems } from '../../../layouts/sidebarItems';
@@ -60,12 +59,7 @@ const renderPage = (items: SidebarItems | null, url = '/') => render(
     </DialogProvider>,
 );
 
-const collection = (id: string, title: string, sortTitle?: string): CollectionSummary =>
-    ({ id, title, sortTitle, itemCount: 4, systemGenerated: false });
-
 const tabNames = () => within(screen.getByRole('navigation')).getAllByRole('button').map(button => button.textContent);
-
-const shownTitles = (titles: string[]) => screen.getAllByText(new RegExp(`^(${titles.join('|')})$`)).map(node => node.textContent);
 
 const pinnedEverywhere = sidebar([
     libraryEntry('movies', 'Movies', true),
@@ -97,20 +91,7 @@ describe('CollectionsPage library tabs', () => {
 
         await screen.findByRole('button', { name: 'Movies' });
 
-        expect(tabNames()).toEqual(['Global', 'Movies', 'Shows', 'Music']);
-    });
-
-    it('leaves out every music library when Music is unpinned', async () => {
-        renderPage(sidebar([
-            libraryEntry('movies', 'Movies', true),
-            libraryEntry('test-movies', 'Test Movies', true),
-            libraryEntry('shows', 'Shows', true),
-            musicEntry(false),
-        ]));
-
-        await screen.findByRole('button', { name: 'Movies' });
-
-        expect(tabNames()).toEqual(['Global', 'Movies', 'Test Movies', 'Shows']);
+        expect(tabNames()).toEqual(['Global', 'Movies', 'Shows']);
     });
 
     it('opens Global instead of an unpinned library named in the link, and never fetches its collections', async () => {
@@ -144,60 +125,35 @@ describe('CollectionsPage library tabs', () => {
         expect(mocks.getGlobalCollections).not.toHaveBeenCalled();
     });
 
-    it('shows every library outside the client layout', async () => {
+    it('shows every library but music outside the client layout', async () => {
         renderPage(null);
 
         await screen.findByRole('button', { name: 'Movies' });
 
-        expect(tabNames()).toEqual(['Global', 'Movies', 'Test Movies', 'Shows', 'Music']);
+        expect(tabNames()).toEqual(['Global', 'Movies', 'Test Movies', 'Shows']);
     });
 });
 
-describe('CollectionsPage Music tab', () => {
-    beforeEach(() => {
-        mocks.getLibraryCollections.mockImplementation((libraryId: string) => Promise.resolve(
-            libraryId === 'music' ? [collection('road', 'Road Trip'), collection('zydeco', 'Zydeco')]
-                : libraryId === 'test-music' ? [collection('chill', 'chill', 'Afternoon')]
-                    : []));
+describe('CollectionsPage music libraries', () => {
+    it('gives music libraries no tab while Music is pinned', async () => {
+        renderPage(pinnedEverywhere);
+
+        await screen.findByRole('button', { name: 'Movies' });
+
+        expect(tabNames()).toEqual(['Global', 'Movies', 'Test Movies', 'Shows']);
     });
 
-    it('gathers every music library into one tab, listed in title order', async () => {
-        renderPage(pinnedEverywhere, '/?tab=music');
+    it.each(['music', 'test-music'])('opens Global from an old link to the %s library, never fetching its collections', async tab => {
+        renderPage(pinnedEverywhere, `/?tab=${tab}`);
 
-        await screen.findByText('Zydeco');
+        await waitFor(() => expect(mocks.getGlobalCollections).toHaveBeenCalled());
 
-        expect(tabNames().filter(name => name === 'Music' || name === 'TestMusic')).toEqual(['Music']);
-        expect(mocks.getLibraryCollections).toHaveBeenCalledWith('music', undefined, false);
-        expect(mocks.getLibraryCollections).toHaveBeenCalledWith('test-music', undefined, false);
-        expect(shownTitles(['Road Trip', 'chill', 'Zydeco'])).toEqual(['chill', 'Road Trip', 'Zydeco']);
+        expect(mocks.getLibraryCollections).not.toHaveBeenCalled();
     });
+});
 
-    it('opens the Music tab from a link to one music library', async () => {
-        renderPage(pinnedEverywhere, '/?tab=test-music');
-
-        await screen.findByText('Road Trip');
-
-        expect(screen.getByText('chill')).toBeTruthy();
-        expect(mocks.getGlobalCollections).not.toHaveBeenCalled();
-    });
-
-    it('asks which music library a new collection goes in', async () => {
-        localStorage.setItem(StorageKeys.isServerAdmin, 'true');
-        mocks.createCollection.mockResolvedValue('new-collection');
-        renderPage(pinnedEverywhere, '/?tab=music');
-        await screen.findByText('Zydeco');
-
-        fireEvent.click(screen.getByRole('button', { name: 'Create collection' }));
-        const dialog = await screen.findByRole('dialog');
-        fireEvent.change(within(dialog).getAllByRole('textbox')[0], { target: { value: 'Road songs' } });
-        fireEvent.change(within(dialog).getByLabelText('Library'), { target: { value: 'test-music' } });
-        fireEvent.click(within(dialog).getByRole('button', { name: 'Create Collection' }));
-
-        await waitFor(() => expect(mocks.createCollection).toHaveBeenCalled());
-        expect(mocks.createCollection.mock.calls[0][0]).toMatchObject({ title: 'Road songs', libraryId: 'test-music' });
-    });
-
-    it('creates in the one library of a library tab without asking', async () => {
+describe('CollectionsPage creating a collection', () => {
+    it('creates it in the open library tab', async () => {
         localStorage.setItem(StorageKeys.isServerAdmin, 'true');
         mocks.createCollection.mockResolvedValue('new-collection');
         renderPage(pinnedEverywhere, '/?tab=movies');
@@ -206,8 +162,6 @@ describe('CollectionsPage Music tab', () => {
         fireEvent.click(screen.getByRole('button', { name: 'Create collection' }));
         const dialog = await screen.findByRole('dialog');
         fireEvent.change(within(dialog).getAllByRole('textbox')[0], { target: { value: 'Heists' } });
-
-        expect(within(dialog).queryByLabelText('Library')).toBeNull();
         fireEvent.click(within(dialog).getByRole('button', { name: 'Create Collection' }));
 
         await waitFor(() => expect(mocks.createCollection).toHaveBeenCalled());
