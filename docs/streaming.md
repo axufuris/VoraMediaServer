@@ -19,6 +19,8 @@ GET  /api/streaming/sessions/{sessionId}/subtitle/{trackId}.vtt
 
 `/play` and the HLS route are **not** `RequireAuthorization`. They are gated by short-lived HMAC tokens from `IStreamingTokenSigner`, so a `<video src>` works without carrying an auth header. `/start`, `/start-extra`, and the subtitle route are authenticated normally.
 
+**HEAD on `/play`** runs the same token and session checks. A DirectPlay session answers with the file's headers (length, type, `Accept-Ranges: bytes`) and no body; a session that streams through HLS answers 405 with `Allow: GET` and starts nothing, because the GET starts FFmpeg. The route used to be GET-only, so a HEAD fell through to the web app's `index.html`. Any unknown `/api/...` path or method is now a 404, not the web app (`MapFallback("/api/{**rest}")` ahead of `MapFallbackToFile`).
+
 The subtitle route is deliberately **off the video path**. Nothing about starting or serving the stream depends on it, so a slow extraction can't stall or time out playback.
 
 ## The decision
