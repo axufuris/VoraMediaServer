@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useMemo, useState, useCallback } from 'react';
 import { Outlet, useNavigate, useParams } from 'react-router-dom';
 import { libraryService } from '../api/Media/libraryService';
 import { authService } from '../api/Auth/authService';
@@ -30,6 +30,7 @@ import { useScrollRestoration } from '../hooks/useScrollRestoration';
 import type { FeatureFlagsVM } from '../api/System/featureFlagsService';
 import { moveShownNavItem } from '../utils/navOrder';
 import MediaItemMenuProvider from '../components/Media/ItemMenu/MediaItemMenuProvider';
+import { SidebarItemsContext } from './sidebarItems';
 
 const isNavItemEnabled = (item: NavItem, flags: FeatureFlagsVM): boolean => {
     if (item.type !== 'system') return true;
@@ -123,6 +124,7 @@ export default function MainLayout() {
     }, [playerOpen]);
 
     const [navItems, setNavItems] = useState<NavItem[]>([]);
+    const [navLoaded, setNavLoaded] = useState(false);
     const [isEditingNav, setIsEditingNav] = useState(false);
     const [showUnpinned, setShowUnpinned] = useState(false);
 
@@ -132,6 +134,7 @@ export default function MainLayout() {
     const closePhoneNav = useCallback(() => setIsPhoneNavOpen(false), []);
 
     const flags = useFeatureFlags();
+    const sidebarItems = useMemo(() => ({ items: navItems, loaded: navLoaded || !activeProfileId }), [navItems, navLoaded, activeProfileId]);
 
     useSignalREvent("UserAccessUpdated", useCallback(async (updatedUserId: string) => {
         if (currentUserId && updatedUserId.toLowerCase() === currentUserId.toLowerCase()) {
@@ -159,7 +162,10 @@ export default function MainLayout() {
             seenUrls.add(s.url);
             return true;
         });
-        if (connectedServers.length === 0) return;
+        if (connectedServers.length === 0) {
+            setNavLoaded(true);
+            return;
+        }
 
         try {
             const serverPromises = connectedServers.map(async (server) => {
@@ -210,7 +216,7 @@ export default function MainLayout() {
             const primaryServerName = connectedServers[0]?.name;
 
             const baseItems: NavItem[] = [
-                { id: 'music', title: 'Music', path: '/music', type: 'system', serverName: primaryServerName, isPinned: true, order: 0 },
+                { id: 'music', title: 'Music', path: '/music', type: 'system', isPinned: true, order: 0 },
                 { id: 'podcasts', title: 'Podcasts', path: '/podcasts', type: 'system', serverName: primaryServerName, isPinned: true, order: 1 },
                 { id: 'livetv', title: 'Live TV', path: '/livetv', type: 'system', isPinned: true, order: 2 },
                 { id: 'radio', title: 'Radio', path: '/radio', type: 'system', isPinned: true, order: 3 },
@@ -235,6 +241,8 @@ export default function MainLayout() {
             }
         } catch (error) {
             console.error("Critical error loading cross-server navigation", error);
+        } finally {
+            setNavLoaded(true);
         }
     }, [activeProfileId, serverId]);
 
@@ -419,7 +427,9 @@ export default function MainLayout() {
                 <MpvMissingBanner />
 
                 <main ref={scrollContainerRef} className="flex-1 overflow-y-auto">
-                    <Outlet />
+                    <SidebarItemsContext.Provider value={sidebarItems}>
+                        <Outlet />
+                    </SidebarItemsContext.Provider>
                 </main>
             </div>
 

@@ -7,6 +7,7 @@ import EmptyState from '../../../components/Client/Primitives/EmptyState';
 import MediaGrid from '../../../components/Client/Primitives/MediaGrid';
 import { StorageKeys } from '../../../utils/storageKeys';
 import LibraryCollectionGrid from '../../../components/Collections/LibraryCollectionGrid';
+import { isLibraryUnpinned, useSidebarItems } from '../../../layouts/sidebarItems';
 
 export default function CollectionsPage() {
     const { serverId } = useParams<{ serverId?: string }>();
@@ -16,9 +17,9 @@ export default function CollectionsPage() {
     // The active tab lives in the URL (?tab=<libraryId|global>) so returning
     // from a collection (the browser's back) restores the tab you were on
     // instead of snapping back to Global.
-    const activeTab = searchParams.get('tab') ?? 'global';
+    const requestedTab = searchParams.get('tab') ?? 'global';
 
-    const [libraries, setLibraries] = useState<LibrarySummary[]>([]);
+    const [libraries, setLibraries] = useState<LibrarySummary[] | null>(null);
     const [collections, setCollections] = useState<CollectionSummary[]>([]);
     const [loading, setLoading] = useState(true);
     const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
@@ -26,8 +27,24 @@ export default function CollectionsPage() {
     const isAdmin = localStorage.getItem(StorageKeys.isServerAdmin) === 'true';
 
     useEffect(() => {
-        libraryService.getLibraries(serverId).then(setLibraries).catch(console.error);
+        libraryService.getLibraries(serverId).then(setLibraries).catch(error => {
+            console.error(error);
+            setLibraries([]);
+        });
     }, [serverId]);
+
+    // A library the profile unpinned from the sidebar gets no tab here either,
+    // and its collections aren't fetched, even from an old ?tab= link.
+    const sidebar = useSidebarItems();
+    const shownLibraries = useMemo(() => {
+        if (!libraries || !sidebar.loaded) return null;
+        return libraries.filter(lib => !isLibraryUnpinned(sidebar.items, lib));
+    }, [libraries, sidebar]);
+
+    const activeTab = requestedTab === 'global' || !shownLibraries || shownLibraries.some(lib => lib.id === requestedTab)
+        ? requestedTab
+        : 'global';
+    const tabKnown = activeTab === 'global' || shownLibraries !== null;
 
     const sortedLibraries = useMemo(() => {
         const rank = (type: string): number => {
@@ -37,14 +54,15 @@ export default function CollectionsPage() {
             if (t === 'music' || t === 'audio') return 2;
             return 3;
         };
-        return [...libraries].sort((a, b) => {
+        return [...(shownLibraries ?? [])].sort((a, b) => {
             const diff = rank(a.type) - rank(b.type);
             if (diff !== 0) return diff;
             return a.name.localeCompare(b.name);
         });
-    }, [libraries]);
+    }, [shownLibraries]);
 
     const fetchCollections = useCallback(async () => {
+        if (!tabKnown) return;
         try {
             const data = activeTab === 'global'
                 ? await collectionService.getGlobalCollections(serverId)
@@ -55,7 +73,7 @@ export default function CollectionsPage() {
         } finally {
             setLoading(false);
         }
-    }, [activeTab, serverId, isAdmin]);
+    }, [activeTab, tabKnown, serverId, isAdmin]);
 
     useEffect(() => {
         let isMounted = true;
