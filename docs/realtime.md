@@ -2,7 +2,7 @@
 
 ## Hub
 
-- **`Vora.Api/Hubs/VoraHub.cs`** — the SignalR `Hub`. Mapped at `/hubs/Vora`.
+- **`Vora.Api/Hubs/VoraHub.cs`** — the SignalR `Hub`. Mapped at `/hubs/Vora`, with **long polls ended at 45 s** (`VoraHubConnections`, SignalR's default is 90 s): the Roku has no WebSocket and long-polls, and an nginx proxy (Nginx Proxy Manager) gives up on an upstream read after 60 s, so every idle poll ended in a 504 and a reconnect. Keep it under 60 s. WebSocket clients are unaffected. An unknown `/hubs/...` path is a 404, never the web app.
 - **`Vora.Api/Hubs/SignalRClientNotifier.cs`** — implements `Vora.Application.Analysis.IClientNotifier`. Every push notification from the server flows through this class.
 
 ## Adding a new real-time event
