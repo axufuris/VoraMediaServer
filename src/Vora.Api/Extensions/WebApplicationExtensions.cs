@@ -164,8 +164,10 @@ public static class WebApplicationExtensions
         app.MapUserImageEndpoints();
         app.MapVideoThumbnailEndpoints();
 
-        app.MapHub<VoraHub>("/hubs/Vora").RequireAuthorization();
+        app.MapHub<VoraHub>("/hubs/Vora", VoraHubConnections.Configure).RequireAuthorization();
         app.MapHealthChecks("/health").AllowAnonymous();
+        app.MapFallback("/api/{**rest}", () => Results.NotFound()).AllowAnonymous();
+        app.MapFallback("/hubs/{**rest}", () => Results.NotFound()).AllowAnonymous();
         app.MapFallbackToFile("index.html", WebClientFileCaching.Options());
 
         return app;
