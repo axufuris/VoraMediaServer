@@ -1,5 +1,6 @@
 using System.Collections.Concurrent;
 using System.Diagnostics;
+using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Vora.Application.Streaming;
 using Vora.Application.Subtitles;
@@ -16,11 +17,14 @@ public class FFmpegSubtitleExtractionService : ISubtitleExtractionService
     private const string FailureExtension = ".failed";
 
     private readonly Dictionary<string, KeyedGate> _perKeyLocks = new(StringComparer.Ordinal);
+    private readonly ConcurrentDictionary<string, Lazy<Task<string?>>> _onDemand = new(StringComparer.Ordinal);
     private readonly ILogger<FFmpegSubtitleExtractionService> _logger;
+    private readonly CancellationToken _stopping;
 
-    public FFmpegSubtitleExtractionService(ILogger<FFmpegSubtitleExtractionService> logger)
+    public FFmpegSubtitleExtractionService(ILogger<FFmpegSubtitleExtractionService> logger, IHostApplicationLifetime lifetime)
     {
         _logger = logger;
+        _stopping = lifetime.ApplicationStopping;
     }
 
     public static string CacheDirectory(string transcodeTempDirectory) =>
@@ -153,8 +157,39 @@ public class FFmpegSubtitleExtractionService : ISubtitleExtractionService
         return fingerprint != null && File.Exists(FailurePath(transcodeTempDirectory, mediaPartId, subtitleTrackId, fingerprint));
     }
 
-    public Task<string?> GetOrExtractWebVttAsync(SubtitleSource source, string transcodeTempDirectory, Guid mediaPartId, Guid subtitleTrackId, CancellationToken cancellationToken = default) =>
-        GetOrExtractAsync(source, transcodeTempDirectory, mediaPartId, subtitleTrackId, inBackground: false, cancellationToken);
+    public async Task<string?> GetOrExtractWebVttAsync(SubtitleSource source, string transcodeTempDirectory, Guid mediaPartId, Guid subtitleTrackId, CancellationToken cancellationToken = default)
+    {
+        if (string.IsNullOrWhiteSpace(source.ContentPath) || !File.Exists(source.ContentPath)) return null;
+        if (string.IsNullOrWhiteSpace(transcodeTempDirectory)) return null;
+
+        var fingerprint = FingerprintForSource(source.ContentPath, source.StreamIndex);
+        if (fingerprint == null) return null;
+
+        var cachePath = CachePath(transcodeTempDirectory, mediaPartId, subtitleTrackId, fingerprint);
+        if (IsUsable(cachePath)) return cachePath;
+
+        var run = _onDemand.GetOrAdd(cachePath, key => new Lazy<Task<string?>>(
+            () => ExtractOnDemandAsync(key, source, transcodeTempDirectory, mediaPartId, subtitleTrackId),
+            LazyThreadSafetyMode.ExecutionAndPublication));
+        return await run.Value.WaitAsync(cancellationToken);
+    }
+
+    private async Task<string?> ExtractOnDemandAsync(string cachePath, SubtitleSource source, string transcodeTempDirectory, Guid mediaPartId, Guid subtitleTrackId)
+    {
+        try
+        {
+            await Task.Yield();
+            return await GetOrExtractAsync(source, transcodeTempDirectory, mediaPartId, subtitleTrackId, inBackground: false, _stopping);
+        }
+        catch (OperationCanceledException) when (_stopping.IsCancellationRequested)
+        {
+            return null;
+        }
+        finally
+        {
+            _onDemand.TryRemove(cachePath, out _);
+        }
+    }
 
     public Task<string?> ExtractInBackgroundAsync(SubtitleSource source, string transcodeTempDirectory, Guid mediaPartId, Guid subtitleTrackId, CancellationToken cancellationToken = default) =>
         GetOrExtractAsync(source, transcodeTempDirectory, mediaPartId, subtitleTrackId, inBackground: true, cancellationToken);
