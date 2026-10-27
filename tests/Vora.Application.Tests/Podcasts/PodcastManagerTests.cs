@@ -250,4 +250,20 @@ public class PodcastManagerTests
 
         result.Single().EpisodeCount.Should().Be(0);
     }
+
+    [Fact]
+    public async Task GetSubscriptionsAsync_includes_each_show_feed_url()
+    {
+        var profileId = Guid.NewGuid();
+        var showId = Guid.NewGuid();
+        _repo.GetSubscriptionsForProfileAsync(profileId).Returns(new List<PodcastSubscription>
+        {
+            MakeSubscription(Guid.NewGuid(), profileId, showId)
+        });
+        _repo.GetEpisodeCountsAsync(Arg.Any<IEnumerable<Guid>>()).Returns(new Dictionary<Guid, int>());
+
+        var result = await _manager.GetSubscriptionsAsync(profileId);
+
+        result.Single().FeedUrl.Should().Be("https://example.com/feed.xml");
+    }
 }

@@ -175,7 +175,7 @@ The now-playing control bar holds transport in the centre and the panel toggles 
 
 **All albums** — `GET /api/music/albums?offset=&limit=&sort=&libraryId=` (`ListAlbums`) returns `AlbumPageVM { items, total, offset, limit }` for the profile's accessible libraries and ratings. `sort` is `RecentlyAdded` (default) or `Alphabetical` (`SortTitle ?? Title`), exact case; `limit` defaults to 60 and is capped at 200. An album with no track the profile may play is left out, as with Recently Added.
 
-Podcasts (`/podcasts`) and Radio (`/radio`) are separate pages. Music libraries don't appear in the left nav — they're reached via the Music page.
+Podcasts (`/podcasts`) and Radio (`/radio`) are separate pages. Music libraries don't appear in the left nav — they're reached via the Music page. **The Podcasts page covers every connected server**, so its sidebar entry names none. Browse Catalog always did; Subscriptions and New Episodes do too (`podcastService.getSubscriptionsOnEveryServer` / `getRecentEpisodesOnEveryServer`). A podcast subscribed on several servers is listed once, matched by feed address (`PodcastSubscriptionVM.FeedUrl`; a server too old to send it keeps its own entries), and the copy shown is the page's server's, else the first server's. Its episodes, plays and progress all go to the server that copy came from (`serverId` on each row, and on `PlayableMedia`, which `LiveRadioPlayer` saves progress to), and Unsubscribe removes it from every server it is on. A server with podcasts turned off (403) is skipped rather than reported as unreachable. Search and a pasted feed still subscribe on the page's server.
 
 ## Plugins relevant to music
 

@@ -6,6 +6,7 @@ public class PodcastSubscriptionVM
 {
     public Guid Id { get; set; }
     public Guid ShowId { get; set; }
+    public string FeedUrl { get; set; } = string.Empty;
     public string Title { get; set; } = string.Empty;
     public string? Author { get; set; }
     public string? Description { get; set; }
