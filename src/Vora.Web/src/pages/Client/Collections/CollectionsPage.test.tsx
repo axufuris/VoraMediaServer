@@ -1,9 +1,11 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { cleanup, render, screen, waitFor } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import CollectionsPage from './CollectionsPage';
 import { DialogProvider } from '../../../dialogs';
 import type { LibrarySummary } from '../../../api/Media/libraryService';
+import type { CollectionSummary } from '../../../api/Collections/collectionService';
+import { StorageKeys } from '../../../utils/storageKeys';
 import type { NavItem } from '../../../layouts/MainLayout';
 import { SidebarItemsContext, type SidebarItems } from '../../../layouts/sidebarItems';
 
@@ -11,6 +13,7 @@ const mocks = vi.hoisted(() => ({
     getLibraries: vi.fn(),
     getGlobalCollections: vi.fn(),
     getLibraryCollections: vi.fn(),
+    createCollection: vi.fn(),
 }));
 
 vi.mock('../../../api/Media/libraryService', () => ({
@@ -19,6 +22,14 @@ vi.mock('../../../api/Media/libraryService', () => ({
 
 vi.mock('../../../api/Collections/collectionService', () => ({
     collectionService: { getGlobalCollections: mocks.getGlobalCollections, getLibraryCollections: mocks.getLibraryCollections },
+}));
+
+vi.mock('../../../api/Collections/collectionAdminService', () => ({
+    collectionAdminService: { createCollection: mocks.createCollection },
+}));
+
+vi.mock('../../../api/System/pluginAdminService', () => ({
+    pluginAdminService: { getChronologyProviders: () => Promise.resolve([]), getCollectionSyncProviders: () => Promise.resolve([]) },
 }));
 
 const library = (id: string, name: string, type: string): LibrarySummary => ({ id, name, type, isBeingWatched: false });
@@ -49,9 +60,19 @@ const renderPage = (items: SidebarItems | null, url = '/') => render(
     </DialogProvider>,
 );
 
-const tabNames = () => screen.getAllByRole('button')
-    .map(button => button.textContent ?? '')
-    .filter(name => name === 'Global' || libraries.some(lib => lib.name === name));
+const collection = (id: string, title: string, sortTitle?: string): CollectionSummary =>
+    ({ id, title, sortTitle, itemCount: 4, systemGenerated: false });
+
+const tabNames = () => within(screen.getByRole('navigation')).getAllByRole('button').map(button => button.textContent);
+
+const shownTitles = (titles: string[]) => screen.getAllByText(new RegExp(`^(${titles.join('|')})$`)).map(node => node.textContent);
+
+const pinnedEverywhere = sidebar([
+    libraryEntry('movies', 'Movies', true),
+    libraryEntry('test-movies', 'Test Movies', true),
+    libraryEntry('shows', 'Shows', true),
+    musicEntry(true),
+]);
 
 beforeEach(() => {
     localStorage.clear();
@@ -76,7 +97,7 @@ describe('CollectionsPage library tabs', () => {
 
         await screen.findByRole('button', { name: 'Movies' });
 
-        expect(tabNames()).toEqual(['Global', 'Movies', 'Shows', 'Music', 'TestMusic']);
+        expect(tabNames()).toEqual(['Global', 'Movies', 'Shows', 'Music']);
     });
 
     it('leaves out every music library when Music is unpinned', async () => {
@@ -128,6 +149,68 @@ describe('CollectionsPage library tabs', () => {
 
         await screen.findByRole('button', { name: 'Movies' });
 
-        expect(tabNames()).toEqual(['Global', 'Movies', 'Test Movies', 'Shows', 'Music', 'TestMusic']);
+        expect(tabNames()).toEqual(['Global', 'Movies', 'Test Movies', 'Shows', 'Music']);
+    });
+});
+
+describe('CollectionsPage Music tab', () => {
+    beforeEach(() => {
+        mocks.getLibraryCollections.mockImplementation((libraryId: string) => Promise.resolve(
+            libraryId === 'music' ? [collection('road', 'Road Trip'), collection('zydeco', 'Zydeco')]
+                : libraryId === 'test-music' ? [collection('chill', 'chill', 'Afternoon')]
+                    : []));
+    });
+
+    it('gathers every music library into one tab, listed in title order', async () => {
+        renderPage(pinnedEverywhere, '/?tab=music');
+
+        await screen.findByText('Zydeco');
+
+        expect(tabNames().filter(name => name === 'Music' || name === 'TestMusic')).toEqual(['Music']);
+        expect(mocks.getLibraryCollections).toHaveBeenCalledWith('music', undefined, false);
+        expect(mocks.getLibraryCollections).toHaveBeenCalledWith('test-music', undefined, false);
+        expect(shownTitles(['Road Trip', 'chill', 'Zydeco'])).toEqual(['chill', 'Road Trip', 'Zydeco']);
+    });
+
+    it('opens the Music tab from a link to one music library', async () => {
+        renderPage(pinnedEverywhere, '/?tab=test-music');
+
+        await screen.findByText('Road Trip');
+
+        expect(screen.getByText('chill')).toBeTruthy();
+        expect(mocks.getGlobalCollections).not.toHaveBeenCalled();
+    });
+
+    it('asks which music library a new collection goes in', async () => {
+        localStorage.setItem(StorageKeys.isServerAdmin, 'true');
+        mocks.createCollection.mockResolvedValue('new-collection');
+        renderPage(pinnedEverywhere, '/?tab=music');
+        await screen.findByText('Zydeco');
+
+        fireEvent.click(screen.getByRole('button', { name: 'Create collection' }));
+        const dialog = await screen.findByRole('dialog');
+        fireEvent.change(within(dialog).getAllByRole('textbox')[0], { target: { value: 'Road songs' } });
+        fireEvent.change(within(dialog).getByLabelText('Library'), { target: { value: 'test-music' } });
+        fireEvent.click(within(dialog).getByRole('button', { name: 'Create Collection' }));
+
+        await waitFor(() => expect(mocks.createCollection).toHaveBeenCalled());
+        expect(mocks.createCollection.mock.calls[0][0]).toMatchObject({ title: 'Road songs', libraryId: 'test-music' });
+    });
+
+    it('creates in the one library of a library tab without asking', async () => {
+        localStorage.setItem(StorageKeys.isServerAdmin, 'true');
+        mocks.createCollection.mockResolvedValue('new-collection');
+        renderPage(pinnedEverywhere, '/?tab=movies');
+        await screen.findByRole('button', { name: 'Movies' });
+
+        fireEvent.click(screen.getByRole('button', { name: 'Create collection' }));
+        const dialog = await screen.findByRole('dialog');
+        fireEvent.change(within(dialog).getAllByRole('textbox')[0], { target: { value: 'Heists' } });
+
+        expect(within(dialog).queryByLabelText('Library')).toBeNull();
+        fireEvent.click(within(dialog).getByRole('button', { name: 'Create Collection' }));
+
+        await waitFor(() => expect(mocks.createCollection).toHaveBeenCalled());
+        expect(mocks.createCollection.mock.calls[0][0]).toMatchObject({ title: 'Heists', libraryId: 'movies' });
     });
 });

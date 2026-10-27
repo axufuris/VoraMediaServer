@@ -9,12 +9,55 @@ import { StorageKeys } from '../../../utils/storageKeys';
 import LibraryCollectionGrid from '../../../components/Collections/LibraryCollectionGrid';
 import { isLibraryUnpinned, useSidebarItems } from '../../../layouts/sidebarItems';
 
+interface CollectionTab {
+    key: string;
+    label: string;
+    libraries: LibrarySummary[];
+}
+
+const GLOBAL_TAB: CollectionTab = { key: 'global', label: 'Global', libraries: [] };
+
+const tabRank = (type: string): number => {
+    const t = (type || '').toLowerCase();
+    if (t === 'movie' || t === 'homevideo') return 0;
+    if (t === 'tvshow' || t === 'show' || t === 'tv') return 1;
+    if (t === 'music' || t === 'audio') return 2;
+    return 3;
+};
+
+// The sidebar opens every music library through its one Music entry, so their
+// collections share one Music tab too.
+function collectionTabs(libraries: LibrarySummary[]): CollectionTab[] {
+    const music = libraries.filter(lib => lib.type === 'Music');
+    const tabs: CollectionTab[] = libraries
+        .filter(lib => lib.type !== 'Music')
+        .map(lib => ({ key: lib.id, label: lib.name, libraries: [lib] }));
+    if (music.length > 0) tabs.push({ key: 'music', label: 'Music', libraries: music });
+    return tabs.sort((a, b) => tabRank(a.libraries[0].type) - tabRank(b.libraries[0].type) || a.label.localeCompare(b.label));
+}
+
+const listTitle = (collection: CollectionSummary): string =>
+    (collection.sortTitle && collection.sortTitle.trim() ? collection.sortTitle : collection.title).toUpperCase();
+
+const ordinal = (a: string, b: string): number => (a < b ? -1 : a > b ? 1 : 0);
+
+// Each library's list comes back in the server's order (sort title, then title,
+// ignoring case), so a tab spanning several libraries puts theirs back in that
+// order once they're together.
+async function tabCollections(tab: CollectionTab, serverId: string | undefined, isAdmin: boolean): Promise<CollectionSummary[]> {
+    if (tab.libraries.length === 0) return collectionService.getGlobalCollections(serverId);
+    if (tab.libraries.length === 1) return collectionService.getLibraryCollections(tab.libraries[0].id, serverId, isAdmin);
+    const lists = await Promise.all(tab.libraries.map(lib => collectionService.getLibraryCollections(lib.id, serverId, isAdmin)));
+    const byId = new Map(lists.flat().map(collection => [collection.id, collection]));
+    return [...byId.values()].sort((a, b) => ordinal(listTitle(a), listTitle(b)) || ordinal(a.title.toUpperCase(), b.title.toUpperCase()));
+}
+
 export default function CollectionsPage() {
     const { serverId } = useParams<{ serverId?: string }>();
     const navigate = useNavigate();
     const [searchParams, setSearchParams] = useSearchParams();
 
-    // The active tab lives in the URL (?tab=<libraryId|global>) so returning
+    // The active tab lives in the URL (?tab=<libraryId|music|global>) so returning
     // from a collection (the browser's back) restores the tab you were on
     // instead of snapping back to Global.
     const requestedTab = searchParams.get('tab') ?? 'global';
@@ -41,39 +84,25 @@ export default function CollectionsPage() {
         return libraries.filter(lib => !isLibraryUnpinned(sidebar.items, lib));
     }, [libraries, sidebar]);
 
-    const activeTab = requestedTab === 'global' || !shownLibraries || shownLibraries.some(lib => lib.id === requestedTab)
-        ? requestedTab
-        : 'global';
-    const tabKnown = activeTab === 'global' || shownLibraries !== null;
+    const tabs = useMemo(() => shownLibraries && collectionTabs(shownLibraries), [shownLibraries]);
 
-    const sortedLibraries = useMemo(() => {
-        const rank = (type: string): number => {
-            const t = (type || '').toLowerCase();
-            if (t === 'movie' || t === 'homevideo') return 0;
-            if (t === 'tvshow' || t === 'show' || t === 'tv') return 1;
-            if (t === 'music' || t === 'audio') return 2;
-            return 3;
-        };
-        return [...(shownLibraries ?? [])].sort((a, b) => {
-            const diff = rank(a.type) - rank(b.type);
-            if (diff !== 0) return diff;
-            return a.name.localeCompare(b.name);
-        });
-    }, [shownLibraries]);
+    // Null while a library tab is asked for and the tabs aren't known yet. A link
+    // to one music library opens the Music tab.
+    const activeTab = requestedTab === GLOBAL_TAB.key
+        ? GLOBAL_TAB
+        : tabs && (tabs.find(tab => tab.key === requestedTab || tab.libraries.some(lib => lib.id === requestedTab)) ?? GLOBAL_TAB);
+    const activeKey = activeTab?.key ?? requestedTab;
 
     const fetchCollections = useCallback(async () => {
-        if (!tabKnown) return;
+        if (!activeTab) return;
         try {
-            const data = activeTab === 'global'
-                ? await collectionService.getGlobalCollections(serverId)
-                : await collectionService.getLibraryCollections(activeTab, serverId, isAdmin);
-            setCollections(data);
+            setCollections(await tabCollections(activeTab, serverId, isAdmin));
         } catch (error) {
             console.error(error);
         } finally {
             setLoading(false);
         }
-    }, [activeTab, tabKnown, serverId, isAdmin]);
+    }, [activeTab, serverId, isAdmin]);
 
     useEffect(() => {
         let isMounted = true;
@@ -82,7 +111,7 @@ export default function CollectionsPage() {
     }, [fetchCollections]);
 
     const handleTabChange = (tabId: string) => {
-        if (activeTab === tabId) return;
+        if (activeKey === tabId) return;
         setLoading(true);
         setSearchParams(prev => {
             const next = new URLSearchParams(prev);
@@ -109,7 +138,7 @@ export default function CollectionsPage() {
                 isOpen={isCreateModalOpen}
                 onClose={() => setIsCreateModalOpen(false)}
                 onSaved={() => { setLoading(true); fetchCollections(); }}
-                activeTab={activeTab}
+                libraries={(activeTab ?? GLOBAL_TAB).libraries}
             />
 
             {createAction && <div className="flex justify-end px-8 max-md:px-4 pt-4">{createAction}</div>}
@@ -119,26 +148,17 @@ export default function CollectionsPage() {
                     className="flex gap-1 overflow-x-auto"
                     style={{ borderBottom: '1px solid var(--vora-border-subtle)' }}
                 >
-                    <button
-                        type="button"
-                        onClick={() => handleTabChange('global')}
-                        className="relative cursor-pointer whitespace-nowrap px-4 py-3 text-sm font-medium transition-colors"
-                        style={{ color: activeTab === 'global' ? 'var(--vora-text-primary)' : 'var(--vora-text-muted)' }}
-                    >
-                        Global
-                        {activeTab === 'global' && <span className="absolute bottom-0 left-0 right-0 h-0.5 rounded-full" style={{ background: 'var(--vora-accent-500)' }} />}
-                    </button>
-                    {sortedLibraries.map(lib => {
-                        const isActive = activeTab === lib.id;
+                    {[GLOBAL_TAB, ...(tabs ?? [])].map(tab => {
+                        const isActive = activeKey === tab.key;
                         return (
                             <button
-                                key={lib.id}
+                                key={tab.key}
                                 type="button"
-                                onClick={() => handleTabChange(lib.id)}
+                                onClick={() => handleTabChange(tab.key)}
                                 className="relative cursor-pointer whitespace-nowrap px-4 py-3 text-sm font-medium transition-colors"
                                 style={{ color: isActive ? 'var(--vora-text-primary)' : 'var(--vora-text-muted)' }}
                             >
-                                {lib.name}
+                                {tab.label}
                                 {isActive && <span className="absolute bottom-0 left-0 right-0 h-0.5 rounded-full" style={{ background: 'var(--vora-accent-500)' }} />}
                             </button>
                         );
@@ -154,7 +174,7 @@ export default function CollectionsPage() {
                 ) : (
                     <LibraryCollectionGrid
                         collections={collections}
-                        isAdmin={isAdmin && activeTab !== 'global'}
+                        isAdmin={isAdmin && (activeTab?.libraries.length ?? 0) > 0}
                         onOpen={collection => navigate(serverId ? `/server/${serverId}/collection/${collection.id}` : `/collection/${collection.id}`)}
                         empty={(
                     <EmptyState
