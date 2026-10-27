@@ -15,11 +15,11 @@ interface CreateCollectionModalProps {
     isOpen: boolean;
     onClose: () => void;
     onSaved: () => void;
-    activeTab: string;
+    libraries: { id: string; name: string }[];
 }
 
 export default function CreateCollectionModal({
-    isOpen, onClose, onSaved, activeTab }: CreateCollectionModalProps) {
+    isOpen, onClose, onSaved, libraries }: CreateCollectionModalProps) {
     const dialog = useDialog();
     const { serverId } = useParams<{ serverId?: string }>();
     const navigate = useNavigate();
@@ -28,7 +28,10 @@ export default function CreateCollectionModal({
     const [posterUrl, setPosterUrl] = useState('');
     const [backdropUrl, setBackdropUrl] = useState('');
     const [defaultSort, setDefaultSort] = useState<CollectionSortOrder>('ReleaseDateAsc');
-    const [isGlobal, setIsGlobal] = useState(activeTab === 'global');
+    const hasLibraries = libraries.length > 0;
+    const firstLibraryId = libraries[0]?.id ?? '';
+    const [isGlobal, setIsGlobal] = useState(!hasLibraries);
+    const [libraryId, setLibraryId] = useState(firstLibraryId);
     const [autoSyncChronology, setAutoSyncChronology] = useState(false);
 
     const [sortTitle, setSortTitle] = useState('');
@@ -57,7 +60,8 @@ export default function CreateCollectionModal({
             setDefaultSort('ReleaseDateAsc');
             setSortProviderId('');
             setExternalListId('');
-            setIsGlobal(activeTab === 'global');
+            setIsGlobal(!hasLibraries);
+            setLibraryId(firstLibraryId);
             setIsCreating(false);
             setAutoSyncChronology(false);
             setActiveSection('general');
@@ -80,7 +84,7 @@ export default function CreateCollectionModal({
                 .then(setSyncProviders)
                 .catch(console.error);
         }
-    }, [isOpen, activeTab, serverId]);
+    }, [isOpen, hasLibraries, firstLibraryId, serverId]);
 
     const handleSubmit = async (e: React.SyntheticEvent) => {
         e.preventDefault();
@@ -103,7 +107,7 @@ export default function CreateCollectionModal({
                 sortTitle: sortTitle.trim() || undefined,
                 visibleStartDate: visibleStartDate || undefined,
                 visibleEndDate: visibleEndDate || undefined,
-                libraryId: isGlobal ? undefined : activeTab,
+                libraryId: isGlobal ? undefined : libraryId,
                 contentSyncProviderId: contentSyncProviderId === SMART_CONTENT ? undefined : (contentSyncProviderId || undefined),
                 contentSyncExternalId: contentSyncProviderId === SMART_CONTENT ? undefined : (contentSyncExternalId || undefined),
                 syncIntervalDays: Math.max(1, syncIntervalDays),
@@ -394,10 +398,27 @@ export default function CreateCollectionModal({
                         </div>
                     )}
 
-                    {activeTab !== 'global' && (
-                        <div className="flex items-center gap-2 pt-4 border-t border-[var(--vora-border-subtle)]">
-                            <input type="checkbox" id="isGlobalCreate" checked={isGlobal} onChange={e => setIsGlobal(e.target.checked)} className="w-4 h-4 accent-[var(--vora-accent-500)]" />
-                            <label htmlFor="isGlobalCreate" className="text-sm text-[var(--vora-text-secondary)] font-medium cursor-pointer">Make this a Global Collection (visible across all libraries)</label>
+                    {hasLibraries && (
+                        <div className="pt-4 border-t border-[var(--vora-border-subtle)] space-y-4">
+                            {libraries.length > 1 && !isGlobal && (
+                                <div>
+                                    <label htmlFor="collectionLibraryCreate" className="block text-sm font-medium text-[var(--vora-text-muted)] mb-1">Library</label>
+                                    <select
+                                        id="collectionLibraryCreate"
+                                        value={libraryId}
+                                        onChange={e => setLibraryId(e.target.value)}
+                                        className="w-full bg-[var(--vora-bg-canvas)] border border-[var(--vora-border-subtle)] rounded-md p-2 text-[var(--vora-text-primary)] outline-none"
+                                    >
+                                        {libraries.map(library => (
+                                            <option key={library.id} value={library.id}>{library.name}</option>
+                                        ))}
+                                    </select>
+                                </div>
+                            )}
+                            <div className="flex items-center gap-2">
+                                <input type="checkbox" id="isGlobalCreate" checked={isGlobal} onChange={e => setIsGlobal(e.target.checked)} className="w-4 h-4 accent-[var(--vora-accent-500)]" />
+                                <label htmlFor="isGlobalCreate" className="text-sm text-[var(--vora-text-secondary)] font-medium cursor-pointer">Make this a Global Collection (visible across all libraries)</label>
+                            </div>
                         </div>
                     )}
                     </div>

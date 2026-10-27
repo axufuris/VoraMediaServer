@@ -35,6 +35,8 @@ A page that is only ever hosted takes no prop and just renders the hosted form;
 `CollectionsPage` has no standalone route, so it has no `embedded` prop and no
 unreachable branch. Don't add the prop speculatively.
 
+**Collections follows the sidebar.** `MainLayout` hands its sidebar entries to the pages through `SidebarItemsContext` (`layouts/sidebarItems.ts`, `loaded` once the profile's arrangement is in). A library the profile unpinned gets no Collections tab and its collections are never fetched, even from an old `?tab=` link (`isLibraryUnpinned`). Music libraries have no entries of their own, so they follow the one Music entry, which carries no server name, and share one **Music** tab (`?tab=music`; a link to one music library opens it): each library's collections are fetched and put back in the server's order (sort title, then title). Creating a collection there asks which music library it belongs to.
+
 The host owns which tab is active and persists it in `sessionStorage`
 (`home_active_tab`, `discover_active_tab`), so returning from a detail page lands
 back on the tab you left. Put page-level controls in the `Tabs` `actions` slot
