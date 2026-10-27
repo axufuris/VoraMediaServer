@@ -15,6 +15,7 @@ import { useDialog } from '../../../../dialogs';
 import MediaCard from '../../../../components/Client/Primitives/MediaCard';
 import MediaRow, { MediaRowItem } from '../../../../components/Client/Primitives/MediaRow';
 import AiPlaylistsSection from './AiPlaylistsSection';
+import { MadeForYouRow, MixRow } from './MixRow';
 import EmptyState from '../../../../components/Client/Primitives/EmptyState';
 import { type MusicNavState } from './musicNavState';
 import { albumCaption, trackCaption } from './musicCaptions';
@@ -110,28 +111,10 @@ export default function MusicForYouView({
         );
     }
 
-    const madeForYou = dailyMixes.filter(m => m.kind === 'DailyMix' || m.kind === 'DiscoverMix');
     const releaseRadar = dailyMixes.filter(m => m.kind === 'ReleaseRadar');
     const moodMixes = dailyMixes.filter(m => m.kind === 'MoodMix');
     const recapYear = availableYears[0] ?? new Date().getFullYear();
-
-    const mixRow = (title: string, mixes: GeneratedMixSummaryVM[], kicker: (mix: GeneratedMixSummaryVM) => string, badge?: ReactNode) => mixes.length > 0 && (
-        <MediaRow title={title}>
-            {mixes.map(mix => (
-                <MediaRowItem key={mix.id}>
-                    <MediaCard
-                        title={mix.name}
-                        captionLines={[kicker(mix), trackCountLabel(mix.trackCount)]}
-                        imageUrl={mix.artworkUrl}
-                        shape="square"
-                        size="xs"
-                        badge={badge}
-                        onClick={() => updateNav({ view: 'mix', mixId: mix.id })}
-                    />
-                </MediaRowItem>
-            ))}
-        </MediaRow>
-    );
+    const openMix = (mix: GeneratedMixSummaryVM) => updateNav({ view: 'mix', mixId: mix.id });
 
     return (
         <div className="space-y-8">
@@ -194,18 +177,24 @@ export default function MusicForYouView({
 
             <AiPlaylistsSection data={aiPlaylists} updateNav={updateNav} />
 
-            {mixRow('Made for You', madeForYou, mix => mix.kind === 'DiscoverMix' ? 'Discover' : `Daily Mix ${mix.slot}`)}
+            <MadeForYouRow mixes={dailyMixes} onOpen={openMix} />
 
-            {mixRow('Release Radar', releaseRadar, mix => mix.descriptionTag ?? 'New releases', (
-                <span
-                    className="rounded px-1.5 py-0.5 font-bold uppercase tracking-widest"
-                    style={{ background: 'var(--vora-accent-500)', color: 'var(--vora-accent-contrast)', fontSize: 'var(--vora-card-badge-size)' }}
-                >
-                    New
-                </span>
-            ))}
+            <MixRow
+                title="Release Radar"
+                mixes={releaseRadar}
+                kicker={mix => mix.descriptionTag ?? 'New releases'}
+                onOpen={openMix}
+                badge={(
+                    <span
+                        className="rounded px-1.5 py-0.5 font-bold uppercase tracking-widest"
+                        style={{ background: 'var(--vora-accent-500)', color: 'var(--vora-accent-contrast)', fontSize: 'var(--vora-card-badge-size)' }}
+                    >
+                        New
+                    </span>
+                )}
+            />
 
-            {mixRow('Moods', moodMixes, mix => mix.descriptionTag ?? 'Mood')}
+            <MixRow title="Moods" mixes={moodMixes} kicker={mix => mix.descriptionTag ?? 'Mood'} onOpen={openMix} />
 
             <BrowseByMoodRow moods={moods} onOpen={mood => updateNav({ view: 'mood', mood })} />
 

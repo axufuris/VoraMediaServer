@@ -1,8 +1,10 @@
 import { useEffect, useState } from 'react';
-import { useParams } from 'react-router-dom';
+import { useNavigate, useParams } from 'react-router-dom';
 import { recommendationService, type RecommendationListVM } from '../../api/Discovery/recommendationService';
+import { musicService, type GeneratedMixSummaryVM } from '../../api/Music/musicService';
 import RecommendationRow from '../../components/Media/RecommendationRow';
 import EmptyState from '../../components/Client/Primitives/EmptyState';
+import { MadeForYouRow } from './Audio/Music/MixRow';
 
 function AsyncProviderBlock({ providerId, serverId }: { providerId: string, serverId?: string }) {
     const [lists, setLists] = useState<RecommendationListVM[]>([]);
@@ -39,8 +41,11 @@ function AsyncProviderBlock({ providerId, serverId }: { providerId: string, serv
 
 export default function RecommendationsPage() {
     const { serverId } = useParams<{ serverId?: string }>();
+    const navigate = useNavigate();
     const [providers, setProviders] = useState<string[]>([]);
     const [loadingProviders, setLoadingProviders] = useState(true);
+    const [mixes, setMixes] = useState<GeneratedMixSummaryVM[]>([]);
+    const [loadingMixes, setLoadingMixes] = useState(true);
 
     useEffect(() => {
         recommendationService.getProviders(serverId)
@@ -49,15 +54,25 @@ export default function RecommendationsPage() {
             .finally(() => setLoadingProviders(false));
     }, [serverId]);
 
+    useEffect(() => {
+        musicService.getMixes(serverId)
+            .then(setMixes)
+            .catch(() => setMixes([]))
+            .finally(() => setLoadingMixes(false));
+    }, [serverId]);
+
+    const openMix = (mix: GeneratedMixSummaryVM) =>
+        navigate(serverId ? `/server/${serverId}/music?mix=${mix.id}` : `/music?mix=${mix.id}`);
+
     return (
         <div className="min-h-full pb-20">
             <div className="space-y-10 pt-2">
-                {loadingProviders ? (
+                {loadingProviders || (providers.length === 0 && loadingMixes) ? (
                     <div className="px-8 max-md:px-4">
                         <div className="vora-skeleton mb-4 h-6 w-48" />
                         <div className="vora-skeleton h-72 w-full" />
                     </div>
-                ) : providers.length === 0 ? (
+                ) : providers.length === 0 && mixes.length === 0 ? (
                     <EmptyState
                         title="No recommendation engines enabled"
                         description="Ask your server admin to enable a recommendation provider in the admin Plugins page."
@@ -68,13 +83,16 @@ export default function RecommendationsPage() {
                         )}
                     />
                 ) : (
-                    [...providers].sort((a, b) => {
-                        if (a === 'openai_recommendations') return -1;
-                        if (b === 'openai_recommendations') return 1;
-                        return 0;
-                    }).map(providerId => (
-                        <AsyncProviderBlock key={providerId} providerId={providerId} serverId={serverId} />
-                    ))
+                    <>
+                        {[...providers].sort((a, b) => {
+                            if (a === 'openai_recommendations') return -1;
+                            if (b === 'openai_recommendations') return 1;
+                            return 0;
+                        }).map(providerId => (
+                            <AsyncProviderBlock key={providerId} providerId={providerId} serverId={serverId} />
+                        ))}
+                        <MadeForYouRow mixes={mixes} onOpen={openMix} />
+                    </>
                 )}
             </div>
         </div>

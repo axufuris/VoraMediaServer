@@ -2,7 +2,6 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { playlistTileArt } from '../../../utils/playlistArt';
 import { useNavigate, useParams } from 'react-router-dom';
 import { playlistService, type PlaylistSummaryVM, type SharedPlaylistsVM } from '../../../api/Collections/playlistService';
-import { musicService, type GeneratedMixSummaryVM } from '../../../api/Music/musicService';
 import { smartPlaylistService, type SmartPlaylistSummaryVM, type PlaylistMediaType } from '../../../api/Music/smartPlaylistService';
 import MediaCard from '../../../components/Client/Primitives/MediaCard';
 import MediaGrid from '../../../components/Client/Primitives/MediaGrid';
@@ -18,31 +17,36 @@ type TypeFilter = 'video' | 'music';
 // own, and remembering the Shared tab would need a new localStorage key.
 type Scope = 'yours' | 'shared';
 
+// Kept for the browser session only, like the Home tabs, so Back from a music
+// playlist returns to Music while a new visit opens on Movies & Shows.
 const TAB_STORAGE_KEY = 'playlists_active_tab';
+
+const readSavedTab = (): TypeFilter => {
+    try {
+        return window.sessionStorage.getItem(TAB_STORAGE_KEY) === 'music' ? 'music' : 'video';
+    } catch {
+        return 'video';
+    }
+};
 
 interface PlaylistsPageProps {
     embedded?: boolean;
-    // Pins the list to one media type and hides the type tabs, for hosts that
+    // Pins the list to one media type and hides the type filter, for hosts that
     // are already scoped (the Music page shows only music playlists).
     lockedType?: TypeFilter;
-    showMixes?: boolean;
 }
 
-export default function PlaylistsPage({ embedded = false, lockedType, showMixes = true }: PlaylistsPageProps) {
+export default function PlaylistsPage({ embedded = false, lockedType }: PlaylistsPageProps) {
     const dialog = useDialog();
     const { serverId } = useParams<{ serverId?: string }>();
     const navigate = useNavigate();
     const [playlists, setPlaylists] = useState<PlaylistSummaryVM[]>([]);
-    const [dailyMixes, setDailyMixes] = useState<GeneratedMixSummaryVM[]>([]);
     const [smartPlaylists, setSmartPlaylists] = useState<SmartPlaylistSummaryVM[]>([]);
     const [shared, setShared] = useState<SharedPlaylistsVM>({ manual: [], smart: [] });
     const [scope, setScope] = useState<Scope>('yours');
     const [loading, setLoading] = useState(true);
 
-    const [savedTab, setActiveTab] = useState<TypeFilter>(() => {
-        const saved = typeof window !== 'undefined' ? window.localStorage.getItem(TAB_STORAGE_KEY) : null;
-        return saved === 'music' ? 'music' : 'video';
-    });
+    const [savedTab, setActiveTab] = useState<TypeFilter>(readSavedTab);
     const activeTab = lockedType ?? savedTab;
 
     const [chooserOpen, setChooserOpen] = useState(false);
@@ -53,7 +57,7 @@ export default function PlaylistsPage({ embedded = false, lockedType, showMixes 
     const [isSubmitting, setIsSubmitting] = useState(false);
 
     useEffect(() => {
-        try { window.localStorage.setItem(TAB_STORAGE_KEY, savedTab); } catch { /* ignore */ }
+        try { window.sessionStorage.setItem(TAB_STORAGE_KEY, savedTab); } catch { /* ignore */ }
     }, [savedTab]);
 
     const loadSmart = () => {
@@ -65,14 +69,12 @@ export default function PlaylistsPage({ embedded = false, lockedType, showMixes 
     useEffect(() => {
         Promise.all([
             playlistService.getPlaylists(serverId),
-            musicService.getMixes(serverId).catch(() => [] as GeneratedMixSummaryVM[]),
             smartPlaylistService.list(serverId).catch(() => [] as SmartPlaylistSummaryVM[]),
             // Failing independently: a server that cannot list shared playlists
             // still shows the profile its own.
             playlistService.getShared(serverId).catch((): SharedPlaylistsVM => ({ manual: [], smart: [] }))
-        ]).then(([pls, mixes, smarts, sharedByOthers]) => {
+        ]).then(([pls, smarts, sharedByOthers]) => {
             setPlaylists(pls);
-            setDailyMixes(mixes);
             setSmartPlaylists(smarts);
             setShared(sharedByOthers);
         }).finally(() => setLoading(false));
@@ -115,7 +117,6 @@ export default function PlaylistsPage({ embedded = false, lockedType, showMixes 
     const visiblePlaylists = useMemo(() => playlists.filter(p => matchesTab(p.mediaType)), [playlists, matchesTab]);
 
     const visibleSmart = useMemo(() => smartPlaylists.filter(sp => matchesTab(sp.mediaType)), [smartPlaylists, matchesTab]);
-    const visibleMixes = useMemo(() => showMixes && activeTab === 'music' ? dailyMixes : [], [dailyMixes, activeTab, showMixes]);
 
     const visibleSharedManual = useMemo(() => shared.manual.filter(p => matchesTab(p.mediaType)), [shared.manual, matchesTab]);
     const visibleSharedSmart = useMemo(() => shared.smart.filter(sp => matchesTab(sp.mediaType)), [shared.smart, matchesTab]);
@@ -134,7 +135,7 @@ export default function PlaylistsPage({ embedded = false, lockedType, showMixes 
         );
     }
 
-    const emptyState = visiblePlaylists.length === 0 && visibleMixes.length === 0 && visibleSmart.length === 0;
+    const emptyState = visiblePlaylists.length === 0 && visibleSmart.length === 0;
 
     const newAction = (
         <button
@@ -147,18 +148,43 @@ export default function PlaylistsPage({ embedded = false, lockedType, showMixes 
         </button>
     );
 
+    // The media type filters both Yours and Shared. In the Music tab the type is
+    // already fixed, so it doesn't show.
+    const typeFilter = lockedType ? null : (
+        <div className="flex items-center gap-2" role="group" aria-label="Media type">
+            {([
+                { key: 'video', label: 'Movies & Shows' },
+                { key: 'music', label: 'Music' },
+            ] as const).map(t => (
+                <button
+                    key={t.key}
+                    type="button"
+                    onClick={() => setActiveTab(t.key)}
+                    data-active={activeTab === t.key}
+                    aria-pressed={activeTab === t.key}
+                    className="vora-pill cursor-pointer rounded-full px-3 py-1 text-xs font-medium"
+                >
+                    {t.label}
+                </button>
+            ))}
+        </div>
+    );
+
     return (
         <div className="min-h-full pb-16">
             {embedded ? (
-                <div className="flex justify-end px-8 max-md:px-4 pt-4">{newAction}</div>
+                <div className="flex flex-wrap items-center gap-3 px-8 max-md:px-4 pt-4">
+                    {typeFilter}
+                    <div className="ml-auto">{newAction}</div>
+                </div>
             ) : (
-                <PageHeader title="My Playlists" subtitle="Curated by you, by us, and by smart rules." actions={newAction} />
+                <>
+                    <PageHeader title="My Playlists" subtitle="Curated by you, by us, and by smart rules." actions={newAction} />
+                    {typeFilter && <div className="px-8 max-md:px-4 pb-4">{typeFilter}</div>}
+                </>
             )}
 
             <div className="px-8 max-md:px-4">
-                {/* Whose playlists is the primary split; the media type is a filter
-                    within it. In the Music tab the type is already fixed, so only
-                    the split shows. */}
                 <Tabs<Scope>
                     tabs={[
                         { key: 'yours', label: 'Yours' },
@@ -167,25 +193,6 @@ export default function PlaylistsPage({ embedded = false, lockedType, showMixes 
                     active={scope}
                     onChange={setScope}
                     className="mb-6"
-                    actions={lockedType ? undefined : (
-                        <div className="flex items-center gap-2" role="group" aria-label="Media type">
-                            {([
-                                { key: 'video', label: 'Movies & Shows' },
-                                { key: 'music', label: 'Music' },
-                            ] as const).map(t => (
-                                <button
-                                    key={t.key}
-                                    type="button"
-                                    onClick={() => setActiveTab(t.key)}
-                                    data-active={activeTab === t.key}
-                                    aria-pressed={activeTab === t.key}
-                                    className="vora-pill cursor-pointer rounded-full px-3 py-1 text-xs font-medium"
-                                >
-                                    {t.label}
-                                </button>
-                            ))}
-                        </div>
-                    )}
                 />
 
                 {scope === 'shared' ? (
@@ -197,34 +204,6 @@ export default function PlaylistsPage({ embedded = false, lockedType, showMixes 
                     />
                 ) : (
                 <>
-
-                {visibleMixes.length > 0 && (
-                    <div className="mb-10">
-                        <h2 className="text-xl font-bold text-[var(--vora-text-secondary)] mb-4">For You</h2>
-                        <div className="grid grid-cols-3 md:grid-cols-5 lg:grid-cols-8 gap-4">
-                            {visibleMixes.map(mix => (
-                                <button
-                                    key={mix.id}
-                                    type="button"
-                                    onClick={() => navigate(serverId ? `/server/${serverId}/music?mix=${mix.id}` : `/music?mix=${mix.id}`)}
-                                    className="group text-left cursor-pointer"
-                                    title={mix.name}
-                                >
-                                    <div className="w-full aspect-square rounded bg-[linear-gradient(135deg,color-mix(in_srgb,var(--vora-accent-500)_75%,var(--vora-bg-canvas)),color-mix(in_srgb,var(--vora-info-500)_30%,var(--vora-bg-canvas)))] border border-[var(--vora-border-subtle)] group-hover:border-[var(--vora-accent-500)] transition-all overflow-hidden mb-2 relative">
-                                        {mix.artworkUrl ? <img src={mix.artworkUrl} alt="" className="w-full h-full object-cover opacity-70" /> : null}
-                                        <div className="absolute inset-0 flex flex-col justify-end p-3 bg-gradient-to-t from-[color-mix(in_srgb,var(--vora-bg-canvas)_80%,transparent)] via-[color-mix(in_srgb,var(--vora-bg-canvas)_30%,transparent)] to-transparent">
-                                            <div className="text-xs uppercase tracking-widest text-[var(--vora-accent-text)] font-bold">Daily Mix {mix.slot}</div>
-                                            <div className="text-sm font-bold text-[var(--vora-text-primary)] drop-shadow-[0_3px_3px_color-mix(in_srgb,var(--vora-bg-canvas)_60%,transparent)] truncate">{mix.descriptionTag ?? 'Mix'}</div>
-                                        </div>
-                                    </div>
-                                    <div className="text-sm font-bold text-[var(--vora-text-secondary)] truncate" title={mix.name}>{mix.name}</div>
-                                    <div className="text-xs text-[var(--vora-text-muted)]">{mix.trackCount} tracks</div>
-                                </button>
-                            ))}
-                        </div>
-                    </div>
-                )}
-
                 {visibleSmart.length > 0 && (
                     <div className="mb-10">
                         <h2 className="text-xl font-bold text-[var(--vora-text-secondary)] mb-4 flex items-center gap-2">
@@ -260,7 +239,7 @@ export default function PlaylistsPage({ embedded = false, lockedType, showMixes 
                     />
                 ) : visiblePlaylists.length === 0 ? null : (
                     <>
-                        {(visibleMixes.length > 0 || visibleSmart.length > 0) && <h2 className="text-xl font-bold text-[var(--vora-text-secondary)] mb-4">Your Playlists</h2>}
+                        {visibleSmart.length > 0 && <h2 className="text-xl font-bold text-[var(--vora-text-secondary)] mb-4">Your Playlists</h2>}
                         <MediaGrid>
                             {visiblePlaylists.map(p => (
                                 <MediaCard
