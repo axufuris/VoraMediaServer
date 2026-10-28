@@ -41,6 +41,7 @@ public class MediaAnalyzerManager : IMediaAnalyzerManager
     // recurring theme to be distinguishable from coincidence.
     private const int FingerprintHeadWindowMinutes = 10;
     private const int FingerprintMinSeasonEpisodes = 3;
+    private static readonly TimeSpan CreditsSceneLogLeadIn = TimeSpan.FromMinutes(8);
     private static readonly AudioIntroDetectionOptions FingerprintOptions = new();
 
     private readonly IMediaRepository _mediaRepository;
@@ -628,7 +629,7 @@ public class MediaAnalyzerManager : IMediaAnalyzerManager
         // partial — don't persist markers from it.
         cancellationToken.ThrowIfCancellationRequested();
 
-        var assembled = _markerAssembler.Assemble(new MarkerAssemblerInput
+        var assemblerInput = new MarkerAssemblerInput
         {
             Duration = duration.Value,
             SilenceIntervals = detection.SilenceIntervals,
@@ -642,14 +643,30 @@ public class MediaAnalyzerManager : IMediaAnalyzerManager
             ChapterStarts = chapterResult.ChapterStarts,
             RecapCueStart = recapCueStart,
             KnownIntroStart = knownIntro?.Start
-        });
+        };
+        var assembled = _markerAssembler.Assemble(assemblerInput);
 
         // Precedence: chapters (already resolved above when they fully covered) win
         // per type, then the season fingerprint intro, then silence/black. The
         // fingerprint only supplies a better intro; recap/credits/preview/scenes
         // still come from chapters or silence/black.
         var merged = MarkerMerge.Resolve(chapterResult.Markers, fingerprintIntro, assembled, detectIntro);
+        if (expectsCreditsScenes && detectCredits && !merged.Any(m => m.Type == MarkerType.CreditsScene))
+        {
+            LogMissingCreditsScene(mediaItemId, inputs.HasMidCreditsStinger, inputs.HasPostCreditsStinger, assemblerInput, merged);
+        }
         await PersistMarkersAsync(mediaItemId, merged);
+    }
+
+    private void LogMissingCreditsScene(Guid mediaItemId, bool mid, bool post, MarkerAssemblerInput input, List<DetectedMarker> markers)
+    {
+        var creditsStart = markers.FirstOrDefault(m => m.Type == MarkerType.Credits)?.Start
+            ?? TimeSpan.FromSeconds(input.Duration.TotalSeconds * MarkerAssembler.CreditsSearchStartFraction);
+        var from = creditsStart > CreditsSceneLogLeadIn ? creditsStart - CreditsSceneLogLeadIn : TimeSpan.Zero;
+        var listed = mid && post ? "during and after the credits" : mid ? "during the credits" : "after the credits";
+        _logger.LogInformation(
+            "Found no credits scene in {MediaItemId}, though its metadata lists one {Listed}. Credits start {CreditsStart}. What the analyzer saw from {From}: {Tail}",
+            mediaItemId, listed, creditsStart.ToString(@"h\:mm\:ss"), from.ToString(@"h\:mm\:ss"), MarkerAssembler.DescribeTail(input, from));
     }
 
     private async Task<TimeSpan?> FindRecapCueAsync(Guid mediaItemId, string primaryPath, DetectedMarker? knownIntro, CancellationToken cancellationToken)

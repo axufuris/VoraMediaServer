@@ -61,6 +61,8 @@ public class MarkerAssembler : IMarkerAssembler
     private static readonly TimeSpan MinFadeOutLength = TimeSpan.FromSeconds(2);
     private const double SceneMinPictureShare = 0.65;
     private static readonly TimeSpan SceneJoinGap = TimeSpan.FromSeconds(8);
+    private static readonly TimeSpan MaxSceneInterruption = TimeSpan.FromSeconds(3);
+    private const int MaxDescribedEntries = 150;
     private static readonly TimeSpan BoundaryProximity = TimeSpan.FromSeconds(3);
     // A real title sequence / "previously on" runs longer than this. A shorter
     // black+silence blip at the very start is a studio-logo ident (HBO, etc.), not
@@ -127,6 +129,10 @@ public class MarkerAssembler : IMarkerAssembler
                 var candidates = crawl != null
                     ? FindCreditsScenesAroundCrawl(input, crawl)
                     : FindCreditsScenes(jointGaps, creditsRollStart.Value, input.Duration).ToList();
+                if (crawl != null && candidates.Count < ExpectedCreditsScenes(input))
+                {
+                    candidates = WithLitScenesInTheCrawl(candidates, input, crawl);
+                }
                 var stingers = PickCreditsScenes(candidates, input.ExpectsMidCreditsStinger, input.ExpectsPostCreditsStinger);
                 for (var i = 0; i < stingers.Count; i++)
                 {
@@ -436,6 +442,106 @@ public class MarkerAssembler : IMarkerAssembler
         }
         return new CreditsSegment(start, end, count, pictures);
     }
+
+    private static int ExpectedCreditsScenes(MarkerAssemblerInput input) =>
+        (input.ExpectsMidCreditsStinger ? 1 : 0) + (input.ExpectsPostCreditsStinger ? 1 : 0);
+
+    // The metadata says a scene is there but no black run or chapter sets one off,
+    // as when the crawl cuts straight to a scene and back, or a post-credits scene
+    // follows the last name with no fade. The per-second samples still show it: a
+    // lit picture stretch once the crawl has begun, ended by more crawl, a lasting
+    // black or the end of the file. Dark colourful frames (logos and coloured
+    // credit cards on black) don't count as picture here.
+    private static List<DetectedMarker> WithLitScenesInTheCrawl(List<DetectedMarker> found, MarkerAssemblerInput input, CreditsCrawl crawl)
+    {
+        var creditsLength = input.Duration - crawl.CreditsStart;
+        var lit = FindLitStretches(input, crawl.CrawlStart)
+            .Where(s => s.IsScene && CouldBeACreditsScene(s.Start, s.End, crawl.CreditsStart, creditsLength))
+            .Where(s => !found.Any(f => f.Start < s.End && s.Start < f.End))
+            .Select(s => new DetectedMarker { Type = MarkerType.CreditsScene, Start = s.Start, End = s.End });
+
+        return found.Concat(lit).OrderBy(m => m.Start).ToList();
+    }
+
+    private static List<CreditsSegment> FindLitStretches(MarkerAssemblerInput input, TimeSpan from)
+    {
+        var samples = input.PictureSamples
+            .Where(s => s.Time >= from && s.Time <= input.Duration)
+            .OrderBy(s => s.Time)
+            .ToList();
+
+        var stretches = new List<CreditsSegment>();
+        TimeSpan? start = null, lastLit = null;
+        int count = 0, pictures = 0, sinceLastLit = 0;
+
+        void Close()
+        {
+            if (start is { } from && lastLit is { } to)
+            {
+                var end = to + PictureSampleInterval;
+                if (input.Duration - end <= PictureSampleInterval) end = input.Duration;
+                stretches.Add(new CreditsSegment(from, end, count, pictures));
+            }
+            start = lastLit = null;
+            count = pictures = sinceLastLit = 0;
+        }
+
+        foreach (var sample in samples)
+        {
+            if (lastLit is { } previous && sample.Time - previous > MaxSceneInterruption + PictureSampleInterval) Close();
+
+            if (IsLitPicture(sample))
+            {
+                start ??= sample.Time;
+                lastLit = sample.Time;
+                count += sinceLastLit + 1;
+                pictures++;
+                sinceLastLit = 0;
+            }
+            else if (start != null)
+            {
+                sinceLastLit++;
+            }
+        }
+        Close();
+
+        return stretches;
+    }
+
+    public static string DescribeTail(MarkerAssemblerInput input, TimeSpan from)
+    {
+        var runs = new List<(string Look, TimeSpan Start, TimeSpan End)>();
+        foreach (var sample in input.PictureSamples.Where(s => s.Time >= from).OrderBy(s => s.Time))
+        {
+            var look = Look(sample);
+            var end = sample.Time + PictureSampleInterval;
+            if (runs.Count > 0 && runs[^1].Look == look) runs[^1] = (look, runs[^1].Start, end);
+            else runs.Add((look, sample.Time, end));
+        }
+
+        var pictures = Listed(runs.Select(r => $"{Clock(r.Start)} {r.Look} {(r.End - r.Start).TotalSeconds:0}s").ToList());
+        var blacks = Listed(input.BlackIntervals.Where(b => b.End >= from).OrderBy(b => b.Start).Select(b => $"{Clock(b.Start)}-{Clock(b.End)}").ToList());
+        var chapters = Listed(input.ChapterStarts.Where(c => c >= from).OrderBy(c => c).Select(Clock).ToList());
+        return $"pictures: {pictures}; black frames: {blacks}; chapters: {chapters}";
+    }
+
+    private static string Look(PictureSample sample) => Classify(sample) switch
+    {
+        Shot.Black => "black",
+        Shot.Crawl => "crawl",
+        _ => IsLitPicture(sample) ? "picture" : "dark"
+    };
+
+    private static string Clock(TimeSpan time) => time.ToString(@"h\:mm\:ss");
+
+    private static string Listed(List<string> entries) =>
+        entries.Count == 0 ? "none"
+        : entries.Count <= MaxDescribedEntries ? string.Join(", ", entries)
+        : $"{string.Join(", ", entries.Take(MaxDescribedEntries))}, and {entries.Count - MaxDescribedEntries} more";
+
+    private static bool IsLitPicture(PictureSample sample) =>
+        Classify(sample) == Shot.Picture
+        && (sample.MeanLuma > CrawlMaxMeanLuma || sample.LowLuma > CrawlMaxLowLuma);
 
     private static bool JoinsPreviousScene(CreditsSegment previous, CreditsSegment next, TimeSpan crawlStart) =>
         previous.Start > crawlStart

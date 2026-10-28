@@ -519,7 +519,8 @@ public class MarkerAssemblerTests
         Crawl,
         Black,
         DarkGrey,
-        BrightGrey
+        BrightGrey,
+        DarkColour
     }
 
     private static List<PictureSample> Pictures(params (double From, double To, Look Look)[] spans) =>
@@ -529,6 +530,7 @@ public class MarkerAssemblerTests
             Look.Black => Sample(t, saturation: 0, low: 16, mean: 16, peak: 20),
             Look.DarkGrey => Sample(t, saturation: 1.5, low: 16, mean: 35, peak: 200),
             Look.BrightGrey => Sample(t, saturation: 0.8, low: 16, mean: 80, peak: 235),
+            Look.DarkColour => Sample(t, saturation: 6, low: 16, mean: 30, peak: 200),
             _ => Sample(t, saturation: 9, low: 20, mean: 70, peak: 220)
         })).ToList();
 
@@ -620,6 +622,107 @@ public class MarkerAssemblerTests
 
         CreditsStart(_assembler.Assemble(input)).Should().Be(6050);
         Scenes(input).Should().Equal((6413, 6490));
+    }
+
+    private static MarkerAssemblerInput CrawlFrom6650(bool mid, bool post, List<DetectedInterval> black, params (double From, double To, Look Look)[] credits) => new()
+    {
+        Duration = TimeSpan.FromSeconds(7000),
+        IsEpisode = false,
+        ExpectsMidCreditsStinger = mid,
+        ExpectsPostCreditsStinger = post,
+        SilenceIntervals = new List<DetectedInterval>(),
+        BlackIntervals = black,
+        PictureSamples = Pictures(new[] { (4200d, 6620d, Look.Scene), (6620d, 6650d, Look.Black) }.Concat(credits).ToArray())
+    };
+
+    [Fact]
+    public void A_mid_credits_scene_cut_straight_into_the_crawl_and_back_is_found()
+    {
+        var input = CrawlFrom6650(mid: true, post: false, [Interval(6620, 6650), Interval(6990, 7000)],
+            (6650, 6800, Look.Crawl), (6800, 6860, Look.Scene), (6860, 6990, Look.Crawl), (6990, 7000, Look.Black));
+
+        CreditsStart(_assembler.Assemble(input)).Should().Be(6620);
+        Scenes(input).Should().Equal((6800, 6860));
+    }
+
+    [Fact]
+    public void An_after_credits_scene_with_no_fade_before_it_runs_to_the_end()
+    {
+        var input = CrawlFrom6650(mid: false, post: true, [Interval(6620, 6650)],
+            (6650, 6950, Look.Crawl), (6950, 7000, Look.Scene));
+
+        Scenes(input).Should().Equal((6950, 7000));
+    }
+
+    [Fact]
+    public void A_brief_dark_shot_inside_the_scene_keeps_it_whole()
+    {
+        var input = CrawlFrom6650(mid: true, post: false, [Interval(6620, 6650), Interval(6990, 7000)],
+            (6650, 6800, Look.Crawl), (6800, 6830, Look.Scene), (6830, 6832, Look.Black), (6832, 6860, Look.Scene),
+            (6860, 6990, Look.Crawl), (6990, 7000, Look.Black));
+
+        Scenes(input).Should().Equal((6800, 6860));
+    }
+
+    [Fact]
+    public void Coloured_logos_on_black_in_the_crawl_are_not_a_scene()
+    {
+        var input = CrawlFrom6650(mid: true, post: true, [Interval(6620, 6650), Interval(6990, 7000)],
+            (6650, 6900, Look.Crawl), (6900, 6915, Look.DarkColour), (6915, 6990, Look.Crawl), (6990, 7000, Look.Black));
+
+        Scenes(input).Should().BeEmpty();
+    }
+
+    [Fact]
+    public void A_scene_in_the_crawl_is_left_alone_when_the_metadata_lists_none()
+    {
+        var input = CrawlFrom6650(mid: false, post: false, [Interval(6620, 6650), Interval(6990, 7000)],
+            (6650, 6800, Look.Crawl), (6800, 6860, Look.Scene), (6860, 6990, Look.Crawl), (6990, 7000, Look.Black));
+
+        Scenes(input).Should().BeEmpty();
+    }
+
+    [Fact]
+    public void A_mid_credits_scene_cut_into_the_crawl_joins_an_after_credits_scene_set_off_by_black()
+    {
+        var input = CrawlFrom6650(mid: true, post: true, [Interval(6620, 6650), Interval(6940, 6945), Interval(6990, 7000)],
+            (6650, 6750, Look.Crawl), (6750, 6800, Look.Scene), (6800, 6940, Look.Crawl), (6940, 6945, Look.Black),
+            (6945, 6990, Look.Scene), (6990, 7000, Look.Black));
+
+        Scenes(input).Should().Equal((6750, 6800), (6945, 6990));
+    }
+
+    [Fact]
+    public void A_scene_before_the_crawl_with_nothing_setting_it_off_from_the_movie_is_left_alone()
+    {
+        var input = new MarkerAssemblerInput
+        {
+            Duration = TimeSpan.FromSeconds(7000),
+            IsEpisode = false,
+            ExpectsMidCreditsStinger = true,
+            SilenceIntervals = new List<DetectedInterval>(),
+            BlackIntervals = new List<DetectedInterval> { Interval(6620, 6622), Interval(6990, 7000) },
+            PictureSamples = Pictures((4200, 6620, Look.Scene), (6620, 6622, Look.Black), (6622, 6990, Look.Crawl), (6990, 7000, Look.Black))
+        };
+
+        CreditsStart(_assembler.Assemble(input)).Should().Be(6620);
+        Scenes(input).Should().BeEmpty();
+    }
+
+    [Fact]
+    public void Describes_what_the_analyzer_saw_at_the_end_of_the_movie()
+    {
+        var input = new MarkerAssemblerInput
+        {
+            Duration = TimeSpan.FromSeconds(112),
+            SilenceIntervals = new List<DetectedInterval>(),
+            BlackIntervals = new List<DetectedInterval> { Interval(100, 103) },
+            ChapterStarts = new List<TimeSpan> { TimeSpan.FromSeconds(105) },
+            PictureSamples = Pictures((90, 100, Look.Scene), (100, 103, Look.Black), (103, 106, Look.Crawl), (106, 110, Look.Scene), (110, 112, Look.DarkColour))
+        };
+
+        MarkerAssembler.DescribeTail(input, TimeSpan.FromSeconds(100)).Should().Be(
+            "pictures: 0:01:40 black 3s, 0:01:43 crawl 3s, 0:01:46 picture 4s, 0:01:50 dark 2s; black frames: 0:01:40-0:01:43; chapters: 0:01:45");
     }
 
     [Fact]
