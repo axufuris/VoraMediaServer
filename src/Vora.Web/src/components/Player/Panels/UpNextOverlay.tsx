@@ -44,7 +44,10 @@ export default function UpNextOverlay({ currentMedia, upNextData, onPlayNext, on
                 {currentMedia.subtitle && <p className="m-0 mt-1 truncate text-sm" style={{ color: 'var(--vora-text-muted)' }}>{currentMedia.subtitle}</p>}
             </div>
 
-            <div className="ml-auto flex h-full w-[60%] flex-col overflow-y-auto pr-4 pt-20 max-md:ml-0 max-md:w-full max-md:pr-0 max-md:pt-32">
+            {/* The column scrolls, so it clips; the room on its left (and on
+                both sides on a phone, where it has no padding) lets a focused
+                card's outline in the rows show whole. */}
+            <div className="ml-auto flex h-full w-[calc(60%+0.25rem)] flex-col overflow-y-auto pl-1 pr-4 pt-20 max-md:-mx-1 max-md:w-[calc(100%+0.5rem)] max-md:px-1 max-md:pt-32">
                 {upNextData?.nextItem && (
                     <div className="mb-12 max-md:mb-8">
                         <div className="mb-4 flex flex-wrap items-end justify-between gap-3 pb-2" style={{ borderBottom: '1px solid var(--vora-border-subtle)' }}>

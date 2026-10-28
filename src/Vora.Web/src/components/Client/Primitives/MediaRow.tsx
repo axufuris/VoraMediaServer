@@ -76,10 +76,14 @@ export default function MediaRow({
             style={isPage ? { paddingInline: 'var(--vora-row-gutter)' } : undefined}
         >
             <SectionHeader title={title} subtitle={subtitle} actions={rowActions} underline={!isPage} />
+            {/* A focused card's outline reaches 4px past its picture. The
+                scroller clips on every side, so it keeps that much room inside
+                its edges and takes it back with negative margins: the cards
+                stay put and the outline is drawn whole. */}
             <div
                 ref={scrollerRef}
-                className="flex overflow-x-auto pb-2"
-                style={{ gap: 'var(--vora-card-gap)', scrollSnapType: 'x mandatory', scrollbarWidth: 'none' }}
+                className="-mx-1 -mt-1 flex overflow-x-auto px-1 pt-1 pb-2"
+                style={{ gap: 'var(--vora-card-gap)', scrollSnapType: 'x mandatory', scrollPaddingInline: '0.25rem', scrollbarWidth: 'none' }}
             >
                 {children}
             </div>
