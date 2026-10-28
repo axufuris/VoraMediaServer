@@ -59,17 +59,25 @@ public class WatchlistManager(
             }
         }
 
-        return items.Select(i => new WatchlistItemVM
+        var localIdsByEntry = items.ToDictionary(i => i.Id, i => i.MediaItemId ?? (resolved.TryGetValue(i.Id, out var localId) ? localId : null));
+        var libraryPosters = await mediaRepository.GetPosterUrlsByIdsAsync(
+            localIdsByEntry.Values.OfType<Guid>().Distinct().ToList());
+
+        return items.Select(i =>
         {
-            Id = i.Id,
-            ProfileId = i.ProfileId,
-            ExternalId = i.ExternalId,
-            ProviderId = i.ProviderId,
-            Type = i.Type,
-            Title = i.Title,
-            PosterUrl = i.PosterUrl,
-            AddedAt = i.AddedAt,
-            MediaItemId = i.MediaItemId ?? (resolved.TryGetValue(i.Id, out var localId) ? localId : null),
+            var mediaItemId = localIdsByEntry[i.Id];
+            return new WatchlistItemVM
+            {
+                Id = i.Id,
+                ProfileId = i.ProfileId,
+                ExternalId = i.ExternalId,
+                ProviderId = i.ProviderId,
+                Type = i.Type,
+                Title = i.Title,
+                PosterUrl = mediaItemId is Guid id && libraryPosters.TryGetValue(id, out var poster) ? poster : i.PosterUrl,
+                AddedAt = i.AddedAt,
+                MediaItemId = mediaItemId,
+            };
         }).ToList();
     }
 
