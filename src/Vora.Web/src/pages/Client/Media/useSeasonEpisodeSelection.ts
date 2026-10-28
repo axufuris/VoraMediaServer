@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { mediaService, type Episode, type MediaItem, type Season } from '../../../api/Media/mediaService';
+import { mediaService, type Episode, type MediaItem } from '../../../api/Media/mediaService';
 import { SelectedEpisodeParam } from '../../../utils/mediaPath';
 
 const DetailsDelayMs = 150;
@@ -82,21 +82,4 @@ export function useSeasonEpisodeSelection(season: MediaItem | null, upNext: Medi
     }, [searchParams, setSearchParams]);
 
     return { selectedId, selected, details, select };
-}
-
-// The show's seasons, for the pills at the top of a season page.
-export function useSiblingSeasons(season: MediaItem | null, serverId?: string): Season[] {
-    const showId = season?.type === 'Season' ? season.tvShowId : undefined;
-    const [loaded, setLoaded] = useState<{ showId: string; seasons: Season[] } | null>(null);
-
-    useEffect(() => {
-        if (!showId) return;
-        let cancelled = false;
-        mediaService.getMediaItem(showId, serverId)
-            .then(show => { if (!cancelled) setLoaded({ showId, seasons: show.seasons ?? [] }); })
-            .catch(() => { if (!cancelled) setLoaded({ showId, seasons: [] }); });
-        return () => { cancelled = true; };
-    }, [showId, serverId]);
-
-    return showId && loaded?.showId === showId ? loaded.seasons : [];
 }
