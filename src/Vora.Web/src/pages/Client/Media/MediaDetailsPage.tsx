@@ -82,14 +82,6 @@ export default function MediaDetailsPage() {
             : !playsUpNext ? media : upNextEpisode;
     const playEpisode = isSeasonPage ? selection.selected : qualityMedia;
 
-    // A show with one season lists that season's episodes on its own page, so
-    // there is no extra click through a Seasons row of one. The show page stays,
-    // for its own menu (Fix match, Edit metadata), trailers, rating and watchlist.
-    const [singleSeason, setSingleSeason] = useState<{ showId: string; season: MediaItem | null } | null>(null);
-    const onlySeasonId = media?.type === 'TvShow' && media.seasons?.length === 1 ? media.seasons[0].id : null;
-    const inlineSeason = media && singleSeason?.showId === media.id ? singleSeason.season : null;
-    const inlineSeasonFailed = !!media && singleSeason?.showId === media.id && singleSeason.season === null;
-
     // Navigating between items (e.g. episode → season) reuses this component,
     // so close any open overlay/menu from the previous item. Adjusted during
     // render rather than in an effect so the stale overlay never paints.
@@ -200,17 +192,6 @@ export default function MediaDetailsPage() {
     }, [media, serverId]);
 
     useEffect(() => {
-        if (!media || !onlySeasonId) return;
-
-        const showId = media.id;
-        let cancelled = false;
-        mediaService.getMediaItem(onlySeasonId, serverId)
-            .then(season => { if (!cancelled) setSingleSeason({ showId, season }); })
-            .catch(() => { if (!cancelled) setSingleSeason({ showId, season: null }); });
-        return () => { cancelled = true; };
-    }, [media, onlySeasonId, serverId]);
-
-    useEffect(() => {
         if (!isPlaying && id) {
             const timer = setTimeout(() => reloadMedia(), 500);
             return () => clearTimeout(timer);
@@ -220,11 +201,10 @@ export default function MediaDetailsPage() {
     useSignalREvent('MediaItemUpdated', useCallback((updatedId: string) => {
         if (!id || !media) return;
         const targetId = updatedId.toLowerCase();
-        const listed = [...(media.episodes ?? []), ...(inlineSeason?.episodes ?? [])];
-        if (targetId === id.toLowerCase() || listed.some(ep => ep.id.toLowerCase() === targetId) || media.seasons?.some(s => s.id.toLowerCase() === targetId)) {
+        if (targetId === id.toLowerCase() || media.episodes?.some(ep => ep.id.toLowerCase() === targetId) || media.seasons?.some(s => s.id.toLowerCase() === targetId)) {
             reloadMedia();
         }
-    }, [id, media, inlineSeason, reloadMedia]));
+    }, [id, media, reloadMedia]));
 
     useSignalREvent('MediaAnalysisUpdated', useCallback((updatedId: string) => {
         if (id && updatedId.toLowerCase() === id.toLowerCase()) reloadMedia();
@@ -420,13 +400,8 @@ export default function MediaDetailsPage() {
     ]) : tidyMenu(itemActions.entries);
     const playLabel = playButton.label;
     const playRuntime = formatRuntime(described.durationMinutes);
-    const listedEpisodes = isSeason ? media.episodes ?? [] : inlineSeason?.episodes ?? [];
-    const listedSeasonNumber = isSeason ? media.seasonNumber : inlineSeason?.seasonNumber;
-    const listedShowTitle = isSeason ? media.tvShowTitle : media.title;
-    const pickListedEpisode = (episode: Episode) => isSeason
-        ? selection.select(episode)
-        : navigate(mediaPath({ id: episode.id, type: 'Episode', seasonId: inlineSeason?.id }, serverId));
-    const showSeasonsRow = media.type === 'TvShow' && (media.seasons || []).length > 0 && ((media.seasons || []).length > 1 || inlineSeasonFailed);
+    const listedEpisodes = isSeason ? media.episodes ?? [] : [];
+    const showSeasonsRow = media.type === 'TvShow' && (media.seasons || []).length > 0;
 
     const videos = media.videos ?? [];
     const trailerVideo = videos.find(v => v.type === 'Trailer') ?? videos[0];
@@ -639,25 +614,25 @@ export default function MediaDetailsPage() {
                 {episodeLayout === 'List' ? (
                     <EpisodeList
                         episodes={listedEpisodes}
-                        seasonNumber={listedSeasonNumber}
+                        seasonNumber={media.seasonNumber}
                         serverId={serverId}
-                        selectedId={isSeason ? selection.selectedId : undefined}
+                        selectedId={selection.selectedId}
                         onSelect={episode => {
-                            pickListedEpisode(episode);
-                            if (isSeason) window.scrollTo({ top: 0, behavior: prefersReducedMotion() ? 'auto' : 'smooth' });
+                            selection.select(episode);
+                            window.scrollTo({ top: 0, behavior: prefersReducedMotion() ? 'auto' : 'smooth' });
                         }}
-                        onPlay={episode => { void playListedEpisode(episode, listedSeasonNumber, listedShowTitle); }}
+                        onPlay={episode => { void playListedEpisode(episode, media.seasonNumber, media.tvShowTitle); }}
                         onChanged={reloadMedia}
                     />
                 ) : episodeLayout === 'Row' ? (
                     <EpisodeRail
                         episodes={listedEpisodes}
-                        seasonNumber={listedSeasonNumber}
+                        seasonNumber={media.seasonNumber}
                         serverId={serverId}
-                        selectedId={isSeason ? selection.selectedId : undefined}
-                        selectOnFocus={isSeason}
-                        onSelect={pickListedEpisode}
-                        onPlay={episode => { void playListedEpisode(episode, listedSeasonNumber, listedShowTitle); }}
+                        selectedId={selection.selectedId}
+                        selectOnFocus
+                        onSelect={selection.select}
+                        onPlay={episode => { void playListedEpisode(episode, media.seasonNumber, media.tvShowTitle); }}
                         onChanged={reloadMedia}
                     />
                 ) : null}
