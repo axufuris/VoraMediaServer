@@ -1,5 +1,5 @@
 import { useEffect, useState, useCallback } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { mediaService, type Episode, type MediaItem } from '../../../api/Media/mediaService';
 import CastRow from '../../../components/Client/Primitives/CastRow';
 import MediaExtrasRow from '../../../components/Media/MediaExtrasRow';
@@ -33,7 +33,7 @@ import { seasonEpisodeLabel, seasonName } from '../../../utils/seasonLabel';
 import { errorDetail, isMissingOrForbidden } from '../../../utils/apiError';
 import { ActionMenuList } from '../../../components/Client/Primitives/ActionMenu';
 import { menuAction, menuHeading, menuSeparator, tidyMenu, withKeyPrefix } from '../../../components/Client/Primitives/menuEntries';
-import { mediaPath } from '../../../utils/mediaPath';
+import { mediaPath, ShowPageState, type MediaPageState } from '../../../utils/mediaPath';
 import SeasonPills from '../../../components/Media/SeasonPills';
 import { useSeasonEpisodeSelection, useSiblingSeasons } from './useSeasonEpisodeSelection';
 import { useEpisodeLayout } from './useEpisodeLayout';
@@ -82,14 +82,6 @@ export default function MediaDetailsPage() {
             : !playsUpNext ? media : upNextEpisode;
     const playEpisode = isSeasonPage ? selection.selected : qualityMedia;
 
-    // A show with one season lists that season's episodes on its own page, so
-    // there is no extra click through a Seasons row of one. The show page stays,
-    // for its own menu (Fix match, Edit metadata), trailers, rating and watchlist.
-    const [singleSeason, setSingleSeason] = useState<{ showId: string; season: MediaItem | null } | null>(null);
-    const onlySeasonId = media?.type === 'TvShow' && media.seasons?.length === 1 ? media.seasons[0].id : null;
-    const inlineSeason = media && singleSeason?.showId === media.id ? singleSeason.season : null;
-    const inlineSeasonFailed = !!media && singleSeason?.showId === media.id && singleSeason.season === null;
-
     // Navigating between items (e.g. episode → season) reuses this component,
     // so close any open overlay/menu from the previous item. Adjusted during
     // render rather than in an effect so the stale overlay never paints.
@@ -107,11 +99,19 @@ export default function MediaDetailsPage() {
 
     // An episode has no page of its own: its address moves to its season with
     // the episode selected, so a link from anywhere lands where the TV apps do.
+    // A show with one season moves to that season too, unless the address
+    // asks for the show's own page.
+    const location = useLocation();
+    const asksForShowPage = (location.state as MediaPageState | null)?.showPage === true;
     const openOnSeason = useCallback((data: MediaItem) => {
-        if (data.type !== 'Episode' || !data.seasonId) return false;
-        navigate(mediaPath(data, serverId), { replace: true });
+        const onlySeason = data.type === 'TvShow' && !asksForShowPage && data.seasons?.length === 1 ? data.seasons[0] : undefined;
+        const seasonPath = data.type === 'Episode' && data.seasonId
+            ? mediaPath(data, serverId)
+            : onlySeason ? mediaPath({ id: onlySeason.id, type: 'Season' }, serverId) : null;
+        if (!seasonPath) return false;
+        navigate(seasonPath, { replace: true });
         return true;
-    }, [navigate, serverId]);
+    }, [navigate, serverId, asksForShowPage]);
 
     const reloadMedia = useCallback(async () => {
         if (!id) return;
@@ -200,17 +200,6 @@ export default function MediaDetailsPage() {
     }, [media, serverId]);
 
     useEffect(() => {
-        if (!media || !onlySeasonId) return;
-
-        const showId = media.id;
-        let cancelled = false;
-        mediaService.getMediaItem(onlySeasonId, serverId)
-            .then(season => { if (!cancelled) setSingleSeason({ showId, season }); })
-            .catch(() => { if (!cancelled) setSingleSeason({ showId, season: null }); });
-        return () => { cancelled = true; };
-    }, [media, onlySeasonId, serverId]);
-
-    useEffect(() => {
         if (!isPlaying && id) {
             const timer = setTimeout(() => reloadMedia(), 500);
             return () => clearTimeout(timer);
@@ -220,11 +209,10 @@ export default function MediaDetailsPage() {
     useSignalREvent('MediaItemUpdated', useCallback((updatedId: string) => {
         if (!id || !media) return;
         const targetId = updatedId.toLowerCase();
-        const listed = [...(media.episodes ?? []), ...(inlineSeason?.episodes ?? [])];
-        if (targetId === id.toLowerCase() || listed.some(ep => ep.id.toLowerCase() === targetId) || media.seasons?.some(s => s.id.toLowerCase() === targetId)) {
+        if (targetId === id.toLowerCase() || media.episodes?.some(ep => ep.id.toLowerCase() === targetId) || media.seasons?.some(s => s.id.toLowerCase() === targetId)) {
             reloadMedia();
         }
-    }, [id, media, inlineSeason, reloadMedia]));
+    }, [id, media, reloadMedia]));
 
     useSignalREvent('MediaAnalysisUpdated', useCallback((updatedId: string) => {
         if (id && updatedId.toLowerCase() === id.toLowerCase()) reloadMedia();
@@ -420,13 +408,8 @@ export default function MediaDetailsPage() {
     ]) : tidyMenu(itemActions.entries);
     const playLabel = playButton.label;
     const playRuntime = formatRuntime(described.durationMinutes);
-    const listedEpisodes = isSeason ? media.episodes ?? [] : inlineSeason?.episodes ?? [];
-    const listedSeasonNumber = isSeason ? media.seasonNumber : inlineSeason?.seasonNumber;
-    const listedShowTitle = isSeason ? media.tvShowTitle : media.title;
-    const pickListedEpisode = (episode: Episode) => isSeason
-        ? selection.select(episode)
-        : navigate(mediaPath({ id: episode.id, type: 'Episode', seasonId: inlineSeason?.id }, serverId));
-    const showSeasonsRow = media.type === 'TvShow' && (media.seasons || []).length > 0 && ((media.seasons || []).length > 1 || inlineSeasonFailed);
+    const listedEpisodes = isSeason ? media.episodes ?? [] : [];
+    const showSeasonsRow = media.type === 'TvShow' && (media.seasons || []).length > 0;
 
     const videos = media.videos ?? [];
     const trailerVideo = videos.find(v => v.type === 'Trailer') ?? videos[0];
@@ -470,7 +453,7 @@ export default function MediaDetailsPage() {
     );
 
     // On every season page, a one-season show's too: the Show pill is the way
-    // back to the show, which the title menu no longer offers.
+    // to the show's own page, which the title menu no longer offers.
     const showId = isSeason ? media.tvShowId : undefined;
     const seasonPills = showId && siblingSeasons.length > 0 ? (
         <SeasonPills
@@ -478,7 +461,7 @@ export default function MediaDetailsPage() {
             currentId={media.id}
             onPick={season => navigate(mediaPath({ id: season.id, type: 'Season' }, serverId), { replace: true })}
             showTitle={media.tvShowTitle}
-            onPickShow={() => navigate(mediaPath({ id: showId, type: 'TvShow' }, serverId))}
+            onPickShow={() => navigate(mediaPath({ id: showId, type: 'TvShow' }, serverId), { state: ShowPageState })}
         />
     ) : null;
 
@@ -639,25 +622,25 @@ export default function MediaDetailsPage() {
                 {episodeLayout === 'List' ? (
                     <EpisodeList
                         episodes={listedEpisodes}
-                        seasonNumber={listedSeasonNumber}
+                        seasonNumber={media.seasonNumber}
                         serverId={serverId}
-                        selectedId={isSeason ? selection.selectedId : undefined}
+                        selectedId={selection.selectedId}
                         onSelect={episode => {
-                            pickListedEpisode(episode);
-                            if (isSeason) window.scrollTo({ top: 0, behavior: prefersReducedMotion() ? 'auto' : 'smooth' });
+                            selection.select(episode);
+                            window.scrollTo({ top: 0, behavior: prefersReducedMotion() ? 'auto' : 'smooth' });
                         }}
-                        onPlay={episode => { void playListedEpisode(episode, listedSeasonNumber, listedShowTitle); }}
+                        onPlay={episode => { void playListedEpisode(episode, media.seasonNumber, media.tvShowTitle); }}
                         onChanged={reloadMedia}
                     />
                 ) : episodeLayout === 'Row' ? (
                     <EpisodeRail
                         episodes={listedEpisodes}
-                        seasonNumber={listedSeasonNumber}
+                        seasonNumber={media.seasonNumber}
                         serverId={serverId}
-                        selectedId={isSeason ? selection.selectedId : undefined}
-                        selectOnFocus={isSeason}
-                        onSelect={pickListedEpisode}
-                        onPlay={episode => { void playListedEpisode(episode, listedSeasonNumber, listedShowTitle); }}
+                        selectedId={selection.selectedId}
+                        selectOnFocus
+                        onSelect={selection.select}
+                        onPlay={episode => { void playListedEpisode(episode, media.seasonNumber, media.tvShowTitle); }}
                         onChanged={reloadMedia}
                     />
                 ) : null}
