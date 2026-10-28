@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { fireEvent, render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, within } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import PlaylistsPage from './PlaylistsPage';
 import type { PlaylistSummaryVM, SharedPlaylistsVM } from '../../../api/Collections/playlistService';
@@ -43,16 +43,23 @@ vi.mock('../../../dialogs', () => ({
     useDialog: () => ({ alert: () => Promise.resolve(), confirm: () => Promise.resolve(true), prompt: () => Promise.resolve(null) }),
 }));
 
+const renderPage = (embedded = false) => render(
+    <MemoryRouter>
+        <PlaylistsPage embedded={embedded} />
+    </MemoryRouter>,
+);
+
 describe('PlaylistsPage', () => {
     beforeEach(() => {
         localStorage.clear();
+        sessionStorage.clear();
         shared = { manual: [], smart: [] };
     });
 
-    it('locked to music shows only music playlists, with no type filter or mixes', async () => {
+    it('locked to music shows only music playlists, with no type filter', async () => {
         render(
             <MemoryRouter>
-                <PlaylistsPage embedded lockedType="music" showMixes={false} />
+                <PlaylistsPage embedded lockedType="music" />
             </MemoryRouter>,
         );
 
@@ -61,17 +68,12 @@ describe('PlaylistsPage', () => {
         expect(screen.queryByText('Comfort Movies')).toBeNull();
         expect(screen.queryByText('Unwatched Comedy')).toBeNull();
         expect(screen.queryByText('Sunday Chill')).toBeNull();
-        // The type is fixed here, so only the Yours / Shared split is offered.
-        expect(screen.queryByRole('button', { name: 'Movies & Shows' })).toBeNull();
+        expect(screen.queryByRole('group', { name: 'Media type' })).toBeNull();
         expect(screen.getByRole('tab', { name: 'Yours' })).toHaveAttribute('aria-selected', 'true');
     });
 
     it('opens on your own Movies & Shows, which also carries mixed-type playlists', async () => {
-        render(
-            <MemoryRouter>
-                <PlaylistsPage />
-            </MemoryRouter>,
-        );
+        renderPage();
 
         expect(await screen.findByText('Comfort Movies')).toBeInTheDocument();
         expect(screen.getByText('Unwatched Comedy')).toBeInTheDocument();
@@ -79,36 +81,48 @@ describe('PlaylistsPage', () => {
         expect(screen.getByRole('tab', { name: 'Yours' })).toHaveAttribute('aria-selected', 'true');
         expect(screen.getByRole('button', { name: 'Movies & Shows' })).toHaveAttribute('aria-pressed', 'true');
         expect(screen.queryByText('Road Trip')).toBeNull();
-        expect(screen.queryByText('Sunday Chill')).toBeNull();
     });
 
-    it('shows music playlists and mixes under Music, and remembers the choice', async () => {
-        const { unmount } = render(
-            <MemoryRouter>
-                <PlaylistsPage />
-            </MemoryRouter>,
-        );
+    it('opens on Movies & Shows even when an earlier visit picked Music', async () => {
+        localStorage.setItem('playlists_active_tab', 'music');
+        renderPage(true);
+
+        expect(await screen.findByText('Comfort Movies')).toBeInTheDocument();
+        expect(screen.getByRole('button', { name: 'Movies & Shows' })).toHaveAttribute('aria-pressed', 'true');
+    });
+
+    it('shows music playlists under Music, without mixes, and keeps the pick for the session', async () => {
+        const { unmount } = renderPage(true);
         await screen.findByText('Comfort Movies');
 
         fireEvent.click(screen.getByRole('button', { name: 'Music' }));
 
         expect(screen.getByText('Road Trip')).toBeInTheDocument();
-        expect(screen.getByText('Sunday Chill')).toBeInTheDocument();
+        expect(screen.queryByText('Sunday Chill')).toBeNull();
+        expect(screen.queryByText('For You')).toBeNull();
         expect(screen.queryByText('Comfort Movies')).toBeNull();
         unmount();
 
-        render(
-            <MemoryRouter>
-                <PlaylistsPage />
-            </MemoryRouter>,
-        );
+        renderPage(true);
         expect(await screen.findByRole('button', { name: 'Music' })).toHaveAttribute('aria-pressed', 'true');
+    });
+
+    it('puts the type filter on the left of New, outside the Yours / Shared tabs', async () => {
+        renderPage(true);
+        await screen.findByText('Comfort Movies');
+
+        const filter = screen.getByRole('group', { name: 'Media type' });
+        const newButton = screen.getByRole('button', { name: 'New' });
+
+        expect(filter.parentElement).toBe(newButton.parentElement?.parentElement);
+        expect(filter.compareDocumentPosition(newButton) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+        expect(within(screen.getByRole('tablist')).queryByRole('button', { name: 'Music' })).toBeNull();
     });
 
     it('marks a playlist of your own that you have shared', async () => {
         render(
             <MemoryRouter>
-                <PlaylistsPage embedded lockedType="music" showMixes={false} />
+                <PlaylistsPage embedded lockedType="music" />
             </MemoryRouter>,
         );
 
@@ -122,7 +136,7 @@ describe('PlaylistsPage', () => {
         };
         render(
             <MemoryRouter>
-                <PlaylistsPage embedded lockedType="music" showMixes={false} />
+                <PlaylistsPage embedded lockedType="music" />
             </MemoryRouter>,
         );
         await screen.findByText('Road Trip');
@@ -141,7 +155,7 @@ describe('PlaylistsPage', () => {
     it('says so when nothing has been shared', async () => {
         render(
             <MemoryRouter>
-                <PlaylistsPage embedded lockedType="music" showMixes={false} />
+                <PlaylistsPage embedded lockedType="music" />
             </MemoryRouter>,
         );
         await screen.findByText('Road Trip');

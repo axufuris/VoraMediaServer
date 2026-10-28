@@ -111,7 +111,8 @@ The frontend detail page renders three different views depending on `mediaType`:
 
 `/playlists`:
 
-- Top-level tabs (`Movies & Shows` / `Music`) persisted in `localStorage` (`playlists_active_tab`); an unrecognised or missing value opens `Movies & Shows`. A host that is already scoped passes `lockedType` (the Music page uses `lockedType="music"` with `showMixes={false}`), which hides the tabs. Daily mixes render on the `Music` tab only.
+- A type filter (`Movies & Shows` / `Music` pills) on the left of the **+ New** row, above the Yours / Shared tabs. It opens on `Movies & Shows` and keeps a pick for the browser session only, in `sessionStorage` (`playlists_active_tab`, as the Home tabs keep theirs), so Back from a music playlist returns to Music while a new visit starts on Movies & Shows. A host that is already scoped passes `lockedType` (the Music page uses `lockedType="music"`), which hides the filter.
+- Generated mixes are not playlists and never show here. The Home **For You** tab lists the Made for You mixes (daily and Discover) after its recommendations, in the same `MadeForYouRow` the Music page uses (`pages/Client/Audio/Music/MixRow.tsx`: square `xs` `MediaCard`s in a `MediaRow`), and opens one on the Music page (`/music?mix=<id>`). Release Radar and Moods stay on the Music page.
 - A single **+ New** button opens a two-step chooser:
   1. Pick type (Music / Movies / Shows / Mixed).
   2. Pick kind (Manual / Smart). `Mixed` disables Smart (smart playlists need a single type).

@@ -878,7 +878,7 @@ export default function MusicTab() {
                         onOpenAlbum={(album) => updateNav({ view: 'album', albumId: album.id, artistId: album.artistId })}
                     />
                 )}
-                {subTab === 'playlists' && <PlaylistsPage embedded lockedType="music" showMixes={false} />}
+                {subTab === 'playlists' && <PlaylistsPage embedded lockedType="music" />}
             </div>
 
             {!searchActive && nav.view !== 'root' && (
