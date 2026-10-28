@@ -313,8 +313,9 @@
     transition: background var(--vora-duration-fast) var(--vora-ease-out);
 }
 
-[data-vora-client] .vora-button-primary:hover { background: var(--vora-accent-hover); }
-[data-vora-client] .vora-button-primary:active { background: var(--vora-accent-active); }
+[data-vora-client] .vora-button-primary:not(:disabled):hover,
+[data-vora-client] .vora-button-primary:focus-visible { background: var(--vora-accent-hover); }
+[data-vora-client] .vora-button-primary:not(:disabled):active { background: var(--vora-accent-active); }
 
 [data-vora-client] .vora-button-secondary {
     background: color-mix(in srgb, var(--vora-text-primary) 6%, transparent);
@@ -325,9 +326,15 @@
     font-weight: 500;
     font-size: 14px;
     cursor: pointer;
+    transition: background-color var(--vora-duration-fast) var(--vora-ease-out),
+                border-color var(--vora-duration-fast) var(--vora-ease-out);
 }
 
-[data-vora-client] .vora-button-secondary:hover { border-color: var(--vora-border-strong); }
+[data-vora-client] .vora-button-secondary:not(:disabled):hover,
+[data-vora-client] .vora-button-secondary:focus-visible {
+    background: var(--vora-accent-soft);
+    border-color: var(--vora-accent-soft-hover);
+}
 
 [data-vora-client] .vora-input {
     background: var(--vora-bg-surface);
