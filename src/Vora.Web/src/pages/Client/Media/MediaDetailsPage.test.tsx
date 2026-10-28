@@ -5,6 +5,7 @@ import MediaDetailsPage from './MediaDetailsPage';
 import { PlayerContext, type PlayerContextType } from '../../../contexts/usePlayer';
 import type { Episode, MediaItem, UpNextResultVM } from '../../../api/Media/mediaService';
 import { StorageKeys } from '../../../utils/storageKeys';
+import { ShowPageState, type MediaPageState } from '../../../utils/mediaPath';
 
 const api = vi.hoisted(() => ({
     getMediaItem: vi.fn<(id: string) => Promise<MediaItem>>(),
@@ -100,10 +101,10 @@ function Address() {
     return <output data-testid="address">{location.pathname + location.search}</output>;
 }
 
-function openPage(path: string) {
+function openPage(path: string, state?: MediaPageState) {
     return render(
         <PlayerContext.Provider value={player}>
-            <MemoryRouter initialEntries={[path]}>
+            <MemoryRouter initialEntries={[state ? { pathname: path, state } : path]}>
                 <Routes>
                     <Route path="/media/:id" element={<><MediaDetailsPage /><Address /></>} />
                 </Routes>
@@ -264,19 +265,6 @@ describe('a season page', () => {
         await waitFor(() => expect(screen.getByTestId('address')).toHaveTextContent('/media/shogun'));
     });
 
-    it("keeps the Show pill on a one-season show's season page, and it opens the show's own page", async () => {
-        items.shogun = show(1);
-        openPage('/media/season-1');
-
-        const pills = await screen.findByRole('navigation', { name: 'Seasons' });
-        expect(within(pills).getAllByRole('button').map(pill => pill.textContent)).toEqual(['Show', 'Season 1']);
-        fireEvent.click(within(pills).getByRole('button', { name: 'Show: Shōgun' }));
-
-        await waitFor(() => expect(screen.getByTestId('address')).toHaveTextContent('/media/shogun'));
-        expect(await screen.findByText('Seasons')).toBeInTheDocument();
-        expect(screen.queryByText('Episodes')).toBeNull();
-    });
-
     // Both halves of the menu come from the same actions, so both have a
     // "manage" row; each must open its own title's rows.
     it("opens the season's own Manage rows, not the episode's", async () => {
@@ -304,10 +292,40 @@ describe('an episode link', () => {
     });
 });
 
+describe('a one-season show', () => {
+    beforeEach(() => { items.shogun = show(1); });
+
+    it('opens on its season, wherever it is opened from', async () => {
+        const { container } = openPage('/media/shogun');
+
+        await waitFor(() => expect(screen.getByTestId('address')).toHaveTextContent('/media/season-1'));
+        expect(await screen.findByRole('button', { name: 'Resume S1 E2 20:50' })).toBeInTheDocument();
+        expect(tile(container, 'ep-2')).toHaveAttribute('aria-current', 'true');
+        expect(screen.queryByText('Seasons')).toBeNull();
+    });
+
+    it("opens the show's own page from the Show pill, with its season in a Seasons row", async () => {
+        openPage('/media/shogun');
+
+        const pills = await screen.findByRole('navigation', { name: 'Seasons' });
+        expect(within(pills).getAllByRole('button').map(pill => pill.textContent)).toEqual(['Show', 'Season 1']);
+        fireEvent.click(within(pills).getByRole('button', { name: 'Show: Shōgun' }));
+
+        await waitFor(() => expect(screen.getByTestId('address')).toHaveTextContent('/media/shogun'));
+        expect(await screen.findByText('Seasons')).toBeInTheDocument();
+        expect(screen.queryByText('Episodes')).toBeNull();
+        expect(await screen.findByRole('button', { name: 'Resume S1 E2 20:50' })).toBeInTheDocument();
+
+        fireEvent.click(screen.getByText('Season 1'));
+
+        await waitFor(() => expect(screen.getByTestId('address')).toHaveTextContent('/media/season-1'));
+    });
+});
+
 describe('a show page', () => {
     it("shows a one-season show's season in its Seasons row, as for any show", async () => {
         items.shogun = show(1);
-        openPage('/media/shogun');
+        openPage('/media/shogun', ShowPageState);
 
         expect(await screen.findByText('Seasons')).toBeInTheDocument();
         expect(screen.queryByText('Episodes')).toBeNull();
@@ -404,7 +422,7 @@ describe('a profile that shows episodes as a list', () => {
 
     it("lists no episodes on a one-season show's page, only its Seasons row", async () => {
         items.shogun = show(1);
-        openPage('/media/shogun');
+        openPage('/media/shogun', ShowPageState);
 
         expect(await screen.findByText('Seasons')).toBeInTheDocument();
         await screen.findByRole('button', { name: 'Resume S1 E2 20:50' });
