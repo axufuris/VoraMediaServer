@@ -58,7 +58,7 @@ Everything that renders a piece of media as a tile goes through one small set of
 | Primitive | Use |
 | --- | --- |
 | `MediaCard` | **The** media tile: artwork plus the caption block under it. Home rails, Continue Watching, discover rows, recommendations, library/collection/watchlist/filmography grids, search results, playlists, seasons, collection tiles. |
-| `MediaRow` | **The** horizontal rail. `variant="page"` sits on a page canvas and owns its gutter (`--vora-row-gutter`); `variant="section"` sits inside an already-padded block and gets an underlined header. Exports `MediaRowItem` for scroll-snap children. |
+| `MediaRow` | **The** horizontal rail. `variant="page"` sits on a page canvas and owns its gutter (`--vora-row-gutter`); `variant="section"` sits inside an already-padded block and gets an underlined header. Exports `MediaRowItem` for scroll-snap children. The scroller keeps 0.25rem inside its left, right and top edges (taken back with negative margins, plus `scroll-padding-inline`) so a focused card's outline isn't clipped; a clipping parent with no padding of its own, like the end-of-video column, needs that much room too. |
 | `MediaGrid` | The wrapping-grid counterpart to `MediaRow`, on the same card metrics. |
 | `PersonCard` | The cast/crew tile. |
 | `CastRow` | `MediaRow` + `PersonCard`, with actors sorted ahead of crew. Used by both the media details page and the discovery details page. |

@@ -142,6 +142,7 @@ Horizontal-scroll rail of `MediaCard`s. The primary content unit on Home, Discov
 
 **Behavior:**
 - Title above the row. Row scrolls horizontally with snap.
+- A focused card's ring is drawn whole on every card, first and last included: the row keeps room inside its clipped edges for it without moving the cards (web: 0.25rem on the left, right and top, taken back with negative margins, with scroll padding to match so snapping keeps it).
 - On web: scroll with momentum, optional arrow buttons on the rail edges that paginate by one viewport. Edge gradient fade (right-fade always when overflow exists, left-fade only when scrolled past start).
 - On phone (touch): identical to web; snap behavior is platform default.
 - On TV: D-pad left/right traverses cards. **The rail does not scroll free-form** — focus drives scroll. When focused card approaches the right edge, the rail scroll-into-views the next card with a smooth scroll animation (`durationMed`).
