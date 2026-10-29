@@ -46,125 +46,130 @@ public class CollectionSyncService(
             return;
         }
 
-        var isSmart = !string.IsNullOrWhiteSpace(collection.RulesJson);
-        var hasProvider = !string.IsNullOrEmpty(collection.ContentSyncProviderId) && !string.IsNullOrEmpty(collection.ContentSyncExternalId);
-        if (!isSmart && !hasProvider)
-        {
-            return;
-        }
-
         try
         {
-            var existingMediaIds = await collectionRepo.GetCollectionMediaIdsAsync(collection.Id);
-
-            if (isSmart)
+            if (!string.IsNullOrWhiteSpace(collection.RulesJson))
             {
-                var ruleMatches = await EvaluateSmartMembership(collection.RulesJson!, collection.SmartMediaType, collection.LibraryId);
-                var excluded = await collectionRepo.GetExcludedMediaIdsAsync(collection.Id);
-                ruleMatches.ExceptWith(excluded);
-                await ReconcileMembershipAsync(collection.Id, collection.Title, true, ruleMatches, existingMediaIds);
-                await collectionRepo.TouchContentSyncedAtAsync(collection.Id);
-                return;
+                await SyncSmartMembershipAsync(collection, collection.RulesJson);
             }
-
-            var provider = providers.FirstOrDefault(p => p.Id == collection.ContentSyncProviderId);
-            if (provider == null)
+            else if (!string.IsNullOrEmpty(collection.ContentSyncProviderId) && !string.IsNullOrEmpty(collection.ContentSyncExternalId))
             {
-                logger.LogWarning("Collection Sync Provider '{ProviderId}' not found.", collection.ContentSyncProviderId);
-                return;
+                await SyncProviderMembershipAsync(collection, collection.ContentSyncProviderId, collection.ContentSyncExternalId, cancellationToken);
             }
-
-            var collectionIsEmpty = existingMediaIds.Count == 0;
-
-            if (provider is ILibraryCollectionSyncProvider libraryProvider)
-            {
-                var found = await libraryProvider.FindInLibraryAsync(
-                    new LibraryCollectionSyncRequest(collection.Id, collection.ContentSyncExternalId!, collection.LibraryId), cancellationToken);
-                await FillBlankDescriptionAsync(provider, collection.Id, collection.Description, collection.ContentSyncExternalId!, cancellationToken);
-
-                await collectionRepo.TouchContentSyncedAtAsync(collection.Id);
-
-                var themed = found.ToHashSet();
-                themed.ExceptWith(await collectionRepo.GetExcludedMediaIdsAsync(collection.Id));
-                if (themed.Count == 0)
-                {
-                    if (collectionIsEmpty)
-                    {
-                        await adminNotifications.RaiseAsync(AdminNotificationSeverity.Warning,
-                            $"'{collection.Title}' found nothing in your library for its theme",
-                            "The AI Theme looks for titles TMDB tags with the theme and checks the titles whose descriptions come closest to it. Name the occasion itself (e.g. \"Halloween\"), and check that AI Settings has an embedding model and the nightly task has described your titles.");
-                    }
-                    return;
-                }
-
-                await ReconcileMembershipAsync(collection.Id, collection.Title, collection.MirrorList, themed, existingMediaIds);
-                return;
-            }
-
-            // The provider contract has no token, so the fetch itself runs to
-            // completion; checkpoint on either side so a cancel between the fetch
-            // and the (possibly second) description call is honored.
-            cancellationToken.ThrowIfCancellationRequested();
-            var externalItems = await provider.FetchItemsAsync(collection.ContentSyncExternalId!);
-            if (externalItems == null || !externalItems.Any())
-            {
-                if (collectionIsEmpty)
-                {
-                    await adminNotifications.RaiseAsync(AdminNotificationSeverity.Warning,
-                        $"'{collection.Title}' got no titles from the AI",
-                        "The AI List works best for a specific franchise or shared universe (e.g. \"Marvel Cinematic Universe\"). A broad genre or mood (e.g. \"kung fu movies\") often returns nothing — build those with a Smart Collection instead.");
-                }
-                return;
-            }
-
-            var membership = externalItems.Select(x => new CollectionMembershipEntry
-            {
-                TmdbId = x.TmdbId,
-                ImdbId = x.ImdbId,
-                MediaType = x.MediaType,
-                Title = x.Title,
-                Year = x.Year,
-                ShowTitle = x.ShowTitle,
-                SeasonNumber = x.SeasonNumber
-            }).ToList();
-            await collectionRepo.UpdateContentSyncCacheAsync(collection.Id, JsonSerializer.Serialize(membership));
-
-            await FillBlankDescriptionAsync(provider, collection.Id, collection.Description, collection.ContentSyncExternalId!, cancellationToken);
-
-            var tmdbIds = externalItems.Where(x => !string.IsNullOrEmpty(x.TmdbId)).Select(x => x.TmdbId!).ToList();
-            var imdbIds = externalItems.Where(x => !string.IsNullOrEmpty(x.ImdbId)).Select(x => x.ImdbId!).ToList();
-
-            var matchedIds = new HashSet<Guid>(await mediaRepo.GetMediaIdsByExternalIdsAsync(tmdbIds, imdbIds));
-
-            if (membership.Any(NeedsTitleMatch))
-            {
-                var candidates = await mediaRepo.GetCollectionMatchCandidatesAsync(collection.LibraryId);
-                foreach (var id in CollectionMembershipResolver.Resolve(membership.Where(NeedsTitleMatch), candidates))
-                {
-                    matchedIds.Add(id);
-                }
-            }
-
-            var excludedIds = await collectionRepo.GetExcludedMediaIdsAsync(collection.Id);
-            matchedIds.ExceptWith(excludedIds);
-
-            if (matchedIds.Count == 0)
-            {
-                if (collectionIsEmpty)
-                {
-                    await adminNotifications.RaiseAsync(AdminNotificationSeverity.Warning,
-                        $"'{collection.Title}' matched nothing in your library",
-                        $"The AI listed {externalItems.Count} title(s) for this collection, but none matched an item in your library. Check the description names the right franchise, or that the titles are in a scanned library.");
-                }
-                return;
-            }
-
-            await ReconcileMembershipAsync(collection.Id, collection.Title, collection.MirrorList, matchedIds, existingMediaIds);
         }
         catch (Exception ex)
         {
             logger.LogError(ex, "Failed to sync content for collection '{Title}'.", collection.Title);
         }
+    }
+
+    private async Task SyncSmartMembershipAsync(SyncTarget collection, string rulesJson)
+    {
+        var existingMediaIds = await collectionRepo.GetCollectionMediaIdsAsync(collection.Id);
+        var ruleMatches = await EvaluateSmartMembership(rulesJson, collection.SmartMediaType, collection.LibraryId);
+        var excluded = await collectionRepo.GetExcludedMediaIdsAsync(collection.Id);
+        ruleMatches.ExceptWith(excluded);
+        await ReconcileMembershipAsync(collection.Id, collection.Title, true, ruleMatches, existingMediaIds);
+        await collectionRepo.TouchContentSyncedAtAsync(collection.Id);
+    }
+
+    private async Task SyncProviderMembershipAsync(SyncTarget collection, string providerId, string externalId, CancellationToken cancellationToken)
+    {
+        var existingMediaIds = await collectionRepo.GetCollectionMediaIdsAsync(collection.Id);
+
+        var provider = providers.FirstOrDefault(p => p.Id == providerId);
+        if (provider == null)
+        {
+            logger.LogWarning("Collection Sync Provider '{ProviderId}' not found.", providerId);
+            return;
+        }
+
+        var collectionIsEmpty = existingMediaIds.Count == 0;
+
+        if (provider is ILibraryCollectionSyncProvider libraryProvider)
+        {
+            var found = await libraryProvider.FindInLibraryAsync(
+                new LibraryCollectionSyncRequest(collection.Id, externalId, collection.LibraryId), cancellationToken);
+            await FillBlankDescriptionAsync(provider, collection.Id, collection.Description, externalId, cancellationToken);
+
+            await collectionRepo.TouchContentSyncedAtAsync(collection.Id);
+
+            var themed = found.ToHashSet();
+            themed.ExceptWith(await collectionRepo.GetExcludedMediaIdsAsync(collection.Id));
+            if (themed.Count == 0)
+            {
+                if (collectionIsEmpty)
+                {
+                    await adminNotifications.RaiseAsync(AdminNotificationSeverity.Warning,
+                        $"'{collection.Title}' found nothing in your library for its theme",
+                        "The AI Theme looks for titles TMDB tags with the theme and checks the titles whose descriptions come closest to it. Name the occasion itself (e.g. \"Halloween\"), and check that AI Settings has an embedding model and the nightly task has described your titles.");
+                }
+                return;
+            }
+
+            await ReconcileMembershipAsync(collection.Id, collection.Title, collection.MirrorList, themed, existingMediaIds);
+            return;
+        }
+
+        // The provider contract has no token, so the fetch itself runs to
+        // completion; checkpoint on either side so a cancel between the fetch
+        // and the (possibly second) description call is honored.
+        cancellationToken.ThrowIfCancellationRequested();
+        var externalItems = await provider.FetchItemsAsync(externalId);
+        if (externalItems == null || !externalItems.Any())
+        {
+            if (collectionIsEmpty)
+            {
+                await adminNotifications.RaiseAsync(AdminNotificationSeverity.Warning,
+                    $"'{collection.Title}' got no titles from the AI",
+                    "The AI List works best for a specific franchise or shared universe (e.g. \"Marvel Cinematic Universe\"). A broad genre or mood (e.g. \"kung fu movies\") often returns nothing — build those with a Smart Collection instead.");
+            }
+            return;
+        }
+
+        var membership = externalItems.Select(x => new CollectionMembershipEntry
+        {
+            TmdbId = x.TmdbId,
+            ImdbId = x.ImdbId,
+            MediaType = x.MediaType,
+            Title = x.Title,
+            Year = x.Year,
+            ShowTitle = x.ShowTitle,
+            SeasonNumber = x.SeasonNumber
+        }).ToList();
+        await collectionRepo.UpdateContentSyncCacheAsync(collection.Id, JsonSerializer.Serialize(membership));
+
+        await FillBlankDescriptionAsync(provider, collection.Id, collection.Description, externalId, cancellationToken);
+
+        var tmdbIds = externalItems.Select(x => x.TmdbId).OfType<string>().Where(id => id.Length > 0).ToList();
+        var imdbIds = externalItems.Select(x => x.ImdbId).OfType<string>().Where(id => id.Length > 0).ToList();
+
+        var matchedIds = new HashSet<Guid>(await mediaRepo.GetMediaIdsByExternalIdsAsync(tmdbIds, imdbIds));
+
+        if (membership.Any(NeedsTitleMatch))
+        {
+            var candidates = await mediaRepo.GetCollectionMatchCandidatesAsync(collection.LibraryId);
+            foreach (var id in CollectionMembershipResolver.Resolve(membership.Where(NeedsTitleMatch), candidates))
+            {
+                matchedIds.Add(id);
+            }
+        }
+
+        var excludedIds = await collectionRepo.GetExcludedMediaIdsAsync(collection.Id);
+        matchedIds.ExceptWith(excludedIds);
+
+        if (matchedIds.Count == 0)
+        {
+            if (collectionIsEmpty)
+            {
+                await adminNotifications.RaiseAsync(AdminNotificationSeverity.Warning,
+                    $"'{collection.Title}' matched nothing in your library",
+                    $"The AI listed {externalItems.Count} title(s) for this collection, but none matched an item in your library. Check the description names the right franchise, or that the titles are in a scanned library.");
+            }
+            return;
+        }
+
+        await ReconcileMembershipAsync(collection.Id, collection.Title, collection.MirrorList, matchedIds, existingMediaIds);
     }
 
     private async Task FillBlankDescriptionAsync(ICollectionSyncProvider provider, Guid collectionId, string? description, string externalId, CancellationToken cancellationToken)
