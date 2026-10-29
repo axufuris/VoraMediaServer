@@ -28,8 +28,9 @@ public class PostgresThemeCollectionTests(PostgresDatabase database) : IClassFix
         var hocusPocus = new Movie { Title = "Hocus Pocus", LibraryId = library.Id, Keywords = new() { "witch", "halloween" } };
         var gone = new Movie { Title = "Trick 'r Treat", LibraryId = library.Id, Keywords = new() { "halloween" }, MissingSince = DateTime.UtcNow };
         var untagged = new Movie { Title = "Saw", LibraryId = library.Id, Keywords = new() { "slasher" } };
-        var elsewhere = new Movie { Title = "Halloween", LibraryId = Guid.NewGuid(), Keywords = new() { "halloween" } };
-        db.AddRange(library, hocusPocus, gone, untagged, elsewhere);
+        var otherLibrary = new MediaLibrary { Name = "Kids", Type = LibraryType.Movie, FolderPaths = new List<string> { "/kids" } };
+        var elsewhere = new Movie { Title = "Halloween", LibraryId = otherLibrary.Id, Keywords = new() { "halloween" } };
+        db.AddRange(library, otherLibrary, hocusPocus, gone, untagged, elsewhere);
         await db.SaveChangesAsync(TestContext.Current.CancellationToken);
 
         var found = await new CollectionThemeRepository(db).FindByKeywordsAsync(new[] { "halloween", "trick or treating" }, library.Id);
