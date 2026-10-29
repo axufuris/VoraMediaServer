@@ -346,6 +346,8 @@ public static class ServiceRegistrationExtensions
         services.AddScoped<IAdminNotificationRepository, AdminNotificationRepository>();
         services.AddScoped<ICalendarRepository, CalendarRepository>();
         services.AddScoped<ICollectionRepository, CollectionRepository>();
+        services.AddScoped<ICollectionThemeRepository, CollectionThemeRepository>();
+        services.AddScoped<ITitleKeywordRepository, TitleKeywordRepository>();
         services.AddScoped<IDeviceRepository, DeviceRepository>();
         services.AddScoped<IDiscoveryRepository, DiscoveryRepository>();
         services.AddScoped<IWatchlistRepository, WatchlistRepository>();
@@ -401,6 +403,8 @@ public static class ServiceRegistrationExtensions
         services.AddScoped<ICalendarManager, CalendarManager>();
         services.AddScoped<ICollectionManager, CollectionManager>();
         services.AddScoped<ICollectionDescriptionService, CollectionDescriptionService>();
+        services.AddScoped<ITitleKeywordService, TitleKeywordService>();
+        services.AddScoped<IServerCalendar, ServerCalendar>();
         services.AddScoped<IDashboardManager, DashboardManager>();
         services.AddScoped<IDeviceManager, DeviceManager>();
         services.AddScoped<IDiscoveryManager, DiscoveryManager>();

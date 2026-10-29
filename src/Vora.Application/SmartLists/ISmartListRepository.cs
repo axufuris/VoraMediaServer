@@ -21,7 +21,7 @@ public interface ISmartListRepository
         List<string>? allowedTvRatings = null,
         bool blockUnrated = false);
 
-    Task<List<SmartListClientVM>> GetActiveClientListsAsync(bool isAdmin);
+    Task<List<SmartListClientVM>> GetActiveClientListsAsync(bool isAdmin, DateOnly today);
     Task<List<SmartListAdminVM>> GetAllAdminListsAsync();
     Task<SmartList?> GetListByIdAsync(Guid id);
     Task CreateListAsync(SmartList list);

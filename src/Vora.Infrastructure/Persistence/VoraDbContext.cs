@@ -69,6 +69,8 @@ public class VoraDbContext : DbContext
 
     public DbSet<Collection> Collections { get; set; }
     public DbSet<CollectionItem> CollectionItems { get; set; }
+    public DbSet<CollectionTheme> CollectionThemes { get; set; }
+    public DbSet<CollectionThemeVerdict> CollectionThemeVerdicts { get; set; }
     public DbSet<CollectionArtwork> CollectionArtwork { get; set; }
 
     public DbSet<User> Users { get; set; }
@@ -736,6 +738,34 @@ public class VoraDbContext : DbContext
                     j.HasKey(ci => new { ci.CollectionId, ci.MediaItemId });
                     j.ToTable("CollectionItems");
                 });
+
+        modelBuilder.Entity<CollectionTheme>(entity =>
+        {
+            entity.HasKey(e => e.CollectionId);
+            entity.Property(e => e.Theme).IsRequired().HasMaxLength(128);
+            entity.Property(e => e.Profile).IsRequired().HasMaxLength(4000);
+            entity.Property(e => e.EmbeddingModel).HasMaxLength(64);
+
+            entity.HasOne(e => e.Collection)
+                  .WithOne()
+                  .HasForeignKey<CollectionTheme>(e => e.CollectionId)
+                  .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<CollectionThemeVerdict>(entity =>
+        {
+            entity.HasKey(e => new { e.CollectionId, e.MediaItemId });
+
+            entity.HasOne(e => e.Collection)
+                  .WithMany()
+                  .HasForeignKey(e => e.CollectionId)
+                  .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasOne(e => e.MediaItem)
+                  .WithMany()
+                  .HasForeignKey(e => e.MediaItemId)
+                  .OnDelete(DeleteBehavior.Cascade);
+        });
     }
 
     private static void ConfigureUsers(ModelBuilder modelBuilder, ListValueConverters converters)

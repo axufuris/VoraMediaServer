@@ -8,6 +8,7 @@ const HIDDEN_LABEL: Record<CollectionHiddenReason, string> = {
     Empty: 'Hidden · empty',
     AutomaticCollectionsHidden: 'Hidden · automatic off',
     BelowMinimumSize: 'Hidden · below minimum',
+    OutOfSeason: 'Hidden · out of season',
 };
 
 interface LibraryCollectionGridProps {

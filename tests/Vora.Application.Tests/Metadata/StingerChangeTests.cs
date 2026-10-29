@@ -76,4 +76,16 @@ public class StingerChangeTests
         episode.MarkersAnalyzedAt.Should().Be(Analyzed);
         episode.LastOverlayGeneratedAt.Should().BeNull();
     }
+
+    [Fact]
+    public async Task A_refresh_stores_the_keywords_tmdb_gave_and_one_without_any_keeps_those_it_has()
+    {
+        var movie = Movie();
+
+        await _mapper.ApplyTextMetadataAsync(movie, new MetadataResult { Title = movie.Title, Keywords = new List<string> { "a cappella", "sequel" } }, false, "tmdb_metadata", "TMDB");
+        movie.Keywords.Should().Equal("a cappella", "sequel");
+
+        await _mapper.ApplyTextMetadataAsync(movie, new MetadataResult { Title = movie.Title }, false, "tvdb_metadata", "TVDB");
+        movie.Keywords.Should().Equal("a cappella", "sequel");
+    }
 }

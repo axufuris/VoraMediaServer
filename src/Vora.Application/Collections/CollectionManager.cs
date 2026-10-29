@@ -2,6 +2,7 @@
 using Vora.Application.Collections.Dtos;
 using Vora.Application.Collections.Requests;
 using Vora.Application.Collections.ViewModels;
+using Vora.Application.Settings;
 using Vora.Application.Tasks;
 using Vora.Domain.Entities.Library;
 using Vora.Domain.Enums;
@@ -17,7 +18,7 @@ public interface ICollectionManager
     Task AddMediaToCollectionAsync(Guid collectionId, Guid mediaItemId);
     Task<IEnumerable<CollectionSummaryVM>> GetLibraryCollectionsAsync(Guid libraryId, bool hasAllAccess, List<Guid> allowedLibs, bool includeHidden = false);
     Task<IEnumerable<CollectionSummaryVM>> GetAllCollectionsAsync(bool hasAllAccess, List<Guid> allowedLibs);
-    Task<IEnumerable<CollectionSummaryVM>> GetGlobalCollectionsAsync(bool hasAllAccess, List<Guid> allowedLibs);
+    Task<IEnumerable<CollectionSummaryVM>> GetGlobalCollectionsAsync(bool hasAllAccess, List<Guid> allowedLibs, bool includeHidden = false);
     Task UpdateCollectionAsync(Guid id, UpdateCollectionRequest request);
     Task SetItemInUniverseYearAsync(Guid collectionId, Guid mediaItemId, double? year, bool locked);
     Task RemoveMediaFromCollectionAsync(Guid collectionId, Guid mediaItemId);
@@ -30,12 +31,14 @@ public class CollectionManager : ICollectionManager
     private readonly ICollectionRepository _repository;
     private readonly ITaskQueueManager _taskQueueManager;
     private readonly IClientNotifier _notifier;
+    private readonly IServerCalendar _calendar;
 
-    public CollectionManager(ICollectionRepository repository, ITaskQueueManager taskQueueManager, IClientNotifier notifier)
+    public CollectionManager(ICollectionRepository repository, ITaskQueueManager taskQueueManager, IClientNotifier notifier, IServerCalendar calendar)
     {
         _repository = repository;
         _taskQueueManager = taskQueueManager;
         _notifier = notifier;
+        _calendar = calendar;
     }
 
     public async Task<List<CollectionScheduleDto>> GetContentSyncCollectionsAsync()
@@ -106,6 +109,7 @@ public class CollectionManager : ICollectionManager
             SortTitle = request.SortTitle,
             VisibleStartDate = request.VisibleStartDate.HasValue ? DateTime.SpecifyKind(request.VisibleStartDate.Value, DateTimeKind.Utc) : null,
             VisibleEndDate = request.VisibleEndDate.HasValue ? DateTime.SpecifyKind(request.VisibleEndDate.Value, DateTimeKind.Utc) : null,
+            VisibleEveryYear = request.VisibleEveryYear,
             SystemGenerated = request.SystemGenerated,
             LibraryId = request.LibraryId,
             ContentSyncProviderId = request.ContentSyncProviderId,
@@ -156,6 +160,7 @@ public class CollectionManager : ICollectionManager
         collection.SmartMediaType = request.SmartMediaType;
         collection.VisibleStartDate = request.VisibleStartDate.HasValue ? DateTime.SpecifyKind(request.VisibleStartDate.Value, DateTimeKind.Utc) : null;
         collection.VisibleEndDate = request.VisibleEndDate.HasValue ? DateTime.SpecifyKind(request.VisibleEndDate.Value, DateTimeKind.Utc) : null;
+        collection.VisibleEveryYear = request.VisibleEveryYear;
 
         if (request.MakeGlobal)
         {
@@ -206,11 +211,12 @@ public class CollectionManager : ICollectionManager
     public async Task<IEnumerable<CollectionSummaryVM>> GetLibraryCollectionsAsync(Guid libraryId, bool hasAllAccess, List<Guid> allowedLibs, bool includeHidden = false)
     {
         var minimum = await _repository.GetLibraryMinimumCollectionSizeAsync(libraryId);
+        var today = await _calendar.TodayAsync();
 
         var collections = (await _repository.GetAllProjectedAsync(CollectionSummaryVM.LibraryProjection(libraryId), libraryId, false, hasAllAccess, allowedLibs)).ToList();
         foreach (var collection in collections)
         {
-            collection.HiddenReason = CollectionVisibility.HiddenReason(collection.SystemGenerated, collection.ItemCount, minimum);
+            collection.HiddenReason = CollectionVisibility.HiddenReason(collection.SystemGenerated, collection.ItemCount, minimum, InSeason(collection, today));
         }
 
         return InListOrder(collections.Where(c => includeHidden || c.HiddenReason == null));
@@ -222,11 +228,20 @@ public class CollectionManager : ICollectionManager
         return InListOrder(collections);
     }
 
-    public async Task<IEnumerable<CollectionSummaryVM>> GetGlobalCollectionsAsync(bool hasAllAccess, List<Guid> allowedLibs)
+    public async Task<IEnumerable<CollectionSummaryVM>> GetGlobalCollectionsAsync(bool hasAllAccess, List<Guid> allowedLibs, bool includeHidden = false)
     {
-        var collections = await _repository.GetAllProjectedAsync(CollectionSummaryVM.StandardProjection, null, true, hasAllAccess, allowedLibs);
-        return InListOrder(collections);
+        var today = await _calendar.TodayAsync();
+        var collections = (await _repository.GetAllProjectedAsync(CollectionSummaryVM.StandardProjection, null, true, hasAllAccess, allowedLibs)).ToList();
+        foreach (var collection in collections)
+        {
+            collection.HiddenReason = InSeason(collection, today) ? null : CollectionHiddenReason.OutOfSeason;
+        }
+
+        return InListOrder(collections.Where(c => includeHidden || c.HiddenReason == null));
     }
+
+    private static bool InSeason(CollectionSummaryVM collection, DateOnly today) =>
+        CollectionSeason.IsOpen(collection.VisibleStartDate, collection.VisibleEndDate, collection.VisibleEveryYear, today);
 
     private static IEnumerable<CollectionSummaryVM> InListOrder(IEnumerable<CollectionSummaryVM> collections) =>
         collections

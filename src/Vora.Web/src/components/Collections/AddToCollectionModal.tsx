@@ -35,7 +35,7 @@ export default function AddToCollectionModal({
             const fetchCollections = () => {
                 setLoading(true);
                 const fetchPromise = mediaType === 'Episode' || !libraryId
-                    ? collectionService.getGlobalCollections(serverId)
+                    ? collectionService.getGlobalCollections(serverId, true)
                     : collectionService.getLibraryCollections(libraryId, serverId, true);
 
                 fetchPromise

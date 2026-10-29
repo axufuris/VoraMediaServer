@@ -1,4 +1,5 @@
 using Vora.Application.Media;
+using Vora.Application.Settings;
 using Vora.Application.Search.ViewModels;
 
 namespace Vora.Application.Search;
@@ -17,7 +18,7 @@ public interface ISearchManager
         CancellationToken cancellationToken = default);
 }
 
-public class SearchManager(ISearchRepository repository, IMusicManager musicManager) : ISearchManager
+public class SearchManager(ISearchRepository repository, IMusicManager musicManager, IServerCalendar calendar) : ISearchManager
 {
     private const int MinimumQueryLength = 3;
 
@@ -43,7 +44,7 @@ public class SearchManager(ISearchRepository repository, IMusicManager musicMana
         cancellationToken.ThrowIfCancellationRequested();
         var actors = await repository.SearchActorsAsync(query, limitPerCategory);
         cancellationToken.ThrowIfCancellationRequested();
-        var collections = await repository.SearchCollectionsAsync(query, limitPerCategory, hasAllAccess, allowedLibs);
+        var collections = await repository.SearchCollectionsAsync(query, limitPerCategory, hasAllAccess, allowedLibs, await calendar.TodayAsync());
         cancellationToken.ThrowIfCancellationRequested();
 
         var musicAccess = new MusicAccessFilter

@@ -15,12 +15,13 @@ export interface CollectionSummary {
     sortTitle?: string;
     visibleStartDate?: string;
     visibleEndDate?: string;
+    visibleEveryYear?: boolean;
     systemGenerated: boolean;
     // Only sent to admins (includeHidden): why viewers don't see it.
     hiddenReason?: CollectionHiddenReason | null;
 }
 
-export type CollectionHiddenReason = 'Empty' | 'AutomaticCollectionsHidden' | 'BelowMinimumSize';
+export type CollectionHiddenReason = 'Empty' | 'AutomaticCollectionsHidden' | 'BelowMinimumSize' | 'OutOfSeason';
 
 export interface CollectionDetails {
     id: string;
@@ -45,6 +46,7 @@ export interface CollectionDetails {
     sortTitle?: string;
     visibleStartDate?: string;
     visibleEndDate?: string;
+    visibleEveryYear?: boolean;
     systemGenerated: boolean;
     contentSyncProviderId?: string;
     contentSyncExternalId?: string;
@@ -100,8 +102,12 @@ export const collectionService = {
         return response.data;
     },
 
-    getGlobalCollections: async (serverId?: string): Promise<CollectionSummary[]> => {
-        const response = await apiClient.get<CollectionSummary[]>('/collections/global', { serverId });
+    // includeHidden is honoured for admins only, as for a library's collections.
+    getGlobalCollections: async (serverId?: string, includeHidden = false): Promise<CollectionSummary[]> => {
+        const response = await apiClient.get<CollectionSummary[]>('/collections/global', {
+            serverId,
+            params: includeHidden ? { includeHidden: true } : undefined,
+        });
         return response.data;
     }
 };

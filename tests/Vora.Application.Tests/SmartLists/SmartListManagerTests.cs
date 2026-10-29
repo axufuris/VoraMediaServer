@@ -51,7 +51,7 @@ public class SmartListManagerTests
     {
         _settings.EnableLiveTv = false;
         _settings.EnablePodcasts = false;
-        _repository.GetActiveClientListsAsync(false).Returns(new List<SmartListClientVM>
+        _repository.GetActiveClientListsAsync(false, Arg.Any<DateOnly>()).Returns(new List<SmartListClientVM>
         {
             Client(SmartListSource.Library),
             Client(SmartListSource.FavoriteChannels),

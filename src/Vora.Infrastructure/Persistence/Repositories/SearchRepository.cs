@@ -65,7 +65,7 @@ public class SearchRepository(VoraDbContext context) : ISearchRepository
             .ToListAsync();
     }
 
-    public async Task<IEnumerable<CollectionSearchResultVM>> SearchCollectionsAsync(string query, int limit, bool hasAllAccess, List<Guid> allowedLibs)
+    public async Task<IEnumerable<CollectionSearchResultVM>> SearchCollectionsAsync(string query, int limit, bool hasAllAccess, List<Guid> allowedLibs, DateOnly today)
     {
         var dbQuery = context.Collections.AsNoTracking().AsQueryable();
 
@@ -78,6 +78,8 @@ public class SearchRepository(VoraDbContext context) : ISearchRepository
             l.Id == c.LibraryId
             && l.MinimumCollectionSize > CollectionVisibility.HideAutomatic
             && c.Items.Count >= l.MinimumCollectionSize)));
+
+        dbQuery = dbQuery.InSeason(today);
 
         var searchPattern = $"%{query}%";
         return await dbQuery

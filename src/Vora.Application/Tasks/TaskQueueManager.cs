@@ -1303,6 +1303,12 @@ public class TaskQueueManager : ITaskQueueManager
             await RunStepAsync("Fetching collection descriptions…", () => collectionDescriptions.FillAwaitingAsync(libraryId, ct));
         }
 
+        var titleKeywords = sp.GetRequiredService<Vora.Application.Metadata.ITitleKeywordService>();
+        if ((libraryType == LibraryType.Movie || libraryType == LibraryType.TvShow) && await titleKeywords.HasAwaitingAsync(libraryId))
+        {
+            await RunStepAsync("Fetching keywords…", () => titleKeywords.FillAwaitingAsync(libraryId, ct));
+        }
+
         // Straight after the scan rather than waiting for the night, so a newly
         // added explicit album is labelled before a restricted profile finds it.
         if (libraryVm?.Type == nameof(LibraryType.Music))

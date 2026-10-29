@@ -12,6 +12,7 @@ public class CollectionSummaryVM
     public string? SortTitle { get; set; }
     public DateTime? VisibleStartDate { get; set; }
     public DateTime? VisibleEndDate { get; set; }
+    public bool VisibleEveryYear { get; set; }
     public bool SystemGenerated { get; set; }
     public CollectionHiddenReason? HiddenReason { get; set; }
 
@@ -25,6 +26,7 @@ public class CollectionSummaryVM
             SortTitle = c.SortTitle,
             VisibleStartDate = c.VisibleStartDate,
             VisibleEndDate = c.VisibleEndDate,
+            VisibleEveryYear = c.VisibleEveryYear,
             SystemGenerated = c.SystemGenerated
         };
 
@@ -37,6 +39,7 @@ public class CollectionSummaryVM
             SortTitle = c.SortTitle,
             VisibleStartDate = c.VisibleStartDate,
             VisibleEndDate = c.VisibleEndDate,
+            VisibleEveryYear = c.VisibleEveryYear,
             SystemGenerated = c.SystemGenerated,
             ItemCount = c.Items.Count(i => i.LibraryId == libraryId)
         };

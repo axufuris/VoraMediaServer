@@ -15,5 +15,5 @@ public interface ISearchRepository
         bool blockUnrated);
 
     Task<IEnumerable<ActorSearchResultVM>> SearchActorsAsync(string query, int limit);
-    Task<IEnumerable<CollectionSearchResultVM>> SearchCollectionsAsync(string query, int limit, bool hasAllAccess, List<Guid> allowedLibs);
+    Task<IEnumerable<CollectionSearchResultVM>> SearchCollectionsAsync(string query, int limit, bool hasAllAccess, List<Guid> allowedLibs, DateOnly today);
 }

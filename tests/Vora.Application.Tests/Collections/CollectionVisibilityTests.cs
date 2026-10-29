@@ -21,6 +21,16 @@ public class CollectionVisibilityTests
     }
 
     [Theory]
+    [InlineData(false, 5, 3, CollectionHiddenReason.OutOfSeason)]
+    [InlineData(true, 5, 3, CollectionHiddenReason.OutOfSeason)]
+    [InlineData(true, 1, 3, CollectionHiddenReason.OutOfSeason)]
+    [InlineData(false, 0, 3, CollectionHiddenReason.Empty)]
+    public void Any_collection_out_of_its_season_is_hidden_and_an_empty_one_says_so_first(bool systemGenerated, int items, int minimum, CollectionHiddenReason expected)
+    {
+        CollectionVisibility.HiddenReason(systemGenerated, items, minimum, inSeason: false).Should().Be(expected);
+    }
+
+    [Theory]
     [InlineData(null, 3, 3)]
     [InlineData(null, 7, 7)]
     [InlineData(0, 3, 0)]

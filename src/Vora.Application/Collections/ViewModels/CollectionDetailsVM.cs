@@ -26,6 +26,7 @@ public class CollectionDetailsVM
     public string? SortTitle { get; set; }
     public DateTime? VisibleStartDate { get; set; }
     public DateTime? VisibleEndDate { get; set; }
+    public bool VisibleEveryYear { get; set; }
     public bool SystemGenerated { get; set; }
     public int? TmdbId { get; set; }
     public string? ContentSyncProviderId { get; set; }
@@ -65,6 +66,7 @@ public class CollectionDetailsVM
             SortTitle = c.SortTitle,
             VisibleStartDate = c.VisibleStartDate,
             VisibleEndDate = c.VisibleEndDate,
+            VisibleEveryYear = c.VisibleEveryYear,
             SystemGenerated = c.SystemGenerated,
             TmdbId = c.TmdbId,
             LockedFields = c.LockedFields,

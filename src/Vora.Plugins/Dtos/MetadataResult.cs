@@ -36,6 +36,7 @@ public class MetadataResult
 
     public bool HasMidCreditsStinger { get; set; } = false;
     public bool HasPostCreditsStinger { get; set; } = false;
+    public List<string>? Keywords { get; set; }
 
     public CollectionResult? Collection { get; set; }
     public List<int> GenreIds { get; set; } = new List<int>();

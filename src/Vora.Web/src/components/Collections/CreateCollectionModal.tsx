@@ -8,6 +8,9 @@ import { useDialog } from '../../dialogs';
 import { Modal, ModalHeader, ModalBody, ModalFooter } from '../Common/Modal';
 import RuleTreeEditor from '../Common/RuleTreeEditor';
 import { safeMediaUrl } from '../../utils/safeUrl';
+import SeasonalVisibilityFields from './SeasonalVisibilityFields';
+import ContentProviderHelp from './ContentProviderHelp';
+import { seasonalWindowFrom, seasonalWindowRequest, type SeasonalWindow } from './seasonalWindow';
 
 const SMART_CONTENT = '__smart__';
 
@@ -32,8 +35,7 @@ export default function CreateCollectionModal({
     const [autoSyncChronology, setAutoSyncChronology] = useState(false);
 
     const [sortTitle, setSortTitle] = useState('');
-    const [visibleStartDate, setVisibleStartDate] = useState('');
-    const [visibleEndDate, setVisibleEndDate] = useState('');
+    const [season, setSeason] = useState<SeasonalWindow>(() => seasonalWindowFrom());
     const [chronologyProviders, setChronologyProviders] = useState<PluginOptionVM[]>([]);
     const [syncProviders, setSyncProviders] = useState<PluginOptionVM[]>([]);
     const [contentSyncProviderId, setContentSyncProviderId] = useState('');
@@ -63,8 +65,7 @@ export default function CreateCollectionModal({
             setActiveSection('general');
 
             setSortTitle('');
-            setVisibleStartDate('');
-            setVisibleEndDate('');
+            setSeason(seasonalWindowFrom());
 
             setContentSyncProviderId('');
             setContentSyncExternalId('');
@@ -101,8 +102,7 @@ export default function CreateCollectionModal({
                 externalListId: sortProviderId ? (externalListId.trim() || undefined) : undefined,
                 autoSyncChronology: sortProviderId ? autoSyncChronology : false,
                 sortTitle: sortTitle.trim() || undefined,
-                visibleStartDate: visibleStartDate || undefined,
-                visibleEndDate: visibleEndDate || undefined,
+                ...seasonalWindowRequest(season),
                 libraryId: isGlobal ? undefined : activeTab,
                 contentSyncProviderId: contentSyncProviderId === SMART_CONTENT ? undefined : (contentSyncProviderId || undefined),
                 contentSyncExternalId: contentSyncProviderId === SMART_CONTENT ? undefined : (contentSyncExternalId || undefined),
@@ -150,8 +150,8 @@ export default function CreateCollectionModal({
                     <div className="space-y-5">
 
                     <div>
-                        <label className="block text-sm font-medium text-[var(--vora-text-muted)] mb-1">Title</label>
-                        <input required autoFocus type="text" value={title} onChange={e => setTitle(e.target.value)} className="w-full bg-[var(--vora-bg-raised)] border border-[var(--vora-border-subtle)] rounded-md p-2 text-[var(--vora-text-primary)] focus:border-[var(--vora-accent-500)] outline-none" />
+                        <label htmlFor="create-collection-title" className="block text-sm font-medium text-[var(--vora-text-muted)] mb-1">Title</label>
+                        <input id="create-collection-title" required autoFocus type="text" value={title} onChange={e => setTitle(e.target.value)} className="w-full bg-[var(--vora-bg-raised)] border border-[var(--vora-border-subtle)] rounded-md p-2 text-[var(--vora-text-primary)] focus:border-[var(--vora-accent-500)] outline-none" />
                     </div>
 
                     <div>
@@ -173,30 +173,7 @@ export default function CreateCollectionModal({
 
                     <div className="p-4 bg-[var(--vora-bg-raised)]/50 border border-[var(--vora-border-subtle)] rounded-lg space-y-4">
                         <h3 className="text-[var(--vora-text-secondary)] font-bold text-sm tracking-wide uppercase">Seasonal Visibility (Optional)</h3>
-                        <p className="text-xs text-[var(--vora-text-muted)] leading-relaxed">
-                            Set a start and end date to automatically hide this collection during the off-season. If left blank, it is always visible.
-                        </p>
-
-                        <div className="grid grid-cols-2 gap-4">
-                            <div>
-                                <label className="block text-sm font-medium text-[var(--vora-text-muted)] mb-1">Visible Start Date</label>
-                                <input
-                                    type="date"
-                                    value={visibleStartDate}
-                                    onChange={e => setVisibleStartDate(e.target.value)}
-                                    className="w-full bg-[var(--vora-bg-canvas)] border border-[var(--vora-border-subtle)] rounded-md p-2 text-[var(--vora-text-primary)] outline-none color-scheme-dark"
-                                />
-                            </div>
-                            <div>
-                                <label className="block text-sm font-medium text-[var(--vora-text-muted)] mb-1">Visible End Date</label>
-                                <input
-                                    type="date"
-                                    value={visibleEndDate}
-                                    onChange={e => setVisibleEndDate(e.target.value)}
-                                    className="w-full bg-[var(--vora-bg-canvas)] border border-[var(--vora-border-subtle)] rounded-md p-2 text-[var(--vora-text-primary)] outline-none color-scheme-dark"
-                                />
-                            </div>
-                        </div>
+                        <SeasonalVisibilityFields idPrefix="create-collection-season" value={season} onChange={setSeason} />
                     </div>
 
                     <div className="pt-4 border-t border-[var(--vora-border-subtle)]">
@@ -247,11 +224,7 @@ export default function CreateCollectionModal({
                             )}
                         </div>
 
-                        {contentSyncProviderId && contentSyncProviderId !== SMART_CONTENT && syncProviders.find(p => p.id === contentSyncProviderId)?.isAiPlugin && (
-                            <p className="text-xs text-[var(--vora-text-muted)] leading-relaxed mt-2">
-                                Name a specific franchise or shared universe — e.g. <span className="text-[var(--vora-text-secondary)]">Marvel Cinematic Universe</span>, <span className="text-[var(--vora-text-secondary)]">DC Extended Universe</span>, or <span className="text-[var(--vora-text-secondary)]">Star Wars</span>. Every movie and season is pulled in automatically, so the universe name alone is enough (no need to add movies and shows, and don&apos;t narrow it to films only). For a genre or mood like all your kung-fu movies, use a Smart Collection instead.
-                            </p>
-                        )}
+                        <ContentProviderHelp providerId={contentSyncProviderId} />
 
                         {contentSyncProviderId === SMART_CONTENT && (
                             <div className="pt-3 mt-3 border-t border-[var(--vora-border-subtle)]/50 space-y-3">
@@ -277,7 +250,7 @@ export default function CreateCollectionModal({
                                     </label>
                                 </div>
                                 <p className="text-xs text-[var(--vora-text-muted)] leading-relaxed mt-2">
-                                    Remove items from this collection when they're no longer on the external list. Manually added items will also be removed on the next sync.
+                                    Remove titles from this collection when the list or theme no longer has them. Titles you added by hand stay.
                                 </p>
                             </div>
                         )}

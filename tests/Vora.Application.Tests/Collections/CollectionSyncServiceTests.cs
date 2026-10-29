@@ -6,6 +6,8 @@ using Vora.Application.Media.SmartPlaylists;
 using Vora.Application.Notifications;
 using Vora.Application.Tasks;
 using Vora.Domain.Entities.Collections;
+using Vora.Domain.Entities.Library;
+using Vora.Domain.Enums;
 using Vora.Plugins.Interfaces;
 
 namespace Vora.Application.Tests.Collections;
@@ -60,5 +62,71 @@ public class CollectionSyncServiceTests
     {
         var act = async () => await _service.SyncCollectionContentAsync(Guid.NewGuid());
         await act.Should().NotThrowAsync();
+    }
+
+    private ILibraryCollectionSyncProvider ThemeProvider(Guid collectionId, params Guid[] found)
+    {
+        var provider = Substitute.For<ICollectionSyncProvider, ILibraryCollectionSyncProvider>();
+        provider.Id.Returns("openai_theme");
+        var library = (ILibraryCollectionSyncProvider)provider;
+        library.FindInLibraryAsync(Arg.Is<LibraryCollectionSyncRequest>(r => r.CollectionId == collectionId && r.Theme == "Halloween"), Arg.Any<CancellationToken>())
+            .Returns(found);
+        _providers.Add(provider);
+        return library;
+    }
+
+    private void Stored(Guid collectionId, bool mirror, HashSet<Guid> existing, HashSet<Guid> excluded)
+    {
+        _collectionRepo.GetProjectedByIdAsync(collectionId, Arg.Any<System.Linq.Expressions.Expression<Func<Collection, CollectionSyncService.SyncTarget>>>(), Arg.Any<bool>(), Arg.Any<List<Guid>?>())
+            .Returns(new CollectionSyncService.SyncTarget(collectionId, "Halloween Movies", "Spooky.", "openai_theme", "Halloween", null, null, mirror, null));
+        _collectionRepo.GetCollectionMediaIdsAsync(collectionId).Returns(existing);
+        _collectionRepo.GetExcludedMediaIdsAsync(collectionId).Returns(excluded);
+        _collectionRepo.GetManuallyAddedMediaIdsAsync(collectionId).Returns(new HashSet<Guid>());
+    }
+
+    [Fact]
+    public async Task A_theme_collection_takes_what_its_provider_finds_in_the_library_less_what_was_taken_out()
+    {
+        var collectionId = Guid.NewGuid();
+        var (hocusPocus, trickRTreat, saw) = (Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid());
+        var provider = ThemeProvider(collectionId, hocusPocus, trickRTreat, saw);
+        Stored(collectionId, mirror: false, existing: new HashSet<Guid>(), excluded: new HashSet<Guid> { saw });
+
+        await _service.SyncCollectionContentAsync(collectionId, TestContext.Current.CancellationToken);
+
+        await _collectionRepo.Received(1).AddItemsToCollectionAsync(Arg.Is<List<CollectionItem>>(items =>
+            items.Select(i => i.MediaItemId).OrderBy(id => id).SequenceEqual(new[] { hocusPocus, trickRTreat }.OrderBy(id => id))));
+        await _collectionRepo.Received(1).TouchContentSyncedAtAsync(collectionId);
+        await ((ICollectionSyncProvider)provider).DidNotReceive().FetchItemsAsync(Arg.Any<string>());
+        _taskQueue.Received(1).QueueReevaluateCollectionOrder(collectionId);
+    }
+
+    [Fact]
+    public async Task A_mirrored_theme_collection_drops_a_title_its_provider_no_longer_finds()
+    {
+        var collectionId = Guid.NewGuid();
+        var (kept, dropped) = (Guid.NewGuid(), Guid.NewGuid());
+        ThemeProvider(collectionId, kept);
+        Stored(collectionId, mirror: true, existing: new HashSet<Guid> { kept, dropped }, excluded: new HashSet<Guid>());
+
+        await _service.SyncCollectionContentAsync(collectionId, TestContext.Current.CancellationToken);
+
+        await _collectionRepo.Received(1).RemoveItemsFromCollectionAsync(collectionId, Arg.Is<IEnumerable<Guid>>(ids => ids.Single() == dropped));
+        await _collectionRepo.DidNotReceive().AddItemsToCollectionAsync(Arg.Any<List<CollectionItem>>());
+    }
+
+    [Fact]
+    public async Task A_theme_that_finds_nothing_for_an_empty_collection_tells_the_admin()
+    {
+        var collectionId = Guid.NewGuid();
+        ThemeProvider(collectionId);
+        Stored(collectionId, mirror: false, existing: new HashSet<Guid>(), excluded: new HashSet<Guid>());
+
+        await _service.SyncCollectionContentAsync(collectionId, TestContext.Current.CancellationToken);
+
+        await _adminNotifications.Received(1).RaiseAsync(AdminNotificationSeverity.Warning,
+            Arg.Is<string>(title => title.Contains("found nothing")), Arg.Any<string>(), Arg.Any<string?>(), Arg.Any<bool>());
+        await _collectionRepo.Received(1).TouchContentSyncedAtAsync(collectionId);
+        await _collectionRepo.DidNotReceive().AddItemsToCollectionAsync(Arg.Any<List<CollectionItem>>());
     }
 }

@@ -101,6 +101,32 @@ public class TmdbMetadataProvider : IMetadataProvider, IPluginConnectionTest
             : string.Empty;
     }
 
+    public async Task<List<string>?> FetchKeywordsAsync(string tmdbId, bool isShow, CancellationToken cancellationToken = default)
+    {
+        var apiKey = await GetApiKeyAsync();
+        if (string.IsNullOrWhiteSpace(apiKey)) return null;
+
+        using var response = await _httpClient.GetAsync($"{(isShow ? "tv" : "movie")}/{Uri.EscapeDataString(tmdbId)}/keywords?api_key={apiKey}", cancellationToken);
+        if (response.StatusCode == System.Net.HttpStatusCode.NotFound) return new List<string>();
+        if (!response.IsSuccessStatusCode) return null;
+
+        using var doc = JsonDocument.Parse(await response.Content.ReadAsStringAsync(cancellationToken));
+        return KeywordNames(doc.RootElement, isShow);
+    }
+
+    internal static List<string> KeywordNames(JsonElement keywords, bool isShow)
+    {
+        var names = new List<string>();
+        if (!keywords.TryGetProperty(isShow ? "results" : "keywords", out var list) || list.ValueKind != JsonValueKind.Array) return names;
+
+        foreach (var keyword in list.EnumerateArray())
+        {
+            var name = keyword.TryGetProperty("name", out var n) && n.ValueKind == JsonValueKind.String ? n.GetString()?.Trim().ToLowerInvariant() : null;
+            if (!string.IsNullOrEmpty(name) && !names.Contains(name)) names.Add(name);
+        }
+        return names;
+    }
+
     public async Task<MetadataResult?> FetchMovieMetadataAsync(string query, int? year = null, CancellationToken cancellationToken = default)
     {
         var apiKey = await GetApiKeyAsync();
@@ -188,7 +214,7 @@ public class TmdbMetadataProvider : IMetadataProvider, IPluginConnectionTest
             tmdbIdToFetch = tvResults[0].GetProperty("id").GetInt32().ToString();
         }
 
-        var url = $"tv/{tmdbIdToFetch}?api_key={apiKey}&language={lang}&append_to_response=credits,external_ids,content_ratings,videos";
+        var url = $"tv/{tmdbIdToFetch}?api_key={apiKey}&language={lang}&append_to_response=credits,external_ids,content_ratings,videos,keywords";
         var response = await _httpClient.GetAsync(url);
         if (!response.IsSuccessStatusCode) return null;
 
@@ -484,6 +510,11 @@ public class TmdbMetadataProvider : IMetadataProvider, IPluginConnectionTest
                     });
                 }
             }
+        }
+
+        if (el.TryGetProperty("keywords", out var keywordsList))
+        {
+            result.Keywords = KeywordNames(keywordsList, isTv);
         }
 
         if (el.TryGetProperty("keywords", out var keywordsObj) && keywordsObj.TryGetProperty("keywords", out var kwArray))
