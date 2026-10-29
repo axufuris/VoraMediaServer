@@ -881,6 +881,9 @@ public partial class MediaRepository : IMediaRepository
         return await query.Select(projection).FirstOrDefaultAsync();
     }
 
+    internal static IQueryable<MediaItem> TitlesInLibrary(IQueryable<MediaItem> items, Guid libraryId) =>
+        items.Where(m => m.LibraryId == libraryId).Where(MediaCapabilities.IsListedInItsLibrary);
+
     public async Task<IEnumerable<T>> GetAllProjectedAsync<T>(Expression<Func<MediaItem, T>> projection, Guid? libraryId = null, string? libraryType = null, bool hasAllAccess = true, List<Guid>? allowedLibs = null, List<string>? allowedMovieRatings = null, List<string>? allowedTvRatings = null, bool blockUnrated = false)
     {
         var query = _context.MediaItems.AsNoTracking().AsSplitQuery();
@@ -888,7 +891,7 @@ public partial class MediaRepository : IMediaRepository
 
         if (!hasAllAccess && allowedLibs != null) query = query.Where(m => allowedLibs.Contains(m.LibraryId));
 
-        if (libraryId.HasValue) query = query.Where(m => m.LibraryId == libraryId.Value && !(m is Episode) && !(m is Season));
+        if (libraryId.HasValue) query = TitlesInLibrary(query, libraryId.Value);
 
         if (!string.IsNullOrEmpty(libraryType))
         {

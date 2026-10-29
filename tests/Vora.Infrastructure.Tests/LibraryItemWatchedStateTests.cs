@@ -81,6 +81,26 @@ public class LibraryItemWatchedStateTests
     }
 
     [Fact]
+    public async Task Only_this_profile_s_finished_episodes_count_as_watched()
+    {
+        await using var db = NewContext();
+        var shield = await SeedAsync(db);
+        db.UserMediaStates.AddRange(
+            new UserMediaState { ProfileId = Guid.NewGuid(), MediaItemId = shield.SixEpisodes[0].Id, IsPlayed = true, LastPlayedAt = DateTime.UtcNow },
+            new UserMediaState { ProfileId = _profile, MediaItemId = shield.SixEpisodes[1].Id, IsPlayed = false, ResumePositionSeconds = 600, LastPlayedAt = DateTime.UtcNow });
+        await db.SaveChangesAsync(TestContext.Current.CancellationToken);
+        await WatchAsync(db, shield.SixEpisodes.Skip(2));
+        var show = new LibraryItemVM { Id = shield.Show.Id, Title = shield.Show.Title, Type = "TvShow" };
+        var season = new LibraryItemVM { Id = shield.SeasonSix.Id, Title = "Season 6", Type = "Season" };
+
+        await new UserMediaStateRepository(db).AttachLibraryItemUserStatesAsync(new[] { show, season }, _profile);
+
+        show.UnplayedItemCount.Should().Be(5);
+        season.UnplayedItemCount.Should().Be(2);
+        season.IsPlayed.Should().BeFalse();
+    }
+
+    [Fact]
     public async Task An_episode_in_the_trash_is_not_left_to_watch()
     {
         await using var db = NewContext();

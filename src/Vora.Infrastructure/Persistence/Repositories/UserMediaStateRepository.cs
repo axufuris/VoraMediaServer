@@ -588,6 +588,40 @@ public class UserMediaStateRepository : IUserMediaStateRepository
         }
     }
 
+    internal sealed class EpisodeCount
+    {
+        public Guid Id { get; init; }
+        public int Total { get; init; }
+        public int Played { get; init; }
+    }
+
+    private sealed class EpisodeWatch
+    {
+        public Guid SeasonId { get; init; }
+        public Guid ShowId { get; init; }
+        public bool Played { get; init; }
+    }
+
+    private static IQueryable<EpisodeWatch> EpisodesInLibrary(VoraDbContext context, Guid profileId) =>
+        from episode in context.Set<Episode>().AsNoTracking()
+        where episode.MissingSince == null
+        join state in context.Set<UserMediaState>().Where(s => s.ProfileId == profileId && s.IsPlayed)
+            on episode.Id equals state.MediaItemId into states
+        from state in states.DefaultIfEmpty()
+        select new EpisodeWatch { SeasonId = episode.SeasonId, ShowId = episode.Season.TvShowId, Played = state != null };
+
+    internal static IQueryable<EpisodeCount> EpisodeCountsByShow(VoraDbContext context, List<Guid> showIds, Guid profileId) =>
+        EpisodesInLibrary(context, profileId)
+            .Where(e => showIds.Contains(e.ShowId))
+            .GroupBy(e => e.ShowId)
+            .Select(show => new EpisodeCount { Id = show.Key, Total = show.Count(), Played = show.Count(e => e.Played) });
+
+    internal static IQueryable<EpisodeCount> EpisodeCountsBySeason(VoraDbContext context, List<Guid> seasonIds, Guid profileId) =>
+        EpisodesInLibrary(context, profileId)
+            .Where(e => seasonIds.Contains(e.SeasonId))
+            .GroupBy(e => e.SeasonId)
+            .Select(season => new EpisodeCount { Id = season.Key, Total = season.Count(), Played = season.Count(e => e.Played) });
+
     public async Task AttachLibraryItemUserStatesAsync(IEnumerable<LibraryItemVM> items, Guid profileId)
     {
         var itemList = items.ToList();
@@ -608,46 +642,12 @@ public class UserMediaStateRepository : IUserMediaStateRepository
         var tvShowIds = itemList.Where(i => i.Type == "TvShow").Select(i => i.Id).ToList();
         var seasonIds = itemList.Where(i => i.Type == "Season").Select(i => i.Id).ToList();
 
-        var tvStats = new Dictionary<Guid, (int total, int played)>();
-        var seasonStats = new Dictionary<Guid, (int total, int played)>();
-
-        if (tvShowIds.Count > 0 || seasonIds.Count > 0)
-        {
-            var episodeMappings = await _context.Set<Episode>()
-                .AsNoTracking()
-                .Where(e => (tvShowIds.Contains(e.Season.TvShowId) || seasonIds.Contains(e.SeasonId)) && e.MissingSince == null)
-                .Select(e => new { e.Id, e.SeasonId, TvShowId = e.Season.TvShowId })
-                .ToListAsync();
-
-            if (episodeMappings.Count > 0)
-            {
-                var allEpisodeIds = episodeMappings.Select(e => e.Id).ToList();
-
-                var playedEpisodeIds = await _context.Set<UserMediaState>()
-                    .AsNoTracking()
-                    .Where(s => s.ProfileId == profileId && s.IsPlayed && allEpisodeIds.Contains(s.MediaItemId))
-                    .Select(s => s.MediaItemId)
-                    .ToListAsync();
-
-                var playedSet = playedEpisodeIds.ToHashSet();
-
-                if (tvShowIds.Count > 0)
-                {
-                    tvStats = episodeMappings
-                        .Where(e => tvShowIds.Contains(e.TvShowId))
-                        .GroupBy(x => x.TvShowId)
-                        .ToDictionary(g => g.Key, g => (total: g.Count(), played: g.Count(x => playedSet.Contains(x.Id))));
-                }
-
-                if (seasonIds.Count > 0)
-                {
-                    seasonStats = episodeMappings
-                        .Where(e => seasonIds.Contains(e.SeasonId))
-                        .GroupBy(x => x.SeasonId)
-                        .ToDictionary(g => g.Key, g => (total: g.Count(), played: g.Count(x => playedSet.Contains(x.Id))));
-                }
-            }
-        }
+        var tvStats = tvShowIds.Count > 0
+            ? await EpisodeCountsByShow(_context, tvShowIds, profileId).ToDictionaryAsync(c => c.Id, c => (total: c.Total, played: c.Played))
+            : new Dictionary<Guid, (int total, int played)>();
+        var seasonStats = seasonIds.Count > 0
+            ? await EpisodeCountsBySeason(_context, seasonIds, profileId).ToDictionaryAsync(c => c.Id, c => (total: c.Total, played: c.Played))
+            : new Dictionary<Guid, (int total, int played)>();
 
         foreach (var item in itemList)
         {

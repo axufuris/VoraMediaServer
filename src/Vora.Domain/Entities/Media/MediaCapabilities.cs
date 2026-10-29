@@ -71,6 +71,9 @@ public static class MediaCapabilities
     public static readonly Expression<Func<MediaItem, bool>> IsPartOfATvShow =
         m => m is TvShow || m is Season || m is Episode;
 
+    public static readonly Expression<Func<MediaItem, bool>> IsListedInItsLibrary =
+        m => m is Movie || m is TvShow || m is Track;
+
     // Asks a capability of a MediaItem reached through a navigation property, by
     // rebinding the parameter rather than invoking the expression — EF cannot
     // translate an Invoke, so `e => IsBrowsableTitle.Compile()(e.MediaItem)`
