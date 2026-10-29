@@ -50,7 +50,7 @@ public class CollectionManager : ICollectionManager
 
     public async Task<CollectionDetailsVM?> GetCollectionDetailsAsync(Guid id, Guid? profileId, bool hasAllAccess, List<Guid> allowedLibs, CollectionSortOrder? sortOverride = null)
     {
-        var collection = await _repository.GetProjectedByIdAsync(id, CollectionDetailsVM.Projection, hasAllAccess, allowedLibs);
+        var collection = await _repository.GetDetailsAsync(id, profileId, hasAllAccess, allowedLibs);
         if (collection == null) return null;
 
         var effectiveSort = sortOverride ?? collection.DefaultSort;
@@ -86,11 +86,6 @@ public class CollectionManager : ICollectionManager
                     item.InUniverseYearLocked = chr.Locked;
                 }
             }
-        }
-
-        if (profileId.HasValue)
-        {
-            await _repository.AttachCollectionItemUserStatesAsync(collection.Items, profileId.Value);
         }
 
         return collection;

@@ -29,7 +29,6 @@ public interface ISmartListManager
 
 public class SmartListManager(
     ISmartListRepository repository,
-    IUserMediaStateRepository userMediaStates,
     ISmartListSourceResolver sourceResolver,
     ISystemSettingsRepository settingsRepository,
     IClientNotifier notifier,
@@ -210,9 +209,9 @@ public class SmartListManager(
         _ => true
     };
 
-    private async Task<List<LibraryItemVM>> GetLibraryItemsAsync(SmartList list, SmartListViewer viewer)
+    private Task<List<LibraryItemVM>> GetLibraryItemsAsync(SmartList list, SmartListViewer viewer)
     {
-        var items = await repository.GetSmartListItemsAsync(
+        return repository.GetSmartListItemsAsync(
             viewer.ProfileId,
             list.LibraryId,
             ParseRules(list.FilterRulesJson),
@@ -224,13 +223,6 @@ public class SmartListManager(
             viewer.AllowedMovieRatings,
             viewer.AllowedTvRatings,
             viewer.BlockUnrated);
-
-        if (viewer.ProfileId is { } profileId)
-        {
-            await userMediaStates.AttachLibraryItemUserStatesAsync(items, profileId);
-        }
-
-        return items;
     }
 
     private static void Apply(SmartList list, SmartListSaveRequest request)

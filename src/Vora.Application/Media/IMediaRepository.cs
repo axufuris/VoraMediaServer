@@ -57,6 +57,7 @@ public interface IMediaRepository
     Task<Dictionary<Guid, string>> GetPosterUrlsByIdsAsync(IReadOnlyCollection<Guid> ids);
     Task<T?> GetProjectedAsync<T>(Guid id, Expression<Func<MediaItem, T>> projection, bool hasAllAccess = true, List<Guid>? allowedLibs = null, List<string>? allowedMovieRatings = null, List<string>? allowedTvRatings = null, bool blockUnrated = false);
     Task<IEnumerable<T>> GetAllProjectedAsync<T>(Expression<Func<MediaItem, T>> projection, Guid? libraryId = null, string? libraryType = null, bool hasAllAccess = true, List<Guid>? allowedLibs = null, List<string>? allowedMovieRatings = null, List<string>? allowedTvRatings = null, bool blockUnrated = false);
+    Task<List<LibraryItemVM>> GetLibraryItemsAsync(Guid libraryId, Guid? profileId, bool hasAllAccess, List<Guid> allowedLibs, List<string> allowedMovieRatings, List<string> allowedTvRatings, bool blockUnrated);
     Task<MediaItem?> GetForAnalysisAsync(Guid id);
     Task<MediaItem?> GetForPosterOverlayAsync(Guid id);
     Task<MediaItem?> GetForMetadataSyncAsync(Guid id);

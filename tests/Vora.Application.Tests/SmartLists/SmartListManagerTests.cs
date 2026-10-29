@@ -16,7 +16,6 @@ namespace Vora.Application.Tests.SmartLists;
 public class SmartListManagerTests
 {
     private readonly ISmartListRepository _repository = Substitute.For<ISmartListRepository>();
-    private readonly IUserMediaStateRepository _userMediaStates = Substitute.For<IUserMediaStateRepository>();
     private readonly ISmartListSourceResolver _resolver = Substitute.For<ISmartListSourceResolver>();
     private readonly ISystemSettingsRepository _settingsRepository = Substitute.For<ISystemSettingsRepository>();
     private readonly IClientNotifier _notifier = Substitute.For<IClientNotifier>();
@@ -34,7 +33,7 @@ public class SmartListManagerTests
                 Arg.Any<Guid?>(), Arg.Any<bool>(), Arg.Any<List<Guid>?>(), Arg.Any<List<string>?>(), Arg.Any<List<string>?>(), Arg.Any<bool>())
             .Returns(new List<LibraryItemVM>());
         _resolver.ResolveAsync(Arg.Any<SmartList>(), Arg.Any<SmartListRulesDto?>(), Arg.Any<SmartListViewer>()).Returns(new List<SmartListEntryVM>());
-        _manager = new SmartListManager(_repository, _userMediaStates, _resolver, _settingsRepository, _notifier, NullLogger<SmartListManager>.Instance);
+        _manager = new SmartListManager(_repository, _resolver, _settingsRepository, _notifier, NullLogger<SmartListManager>.Instance);
     }
 
     private SmartList Stored(SmartListSource source, Action<SmartList>? configure = null)
@@ -110,19 +109,15 @@ public class SmartListManagerTests
     }
 
     [Fact]
-    public async Task Library_items_get_the_watched_state_the_library_page_shows()
+    public async Task Library_items_are_read_for_the_viewer_so_they_carry_its_watched_state()
     {
         var list = Stored(SmartListSource.Library);
-        var season = new LibraryItemVM { Id = Guid.NewGuid(), Title = "Season 6", Type = "Season" };
-        var items = new List<LibraryItemVM> { season };
-        _repository.GetSmartListItemsAsync(
-                Arg.Any<Guid?>(), Arg.Any<Guid?>(), Arg.Any<SmartListRulesDto?>(), Arg.Any<SmartListSortBy>(), Arg.Any<int>(),
-                Arg.Any<Guid?>(), Arg.Any<bool>(), Arg.Any<List<Guid>?>(), Arg.Any<List<string>?>(), Arg.Any<List<string>?>(), Arg.Any<bool>())
-            .Returns(items);
 
         await _manager.GetSmartListEntriesAsync(list.Id, Viewer);
 
-        await _userMediaStates.Received(1).AttachLibraryItemUserStatesAsync(items, Arg.Is<Guid>(id => id == Viewer.ProfileId));
+        await _repository.Received(1).GetSmartListItemsAsync(
+            Viewer.ProfileId, Arg.Any<Guid?>(), Arg.Any<SmartListRulesDto?>(), Arg.Any<SmartListSortBy>(), Arg.Any<int>(),
+            Arg.Any<Guid?>(), Arg.Any<bool>(), Arg.Any<List<Guid>?>(), Arg.Any<List<string>?>(), Arg.Any<List<string>?>(), Arg.Any<bool>());
     }
 
     [Fact]

@@ -29,11 +29,7 @@ public class CollectionManagerSortTests
             Items = new List<CollectionDetailsLibraryItemVM> { freshNew, ordered2, freshOld, ordered1 }
         };
 
-        repo.GetProjectedByIdAsync(
-            collectionId,
-            Arg.Any<Expression<Func<Collection, CollectionDetailsVM>>>(),
-            Arg.Any<bool>(),
-            Arg.Any<List<Guid>?>())
+        repo.GetDetailsAsync(collectionId, Arg.Any<Guid?>(), Arg.Any<bool>(), Arg.Any<List<Guid>>())
             .Returns(vm);
 
         // ordered1 -> 1, ordered2 -> 2; freshOld stored as 0 (just added, not yet ordered); freshNew absent entirely

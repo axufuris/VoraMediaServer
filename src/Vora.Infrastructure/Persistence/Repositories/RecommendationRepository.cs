@@ -9,6 +9,7 @@ namespace Vora.Infrastructure.Persistence.Repositories;
 public class RecommendationRepository(VoraDbContext context) : IRecommendationRepository
 {
     public async Task<List<LibraryItemVM>> GetHydratedMediaItemsAsync(
+        Guid profileId,
         List<Guid> localItemIds,
         List<string> externalTmdbIds,
         Guid? libraryId,
@@ -29,7 +30,7 @@ public class RecommendationRepository(VoraDbContext context) : IRecommendationRe
 
         return await query
             .Where(m => localItemIds.Contains(m.Id) || (m.TmdbId != null && externalTmdbIds.Contains(m.TmdbId)))
-            .Select(LibraryItemVM.Projection)
+            .Select(LibraryItemVM.ProjectionFor(profileId, context.UserMediaStates, context.UserMediaRatings))
             .ToListAsync();
     }
 

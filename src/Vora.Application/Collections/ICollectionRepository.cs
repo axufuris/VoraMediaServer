@@ -55,7 +55,7 @@ public interface ICollectionRepository
     Task DeleteCollectionArtworkAsync(Guid id);
     Task ReplaceProviderArtworkAsync(Guid collectionId, IEnumerable<CollectionArtwork> newArtwork);
 
-    Task AttachCollectionItemUserStatesAsync(IEnumerable<CollectionDetailsLibraryItemVM> items, Guid profileId);
+    Task<CollectionDetailsVM?> GetDetailsAsync(Guid id, Guid? profileId, bool hasAllAccess, List<Guid> allowedLibs);
 }
 
 public sealed record CollectionDescriptionTarget(Guid CollectionId, int TmdbId);

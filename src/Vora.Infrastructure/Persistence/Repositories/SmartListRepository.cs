@@ -63,7 +63,7 @@ public class SmartListRepository(VoraDbContext context) : ISmartListRepository
         }
 
         var items = await query
-            .Select(LibraryItemVM.Projection)
+            .Select(LibraryItemVM.ProjectionFor(profileId, context.UserMediaStates, context.UserMediaRatings))
             .Take(maxItems)
             .ToListAsync();
 

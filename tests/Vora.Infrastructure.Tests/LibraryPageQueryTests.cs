@@ -1,4 +1,6 @@
 using Microsoft.EntityFrameworkCore;
+using Vora.Application.Collections.ViewModels;
+using Vora.Application.Libraries.ViewModels;
 using Vora.Infrastructure.Persistence;
 using Vora.Infrastructure.Persistence.Repositories;
 
@@ -12,25 +14,29 @@ public class LibraryPageQueryTests
             .Options);
 
     [Fact]
-    public void A_show_s_episodes_left_are_counted_by_the_database_one_row_per_show()
+    public void A_library_item_s_watched_state_episodes_left_and_rating_come_from_the_same_query()
     {
         using var db = PostgresContext();
 
-        var sql = UserMediaStateRepository.EpisodeCountsByShow(db, [Guid.NewGuid()], Guid.NewGuid()).ToQueryString();
+        var sql = db.MediaItems
+            .Select(LibraryItemVM.ProjectionFor(Guid.NewGuid(), db.UserMediaStates, db.UserMediaRatings))
+            .ToQueryString();
 
-        sql.Should().Contain("LEFT JOIN");
-        sql.Should().Contain("GROUP BY");
+        sql.Should().Contain("FROM \"UserMediaStates\"");
+        sql.Should().Contain("FROM \"UserMediaRatings\"");
+        sql.Should().NotContain("@__allEpisodeIds");
     }
 
     [Fact]
-    public void A_season_s_episodes_left_are_counted_by_the_database_one_row_per_season()
+    public void A_collection_s_items_carry_their_watched_state_from_the_same_query()
     {
         using var db = PostgresContext();
 
-        var sql = UserMediaStateRepository.EpisodeCountsBySeason(db, [Guid.NewGuid()], Guid.NewGuid()).ToQueryString();
+        var sql = db.Collections
+            .Select(CollectionDetailsVM.ProjectionFor(Guid.NewGuid(), db.UserMediaStates))
+            .ToQueryString();
 
-        sql.Should().Contain("LEFT JOIN");
-        sql.Should().Contain("GROUP BY");
+        sql.Should().Contain("FROM \"UserMediaStates\"");
     }
 
     [Fact]
