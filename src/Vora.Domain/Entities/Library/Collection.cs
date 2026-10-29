@@ -44,6 +44,7 @@ public class Collection : LockableEntity
 
     public DateTime? VisibleStartDate { get; set; }
     public DateTime? VisibleEndDate { get; set; }
+    public bool VisibleEveryYear { get; set; }
 
     public Guid? LibraryId { get; set; }
 

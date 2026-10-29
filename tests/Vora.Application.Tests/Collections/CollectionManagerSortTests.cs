@@ -2,6 +2,7 @@ using System.Linq.Expressions;
 using Vora.Application.Analysis;
 using Vora.Application.Collections;
 using Vora.Application.Collections.ViewModels;
+using Vora.Application.Settings;
 using Vora.Application.Tasks;
 using Vora.Domain.Entities.Library;
 using Vora.Domain.Enums;
@@ -14,7 +15,7 @@ public class CollectionManagerSortTests
     public async Task Chronological_sort_puts_unordered_items_last_by_release_date()
     {
         var repo = Substitute.For<ICollectionRepository>();
-        var manager = new CollectionManager(repo, Substitute.For<ITaskQueueManager>(), Substitute.For<IClientNotifier>());
+        var manager = new CollectionManager(repo, Substitute.For<ITaskQueueManager>(), Substitute.For<IClientNotifier>(), Substitute.For<IServerCalendar>());
 
         var collectionId = Guid.NewGuid();
         var ordered1 = new CollectionDetailsLibraryItemVM { Id = Guid.NewGuid(), Title = "First", ReleaseDate = new DateOnly(2011, 1, 1) };
@@ -55,7 +56,7 @@ public class CollectionManagerSortTests
     public async Task Collection_lists_follow_the_sort_title_and_fall_back_to_the_title()
     {
         var repo = Substitute.For<ICollectionRepository>();
-        var manager = new CollectionManager(repo, Substitute.For<ITaskQueueManager>(), Substitute.For<IClientNotifier>());
+        var manager = new CollectionManager(repo, Substitute.For<ITaskQueueManager>(), Substitute.For<IClientNotifier>(), Substitute.For<IServerCalendar>());
         var libraryId = Guid.NewGuid();
 
         repo.GetAllProjectedAsync(

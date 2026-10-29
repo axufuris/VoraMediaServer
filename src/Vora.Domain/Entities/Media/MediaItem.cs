@@ -45,6 +45,8 @@ public abstract class MediaItem : LockableEntity
     public bool HasMidCreditsStinger { get; set; }
     public bool HasPostCreditsStinger { get; set; }
 
+    public List<string>? Keywords { get; set; }
+
     public DateTime AddedAt { get; set; } = DateTime.UtcNow;
     public DateTime? LastContentAddedAt { get; set; }
     public DateTime? MissingSince { get; set; }

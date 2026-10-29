@@ -30,8 +30,7 @@ public class CollectionSyncService(
 
     public async Task SyncCollectionContentAsync(Guid collectionId, CancellationToken cancellationToken = default)
     {
-        var collection = await collectionRepo.GetProjectedByIdAsync(collectionId, c => new
-        {
+        var collection = await collectionRepo.GetProjectedByIdAsync(collectionId, c => new SyncTarget(
             c.Id,
             c.Title,
             c.Description,
@@ -40,8 +39,7 @@ public class CollectionSyncService(
             c.RulesJson,
             c.SmartMediaType,
             c.MirrorList,
-            c.LibraryId
-        });
+            c.LibraryId));
 
         if (collection == null)
         {
@@ -78,6 +76,31 @@ public class CollectionSyncService(
 
             var collectionIsEmpty = existingMediaIds.Count == 0;
 
+            if (provider is ILibraryCollectionSyncProvider libraryProvider)
+            {
+                var found = await libraryProvider.FindInLibraryAsync(
+                    new LibraryCollectionSyncRequest(collection.Id, collection.ContentSyncExternalId!, collection.LibraryId), cancellationToken);
+                await FillBlankDescriptionAsync(provider, collection.Id, collection.Description, collection.ContentSyncExternalId!, cancellationToken);
+
+                await collectionRepo.TouchContentSyncedAtAsync(collection.Id);
+
+                var themed = found.ToHashSet();
+                themed.ExceptWith(await collectionRepo.GetExcludedMediaIdsAsync(collection.Id));
+                if (themed.Count == 0)
+                {
+                    if (collectionIsEmpty)
+                    {
+                        await adminNotifications.RaiseAsync(AdminNotificationSeverity.Warning,
+                            $"'{collection.Title}' found nothing in your library for its theme",
+                            "The AI Theme looks for titles TMDB tags with the theme and checks the titles whose descriptions come closest to it. Name the occasion itself (e.g. \"Halloween\"), and check that AI Settings has an embedding model and the nightly task has described your titles.");
+                    }
+                    return;
+                }
+
+                await ReconcileMembershipAsync(collection.Id, collection.Title, collection.MirrorList, themed, existingMediaIds);
+                return;
+            }
+
             // The provider contract has no token, so the fetch itself runs to
             // completion; checkpoint on either side so a cancel between the fetch
             // and the (possibly second) description call is honored.
@@ -106,16 +129,7 @@ public class CollectionSyncService(
             }).ToList();
             await collectionRepo.UpdateContentSyncCacheAsync(collection.Id, JsonSerializer.Serialize(membership));
 
-            if (string.IsNullOrWhiteSpace(collection.Description))
-            {
-                cancellationToken.ThrowIfCancellationRequested();
-                var generatedDescription = await provider.GenerateDescriptionAsync(collection.ContentSyncExternalId!);
-                if (!string.IsNullOrWhiteSpace(generatedDescription))
-                {
-                    await collectionRepo.UpdateDescriptionAsync(collection.Id, generatedDescription.Trim());
-                    await notifier.NotifyCollectionUpdatedAsync(collection.Id);
-                }
-            }
+            await FillBlankDescriptionAsync(provider, collection.Id, collection.Description, collection.ContentSyncExternalId!, cancellationToken);
 
             var tmdbIds = externalItems.Where(x => !string.IsNullOrEmpty(x.TmdbId)).Select(x => x.TmdbId!).ToList();
             var imdbIds = externalItems.Where(x => !string.IsNullOrEmpty(x.ImdbId)).Select(x => x.ImdbId!).ToList();
@@ -151,6 +165,18 @@ public class CollectionSyncService(
         {
             logger.LogError(ex, "Failed to sync content for collection '{Title}'.", collection.Title);
         }
+    }
+
+    private async Task FillBlankDescriptionAsync(ICollectionSyncProvider provider, Guid collectionId, string? description, string externalId, CancellationToken cancellationToken)
+    {
+        if (!string.IsNullOrWhiteSpace(description)) return;
+
+        cancellationToken.ThrowIfCancellationRequested();
+        var generatedDescription = await provider.GenerateDescriptionAsync(externalId);
+        if (string.IsNullOrWhiteSpace(generatedDescription)) return;
+
+        await collectionRepo.UpdateDescriptionAsync(collectionId, generatedDescription.Trim());
+        await notifier.NotifyCollectionUpdatedAsync(collectionId);
     }
 
     private async Task<HashSet<Guid>> EvaluateSmartMembership(string rulesJson, PlaylistMediaType? smartMediaType, Guid? libraryId)
@@ -208,6 +234,17 @@ public class CollectionSyncService(
             taskQueue.QueueReevaluateCollectionOrder(collectionId);
         }
     }
+
+    internal sealed record SyncTarget(
+        Guid Id,
+        string Title,
+        string? Description,
+        string? ContentSyncProviderId,
+        string? ContentSyncExternalId,
+        string? RulesJson,
+        PlaylistMediaType? SmartMediaType,
+        bool MirrorList,
+        Guid? LibraryId);
 
     private static bool NeedsTitleMatch(CollectionMembershipEntry entry) =>
         string.IsNullOrEmpty(entry.TmdbId)

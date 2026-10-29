@@ -54,7 +54,7 @@ Implementations live in `Vora.Infrastructure/Backups/Sections/`. `EntityTableBac
 ### What is deliberately not backed up
 
 - **Everything a scan rebuilds** — media items, parts/tracks, artwork, cast, genres, extras, scan-created collections. Restore **Libraries** (or point a rebuilt server at the same folders) and scan. The hand-made changes on those rows are a section of their own (**Metadata edits** below).
-- **Derived data** — embeddings, song profiles, the mixes and weekly AI playlists Vora generates (requested AI playlists and Blends are backed up), similar artists and tags, silence/black-frame analysis, audio fingerprints, detected markers, scrub-bar thumbnails, the resized artwork cache. Vora recomputes them.
+- **Derived data** — embeddings, theme collections' profiles and AI answers (`CollectionThemes`, `CollectionThemeVerdicts`; the next sync makes them again), song profiles, the mixes and weekly AI playlists Vora generates (requested AI playlists and Blends are backed up), similar artists and tags, silence/black-frame analysis, audio fingerprints, detected markers, scrub-bar thumbnails, the resized artwork cache. Vora recomputes them.
 - **Logs and history the server writes for itself** — email delivery log, AI usage, system metrics, admin notifications.
 - **Secrets that should not outlive a server** — refresh tokens, registration / invitation / password-reset / email-change tickets.
 - **Short-lived state** — `PendingTasks` (the task queue), IPTV channels themselves (re-synced from the playlist; only the admin's choices about them are kept), DVR sessions that haven't finished (re-created from the schedules), podcast episodes (re-fetched from each feed).

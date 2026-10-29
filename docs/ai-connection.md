@@ -13,7 +13,7 @@ All on plugin `openai_recommendations` (`AiConnection.PluginId`). The keys are c
 | `base_url` | `https://api.openai.com/v1` | Where the API starts. |
 | `api_key` | empty | Required for OpenAI. Optional anywhere else. |
 | `chat_model` | `gpt-4o-mini` | Model for the "For You" rows, and the fallback for the next two. |
-| `collections_model` | `gpt-5` (shown in the form) | Model for AI lists and story order. |
+| `collections_model` | `gpt-5` (shown in the form) | Model for AI lists, AI themes and story order. |
 | `music_playlists_model` | empty | Model for song profiles and playlist requests. |
 | `embedding_model` | `text-embedding-3-small` | Model that makes the vectors. |
 | `schedule_time`, `monthly_token_limit`, `guardrails` | `02:00`, `0`, empty | Nightly run, token ceiling, house rules. |

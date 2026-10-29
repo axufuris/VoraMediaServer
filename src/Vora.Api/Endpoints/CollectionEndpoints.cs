@@ -71,9 +71,9 @@ public static class CollectionEndpoints
         return Results.Ok(collections);
     }
 
-    private static async Task<IResult> GetGlobalCollectionsAsync(ClaimsPrincipal user, ICollectionManager manager)
+    private static async Task<IResult> GetGlobalCollectionsAsync([FromQuery] bool? includeHidden, ClaimsPrincipal user, ICollectionManager manager)
     {
-        var collections = await manager.GetGlobalCollectionsAsync(user.HasAllLibraryAccess(), user.GetAllowedLibraryIds());
+        var collections = await manager.GetGlobalCollectionsAsync(user.HasAllLibraryAccess(), user.GetAllowedLibraryIds(), includeHidden == true && user.IsAdmin());
         return Results.Ok(collections);
     }
 

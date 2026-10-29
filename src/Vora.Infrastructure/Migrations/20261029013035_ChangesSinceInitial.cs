@@ -210,11 +210,53 @@ CREATE INDEX IF NOT EXISTS ""IX_ProfileTitlePlaybackChoices_TitleId"" ON ""Profi
             migrationBuilder.Sql(@"
 DROP INDEX IF EXISTS ""IX_Albums_ArtistId_Title"";
 CREATE INDEX ""IX_Albums_ArtistId_Title"" ON ""Albums"" (""ArtistId"", ""Title"");");
+
+            migrationBuilder.Sql(@"
+ALTER TABLE ""MediaItems"" ADD COLUMN IF NOT EXISTS ""Keywords"" text[];
+ALTER TABLE ""Collections"" ADD COLUMN IF NOT EXISTS ""VisibleEveryYear"" boolean NOT NULL DEFAULT FALSE;
+
+CREATE TABLE IF NOT EXISTS ""CollectionThemes"" (
+    ""CollectionId"" uuid NOT NULL,
+    ""Theme"" character varying(128) NOT NULL,
+    ""Profile"" character varying(4000) NOT NULL,
+    ""Keywords"" text[] NOT NULL,
+    ""Embedding"" real[],
+    ""EmbeddingModel"" character varying(64),
+    ""UpdatedAt"" timestamp with time zone NOT NULL,
+    CONSTRAINT ""PK_CollectionThemes"" PRIMARY KEY (""CollectionId""),
+    CONSTRAINT ""FK_CollectionThemes_Collections_CollectionId"" FOREIGN KEY (""CollectionId"") REFERENCES ""Collections"" (""Id"") ON DELETE CASCADE
+);
+
+CREATE TABLE IF NOT EXISTS ""CollectionThemeVerdicts"" (
+    ""CollectionId"" uuid NOT NULL,
+    ""MediaItemId"" uuid NOT NULL,
+    ""Belongs"" boolean NOT NULL,
+    ""JudgedAt"" timestamp with time zone NOT NULL,
+    CONSTRAINT ""PK_CollectionThemeVerdicts"" PRIMARY KEY (""CollectionId"", ""MediaItemId""),
+    CONSTRAINT ""FK_CollectionThemeVerdicts_Collections_CollectionId"" FOREIGN KEY (""CollectionId"") REFERENCES ""Collections"" (""Id"") ON DELETE CASCADE,
+    CONSTRAINT ""FK_CollectionThemeVerdicts_MediaItems_MediaItemId"" FOREIGN KEY (""MediaItemId"") REFERENCES ""MediaItems"" (""Id"") ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS ""IX_CollectionThemeVerdicts_MediaItemId"" ON ""CollectionThemeVerdicts"" (""MediaItemId"");");
         }
 
         /// <inheritdoc />
         protected override void Down(MigrationBuilder migrationBuilder)
         {
+            migrationBuilder.DropTable(
+                name: "CollectionThemeVerdicts");
+
+            migrationBuilder.DropTable(
+                name: "CollectionThemes");
+
+            migrationBuilder.DropColumn(
+                name: "Keywords",
+                table: "MediaItems");
+
+            migrationBuilder.DropColumn(
+                name: "VisibleEveryYear",
+                table: "Collections");
+
             migrationBuilder.DropColumn(
                 name: "VideoCodec",
                 table: "IptvChannels");

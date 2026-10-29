@@ -16,6 +16,7 @@ public class CreateCollectionRequest
     public string? SortTitle { get; set; }
     public DateTime? VisibleStartDate { get; set; }
     public DateTime? VisibleEndDate { get; set; }
+    public bool VisibleEveryYear { get; set; }
     public bool SystemGenerated { get; set; }
     public string? ContentSyncProviderId { get; set; }
     public string? ContentSyncExternalId { get; set; }

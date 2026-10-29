@@ -17,6 +17,7 @@ export interface UpdateCollectionRequest {
     sortTitle?: string;
     visibleStartDate?: string;
     visibleEndDate?: string;
+    visibleEveryYear?: boolean;
     contentSyncProviderId?: string;
     contentSyncExternalId?: string;
     syncIntervalDays?: number;
@@ -37,6 +38,7 @@ export interface CreateCollectionRequest {
     sortTitle?: string;
     visibleStartDate?: string;
     visibleEndDate?: string;
+    visibleEveryYear?: boolean;
     systemGenerated?: boolean;
     libraryId?: string;
     contentSyncProviderId?: string;

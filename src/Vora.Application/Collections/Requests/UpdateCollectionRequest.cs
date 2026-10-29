@@ -22,6 +22,7 @@ public class UpdateCollectionRequest
     public bool MirrorList { get; set; }
     public DateTime? VisibleStartDate { get; set; }
     public DateTime? VisibleEndDate { get; set; }
+    public bool VisibleEveryYear { get; set; }
     public string? RulesJson { get; set; }
     public PlaylistMediaType? SmartMediaType { get; set; }
 }

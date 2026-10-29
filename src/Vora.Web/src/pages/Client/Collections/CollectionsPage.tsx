@@ -65,7 +65,7 @@ export default function CollectionsPage() {
         if (!tabKnown) return;
         try {
             const data = activeTab === 'global'
-                ? await collectionService.getGlobalCollections(serverId)
+                ? await collectionService.getGlobalCollections(serverId, isAdmin)
                 : await collectionService.getLibraryCollections(activeTab, serverId, isAdmin);
             setCollections(data);
         } catch (error) {

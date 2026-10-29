@@ -609,6 +609,50 @@ public class PostgresMigrationHistoryTests(PostgresDatabase database) : IClassFi
         channel.VideoFormatSeenAt.Should().BeNull();
     }
 
+    [Fact]
+    public async Task A_database_on_the_channel_video_format_migration_keeps_its_collections_and_titles_and_gains_theme_collections()
+    {
+        Assert.SkipUnless(PostgresDatabase.IsConfigured, PostgresDatabase.SkipReason);
+        var cancellationToken = TestContext.Current.CancellationToken;
+        await using var legacy = new LegacyDatabase();
+        var collectionId = Guid.NewGuid();
+        var movieId = Guid.NewGuid();
+        await legacy.BuildChannelVideoFormatStateAsync(async db =>
+        {
+            var library = new MediaLibrary { Name = "Movies", Type = LibraryType.Movie, FolderPaths = new List<string> { "/movies" } };
+            db.Add(library);
+            db.Add(new Movie { Id = movieId, Title = "Hocus Pocus", LibraryId = library.Id });
+            db.Add(new Collection
+            {
+                Id = collectionId,
+                Title = "Halloween",
+                VisibleStartDate = new DateTime(2026, 10, 1, 0, 0, 0, DateTimeKind.Utc),
+                VisibleEndDate = new DateTime(2026, 10, 31, 0, 0, 0, DateTimeKind.Utc),
+            });
+            await db.SaveChangesAsync(cancellationToken);
+        }, cancellationToken);
+
+        await using (var before = legacy.NewContext())
+        {
+            (await before.Database.GetPendingMigrationsAsync(cancellationToken)).Should().Equal(MigrationHistoryTests.ChangesSinceInitial);
+            (await ColumnsAsync(before, "Collections", cancellationToken)).Should().NotContain("VisibleEveryYear");
+            (await ColumnsAsync(before, "MediaItems", cancellationToken)).Should().NotContain("Keywords");
+            (await ColumnsAsync(before, "CollectionThemes", cancellationToken)).Should().BeEmpty();
+        }
+
+        await legacy.MigrateAsync(cancellationToken);
+
+        await using var after = legacy.NewContext();
+        (await after.Database.GetPendingMigrationsAsync(cancellationToken)).Should().BeEmpty();
+        var collection = await after.Collections.AsNoTracking().SingleAsync(c => c.Id == collectionId, cancellationToken);
+        collection.Title.Should().Be("Halloween");
+        collection.VisibleStartDate.Should().Be(new DateTime(2026, 10, 1, 0, 0, 0, DateTimeKind.Utc));
+        collection.VisibleEveryYear.Should().BeFalse();
+        (await after.MediaItems.AsNoTracking().SingleAsync(m => m.Id == movieId, cancellationToken)).Keywords.Should().BeNull();
+        (await after.CollectionThemes.CountAsync(cancellationToken)).Should().Be(0);
+        (await after.CollectionThemeVerdicts.CountAsync(cancellationToken)).Should().Be(0);
+    }
+
     private static Task<List<string>> ColumnsAsync(VoraDbContext db, string table, CancellationToken cancellationToken) =>
         db.Database
             .SqlQueryRaw<string>("SELECT column_name AS \"Value\" FROM information_schema.columns WHERE table_schema = current_schema() AND table_name = {0}", table)

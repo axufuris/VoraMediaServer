@@ -42,8 +42,8 @@ public class SmartListManager(
 
     public async Task<List<SmartListClientVM>> GetActiveSmartListsAsync(bool isAdmin)
     {
-        var lists = await repository.GetActiveClientListsAsync(isAdmin);
         var settings = await settingsRepository.GetSettingsAsync();
+        var lists = await repository.GetActiveClientListsAsync(isAdmin, ScheduleClock.Today(settings.ScheduleTimeZone, DateTime.UtcNow));
         return lists.Where(l => IsSourceEnabled(l.Source, settings)).ToList();
     }
 

@@ -2,14 +2,13 @@ import { useState, type ReactNode } from 'react';
 import type { CollectionSummary } from '../../../api/Collections/collectionService';
 import type { LibrarySummary } from '../../../api/Media/libraryService';
 import { Modal } from '../../../components/Common/Modal';
+import MonthDayPicker from '../../../components/Common/MonthDayPicker';
 import {
     DECADES,
     MAX_ITEMS,
     MEDIA_TYPES,
     MIN_ITEMS,
-    MONTHS,
     SOURCE_OPTIONS,
-    daysInMonth,
     sortOptionsFor,
     withSource,
     type SmartListForm,
@@ -36,19 +35,6 @@ function Check({ id, checked, onChange, children }: { id: string; checked: boole
             <input id={id} type="checkbox" checked={checked} onChange={e => onChange(e.target.checked)} className="h-4 w-4 cursor-pointer accent-[var(--vora-accent-500)]" />
             <span className="text-sm font-medium text-[var(--vora-text-primary)]">{children}</span>
         </label>
-    );
-}
-
-function MonthDay({ idPrefix, month, day, onChange }: { idPrefix: string; month: number; day: number; onChange: (month: number, day: number) => void }) {
-    return (
-        <div className="flex gap-2">
-            <select id={`${idPrefix}-month`} aria-label="Month" value={month} onChange={e => { const m = Number(e.target.value); onChange(m, Math.min(day, daysInMonth(m))); }} className="vora-input cursor-pointer">
-                {MONTHS.map((name, i) => <option key={name} value={i + 1}>{name}</option>)}
-            </select>
-            <select id={`${idPrefix}-day`} aria-label="Day" value={day} onChange={e => onChange(month, Number(e.target.value))} className="vora-input w-24 cursor-pointer">
-                {Array.from({ length: daysInMonth(month) }, (_, i) => i + 1).map(d => <option key={d} value={d}>{d}</option>)}
-            </select>
-        </div>
     );
 }
 
@@ -186,11 +172,11 @@ export default function SmartListEditorModal({ isOpen, isEditing, initial, colle
                             <div className="grid gap-3 sm:grid-cols-2">
                                 <div>
                                     <FieldLabel>From</FieldLabel>
-                                    <MonthDay idPrefix="smartlist-start" month={form.startMonth} day={form.startDay} onChange={(startMonth, startDay) => update({ startMonth, startDay })} />
+                                    <MonthDayPicker idPrefix="smartlist-start" month={form.startMonth} day={form.startDay} onChange={(startMonth, startDay) => update({ startMonth, startDay })} />
                                 </div>
                                 <div>
                                     <FieldLabel>Until</FieldLabel>
-                                    <MonthDay idPrefix="smartlist-end" month={form.endMonth} day={form.endDay} onChange={(endMonth, endDay) => update({ endMonth, endDay })} />
+                                    <MonthDayPicker idPrefix="smartlist-end" month={form.endMonth} day={form.endDay} onChange={(endMonth, endDay) => update({ endMonth, endDay })} />
                                 </div>
                             </div>
                         )}

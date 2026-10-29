@@ -5,6 +5,7 @@ import type {
     SmartListSortBy,
     SmartListSource,
 } from '../../../api/Collections/smartListService';
+import { MONTHS, daysInMonth } from '../../../utils/monthDay';
 
 export interface SmartListForm {
     title: string;
@@ -84,10 +85,7 @@ export const MEDIA_TYPES: Option<string>[] = [
 
 export const DECADES = [2020, 2010, 2000, 1990, 1980, 1970, 1960, 1950];
 
-export const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
-
-// 2000 is a leap year, so February offers the 29th; the server checks the same way.
-export const daysInMonth = (month: number): number => new Date(2000, month, 0).getDate();
+export { MONTHS, daysInMonth };
 
 export const MIN_ITEMS = 1;
 export const MAX_ITEMS = 100;

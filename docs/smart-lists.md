@@ -19,7 +19,7 @@ A row whose feature is off is dropped from `GET /api/smartlists/active` for ever
 
 ### Options per source
 
-All sources share `Title`, `SortBy`, `MaxItems` (clamped 1–100 by `SmartListManager`), `ShowOnHomepage`, `ShowToFriends` (off = admins only) and the optional yearly window `ActiveStart/EndMonth/Day` (December → January wraps; an impossible date drops the window on save rather than breaking `/active`). The rest of the options reuse `FilterRulesJson` (`SmartListRulesDto`):
+All sources share `Title`, `SortBy`, `MaxItems` (clamped 1–100 by `SmartListManager`), `ShowOnHomepage`, `ShowToFriends` (off = admins only) and the optional yearly window `ActiveStart/EndMonth/Day` (December → January wraps; an impossible date drops the window on save rather than breaking `/active`). A row built from a collection also follows the collection's Seasonal Visibility: it shows while both windows are open, on today's date in the server's time zone (`CollectionSeason`, `docs/theme-collections.md`). The rest of the options reuse `FilterRulesJson` (`SmartListRulesDto`):
 
 - **Library**: `mediaTypes`, `decade`, `genreIds`, `contentRating`, `unwatchedOnly`, plus `LibraryId` to read from one library. Every `SmartListSortBy` applies; `TitleAsc` sorts by sort title.
   - A show appears at most once. `DateAddedDesc` sorts by `LastContentAddedAt ?? AddedAt`, so a new episode lifts its season and its show as well. When a list mixes more than one of shows, seasons and episodes and is sorted by date added, `RecentlyAddedTv.OnePerShow` keeps one tile per show:

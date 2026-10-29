@@ -250,6 +250,8 @@ public class MetadataMappingService : IMetadataMappingService
         if (!item.IsLocked(nameof(item.TvdbId)) || forceOverride) item.TvdbId = metadata.TvdbId ?? item.TvdbId;
         if (!item.IsLocked(nameof(item.IsAdult)) || forceOverride) item.IsAdult = metadata.IsAdult;
 
+        if (metadata.Keywords != null) item.Keywords = metadata.Keywords;
+
         var stingersChanged = item.HasMidCreditsStinger != metadata.HasMidCreditsStinger
             || item.HasPostCreditsStinger != metadata.HasPostCreditsStinger;
         item.HasMidCreditsStinger = metadata.HasMidCreditsStinger;

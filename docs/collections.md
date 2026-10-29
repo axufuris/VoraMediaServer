@@ -10,7 +10,7 @@ separately on `Collection` (`src/Vora.Domain/Entities/Library/Collection.cs`):
   ordering* text).
 
 Providers implement `ICollectionSyncProvider` (content) and `IChronologyProvider`
-(sort). Built-ins: AI (`openai_list`, `openai_chronology`), Trakt, MDbList, IMDb.
+(sort). Built-ins: AI (`openai_list`, `openai_theme`, `openai_chronology`), Trakt, MDbList, IMDb. AI Theme fills a holiday or occasion collection from the library, and a collection can show only in its season, every year: [`theme-collections.md`](theme-collections.md).
 
 ## Order of collection lists
 
@@ -26,7 +26,7 @@ Every list of collections (the Collections tabs, the library's Collections tab, 
 Best for a **defined franchise or shared universe**, not open genres. A genre or
 mood grouping ("all my kung-fu movies", "all my horror") can't be enumerated by
 the model and it doesn't know your library — use a **Smart Playlist** instead
-(filters your library by genre metadata; see [`playlists.md`](playlists.md)).
+(filters your library by genre metadata; see [`playlists.md`](playlists.md)). A holiday or occasion is the **AI Theme** provider.
 
 `FetchItemsAsync` runs one generation prompt, then up to `MaxCompletenessPasses`
 (2) **critic passes** that name entries the previous list missed, merged with a

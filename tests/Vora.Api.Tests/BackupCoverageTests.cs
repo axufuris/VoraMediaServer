@@ -89,6 +89,8 @@ public class BackupCoverageTests : IClassFixture<VoraApiTestFactory>
         ["Countries"] = Scanned,
         ["Networks"] = Scanned,
         ["MediaItemEmbeddings"] = Derived,
+        ["CollectionThemes"] = "A theme collection's profile and vector, made again by its next sync; the collection's titles are backed up with it.",
+        ["CollectionThemeVerdicts"] = "The AI's answers for a theme collection, asked again by its next sync; the collection's titles and exclusions are backed up with it.",
         ["MediaItemAnalysis"] = Derived,
         ["MediaItemAudioFingerprints"] = Derived,
         ["ArtistSimilarities"] = Derived,

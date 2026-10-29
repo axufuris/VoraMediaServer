@@ -304,6 +304,61 @@ namespace Vora.Infrastructure.Migrations
                     b.ToTable("CollectionItems", (string)null);
                 });
 
+            modelBuilder.Entity("Vora.Domain.Entities.Collections.CollectionTheme", b =>
+                {
+                    b.Property<Guid>("CollectionId")
+                        .HasColumnType("uuid");
+
+                    b.PrimitiveCollection<float[]>("Embedding")
+                        .HasColumnType("real[]");
+
+                    b.Property<string>("EmbeddingModel")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.PrimitiveCollection<List<string>>("Keywords")
+                        .IsRequired()
+                        .HasColumnType("text[]");
+
+                    b.Property<string>("Profile")
+                        .IsRequired()
+                        .HasMaxLength(4000)
+                        .HasColumnType("character varying(4000)");
+
+                    b.Property<string>("Theme")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("CollectionId");
+
+                    b.ToTable("CollectionThemes");
+                });
+
+            modelBuilder.Entity("Vora.Domain.Entities.Collections.CollectionThemeVerdict", b =>
+                {
+                    b.Property<Guid>("CollectionId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("MediaItemId")
+                        .HasColumnType("uuid");
+
+                    b.Property<bool>("Belongs")
+                        .HasColumnType("boolean");
+
+                    b.Property<DateTime>("JudgedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("CollectionId", "MediaItemId");
+
+                    b.HasIndex("MediaItemId");
+
+                    b.ToTable("CollectionThemeVerdicts");
+                });
+
             modelBuilder.Entity("Vora.Domain.Entities.Discovery.DiscoveryRowConfig", b =>
                 {
                     b.Property<Guid>("Id")
@@ -891,6 +946,9 @@ namespace Vora.Infrastructure.Migrations
 
                     b.Property<DateTime?>("VisibleEndDate")
                         .HasColumnType("timestamp with time zone");
+
+                    b.Property<bool>("VisibleEveryYear")
+                        .HasColumnType("boolean");
 
                     b.Property<DateTime?>("VisibleStartDate")
                         .HasColumnType("timestamp with time zone");
@@ -1756,6 +1814,9 @@ namespace Vora.Infrastructure.Migrations
 
                     b.Property<bool>("IsAdult")
                         .HasColumnType("boolean");
+
+                    b.PrimitiveCollection<List<string>>("Keywords")
+                        .HasColumnType("text[]");
 
                     b.Property<DateTime?>("LastContentAddedAt")
                         .HasColumnType("timestamp with time zone");
@@ -4827,6 +4888,36 @@ namespace Vora.Infrastructure.Migrations
                 });
 
             modelBuilder.Entity("Vora.Domain.Entities.Collections.CollectionItem", b =>
+                {
+                    b.HasOne("Vora.Domain.Entities.Library.Collection", "Collection")
+                        .WithMany()
+                        .HasForeignKey("CollectionId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("Vora.Domain.Entities.Media.MediaItem", "MediaItem")
+                        .WithMany()
+                        .HasForeignKey("MediaItemId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Collection");
+
+                    b.Navigation("MediaItem");
+                });
+
+            modelBuilder.Entity("Vora.Domain.Entities.Collections.CollectionTheme", b =>
+                {
+                    b.HasOne("Vora.Domain.Entities.Library.Collection", "Collection")
+                        .WithOne()
+                        .HasForeignKey("Vora.Domain.Entities.Collections.CollectionTheme", "CollectionId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Collection");
+                });
+
+            modelBuilder.Entity("Vora.Domain.Entities.Collections.CollectionThemeVerdict", b =>
                 {
                     b.HasOne("Vora.Domain.Entities.Library.Collection", "Collection")
                         .WithMany()

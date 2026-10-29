@@ -1,6 +1,7 @@
 ﻿using System.Linq.Expressions;
 using Vora.Application.Media;
 using Microsoft.EntityFrameworkCore;
+using Vora.Application.Collections;
 using Vora.Application.Libraries.ViewModels;
 using Vora.Application.SmartLists;
 using Vora.Application.SmartLists.Dtos;
@@ -153,7 +154,7 @@ public class SmartListRepository(VoraDbContext context) : ISmartListRepository
         }
     }
 
-    public async Task<List<SmartListClientVM>> GetActiveClientListsAsync(bool isAdmin)
+    public async Task<List<SmartListClientVM>> GetActiveClientListsAsync(bool isAdmin, DateOnly today)
     {
         var lists = await context.Set<SmartList>()
             .AsNoTracking()
@@ -171,15 +172,14 @@ public class SmartListRepository(VoraDbContext context) : ISmartListRepository
                 l.ActiveEndDay,
                 l.CollectionId,
                 CollectionStartDate = l.Collection != null ? l.Collection.VisibleStartDate : null,
-                CollectionEndDate = l.Collection != null ? l.Collection.VisibleEndDate : null
+                CollectionEndDate = l.Collection != null ? l.Collection.VisibleEndDate : null,
+                CollectionEveryYear = l.Collection != null && l.Collection.VisibleEveryYear
             })
             .ToListAsync();
 
-        var now = DateTime.UtcNow;
-
         return lists
-            .Where(l => IsListActive(l.CollectionId, l.CollectionStartDate, l.CollectionEndDate,
-                                     l.ActiveStartMonth, l.ActiveStartDay, l.ActiveEndMonth, l.ActiveEndDay, now))
+            .Where(l => IsListActive(l.ActiveStartMonth, l.ActiveStartDay, l.ActiveEndMonth, l.ActiveEndDay, today)
+                && CollectionSeason.IsOpen(l.CollectionStartDate, l.CollectionEndDate, l.CollectionEveryYear, today))
             .Select(l => new SmartListClientVM { Id = l.Id, Title = l.Title, DisplayOrder = l.DisplayOrder, Source = l.Source })
             .ToList();
     }
@@ -346,34 +346,17 @@ public class SmartListRepository(VoraDbContext context) : ISmartListRepository
         }
     }
 
-    private static bool IsListActive(
-        Guid? collectionId,
-        DateTime? collectionStart,
-        DateTime? collectionEnd,
-        int? startMonth,
-        int? startDay,
-        int? endMonth,
-        int? endDay,
-        DateTime now)
+    private static bool IsListActive(int? startMonth, int? startDay, int? endMonth, int? endDay, DateOnly today)
     {
-        if (collectionId.HasValue)
-        {
-            if (collectionStart.HasValue && now < collectionStart.Value) return false;
-            if (collectionEnd.HasValue && now > collectionEnd.Value) return false;
-            return true;
-        }
-
         if (!startMonth.HasValue || !startDay.HasValue || !endMonth.HasValue || !endDay.HasValue)
         {
             return true;
         }
 
-        var startDate = new DateTime(2000, startMonth.Value, startDay.Value);
-        var endDate = new DateTime(2000, endMonth.Value, endDay.Value);
-        var current = new DateTime(2000, now.Month, now.Day);
-
-        return startDate > endDate
-            ? current >= startDate || current <= endDate
-            : current >= startDate && current <= endDate;
+        return CollectionSeason.IsOpen(
+            new DateTime(2000, startMonth.Value, startDay.Value),
+            new DateTime(2000, endMonth.Value, endDay.Value),
+            everyYear: true,
+            today);
     }
 }

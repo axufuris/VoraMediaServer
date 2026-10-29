@@ -27,6 +27,9 @@ public static class ScheduleClock
     public static DateTime Now(string? configuredTimeZoneId, DateTime utcNow) =>
         TimeZoneInfo.ConvertTimeFromUtc(utcNow, Resolve(configuredTimeZoneId));
 
+    public static DateOnly Today(string? configuredTimeZoneId, DateTime utcNow) =>
+        DateOnly.FromDateTime(Now(configuredTimeZoneId, utcNow));
+
     private static bool TryFind(string id, out TimeZoneInfo zone)
     {
         try

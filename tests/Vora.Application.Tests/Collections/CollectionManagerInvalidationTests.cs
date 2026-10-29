@@ -1,6 +1,7 @@
 using Vora.Application.Analysis;
 using Vora.Application.Collections;
 using Vora.Application.Collections.Requests;
+using Vora.Application.Settings;
 using Vora.Application.Tasks;
 using Vora.Domain.Entities.Library;
 
@@ -18,7 +19,7 @@ public class CollectionManagerInvalidationTests
         _repo = Substitute.For<ICollectionRepository>();
         _tasks = Substitute.For<ITaskQueueManager>();
         _notifier = Substitute.For<IClientNotifier>();
-        _manager = new CollectionManager(_repo, _tasks, _notifier);
+        _manager = new CollectionManager(_repo, _tasks, _notifier, Substitute.For<IServerCalendar>());
     }
 
     private static Collection Existing(string? provider, string? externalId) => new()
