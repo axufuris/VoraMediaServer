@@ -1,7 +1,9 @@
 ﻿using System.Linq.Expressions;
+using Vora.Application.Libraries.ViewModels;
 using Vora.Domain.Entities.Library;
 using Vora.Domain.Entities.Media;
 using Vora.Domain.Entities.Playlists;
+using Vora.Domain.Entities.Users;
 using Vora.Domain.Enums;
 
 namespace Vora.Application.Collections.ViewModels;
@@ -37,7 +39,14 @@ public class CollectionDetailsVM
     public List<string> LockedFields { get; set; } = new();
     public List<CollectionDetailsLibraryItemVM> Items { get; set; } = new();
 
-    public static Expression<Func<Collection, CollectionDetailsVM>> Projection =>
+    public static Expression<Func<Collection, CollectionDetailsVM>> Projection => ProjectionWith(ItemProjection);
+
+    public static Expression<Func<Collection, CollectionDetailsVM>> ProjectionFor(Guid? profileId, IQueryable<UserMediaState> states) =>
+        ProjectionWith(ItemProjection
+            .Assign(vm => vm.IsPlayed, TitleWatchState.IsPlayed(profileId, states))
+            .Assign(vm => vm.UnplayedItemCount, TitleWatchState.EpisodesLeft(profileId, states)));
+
+    private static Expression<Func<Collection, CollectionDetailsVM>> ProjectionWith(Expression<Func<MediaItem, CollectionDetailsLibraryItemVM>> items) =>
         c => new CollectionDetailsVM
         {
             Id = c.Id,
@@ -67,35 +76,38 @@ public class CollectionDetailsVM
             SmartMediaType = c.SmartMediaType,
             IsPlayed = false,
             UnplayedItemCount = null,
-            Items = c.Items.Select(item => new CollectionDetailsLibraryItemVM
-            {
-                Id = item.Id,
-                Title = item.Title,
-                SortTitle = item.SortTitle,
-                Type = item is Movie ? "Movie"
-                    : item is TvShow ? "TvShow"
-                    : item is Season ? "Season"
-                    : item is Episode ? "Episode"
-                    : "Unknown",
-                NumberOfSeasons = item is TvShow ? ((TvShow)item).Seasons.Count(s => s.MissingSince == null) : (int?)null,
-                TvShowTitle = item is Season ? ((Season)item).TvShow.Title
-                    : item is Episode ? ((Episode)item).Season.TvShow.Title
-                    : null,
-                SeasonNumber = item is Season ? ((Season)item).SeasonNumber
-                    : item is Episode ? ((Episode)item).Season.SeasonNumber
-                    : (int?)null,
-                SeasonName = item is Season ? item.Title
-                    : item is Episode ? ((Episode)item).Season.Title
-                    : null,
-                EpisodeNumber = item is Episode ? ((Episode)item).EpisodeNumber : (int?)null,
-                Edition = item is Movie ? item.Edition : null,
-                PosterUrl = item is Episode
-                    ? (((Episode)item).Season.PosterUrl ?? ((Episode)item).Season.TvShow.PosterUrl)
-                    : (item.PosterUrl ?? (item is Season ? ((Season)item).TvShow.PosterUrl : null)),
-                ReleaseDate = item.ReleaseDate,
-                AddedAt = item.AddedAt,
-                IsPlayed = false,
-                UnplayedItemCount = null
-            }).ToList()
+            Items = c.Items.AsQueryable().Select(items).ToList()
+        };
+
+    private static Expression<Func<MediaItem, CollectionDetailsLibraryItemVM>> ItemProjection =>
+        item => new CollectionDetailsLibraryItemVM
+        {
+            Id = item.Id,
+            Title = item.Title,
+            SortTitle = item.SortTitle,
+            Type = item is Movie ? "Movie"
+                : item is TvShow ? "TvShow"
+                : item is Season ? "Season"
+                : item is Episode ? "Episode"
+                : "Unknown",
+            NumberOfSeasons = item is TvShow ? ((TvShow)item).Seasons.Count(s => s.MissingSince == null) : (int?)null,
+            TvShowTitle = item is Season ? ((Season)item).TvShow.Title
+                : item is Episode ? ((Episode)item).Season.TvShow.Title
+                : null,
+            SeasonNumber = item is Season ? ((Season)item).SeasonNumber
+                : item is Episode ? ((Episode)item).Season.SeasonNumber
+                : (int?)null,
+            SeasonName = item is Season ? item.Title
+                : item is Episode ? ((Episode)item).Season.Title
+                : null,
+            EpisodeNumber = item is Episode ? ((Episode)item).EpisodeNumber : (int?)null,
+            Edition = item is Movie ? item.Edition : null,
+            PosterUrl = item is Episode
+                ? (((Episode)item).Season.PosterUrl ?? ((Episode)item).Season.TvShow.PosterUrl)
+                : (item.PosterUrl ?? (item is Season ? ((Season)item).TvShow.PosterUrl : null)),
+            ReleaseDate = item.ReleaseDate,
+            AddedAt = item.AddedAt,
+            IsPlayed = false,
+            UnplayedItemCount = null
         };
 }

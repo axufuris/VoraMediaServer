@@ -15,14 +15,12 @@ public class RecommendationManager : IRecommendationManager
 {
     private readonly IEnumerable<IRecommendationProvider> _providers;
     private readonly ISystemSettingsRepository _settingsRepo;
-    private readonly IUserMediaStateRepository _userMediaStates;
     private readonly IRecommendationRepository _recommendationRepo;
 
-    public RecommendationManager(IEnumerable<IRecommendationProvider> providers, ISystemSettingsRepository settingsRepo, IUserMediaStateRepository userMediaStates, IRecommendationRepository recommendationRepo)
+    public RecommendationManager(IEnumerable<IRecommendationProvider> providers, ISystemSettingsRepository settingsRepo, IRecommendationRepository recommendationRepo)
     {
         _providers = providers;
         _settingsRepo = settingsRepo;
-        _userMediaStates = userMediaStates;
         _recommendationRepo = recommendationRepo;
     }
 
@@ -49,12 +47,10 @@ public class RecommendationManager : IRecommendationManager
                 foreach (var list in providerLists)
                 {
                     var matchedItems = await _recommendationRepo.GetHydratedMediaItemsAsync(
-                        list.LocalItemIds, list.ExternalTmdbIds, libraryId, hasAllAccess, allowedLibs, allowedMovieRatings, allowedTvRatings, blockUnrated);
+                        profileId, list.LocalItemIds, list.ExternalTmdbIds, libraryId, hasAllAccess, allowedLibs, allowedMovieRatings, allowedTvRatings, blockUnrated);
 
                     if (matchedItems.Any())
                     {
-                        await _userMediaStates.AttachLibraryItemUserStatesAsync(matchedItems, profileId);
-
                         allLists.Add(new RecommendationListVM
                         {
                             Title = list.Title,

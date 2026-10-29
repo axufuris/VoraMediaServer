@@ -17,7 +17,6 @@ public interface IMediaManager
     Task<MediaDetailsVM?> GetMediaItemAsync(Guid id, Guid? profileId, bool hasAllAccess, List<Guid> allowedLibs, List<string> allowedMovieRatings, List<string> allowedTvRatings, bool blockUnrated);
     Task<IEnumerable<LibraryItemVM>> GetLibraryContentAsync(Guid libraryId, Guid? profileId, bool hasAllAccess, List<Guid> allowedLibs, List<string> allowedMovieRatings, List<string> allowedTvRatings, bool blockUnrated);
     Task<MediaDetailsVM?> GetMediaItemAsync(Guid id);
-    Task<IEnumerable<LibraryItemVM>> GetLibraryContentAsync(Guid libraryId);
     Task<SeasonDetailsVM?> GetSeasonDetailsAsync(Guid seasonId);
     Task<List<MediaMarkerVM>> GetMarkersAsync(Guid mediaItemId);
     Task ReplaceMarkersAsync(Guid mediaItemId, IEnumerable<MediaMarkerVM> markers);
@@ -89,12 +88,8 @@ public class MediaManager : IMediaManager
 
     public async Task<IEnumerable<LibraryItemVM>> GetLibraryContentAsync(Guid libraryId, Guid? profileId, bool hasAllAccess, List<Guid> allowedLibs, List<string> allowedMovieRatings, List<string> allowedTvRatings, bool blockUnrated)
     {
-        var items = await _repository.GetAllProjectedAsync(LibraryItemVM.Projection, libraryId, null, hasAllAccess, allowedLibs, allowedMovieRatings, allowedTvRatings, blockUnrated);
-        var groupedItems = items.GroupBy(e => $"{e.Title.ToLower().Trim()}_{e.ReleaseDate?.Year}").Select(g => g.First()).ToList();
-
-        if (profileId.HasValue) await _stateRepository.AttachLibraryItemUserStatesAsync(groupedItems, profileId.Value);
-
-        return groupedItems;
+        var items = await _repository.GetLibraryItemsAsync(libraryId, profileId, hasAllAccess, allowedLibs, allowedMovieRatings, allowedTvRatings, blockUnrated);
+        return items.GroupBy(e => $"{e.Title.ToLower().Trim()}_{e.ReleaseDate?.Year}").Select(g => g.First()).ToList();
     }
 
     public async Task<MediaDetailsVM?> GetMediaItemAsync(Guid id) =>
@@ -124,12 +119,6 @@ public class MediaManager : IMediaManager
         }
         ExtraNames.Apply(details);
         return details;
-    }
-
-    public async Task<IEnumerable<LibraryItemVM>> GetLibraryContentAsync(Guid libraryId)
-    {
-        var items = await _repository.GetAllProjectedAsync(LibraryItemVM.Projection, libraryId);
-        return items.GroupBy(e => $"{e.Title.ToLower().Trim()}_{e.ReleaseDate?.Year}").Select(g => g.First()).ToList();
     }
 
     public async Task<SeasonDetailsVM?> GetSeasonDetailsAsync(Guid seasonId)

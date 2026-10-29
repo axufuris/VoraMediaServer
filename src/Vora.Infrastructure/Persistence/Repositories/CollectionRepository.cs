@@ -12,6 +12,9 @@ namespace Vora.Infrastructure.Persistence.Repositories;
 
 public class CollectionRepository(VoraDbContext context) : ICollectionRepository
 {
+    public Task<CollectionDetailsVM?> GetDetailsAsync(Guid id, Guid? profileId, bool hasAllAccess, List<Guid> allowedLibs) =>
+        GetProjectedByIdAsync(id, CollectionDetailsVM.ProjectionFor(profileId, context.UserMediaStates), hasAllAccess, allowedLibs);
+
     public Task<T?> GetProjectedByIdAsync<T>(Guid id, Expression<Func<Collection, T>> projection, bool hasAllAccess = true, List<Guid>? allowedLibs = null)
     {
         var query = context.Collections.AsNoTracking().Where(c => c.Id == id);
@@ -401,115 +404,5 @@ public class CollectionRepository(VoraDbContext context) : ICollectionRepository
         context.Set<CollectionArtwork>().RemoveRange(existing);
         await context.Set<CollectionArtwork>().AddRangeAsync(newArtwork);
         await context.SaveChangesAsync();
-    }
-
-    public async Task AttachCollectionItemUserStatesAsync(IEnumerable<CollectionDetailsLibraryItemVM> items, Guid profileId)
-    {
-        var itemList = items.ToList();
-        if (itemList.Count == 0)
-        {
-            return;
-        }
-
-        var itemIds = itemList.Select(i => i.Id).ToList();
-
-        var directStates = await context.Set<UserMediaState>()
-            .AsNoTracking()
-            .Where(s => s.ProfileId == profileId && itemIds.Contains(s.MediaItemId))
-            .ToDictionaryAsync(s => s.MediaItemId, s => s.IsPlayed);
-
-        var tvShowIds = itemList.Where(i => i.Type == "TvShow").Select(i => i.Id).ToList();
-        var seasonIds = itemList.Where(i => i.Type == "Season").Select(i => i.Id).ToList();
-
-        var (tvStats, seasonStats) = await ResolveAggregatedPlayStatsAsync(profileId, tvShowIds, seasonIds);
-
-        foreach (var item in itemList)
-        {
-            ApplyUserState(item, directStates, tvStats, seasonStats);
-        }
-    }
-
-    private async Task<(Dictionary<Guid, (int Total, int Played)> TvStats, Dictionary<Guid, (int Total, int Played)> SeasonStats)> ResolveAggregatedPlayStatsAsync(
-        Guid profileId,
-        List<Guid> tvShowIds,
-        List<Guid> seasonIds)
-    {
-        var tvStats = new Dictionary<Guid, (int, int)>();
-        var seasonStats = new Dictionary<Guid, (int, int)>();
-
-        if (tvShowIds.Count == 0 && seasonIds.Count == 0)
-        {
-            return (tvStats, seasonStats);
-        }
-
-        var episodeMappings = await context.Set<Episode>()
-            .AsNoTracking()
-            .Where(e => tvShowIds.Contains(e.Season.TvShowId) || seasonIds.Contains(e.SeasonId))
-            .Select(e => new { e.Id, e.SeasonId, TvShowId = e.Season.TvShowId })
-            .ToListAsync();
-
-        if (episodeMappings.Count == 0)
-        {
-            return (tvStats, seasonStats);
-        }
-
-        var allEpisodeIds = episodeMappings.Select(e => e.Id).ToList();
-
-        var playedEpisodeIds = await context.Set<UserMediaState>()
-            .AsNoTracking()
-            .Where(s => s.ProfileId == profileId && s.IsPlayed && allEpisodeIds.Contains(s.MediaItemId))
-            .Select(s => s.MediaItemId)
-            .ToListAsync();
-
-        var playedSet = playedEpisodeIds.ToHashSet();
-        var tvShowSet = tvShowIds.ToHashSet();
-        var seasonSet = seasonIds.ToHashSet();
-
-        if (tvShowSet.Count > 0)
-        {
-            tvStats = episodeMappings
-                .Where(e => tvShowSet.Contains(e.TvShowId))
-                .GroupBy(x => x.TvShowId)
-                .ToDictionary(g => g.Key, g => (Total: g.Count(), Played: g.Count(x => playedSet.Contains(x.Id))));
-        }
-
-        if (seasonSet.Count > 0)
-        {
-            seasonStats = episodeMappings
-                .Where(e => seasonSet.Contains(e.SeasonId))
-                .GroupBy(x => x.SeasonId)
-                .ToDictionary(g => g.Key, g => (Total: g.Count(), Played: g.Count(x => playedSet.Contains(x.Id))));
-        }
-
-        return (tvStats, seasonStats);
-    }
-
-    private static void ApplyUserState(
-        CollectionDetailsLibraryItemVM item,
-        Dictionary<Guid, bool> directStates,
-        Dictionary<Guid, (int Total, int Played)> tvStats,
-        Dictionary<Guid, (int Total, int Played)> seasonStats)
-    {
-        if (item.Type == "Movie" || item.Type == "Episode")
-        {
-            if (directStates.TryGetValue(item.Id, out var played))
-            {
-                item.IsPlayed = played;
-            }
-            return;
-        }
-
-        if (item.Type == "TvShow" && tvStats.TryGetValue(item.Id, out var tvStat))
-        {
-            item.UnplayedItemCount = tvStat.Total - tvStat.Played;
-            item.IsPlayed = tvStat.Total > 0 && tvStat.Total == tvStat.Played;
-            return;
-        }
-
-        if (item.Type == "Season" && seasonStats.TryGetValue(item.Id, out var seasonStat))
-        {
-            item.UnplayedItemCount = seasonStat.Total - seasonStat.Played;
-            item.IsPlayed = seasonStat.Total > 0 && seasonStat.Total == seasonStat.Played;
-        }
     }
 }

@@ -1,5 +1,6 @@
 ﻿using System.Linq.Expressions;
 using Vora.Domain.Entities.Media;
+using Vora.Domain.Entities.Users;
 
 namespace Vora.Application.Libraries.ViewModels;
 
@@ -37,6 +38,12 @@ public class LibraryItemVM
     public string? ThirdPartyRating2Name { get; set; }
     public decimal? MyRating { get; set; }
     public List<string> Genres { get; set; } = new();
+
+    public static Expression<Func<MediaItem, LibraryItemVM>> ProjectionFor(Guid? profileId, IQueryable<UserMediaState> states, IQueryable<UserMediaRating> ratings) =>
+        Projection
+            .Assign(vm => vm.IsPlayed, TitleWatchState.IsPlayed(profileId, states))
+            .Assign(vm => vm.UnplayedItemCount, TitleWatchState.EpisodesLeft(profileId, states))
+            .Assign(vm => vm.MyRating, TitleWatchState.Rating(profileId, ratings));
 
     public static Expression<Func<MediaItem, LibraryItemVM>> Projection =>
         item => new LibraryItemVM

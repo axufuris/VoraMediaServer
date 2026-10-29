@@ -5,6 +5,7 @@ namespace Vora.Application.Recommendations;
 public interface IRecommendationRepository
 {
     Task<List<LibraryItemVM>> GetHydratedMediaItemsAsync(
+        Guid profileId,
         List<Guid> localItemIds,
         List<string> externalTmdbIds,
         Guid? libraryId,
