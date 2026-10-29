@@ -1,6 +1,6 @@
 import { useEffect, useState, useCallback } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
-import { mediaService, type Episode, type MediaItem } from '../../../api/Media/mediaService';
+import { mediaService, type Episode, type MediaItem, type Season } from '../../../api/Media/mediaService';
 import CastRow from '../../../components/Client/Primitives/CastRow';
 import MediaExtrasRow from '../../../components/Media/MediaExtrasRow';
 import EpisodeRail from '../../../components/Media/EpisodeRail';
@@ -35,7 +35,7 @@ import { ActionMenuList } from '../../../components/Client/Primitives/ActionMenu
 import { menuAction, menuHeading, menuSeparator, tidyMenu, withKeyPrefix } from '../../../components/Client/Primitives/menuEntries';
 import { mediaPath, ShowPageState, type MediaPageState } from '../../../utils/mediaPath';
 import SeasonPills from '../../../components/Media/SeasonPills';
-import { useSeasonEpisodeSelection, useSiblingSeasons } from './useSeasonEpisodeSelection';
+import { useSeasonEpisodeSelection } from './useSeasonEpisodeSelection';
 import { useEpisodeLayout } from './useEpisodeLayout';
 import { mediaMenuTarget } from '../../../components/Media/ItemMenu/mediaItemMenu';
 import { useMediaItemActions } from '../../../components/Media/ItemMenu/useMediaItemActions';
@@ -50,12 +50,54 @@ interface UpcomingEpisodeParsed {
 
 const prefersReducedMotion = () => window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false;
 
+interface UpNextQuality {
+    titleId: string;
+    episode: MediaItem | null;
+}
+
+interface ShowSeasons {
+    showId: string;
+    seasons: Season[];
+}
+
+// What the hero draws is fetched before any of it is shown: the title, the
+// episode it plays (a show's or season's up next, which a season page
+// describes) and a season's pills. Drawn as each came in, the hero's lines,
+// buttons and poster jumped.
+interface ShownPage {
+    media: MediaItem;
+    upNext: UpNextQuality | null;
+    seasons: ShowSeasons | null;
+}
+
+async function fetchUpNext(title: MediaItem, serverId?: string): Promise<UpNextQuality | null> {
+    if (title.type !== 'TvShow' && title.type !== 'Season') return null;
+    try {
+        const upNext = await mediaService.getUpNext(title.id, undefined, undefined, serverId);
+        const episode = upNext.nextItem ? await mediaService.getMediaItem(upNext.nextItem.id, serverId) : null;
+        return { titleId: title.id, episode };
+    } catch {
+        return { titleId: title.id, episode: null };
+    }
+}
+
+// The show's seasons, for the pills at the top of a season page.
+async function fetchShowSeasons(showId: string, serverId?: string): Promise<ShowSeasons> {
+    try {
+        const show = await mediaService.getMediaItem(showId, serverId);
+        return { showId, seasons: show.seasons ?? [] };
+    } catch {
+        return { showId, seasons: [] };
+    }
+}
+
 export default function MediaDetailsPage() {
     const dialog = useDialog();
     const { serverId, id } = useParams<{ serverId?: string, id: string }>();
     const navigate = useNavigate();
 
-    const [media, setMedia] = useState<MediaItem | null>(null);
+    const [page, setPage] = useState<ShownPage | null>(null);
+    const media = page?.media ?? null;
     const [loading, setLoading] = useState(true);
     const [loadFailure, setLoadFailure] = useState<string | null>(null);
 
@@ -67,13 +109,13 @@ export default function MediaDetailsPage() {
     // A show plays its up-next episode, so that episode's file is what the
     // chips describe and the track picks apply to. A season page describes the
     // episode selected on it, which starts as the season's up-next episode.
-    const [upNextQuality, setUpNextQuality] = useState<{ titleId: string; episode: MediaItem | null } | null>(null);
+    const upNextQuality = page?.upNext ?? null;
     const playsUpNext = media?.type === 'TvShow' || media?.type === 'Season';
     const upNextEpisode = media && upNextQuality?.titleId === media.id ? upNextQuality.episode : null;
     const upNextResolved = !!media && upNextQuality?.titleId === media.id;
     const isSeasonPage = media?.type === 'Season';
     const selection = useSeasonEpisodeSelection(media, upNextEpisode, upNextResolved, serverId);
-    const siblingSeasons = useSiblingSeasons(media, serverId);
+    const siblingSeasons = page?.seasons && page.media.type === 'Season' && page.seasons.showId === page.media.tvShowId ? page.seasons.seasons : [];
     const episodeLayout = useEpisodeLayout(serverId);
     const qualityMedia = !media
         ? null
@@ -113,11 +155,15 @@ export default function MediaDetailsPage() {
         return true;
     }, [navigate, serverId, asksForShowPage]);
 
+    // A reload keeps the season's pills, and is dropped when the page has
+    // moved on to another title while it was out.
     const reloadMedia = useCallback(async () => {
         if (!id) return;
         try {
             const data = await mediaService.getMediaItem(id, serverId);
-            if (!openOnSeason(data)) setMedia(data);
+            if (openOnSeason(data)) return;
+            const upNext = await fetchUpNext(data, serverId);
+            setPage(shown => shown?.media.id === data.id ? { media: data, upNext, seasons: shown.seasons } : shown);
         } catch {
             console.error('Failed to reload media details.');
         }
@@ -162,9 +208,15 @@ export default function MediaDetailsPage() {
             .catch(() => { /* a watchlist read failing shouldn't block the page */ });
 
         mediaService.getMediaItem(id, serverId)
-            .then(data => {
+            .then(async data => {
                 if (!isMounted || openOnSeason(data)) return;
-                setMedia(data);
+                const showId = data.type === 'Season' ? data.tvShowId : undefined;
+                const [upNext, seasons] = await Promise.all([
+                    fetchUpNext(data, serverId),
+                    showId ? fetchShowSeasons(showId, serverId) : null,
+                ]);
+                if (!isMounted) return;
+                setPage({ media: data, upNext, seasons });
                 setLoadFailure(null);
                 setLoading(false);
             })
@@ -177,34 +229,20 @@ export default function MediaDetailsPage() {
         return () => { isMounted = false; };
     }, [id, serverId, openOnSeason]);
 
+    // Closing the player changes what was watched and where Play resumes, so
+    // the page reloads then. It once reloaded whenever nothing was playing,
+    // which loaded every page a second time half a second after it opened.
+    const [playerOpen, setPlayerOpen] = useState(isPlaying);
+    const [playerClosed, setPlayerClosed] = useState<{ onId: string | undefined; count: number }>({ onId: undefined, count: 0 });
+    if (playerOpen !== isPlaying) {
+        setPlayerOpen(isPlaying);
+        if (!isPlaying) setPlayerClosed(closed => ({ onId: id, count: closed.count + 1 }));
+    }
     useEffect(() => {
-        if (!media || (media.type !== 'TvShow' && media.type !== 'Season')) return;
-
-        const titleId = media.id;
-        let cancelled = false;
-        (async () => {
-            try {
-                const upNext = await mediaService.getUpNext(titleId, undefined, undefined, serverId);
-                if (cancelled) return;
-                if (!upNext.nextItem) {
-                    setUpNextQuality({ titleId, episode: null });
-                    return;
-                }
-                const episode = await mediaService.getMediaItem(upNext.nextItem.id, serverId);
-                if (!cancelled) setUpNextQuality({ titleId, episode });
-            } catch {
-                if (!cancelled) setUpNextQuality({ titleId, episode: null });
-            }
-        })();
-        return () => { cancelled = true; };
-    }, [media, serverId]);
-
-    useEffect(() => {
-        if (!isPlaying && id) {
-            const timer = setTimeout(() => reloadMedia(), 500);
-            return () => clearTimeout(timer);
-        }
-    }, [isPlaying, id, reloadMedia]);
+        if (playerClosed.count === 0 || playerClosed.onId !== id) return;
+        const timer = setTimeout(() => { void reloadMedia(); }, 500);
+        return () => clearTimeout(timer);
+    }, [playerClosed, id, reloadMedia]);
 
     useSignalREvent('MediaItemUpdated', useCallback((updatedId: string) => {
         if (!id || !media) return;
@@ -319,11 +357,14 @@ export default function MediaDetailsPage() {
 
     const handleSetRating = useCallback(async (next: number | null) => {
         if (!media) return;
-        setMedia(prev => prev ? {
-            ...prev,
-            myRating: next ?? undefined,
-            serverAdminRating: isAdmin ? (next ?? undefined) : prev.serverAdminRating,
-        } : prev);
+        setPage(shown => shown ? {
+            ...shown,
+            media: {
+                ...shown.media,
+                myRating: next ?? undefined,
+                serverAdminRating: isAdmin ? (next ?? undefined) : shown.media.serverAdminRating,
+            },
+        } : shown);
         try {
             await mediaService.setRating(media.id, next, serverId);
         } catch {
@@ -453,12 +494,14 @@ export default function MediaDetailsPage() {
     );
 
     // On every season page, a one-season show's too: the Show pill is the way
-    // to the show's own page, which the title menu no longer offers.
+    // to the show's own page, which the title menu no longer offers. A picked
+    // season's pill lights at once, from the address; the season keeps the
+    // page until everything its hero draws has loaded.
     const showId = isSeason ? media.tvShowId : undefined;
     const seasonPills = showId && siblingSeasons.length > 0 ? (
         <SeasonPills
             seasons={siblingSeasons}
-            currentId={media.id}
+            currentId={id ?? media.id}
             onPick={season => navigate(mediaPath({ id: season.id, type: 'Season' }, serverId), { replace: true })}
             showTitle={media.tvShowTitle}
             onPickShow={() => navigate(mediaPath({ id: showId, type: 'TvShow' }, serverId), { state: ShowPageState })}

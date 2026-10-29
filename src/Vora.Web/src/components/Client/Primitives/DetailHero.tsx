@@ -32,8 +32,9 @@ interface DetailHeroProps {
     // Above the title: the season pills on a season page.
     topContent?: ReactNode;
     // The hero swaps what it describes (a season page's selected episode), and
-    // its file chips and ratings arrive a moment after the rest. Hold their room
-    // so the hero, which centres its content, does not jump as they come and go.
+    // its file chips, ratings and age rating arrive a moment after the rest.
+    // Hold their room so the hero, which centres its content, does not jump as
+    // they come and go.
     steady?: boolean;
     // Resolution / audio / subtitle chips, in the hero's bottom-right corner.
     techChips?: ReactNode;
@@ -274,7 +275,7 @@ export default function DetailHero({
                             </div>
                         )}
 
-                        {chips && <div className="mt-4 flex flex-wrap items-center gap-2">{chips}</div>}
+                        {(chips || steady) && <div data-testid="hero-facts" className={`mt-4 flex flex-wrap items-center gap-2 ${steady ? 'min-h-[calc(1.5rem+2px)]' : ''}`}>{chips}</div>}
 
                         {ratings && <div data-testid="hero-ratings" className={`mt-3 flex flex-wrap items-center gap-x-5 gap-y-2 ${steady ? 'min-h-7' : ''}`}>{ratings}</div>}
 

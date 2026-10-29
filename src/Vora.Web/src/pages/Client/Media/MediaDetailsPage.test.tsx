@@ -1,5 +1,5 @@
 import { afterEach, describe, it, expect, vi, beforeEach } from 'vitest';
-import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom';
 import MediaDetailsPage from './MediaDetailsPage';
 import { PlayerContext, type PlayerContextType } from '../../../contexts/usePlayer';
@@ -96,22 +96,37 @@ const show = (seasonCount: number): MediaItem => ({
 
 let items: Record<string, MediaItem> = {};
 
+const fromItems = (id: string) => {
+    const item = items[id];
+    return item ? Promise.resolve(item) : Promise.reject(new Error(`No ${id}`));
+};
+
+function deferred<T>() {
+    let resolve: (value: T) => void = () => undefined;
+    const promise = new Promise<T>(settle => { resolve = settle; });
+    return { promise, resolve };
+}
+
 function Address() {
     const location = useLocation();
     return <output data-testid="address">{location.pathname + location.search}</output>;
 }
 
 function openPage(path: string, state?: MediaPageState) {
-    return render(
-        <PlayerContext.Provider value={player}>
+    const page = (isPlaying: boolean) => (
+        <PlayerContext.Provider value={{ ...player, isPlaying }}>
             <MemoryRouter initialEntries={[state ? { pathname: path, state } : path]}>
                 <Routes>
                     <Route path="/media/:id" element={<><MediaDetailsPage /><Address /></>} />
                 </Routes>
             </MemoryRouter>
-        </PlayerContext.Provider>,
+        </PlayerContext.Provider>
     );
+    const view = render(page(false));
+    return { ...view, setPlaying: (isPlaying: boolean) => view.rerender(page(isPlaying)) };
 }
+
+const loadsOf = (id: string) => api.getMediaItem.mock.calls.filter(([requested]) => requested === id).length;
 
 const tile = (container: HTMLElement, episodeId: string) => {
     const found = container.querySelector<HTMLElement>(`[data-episode-id="${episodeId}"] [role="button"]`);
@@ -136,10 +151,7 @@ beforeEach(() => {
     api.getUpNext.mockReset().mockImplementation(id => Promise.resolve(id === 'season-2'
         ? { nextItem: { id: 'ep-1', title: 'Anjin', type: 'Episode', seasonNumber: 2, episodeNumber: 1 }, relatedLists: [] }
         : { nextItem: { id: 'ep-2', title: 'Servants of Two Masters', type: 'Episode', seasonNumber: 1, episodeNumber: 2 }, relatedLists: [] }));
-    api.getMediaItem.mockReset().mockImplementation(id => {
-        const item = items[id];
-        return item ? Promise.resolve(item) : Promise.reject(new Error(`No ${id}`));
-    });
+    api.getMediaItem.mockReset().mockImplementation(fromItems);
 });
 
 describe('a season page', () => {
@@ -252,6 +264,57 @@ describe('a season page', () => {
         expect(await screen.findByRole('button', { name: 'Play S2 E1' })).toBeInTheDocument();
     });
 
+    // Drawn as each part came in, the hero's lines moved: the season's own
+    // name first, then its episode's title and number a moment later.
+    it('keeps the season it was on until the picked one has its episode, with the picked pill lit at once', async () => {
+        openPage('/media/season-1');
+        await screen.findByRole('navigation', { name: 'Seasons' });
+        const upNext = deferred<UpNextResultVM>();
+        api.getUpNext.mockImplementation(() => upNext.promise);
+
+        fireEvent.click(within(screen.getByRole('navigation', { name: 'Seasons' })).getByRole('button', { name: 'Season 2' }));
+
+        await waitFor(() => expect(api.getUpNext).toHaveBeenCalledWith('season-2'));
+        const hero = screen.getByRole('banner');
+        expect(within(hero).getByRole('button', { name: 'Season 2' })).toHaveAttribute('aria-current', 'page');
+        expect(within(hero).getByText('Servants of Two Masters')).toBeInTheDocument();
+        expect(within(hero).getByRole('button', { name: 'Resume S1 E2 20:50' })).toBeInTheDocument();
+
+        upNext.resolve({ nextItem: { id: 'ep-1', title: 'Anjin', type: 'Episode', seasonNumber: 2, episodeNumber: 1 }, relatedLists: [] });
+
+        expect(await within(hero).findByRole('button', { name: 'Play S2 E1' })).toBeInTheDocument();
+        expect(within(hero).getByText('Anjin')).toBeInTheDocument();
+    });
+
+    it('loads once when it opens, and again when the player closes', async () => {
+        const { setPlaying } = openPage('/media/season-1');
+        await screen.findByRole('button', { name: 'Resume S1 E2 20:50' });
+
+        await act(() => new Promise(settle => setTimeout(settle, 700)));
+        expect(loadsOf('season-1')).toBe(1);
+
+        setPlaying(true);
+        setPlaying(false);
+
+        await waitFor(() => expect(loadsOf('season-1')).toBe(2), { timeout: 1500 });
+        expect(screen.getByRole('button', { name: 'Resume S1 E2 20:50' })).toBeInTheDocument();
+    });
+
+    it('draws a season page with its pills and its episode at once', async () => {
+        const show = deferred<MediaItem>();
+        api.getMediaItem.mockImplementation(id => id === 'shogun' ? show.promise : fromItems(id));
+        openPage('/media/season-1');
+
+        await waitFor(() => expect(api.getMediaItem).toHaveBeenCalledWith('shogun'));
+        expect(screen.queryByRole('banner')).toBeNull();
+
+        show.resolve(items.shogun);
+
+        const hero = await screen.findByRole('banner');
+        expect(within(hero).getByRole('navigation', { name: 'Seasons' })).toBeInTheDocument();
+        expect(within(hero).getByRole('button', { name: 'Resume S1 E2 20:50' })).toBeInTheDocument();
+    });
+
     // The title menu no longer offers "Go to show": the Show pill, first in
     // the row, is the way there.
     it('opens the show from the Show pill before the seasons', async () => {
@@ -342,6 +405,20 @@ describe('a show page', () => {
 
         expect(await screen.findByText('Seasons')).toBeInTheDocument();
         expect(screen.queryByText('Episodes')).toBeNull();
+    });
+
+    it("is drawn once its next episode is in, so Play doesn't change under it", async () => {
+        const upNext = deferred<UpNextResultVM>();
+        api.getUpNext.mockImplementation(() => upNext.promise);
+        openPage('/media/shogun');
+
+        await waitFor(() => expect(api.getUpNext).toHaveBeenCalledWith('shogun'));
+        expect(screen.queryByRole('banner')).toBeNull();
+
+        upNext.resolve({ nextItem: { id: 'ep-2', title: 'Servants of Two Masters', type: 'Episode', seasonNumber: 1, episodeNumber: 2 }, relatedLists: [] });
+
+        const hero = await screen.findByRole('banner');
+        expect(within(hero).getByRole('button', { name: 'Resume S1 E2 20:50' })).toBeInTheDocument();
     });
 });
 
