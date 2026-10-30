@@ -24,8 +24,8 @@ describe('LibraryCollectionGrid', () => {
         fireEvent.click(screen.getByRole('switch', { name: 'Show hidden (2)' }));
 
         expect(screen.getByText('Legacy of Bourne')).toBeInTheDocument();
-        expect(screen.getByText('Hidden · below minimum')).toBeInTheDocument();
-        expect(screen.getByText('Hidden · automatic off')).toBeInTheDocument();
+        expect(screen.getByText('Below minimum')).toHaveTextContent('Hidden · Below minimum');
+        expect(screen.getByText('Automatic off')).toHaveTextContent('Hidden · Automatic off');
     });
 
     it('gives a viewer no hidden toggle', () => {

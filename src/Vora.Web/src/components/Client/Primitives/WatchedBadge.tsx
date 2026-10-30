@@ -1,5 +1,5 @@
 import { type ReactNode } from 'react';
-import { cornerLength, LANDSCAPE_CORNER_SHARE } from './posterCornerLength';
+import { cornerLength, LANDSCAPE_CORNER_SHARE, POSTER_CORNER_REFERENCE_WIDTH } from './posterCornerLength';
 
 // The top-right corner of every tile in the client, and the mirror of
 // `MediaPoster.kt` in the Android client and `PosterCard.bs` on the Roku, so a
@@ -55,13 +55,32 @@ export function PosterCorner({ children, landscape = false, zIndex = 10 }: { chi
     );
 }
 
-export function CornerChip({ label, watched }: { label?: string | null; watched?: boolean }) {
+// A crossed-out eye: a title an admin can see that viewers cannot.
+export function HiddenGlyph({ size }: { size: string }) {
+    return (
+        <svg
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth={2.4}
+            style={{ width: size, height: size, flexShrink: 0 }}
+            aria-hidden="true"
+        >
+            <path strokeLinecap="round" strokeLinejoin="round" d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21" />
+        </svg>
+    );
+}
+
+// Never wider than the tile less its 6-in margin on each side, so a label too
+// long for one line wraps inside the tile instead of running off its left edge.
+export function CornerChip({ label, watched, hiddenFromViewers }: { label?: string | null; watched?: boolean; hiddenFromViewers?: boolean }) {
     const checkOnly = !label;
     return (
         <span
-            className="inline-flex items-center whitespace-nowrap backdrop-blur-sm"
+            className="inline-flex items-center backdrop-blur-sm"
             style={{
                 gap: cornerLength(4),
+                maxWidth: cornerLength(POSTER_CORNER_REFERENCE_WIDTH - 12),
                 borderRadius: cornerLength(4),
                 background: 'var(--vora-bg-overlay)',
                 border: `${cornerLength(1)} solid var(--vora-border-subtle)`,
@@ -73,6 +92,8 @@ export function CornerChip({ label, watched }: { label?: string | null; watched?
             }}
         >
             {watched && <CheckGlyph size={cornerLength(checkOnly ? FONT_SIZE * 1.2 : FONT_SIZE)} color="var(--vora-accent-500)" />}
+            {hiddenFromViewers && <HiddenGlyph size={cornerLength(FONT_SIZE * 1.1)} />}
+            {hiddenFromViewers && <span className="sr-only">Hidden · </span>}
             {label}
         </span>
     );

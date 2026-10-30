@@ -154,3 +154,21 @@ describe('episode corner label', () => {
         expect(episodeCornerLabel(undefined)).toBeNull();
     });
 });
+
+describe('hidden chip', () => {
+    it('marks a title viewers cannot see with a crossed-out eye and says so to a screen reader', () => {
+        const { container } = render(<CornerChip label="Below minimum" hiddenFromViewers />);
+
+        const chip = container.firstElementChild as HTMLElement;
+        expect(chip.firstElementChild?.tagName.toLowerCase()).toBe('svg');
+        expect(chip.querySelector('path')?.getAttribute('d')).not.toBe(CHECK_PATH);
+        expect(chip.textContent).toBe('Hidden · Below minimum');
+    });
+
+    it('is never wider than the tile less its margins, so a long label wraps inside the tile', () => {
+        const { container } = render(<CornerChip label="Below this library's minimum size" hiddenFromViewers />);
+
+        expect((container.firstElementChild as HTMLElement).style.maxWidth).toBe(css('max-width', cornerLength(116)));
+        expect((container.firstElementChild as HTMLElement).className).not.toContain('whitespace-nowrap');
+    });
+});

@@ -5,10 +5,10 @@ import MediaGrid from '../Client/Primitives/MediaGrid';
 import { CornerChip } from '../Client/Primitives/WatchedBadge';
 
 const HIDDEN_LABEL: Record<CollectionHiddenReason, string> = {
-    Empty: 'Hidden · empty',
-    AutomaticCollectionsHidden: 'Hidden · automatic off',
-    BelowMinimumSize: 'Hidden · below minimum',
-    OutOfSeason: 'Hidden · out of season',
+    Empty: 'Empty',
+    AutomaticCollectionsHidden: 'Automatic off',
+    BelowMinimumSize: 'Below minimum',
+    OutOfSeason: 'Out of season',
 };
 
 interface LibraryCollectionGridProps {
@@ -51,7 +51,7 @@ export default function LibraryCollectionGrid({ collections, isAdmin, onOpen, em
                             key={collection.id}
                             item={{ type: 'Collection', title: collection.title, itemCount: collection.itemCount }}
                             imageUrl={collection.posterUrl}
-                            badge={collection.hiddenReason ? <CornerChip label={HIDDEN_LABEL[collection.hiddenReason]} /> : undefined}
+                            badge={collection.hiddenReason ? <CornerChip label={HIDDEN_LABEL[collection.hiddenReason]} hiddenFromViewers /> : undefined}
                             onClick={() => onOpen(collection)}
                             fill
                         />
