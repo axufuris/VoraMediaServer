@@ -1,0 +1,69 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <title>Vora posters</title>
+    <style>
+        body {
+            margin: 0;
+            background: #050507;
+            font: 600 13px system-ui, sans-serif;
+            color: #c4c4cc;
+        }
+
+        .sheet {
+            display: grid;
+            gap: 16px;
+            padding: 16px;
+        }
+
+        figure {
+            position: relative;
+            margin: 0;
+        }
+
+        img {
+            display: block;
+            width: 250px;
+            height: 375px;
+            border-radius: 8px;
+        }
+
+        figcaption {
+            position: absolute;
+            left: 6px;
+            top: 6px;
+            padding: 2px 6px;
+            border-radius: 4px;
+            background: rgba(0, 0, 0, 0.7);
+        }
+    </style>
+</head>
+<body>
+    <div id="sheet" class="sheet"></div>
+    <script type="module">
+        import { POSTERS } from './posters.mjs';
+
+        const params = new URLSearchParams(location.search);
+        const ids = params.get('ids').split(',');
+        const sheet = document.getElementById('sheet');
+        sheet.style.gridTemplateColumns = `repeat(${params.get('columns')}, 250px)`;
+
+        const images = ids.map(id => {
+            const poster = POSTERS.find(candidate => candidate.id === id);
+            const figure = document.createElement('figure');
+            const image = new Image();
+            image.src = `/posters/${poster.category}/${poster.id}.jpg?t=${Date.now()}`;
+            const caption = document.createElement('figcaption');
+            caption.textContent = poster.id;
+            figure.append(image, caption);
+            sheet.append(figure);
+            return image.decode().catch(() => undefined);
+        });
+
+        Promise.all(images).then(() => {
+            window.__posterState = 'ready';
+        });
+    </script>
+</body>
+</html>

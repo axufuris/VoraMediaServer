@@ -26,7 +26,13 @@ public static partial class ArtworkEndpoints
         group.MapGet("/artwork/thumb", ServeThumbnailAsync)
             .AllowAnonymous();
 
+        group.MapGet("/artwork/vora/{category}/{fileName}", ServeVoraPoster)
+            .AllowAnonymous();
+
         var authGroup = group.MapGroup("").RequireAuthorization();
+
+        authGroup.MapGet("/artwork/vora", GetVoraPosters)
+            .Produces<VoraPosterCatalogVM>(StatusCodes.Status200OK);
 
         authGroup.MapGet("/media/{id:guid}/artwork", GetMediaArtworkAsync)
             .Produces<IEnumerable<MediaArtworkVM>>(StatusCodes.Status200OK);
@@ -69,6 +75,21 @@ public static partial class ArtworkEndpoints
         httpContext.Response.Headers.CacheControl = "public, max-age=2592000, immutable";
         return Results.File(path, ImageContentType(path));
     }
+
+    private static IResult ServeVoraPoster(string category, string fileName, IVoraPosterCatalog posters, HttpContext httpContext)
+    {
+        var poster = posters.Find(category, fileName);
+        if (poster == null || !File.Exists(poster.FilePath))
+        {
+            return Results.NotFound();
+        }
+
+        httpContext.Response.Headers.CacheControl = "public, max-age=2592000, immutable";
+        return Results.File(poster.FilePath, "image/jpeg");
+    }
+
+    private static IResult GetVoraPosters(IVoraPosterCatalog posters) =>
+        Results.Ok(VoraPosterCatalogVM.From(posters));
 
     private static string ImageContentType(string path) => Path.GetExtension(path).ToLowerInvariant() switch
     {

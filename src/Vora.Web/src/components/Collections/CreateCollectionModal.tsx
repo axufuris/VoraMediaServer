@@ -11,6 +11,9 @@ import { safeMediaUrl } from '../../utils/safeUrl';
 import SeasonalVisibilityFields from './SeasonalVisibilityFields';
 import ContentProviderHelp from './ContentProviderHelp';
 import { seasonalWindowFrom, seasonalWindowRequest, type SeasonalWindow } from './seasonalWindow';
+import VoraPosterPicker from './VoraPosterPicker';
+import { useVoraPosters } from './useVoraPosters';
+import { isVoraPosterUrl, suggestVoraPoster } from '../../utils/voraPosters';
 
 const SMART_CONTENT = '__smart__';
 
@@ -29,6 +32,7 @@ export default function CreateCollectionModal({
     const [title, setTitle] = useState('');
     const [description, setDescription] = useState('');
     const [posterUrl, setPosterUrl] = useState('');
+    const [posterChosen, setPosterChosen] = useState(false);
     const [backdropUrl, setBackdropUrl] = useState('');
     const [defaultSort, setDefaultSort] = useState<CollectionSortOrder>('ReleaseDateAsc');
     const [isGlobal, setIsGlobal] = useState(activeTab === 'global');
@@ -50,11 +54,22 @@ export default function CreateCollectionModal({
     const [isCreating, setIsCreating] = useState(false);
     const [activeSection, setActiveSection] = useState<'general' | 'poster' | 'backdrop'>('general');
 
+    const voraPosters = useVoraPosters(serverId, isOpen);
+    const theme = contentSyncProviderId && contentSyncProviderId !== SMART_CONTENT ? contentSyncExternalId : undefined;
+    const suggestedPoster = voraPosters.catalog ? suggestVoraPoster(voraPosters.catalog.posters, [title, theme]) : undefined;
+    const chosenPosterUrl = posterChosen ? posterUrl : (suggestedPoster?.url ?? '');
+    const pastedPosterUrl = isVoraPosterUrl(chosenPosterUrl) ? '' : chosenPosterUrl;
+    const choosePoster = (url: string) => {
+        setPosterUrl(url);
+        setPosterChosen(true);
+    };
+
     useEffect(() => {
         if (isOpen) {
             setTitle('');
             setDescription('');
             setPosterUrl('');
+            setPosterChosen(false);
             setBackdropUrl('');
             setDefaultSort('ReleaseDateAsc');
             setSortProviderId('');
@@ -95,7 +110,7 @@ export default function CreateCollectionModal({
             const newCollectionId = await collectionAdminService.createCollection({
                 title: title.trim(),
                 description: description.trim() || undefined,
-                posterUrl: posterUrl.trim() || undefined,
+                posterUrl: chosenPosterUrl.trim() || undefined,
                 backdropUrl: backdropUrl.trim() || undefined,
                 defaultSort,
                 sortProviderId: sortProviderId || undefined,
@@ -152,6 +167,12 @@ export default function CreateCollectionModal({
                     <div>
                         <label htmlFor="create-collection-title" className="block text-sm font-medium text-[var(--vora-text-muted)] mb-1">Title</label>
                         <input id="create-collection-title" required autoFocus type="text" value={title} onChange={e => setTitle(e.target.value)} className="w-full bg-[var(--vora-bg-raised)] border border-[var(--vora-border-subtle)] rounded-md p-2 text-[var(--vora-text-primary)] focus:border-[var(--vora-accent-500)] outline-none" />
+                        {suggestedPoster && !posterChosen && (
+                            <p className="text-xs text-[var(--vora-text-muted)] mt-1">
+                                Poster: the Vora <span className="text-[var(--vora-text-secondary)]">{suggestedPoster.title}</span> poster.{' '}
+                                <button type="button" onClick={() => setActiveSection('poster')} className="cursor-pointer font-medium text-[var(--vora-accent-text)] underline-offset-2 hover:underline">Change</button>
+                            </p>
+                        )}
                     </div>
 
                     <div>
@@ -377,13 +398,31 @@ export default function CreateCollectionModal({
                     )}
 
                     {activeSection === 'poster' && (
-                        <div className="space-y-3">
-                            <label className="block text-sm font-medium text-[var(--vora-text-muted)] mb-1">Poster URL</label>
-                            <input type="url" value={posterUrl} onChange={e => setPosterUrl(e.target.value)} placeholder="https://…" className="w-full bg-[var(--vora-bg-raised)] border border-[var(--vora-border-subtle)] rounded-md p-2 text-[var(--vora-text-primary)] focus:border-[var(--vora-accent-500)] outline-none" />
-                            {safeMediaUrl(posterUrl)
-                                ? <img src={safeMediaUrl(posterUrl)} alt="Poster preview" className="w-40 aspect-[2/3] object-cover rounded-md border border-[var(--vora-border-subtle)]" />
-                                : <div className="w-40 aspect-[2/3] rounded-md border border-dashed border-[var(--vora-border-subtle)] flex items-center justify-center text-xs text-[var(--vora-text-muted)] text-center p-2">Poster preview</div>}
-                            <p className="text-xs text-[var(--vora-text-muted)] leading-relaxed">Paste an image URL for the poster. To upload a file or pick from an artwork provider, create the collection first, then edit it.</p>
+                        <div className="space-y-5">
+                            <section className="space-y-2">
+                                <h3 className="text-[var(--vora-text-secondary)] font-bold text-sm tracking-wide uppercase">Vora posters</h3>
+                                <p className="text-xs text-[var(--vora-text-muted)] leading-relaxed">
+                                    {suggestedPoster && !posterChosen
+                                        ? `The ${suggestedPoster.title} poster is picked from the title. Pick another, or click it again for no poster.`
+                                        : 'Posters that come with Vora. Click one to use it, and click it again for no poster.'}
+                                </p>
+                                <VoraPosterPicker
+                                    idPrefix="create-collection-vora"
+                                    catalog={voraPosters.catalog}
+                                    failed={voraPosters.failed}
+                                    selectedUrl={chosenPosterUrl}
+                                    suggestedUrl={suggestedPoster?.url}
+                                    onSelect={choosePoster}
+                                />
+                            </section>
+                            <section className="space-y-3 pt-4 border-t border-[var(--vora-border-subtle)]">
+                                <label htmlFor="create-collection-poster-url" className="block text-sm font-medium text-[var(--vora-text-muted)] mb-1">Or paste an image URL</label>
+                                <input id="create-collection-poster-url" type="url" value={pastedPosterUrl} onChange={e => choosePoster(e.target.value)} placeholder="https://…" className="w-full bg-[var(--vora-bg-raised)] border border-[var(--vora-border-subtle)] rounded-md p-2 text-[var(--vora-text-primary)] focus:border-[var(--vora-accent-500)] outline-none" />
+                                {safeMediaUrl(pastedPosterUrl)
+                                    ? <img src={safeMediaUrl(pastedPosterUrl)} alt="Poster preview" className="w-40 aspect-[2/3] object-cover rounded-md border border-[var(--vora-border-subtle)]" />
+                                    : <div className="w-40 aspect-[2/3] rounded-md border border-dashed border-[var(--vora-border-subtle)] flex items-center justify-center text-xs text-[var(--vora-text-muted)] text-center p-2">Poster preview</div>}
+                                <p className="text-xs text-[var(--vora-text-muted)] leading-relaxed">To upload a file or pick from an artwork provider, create the collection first, then edit it.</p>
+                            </section>
                         </div>
                     )}
 

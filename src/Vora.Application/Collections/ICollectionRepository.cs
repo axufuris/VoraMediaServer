@@ -22,6 +22,8 @@ public interface ICollectionRepository
     Task UpdateContentSyncCacheAsync(Guid collectionId, string cacheJson);
     Task TouchContentSyncedAtAsync(Guid collectionId);
     Task UpdateDescriptionAsync(Guid collectionId, string description);
+    Task<List<CollectionPosterAddress>> GetPosterAddressesStartingWithAsync(string prefix);
+    Task SetPosterUrlsAsync(IReadOnlyDictionary<Guid, string> posterUrls);
     Task<List<CollectionDescriptionTarget>> GetCollectionsAwaitingDescriptionAsync(Guid libraryId);
     Task RemoveItemsFromCollectionAsync(Guid collectionId, IEnumerable<Guid> mediaItemIds);
 
@@ -59,3 +61,5 @@ public interface ICollectionRepository
 }
 
 public sealed record CollectionDescriptionTarget(Guid CollectionId, int TmdbId);
+
+public sealed record CollectionPosterAddress(Guid CollectionId, string PosterUrl);

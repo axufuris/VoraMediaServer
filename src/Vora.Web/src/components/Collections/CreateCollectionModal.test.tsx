@@ -8,9 +8,14 @@ const mocks = vi.hoisted(() => ({
     createCollection: vi.fn(),
     getChronologyProviders: vi.fn(),
     getCollectionSyncProviders: vi.fn(),
+    getVoraPosters: vi.fn(),
 }));
 
+const HALLOWEEN_POSTER = '/api/artwork/vora/holidays/halloween.jpg?v=abc';
+const CHRISTMAS_POSTER = '/api/artwork/vora/holidays/christmas.jpg?v=def';
+
 vi.mock('../../api/Collections/collectionAdminService', () => ({ collectionAdminService: { createCollection: mocks.createCollection } }));
+vi.mock('../../api/Media/voraPosterService', () => ({ getVoraPosters: mocks.getVoraPosters }));
 vi.mock('../../api/System/pluginAdminService', () => ({
     pluginAdminService: { getChronologyProviders: mocks.getChronologyProviders, getCollectionSyncProviders: mocks.getCollectionSyncProviders },
 }));
@@ -37,6 +42,54 @@ describe('CreateCollectionModal', () => {
             provider('openai_theme', 'AI Theme', 'Theme or occasion'),
         ]);
         mocks.createCollection.mockResolvedValue('new-collection');
+        mocks.getVoraPosters.mockResolvedValue({
+            categories: [{ id: 'holidays', name: 'Holidays' }],
+            posters: [
+                { id: 'halloween', category: 'holidays', title: 'Halloween', aliases: ['halloween'], url: HALLOWEEN_POSTER },
+                { id: 'christmas', category: 'holidays', title: 'Christmas', aliases: ['christmas'], url: CHRISTMAS_POSTER },
+            ],
+        });
+    });
+
+    it('gives a collection the Vora poster its title names, unless another is picked', async () => {
+        renderModal();
+
+        fireEvent.change(screen.getByLabelText('Title'), { target: { value: 'Christmas Classics' } });
+        expect(await screen.findByText(/Poster: the Vora/)).toHaveTextContent('Poster: the Vora Christmas poster.');
+        fireEvent.click(screen.getByRole('button', { name: 'Create Collection' }));
+
+        await waitFor(() => expect(mocks.createCollection).toHaveBeenCalled());
+        expect(mocks.createCollection.mock.calls[0][0]).toMatchObject({ title: 'Christmas Classics', posterUrl: CHRISTMAS_POSTER });
+    });
+
+    it('creates the collection with no poster when the suggested one is clicked off', async () => {
+        renderModal();
+
+        fireEvent.change(screen.getByLabelText('Title'), { target: { value: 'Christmas Classics' } });
+        await screen.findByText(/Poster: the Vora/);
+        fireEvent.click(screen.getByRole('button', { name: 'Change' }));
+        const christmas = screen.getByRole('button', { name: 'Christmas poster' });
+        expect(christmas).toHaveAttribute('aria-pressed', 'true');
+        fireEvent.click(christmas);
+        expect(christmas).toHaveAttribute('aria-pressed', 'false');
+        fireEvent.click(screen.getByRole('button', { name: 'Create Collection' }));
+
+        await waitFor(() => expect(mocks.createCollection).toHaveBeenCalled());
+        expect(mocks.createCollection.mock.calls[0][0].posterUrl).toBeUndefined();
+    });
+
+    it('uses a pasted image address instead of the suggestion', async () => {
+        renderModal();
+
+        fireEvent.change(screen.getByLabelText('Title'), { target: { value: 'Christmas Classics' } });
+        await screen.findByText(/Poster: the Vora/);
+        fireEvent.click(screen.getByRole('button', { name: 'Posters' }));
+        fireEvent.change(screen.getByLabelText('Or paste an image URL'), { target: { value: 'https://example.com/poster.jpg' } });
+        expect(screen.getByRole('button', { name: 'Christmas poster' })).toHaveAttribute('aria-pressed', 'false');
+        fireEvent.click(screen.getByRole('button', { name: 'Create Collection' }));
+
+        await waitFor(() => expect(mocks.createCollection).toHaveBeenCalled());
+        expect(mocks.createCollection.mock.calls[0][0].posterUrl).toBe('https://example.com/poster.jpg');
     });
 
     it('creates a theme collection that shows every October', async () => {
@@ -65,6 +118,7 @@ describe('CreateCollectionModal', () => {
             visibleStartDate: '2000-10-01',
             visibleEndDate: '2000-10-31',
             visibleEveryYear: true,
+            posterUrl: HALLOWEEN_POSTER,
         });
     });
 

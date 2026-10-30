@@ -24,7 +24,22 @@ public static class StartupTaskExtensions
         await EnsureServerSettingsAsync(app);
         await CheckStorageFoldersAsync(app);
         await SeedPluginSettingsFromEnvironmentAsync(app);
+        await RefreshVoraPosterAddressesAsync(app);
         await PreloadIptvEpgCacheAsync(app);
+    }
+
+    private static async Task RefreshVoraPosterAddressesAsync(WebApplication app)
+    {
+        using var scope = app.Services.CreateScope();
+        var logger = scope.ServiceProvider.GetRequiredService<ILogger<Program>>();
+        try
+        {
+            await scope.ServiceProvider.GetRequiredService<Vora.Application.Artwork.IVoraPosterAddressRefresher>().RefreshAsync();
+        }
+        catch (Exception ex)
+        {
+            logger.LogWarning(ex, "Could not move collections to the current version of their Vora poster; they keep the address they have.");
+        }
     }
 
     private static async Task EnsureServerSettingsAsync(WebApplication app)

@@ -15,6 +15,12 @@ describe('thumbUrl', () => {
         expect(after).not.toBe(before);
     });
 
+    it('asks for a small copy of a poster that ships with Vora', () => {
+        const poster = '/api/artwork/vora/holidays/halloween.jpg?v=0123456789ab';
+
+        expect(thumbUrl(poster, 360)).toBe(`/api/artwork/thumb?w=360&kind=poster&src=${encodeURIComponent(poster)}`);
+    });
+
     it('does the same for uploads and for provider images', () => {
         expect(thumbUrl('/api/artwork/custom/media_1_poster.jpg', 500, 'backdrop'))
             .toBe('/api/artwork/thumb?w=500&kind=backdrop&src=%2Fapi%2Fartwork%2Fcustom%2Fmedia_1_poster.jpg');
