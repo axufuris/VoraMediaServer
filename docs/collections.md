@@ -9,6 +9,9 @@ separately on `Collection` (`src/Vora.Domain/Entities/Library/Collection.cs`):
 - **Sort**: `SortProviderId` + `ExternalListId` (the *Describe the collection and
   ordering* text).
 
+A collection's poster can also be one of the posters that ship with Vora; see
+[`vora-posters.md`](vora-posters.md).
+
 Providers implement `ICollectionSyncProvider` (content) and `IChronologyProvider`
 (sort). Built-ins: AI (`openai_list`, `openai_theme`, `openai_chronology`), Trakt, MDbList, IMDb. AI Theme fills a holiday or occasion collection from the library, and a collection can show only in its season, every year: [`theme-collections.md`](theme-collections.md).
 

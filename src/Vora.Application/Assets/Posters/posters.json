@@ -1,0 +1,969 @@
+{
+  "categories": [
+    {
+      "id": "holidays",
+      "name": "Holidays"
+    },
+    {
+      "id": "popular",
+      "name": "Popular"
+    },
+    {
+      "id": "genres",
+      "name": "Genres"
+    },
+    {
+      "id": "decades",
+      "name": "Decades"
+    },
+    {
+      "id": "ratings",
+      "name": "Ratings"
+    }
+  ],
+  "posters": [
+    {
+      "id": "new-years",
+      "category": "holidays",
+      "title": "New Year's",
+      "aliases": [
+        "new year's",
+        "new years",
+        "new year",
+        "new year's eve",
+        "nye"
+      ],
+      "file": "holidays/new-years.jpg",
+      "version": "fbbea411400f"
+    },
+    {
+      "id": "lunar-new-year",
+      "category": "holidays",
+      "title": "Lunar New Year",
+      "aliases": [
+        "lunar new year",
+        "chinese new year",
+        "spring festival"
+      ],
+      "file": "holidays/lunar-new-year.jpg",
+      "version": "9b15692dd8f4"
+    },
+    {
+      "id": "valentines-day",
+      "category": "holidays",
+      "title": "Valentine's Day",
+      "aliases": [
+        "valentine's",
+        "valentines",
+        "valentine"
+      ],
+      "file": "holidays/valentines-day.jpg",
+      "version": "06d45a3ddd19"
+    },
+    {
+      "id": "presidents-day",
+      "category": "holidays",
+      "title": "Presidents' Day",
+      "aliases": [
+        "presidents' day",
+        "presidents day",
+        "president",
+        "presidents"
+      ],
+      "file": "holidays/presidents-day.jpg",
+      "version": "07f8eb7ed528"
+    },
+    {
+      "id": "st-patricks-day",
+      "category": "holidays",
+      "title": "St. Patrick's Day",
+      "aliases": [
+        "st. patrick's",
+        "st patricks",
+        "saint patrick",
+        "st paddy",
+        "irish"
+      ],
+      "file": "holidays/st-patricks-day.jpg",
+      "version": "af59fa05473a"
+    },
+    {
+      "id": "easter",
+      "category": "holidays",
+      "title": "Easter",
+      "aliases": [
+        "easter"
+      ],
+      "file": "holidays/easter.jpg",
+      "version": "c0670ce5a76c"
+    },
+    {
+      "id": "earth-day",
+      "category": "holidays",
+      "title": "Earth Day",
+      "aliases": [
+        "earth day",
+        "planet earth",
+        "nature",
+        "environment"
+      ],
+      "file": "holidays/earth-day.jpg",
+      "version": "ba4a9d3a0ee0"
+    },
+    {
+      "id": "arbor-day",
+      "category": "holidays",
+      "title": "Arbor Day",
+      "aliases": [
+        "arbor day",
+        "trees",
+        "forest"
+      ],
+      "file": "holidays/arbor-day.jpg",
+      "version": "77a6855dccd9"
+    },
+    {
+      "id": "mothers-day",
+      "category": "holidays",
+      "title": "Mother's Day",
+      "aliases": [
+        "mother's day",
+        "mothers day",
+        "mother",
+        "mom",
+        "moms"
+      ],
+      "file": "holidays/mothers-day.jpg",
+      "version": "9cff10b4794a"
+    },
+    {
+      "id": "memorial-day",
+      "category": "holidays",
+      "title": "Memorial Day",
+      "aliases": [
+        "memorial day",
+        "memorial"
+      ],
+      "file": "holidays/memorial-day.jpg",
+      "version": "bc282b3aec18"
+    },
+    {
+      "id": "fathers-day",
+      "category": "holidays",
+      "title": "Father's Day",
+      "aliases": [
+        "father's day",
+        "fathers day",
+        "father",
+        "dad",
+        "dads"
+      ],
+      "file": "holidays/fathers-day.jpg",
+      "version": "ffc13ec68d29"
+    },
+    {
+      "id": "independence-day",
+      "category": "holidays",
+      "title": "Independence Day",
+      "aliases": [
+        "independence day",
+        "fourth of july",
+        "4th of july",
+        "july 4th",
+        "july 4",
+        "patriotic"
+      ],
+      "file": "holidays/independence-day.jpg",
+      "version": "caede77a51eb"
+    },
+    {
+      "id": "labor-day",
+      "category": "holidays",
+      "title": "Labor Day",
+      "aliases": [
+        "labor day",
+        "labour day"
+      ],
+      "file": "holidays/labor-day.jpg",
+      "version": "52bc6ed37334"
+    },
+    {
+      "id": "halloween",
+      "category": "holidays",
+      "title": "Halloween",
+      "aliases": [
+        "halloween",
+        "spooky season",
+        "spooky",
+        "trick or treat"
+      ],
+      "file": "holidays/halloween.jpg",
+      "version": "2cb187e334d1"
+    },
+    {
+      "id": "veterans-day",
+      "category": "holidays",
+      "title": "Veterans Day",
+      "aliases": [
+        "veterans day",
+        "veterans' day",
+        "veterans",
+        "veteran"
+      ],
+      "file": "holidays/veterans-day.jpg",
+      "version": "f4a7b26580dd"
+    },
+    {
+      "id": "thanksgiving",
+      "category": "holidays",
+      "title": "Thanksgiving",
+      "aliases": [
+        "thanksgiving",
+        "friendsgiving"
+      ],
+      "file": "holidays/thanksgiving.jpg",
+      "version": "32ca3c72fd71"
+    },
+    {
+      "id": "hanukkah",
+      "category": "holidays",
+      "title": "Hanukkah",
+      "aliases": [
+        "hanukkah",
+        "chanukah",
+        "festival of lights"
+      ],
+      "file": "holidays/hanukkah.jpg",
+      "version": "2aafae37e398"
+    },
+    {
+      "id": "christmas",
+      "category": "holidays",
+      "title": "Christmas",
+      "aliases": [
+        "christmas",
+        "xmas",
+        "holiday season",
+        "santa"
+      ],
+      "file": "holidays/christmas.jpg",
+      "version": "77ea74abf5a0"
+    },
+    {
+      "id": "pride-month",
+      "category": "holidays",
+      "title": "Pride Month",
+      "aliases": [
+        "pride month",
+        "pride",
+        "lgbtq",
+        "lgbt"
+      ],
+      "file": "holidays/pride-month.jpg",
+      "version": "fa002e2ef3ef"
+    },
+    {
+      "id": "black-history-month",
+      "category": "holidays",
+      "title": "Black History Month",
+      "aliases": [
+        "black history month",
+        "black history"
+      ],
+      "file": "holidays/black-history-month.jpg",
+      "version": "a31f34962856"
+    },
+    {
+      "id": "trending",
+      "category": "popular",
+      "title": "Trending",
+      "aliases": [
+        "trending",
+        "trending now",
+        "hot right now"
+      ],
+      "file": "popular/trending.jpg",
+      "version": "4fec23c012ab"
+    },
+    {
+      "id": "popular",
+      "category": "popular",
+      "title": "Popular",
+      "aliases": [
+        "popular",
+        "most popular",
+        "fan favorites",
+        "crowd pleasers"
+      ],
+      "file": "popular/popular.jpg",
+      "version": "7a2f1c498c82"
+    },
+    {
+      "id": "top-rated",
+      "category": "popular",
+      "title": "Top Rated",
+      "aliases": [
+        "top rated",
+        "top-rated",
+        "highest rated",
+        "best rated",
+        "imdb top"
+      ],
+      "file": "popular/top-rated.jpg",
+      "version": "06b85a550e37"
+    },
+    {
+      "id": "new-releases",
+      "category": "popular",
+      "title": "New Releases",
+      "aliases": [
+        "new releases",
+        "new release",
+        "just released",
+        "new movies",
+        "new shows"
+      ],
+      "file": "popular/new-releases.jpg",
+      "version": "bfc1df75b1fb"
+    },
+    {
+      "id": "recently-added",
+      "category": "popular",
+      "title": "Recently Added",
+      "aliases": [
+        "recently added",
+        "just added",
+        "new arrivals",
+        "latest additions"
+      ],
+      "file": "popular/recently-added.jpg",
+      "version": "0d168acb9f1e"
+    },
+    {
+      "id": "award-winners",
+      "category": "popular",
+      "title": "Award Winners",
+      "aliases": [
+        "award winners",
+        "award winning",
+        "award-winning",
+        "awards",
+        "oscar",
+        "oscars",
+        "academy award",
+        "emmy",
+        "golden globe"
+      ],
+      "file": "popular/award-winners.jpg",
+      "version": "2b7ca9a07298"
+    },
+    {
+      "id": "hidden-gems",
+      "category": "popular",
+      "title": "Hidden Gems",
+      "aliases": [
+        "hidden gems",
+        "hidden gem",
+        "underrated",
+        "overlooked"
+      ],
+      "file": "popular/hidden-gems.jpg",
+      "version": "d12b9ba183e0"
+    },
+    {
+      "id": "blockbusters",
+      "category": "popular",
+      "title": "Blockbusters",
+      "aliases": [
+        "blockbusters",
+        "blockbuster",
+        "box office",
+        "summer blockbusters"
+      ],
+      "file": "popular/blockbusters.jpg",
+      "version": "374931721fae"
+    },
+    {
+      "id": "action",
+      "category": "genres",
+      "title": "Action",
+      "aliases": [
+        "action",
+        "action & adventure",
+        "action and adventure"
+      ],
+      "file": "genres/action.jpg",
+      "version": "9649fc1987a9"
+    },
+    {
+      "id": "adventure",
+      "category": "genres",
+      "title": "Adventure",
+      "aliases": [
+        "adventure",
+        "adventures"
+      ],
+      "file": "genres/adventure.jpg",
+      "version": "95bb9a25e462"
+    },
+    {
+      "id": "animation",
+      "category": "genres",
+      "title": "Animation",
+      "aliases": [
+        "animation",
+        "animated",
+        "cartoon",
+        "cartoons"
+      ],
+      "file": "genres/animation.jpg",
+      "version": "ff4bf8ddea96"
+    },
+    {
+      "id": "anime",
+      "category": "genres",
+      "title": "Anime",
+      "aliases": [
+        "anime"
+      ],
+      "file": "genres/anime.jpg",
+      "version": "05d85b5bbab8"
+    },
+    {
+      "id": "biography",
+      "category": "genres",
+      "title": "Biography",
+      "aliases": [
+        "biography",
+        "biographies",
+        "biopic",
+        "biopics",
+        "true story",
+        "true stories"
+      ],
+      "file": "genres/biography.jpg",
+      "version": "0532161216d8"
+    },
+    {
+      "id": "comedy",
+      "category": "genres",
+      "title": "Comedy",
+      "aliases": [
+        "comedy",
+        "comedies",
+        "funny",
+        "sitcom",
+        "sitcoms",
+        "stand-up"
+      ],
+      "file": "genres/comedy.jpg",
+      "version": "cb0e3fb5c80c"
+    },
+    {
+      "id": "crime",
+      "category": "genres",
+      "title": "Crime",
+      "aliases": [
+        "crime",
+        "true crime",
+        "heist",
+        "gangster"
+      ],
+      "file": "genres/crime.jpg",
+      "version": "375d860ea450"
+    },
+    {
+      "id": "documentary",
+      "category": "genres",
+      "title": "Documentary",
+      "aliases": [
+        "documentary",
+        "documentaries",
+        "docuseries",
+        "docs"
+      ],
+      "file": "genres/documentary.jpg",
+      "version": "afeae8be8c45"
+    },
+    {
+      "id": "drama",
+      "category": "genres",
+      "title": "Drama",
+      "aliases": [
+        "drama",
+        "dramas"
+      ],
+      "file": "genres/drama.jpg",
+      "version": "51da27edec1b"
+    },
+    {
+      "id": "family",
+      "category": "genres",
+      "title": "Family",
+      "aliases": [
+        "family",
+        "family movie night",
+        "family night"
+      ],
+      "file": "genres/family.jpg",
+      "version": "3bd153bd2a93"
+    },
+    {
+      "id": "fantasy",
+      "category": "genres",
+      "title": "Fantasy",
+      "aliases": [
+        "fantasy"
+      ],
+      "file": "genres/fantasy.jpg",
+      "version": "e169c5a94935"
+    },
+    {
+      "id": "history",
+      "category": "genres",
+      "title": "History",
+      "aliases": [
+        "history",
+        "historical",
+        "period"
+      ],
+      "file": "genres/history.jpg",
+      "version": "c45fc2f82436"
+    },
+    {
+      "id": "horror",
+      "category": "genres",
+      "title": "Horror",
+      "aliases": [
+        "horror",
+        "scary",
+        "slasher"
+      ],
+      "file": "genres/horror.jpg",
+      "version": "e7791ad405a8"
+    },
+    {
+      "id": "kids",
+      "category": "genres",
+      "title": "Kids",
+      "aliases": [
+        "kids",
+        "children",
+        "children's",
+        "kid"
+      ],
+      "file": "genres/kids.jpg",
+      "version": "2777f1f48d0d"
+    },
+    {
+      "id": "martial-arts",
+      "category": "genres",
+      "title": "Martial Arts",
+      "aliases": [
+        "martial arts",
+        "kung fu",
+        "karate",
+        "wuxia"
+      ],
+      "file": "genres/martial-arts.jpg",
+      "version": "cd4950e8a64e"
+    },
+    {
+      "id": "music",
+      "category": "genres",
+      "title": "Music",
+      "aliases": [
+        "music",
+        "musical",
+        "musicals",
+        "concert",
+        "concerts"
+      ],
+      "file": "genres/music.jpg",
+      "version": "ea32e1bce452"
+    },
+    {
+      "id": "mystery",
+      "category": "genres",
+      "title": "Mystery",
+      "aliases": [
+        "mystery",
+        "mysteries",
+        "whodunit",
+        "detective"
+      ],
+      "file": "genres/mystery.jpg",
+      "version": "838ec30cc0b0"
+    },
+    {
+      "id": "reality",
+      "category": "genres",
+      "title": "Reality",
+      "aliases": [
+        "reality",
+        "reality tv",
+        "reality shows"
+      ],
+      "file": "genres/reality.jpg",
+      "version": "cfbbc5211ec9"
+    },
+    {
+      "id": "romance",
+      "category": "genres",
+      "title": "Romance",
+      "aliases": [
+        "romance",
+        "romantic",
+        "rom-com",
+        "rom-coms",
+        "romcom",
+        "love stories"
+      ],
+      "file": "genres/romance.jpg",
+      "version": "fe03e1f3d3cd"
+    },
+    {
+      "id": "science-fiction",
+      "category": "genres",
+      "title": "Science Fiction",
+      "aliases": [
+        "science fiction",
+        "sci-fi",
+        "scifi",
+        "sci-fi & fantasy"
+      ],
+      "file": "genres/science-fiction.jpg",
+      "version": "131e0acf639e"
+    },
+    {
+      "id": "sports",
+      "category": "genres",
+      "title": "Sports",
+      "aliases": [
+        "sports",
+        "sport"
+      ],
+      "file": "genres/sports.jpg",
+      "version": "f90292a9e641"
+    },
+    {
+      "id": "superhero",
+      "category": "genres",
+      "title": "Superhero",
+      "aliases": [
+        "superhero",
+        "superheroes",
+        "super hero",
+        "comic book",
+        "comic books"
+      ],
+      "file": "genres/superhero.jpg",
+      "version": "baa3f5aa8a25"
+    },
+    {
+      "id": "thriller",
+      "category": "genres",
+      "title": "Thriller",
+      "aliases": [
+        "thriller",
+        "thrillers",
+        "suspense"
+      ],
+      "file": "genres/thriller.jpg",
+      "version": "ed6e7a2e3b52"
+    },
+    {
+      "id": "war",
+      "category": "genres",
+      "title": "War",
+      "aliases": [
+        "war",
+        "war & politics",
+        "military"
+      ],
+      "file": "genres/war.jpg",
+      "version": "e45a8b9541b2"
+    },
+    {
+      "id": "western",
+      "category": "genres",
+      "title": "Western",
+      "aliases": [
+        "western",
+        "westerns",
+        "cowboy",
+        "cowboys"
+      ],
+      "file": "genres/western.jpg",
+      "version": "fa9562b97108"
+    },
+    {
+      "id": "1920s",
+      "category": "decades",
+      "title": "1920s",
+      "aliases": [
+        "1920s",
+        "twenties",
+        "roaring twenties",
+        "roaring 20s"
+      ],
+      "file": "decades/1920s.jpg",
+      "version": "1bee9f035160"
+    },
+    {
+      "id": "1930s",
+      "category": "decades",
+      "title": "1930s",
+      "aliases": [
+        "1930s",
+        "30s",
+        "30's",
+        "thirties"
+      ],
+      "file": "decades/1930s.jpg",
+      "version": "1985d5f4b8e5"
+    },
+    {
+      "id": "1940s",
+      "category": "decades",
+      "title": "1940s",
+      "aliases": [
+        "1940s",
+        "40s",
+        "40's",
+        "forties"
+      ],
+      "file": "decades/1940s.jpg",
+      "version": "ea02de84ac3f"
+    },
+    {
+      "id": "1950s",
+      "category": "decades",
+      "title": "1950s",
+      "aliases": [
+        "1950s",
+        "50s",
+        "50's",
+        "fifties"
+      ],
+      "file": "decades/1950s.jpg",
+      "version": "a7bba0a49b75"
+    },
+    {
+      "id": "1960s",
+      "category": "decades",
+      "title": "1960s",
+      "aliases": [
+        "1960s",
+        "60s",
+        "60's",
+        "sixties"
+      ],
+      "file": "decades/1960s.jpg",
+      "version": "02485c6f39df"
+    },
+    {
+      "id": "1970s",
+      "category": "decades",
+      "title": "1970s",
+      "aliases": [
+        "1970s",
+        "70s",
+        "70's",
+        "seventies"
+      ],
+      "file": "decades/1970s.jpg",
+      "version": "48df72c362d5"
+    },
+    {
+      "id": "1980s",
+      "category": "decades",
+      "title": "1980s",
+      "aliases": [
+        "1980s",
+        "80s",
+        "80's",
+        "eighties"
+      ],
+      "file": "decades/1980s.jpg",
+      "version": "8778a4fdebfc"
+    },
+    {
+      "id": "1990s",
+      "category": "decades",
+      "title": "1990s",
+      "aliases": [
+        "1990s",
+        "90s",
+        "90's",
+        "nineties"
+      ],
+      "file": "decades/1990s.jpg",
+      "version": "e329d96103c5"
+    },
+    {
+      "id": "2000s",
+      "category": "decades",
+      "title": "2000s",
+      "aliases": [
+        "2000s",
+        "00s",
+        "00's",
+        "two thousands",
+        "noughties",
+        "aughts"
+      ],
+      "file": "decades/2000s.jpg",
+      "version": "8e439f157160"
+    },
+    {
+      "id": "2010s",
+      "category": "decades",
+      "title": "2010s",
+      "aliases": [
+        "2010s",
+        "10s",
+        "10's",
+        "twenty tens",
+        "twenty-tens"
+      ],
+      "file": "decades/2010s.jpg",
+      "version": "9e3b2b81eb9b"
+    },
+    {
+      "id": "2020s",
+      "category": "decades",
+      "title": "2020s",
+      "aliases": [
+        "2020s",
+        "twenty twenties",
+        "twenty-twenties"
+      ],
+      "file": "decades/2020s.jpg",
+      "version": "7b7edb0b5d4d"
+    },
+    {
+      "id": "g",
+      "category": "ratings",
+      "title": "General Audiences",
+      "aliases": [
+        "rated g",
+        "g rated"
+      ],
+      "file": "ratings/g.jpg",
+      "version": "f4244aa13671"
+    },
+    {
+      "id": "pg",
+      "category": "ratings",
+      "title": "Parental Guidance Suggested",
+      "aliases": [
+        "rated pg",
+        "pg rated"
+      ],
+      "file": "ratings/pg.jpg",
+      "version": "fefc39cf6b58"
+    },
+    {
+      "id": "pg-13",
+      "category": "ratings",
+      "title": "Parents Strongly Cautioned",
+      "aliases": [
+        "rated pg-13",
+        "pg-13 rated",
+        "pg-13"
+      ],
+      "file": "ratings/pg-13.jpg",
+      "version": "981816b9872a"
+    },
+    {
+      "id": "r",
+      "category": "ratings",
+      "title": "Restricted",
+      "aliases": [
+        "rated r",
+        "r rated"
+      ],
+      "file": "ratings/r.jpg",
+      "version": "5f2c7549e7e2"
+    },
+    {
+      "id": "nc-17",
+      "category": "ratings",
+      "title": "Adults Only",
+      "aliases": [
+        "rated nc-17",
+        "nc-17 rated",
+        "nc-17"
+      ],
+      "file": "ratings/nc-17.jpg",
+      "version": "08e58a5f8fbe"
+    },
+    {
+      "id": "tv-y",
+      "category": "ratings",
+      "title": "All Children",
+      "aliases": [
+        "tv-y",
+        "rated tv-y"
+      ],
+      "file": "ratings/tv-y.jpg",
+      "version": "b86250db97d8"
+    },
+    {
+      "id": "tv-y7",
+      "category": "ratings",
+      "title": "Older Children",
+      "aliases": [
+        "tv-y7",
+        "rated tv-y7"
+      ],
+      "file": "ratings/tv-y7.jpg",
+      "version": "4169d355b237"
+    },
+    {
+      "id": "tv-g",
+      "category": "ratings",
+      "title": "General Audience",
+      "aliases": [
+        "tv-g",
+        "rated tv-g"
+      ],
+      "file": "ratings/tv-g.jpg",
+      "version": "6b7ddbf200e0"
+    },
+    {
+      "id": "tv-pg",
+      "category": "ratings",
+      "title": "Parental Guidance Suggested",
+      "aliases": [
+        "tv-pg",
+        "rated tv-pg"
+      ],
+      "file": "ratings/tv-pg.jpg",
+      "version": "2e0f35142757"
+    },
+    {
+      "id": "tv-14",
+      "category": "ratings",
+      "title": "Parents Strongly Cautioned",
+      "aliases": [
+        "tv-14",
+        "rated tv-14"
+      ],
+      "file": "ratings/tv-14.jpg",
+      "version": "28574463beb1"
+    },
+    {
+      "id": "tv-ma",
+      "category": "ratings",
+      "title": "Mature Audience Only",
+      "aliases": [
+        "tv-ma",
+        "rated tv-ma"
+      ],
+      "file": "ratings/tv-ma.jpg",
+      "version": "0f33cc591b19"
+    }
+  ]
+}

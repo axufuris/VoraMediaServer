@@ -1,0 +1,168 @@
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+html,
+body {
+    width: 1000px;
+    height: 1500px;
+    overflow: hidden;
+    background: #000;
+}
+
+.poster {
+    position: relative;
+    width: 1000px;
+    height: 1500px;
+    overflow: hidden;
+    isolation: isolate;
+    background: var(--bg);
+    color: var(--ink);
+    font-family: "Inter Tight", "Inter", system-ui, sans-serif;
+}
+
+.poster > * {
+    position: absolute;
+}
+
+.base {
+    inset: 0;
+    background:
+        radial-gradient(90% 60% at 50% 34%, color-mix(in oklab, var(--a) 26%, var(--bg)) 0%, transparent 70%),
+        radial-gradient(70% 45% at 50% 108%, color-mix(in oklab, var(--b) 30%, var(--bg)) 0%, transparent 70%),
+        linear-gradient(180deg, color-mix(in oklab, var(--bg) 88%, var(--b)) 0%, var(--bg) 60%, color-mix(in oklab, var(--bg) 70%, #000) 100%);
+}
+
+.glow {
+    border-radius: 50%;
+    filter: blur(120px);
+}
+
+.glow-1 {
+    width: 720px;
+    height: 720px;
+    left: 140px;
+    top: 200px;
+    background: var(--a);
+    opacity: var(--glow-1, 0.34);
+}
+
+.glow-2 {
+    width: 640px;
+    height: 640px;
+    left: -300px;
+    top: 860px;
+    background: var(--b);
+    opacity: 0.32;
+}
+
+.glow-3 {
+    width: 600px;
+    height: 600px;
+    right: -280px;
+    top: -200px;
+    background: var(--b);
+    opacity: 0.3;
+}
+
+.art {
+    left: 60px;
+    top: 124px;
+    width: 880px;
+    height: 880px;
+    overflow: visible;
+    filter: drop-shadow(0 36px 54px rgba(0, 0, 0, 0.5));
+}
+
+.art.full {
+    left: 0;
+    top: 0;
+    width: 1000px;
+    height: 1500px;
+    filter: none;
+}
+
+.shade {
+    inset: 0;
+    background: linear-gradient(180deg, transparent 54%, color-mix(in oklab, var(--bg) 78%, transparent) 70%, color-mix(in oklab, var(--bg) 94%, #000) 100%);
+}
+
+.frame {
+    inset: 26px;
+    border-radius: 30px;
+    border: 2px solid color-mix(in oklab, var(--ink) 10%, transparent);
+    box-shadow: inset 0 0 120px rgba(0, 0, 0, 0.35);
+}
+
+.caption {
+    left: 72px;
+    right: 72px;
+    bottom: 156px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 22px;
+    text-align: center;
+}
+
+.eyebrow {
+    display: flex;
+    align-items: center;
+    gap: 22px;
+    font-weight: 700;
+    font-size: 25px;
+    letter-spacing: 0.36em;
+    text-transform: uppercase;
+    color: var(--c);
+    padding-left: 0.36em;
+}
+
+.eyebrow::before,
+.eyebrow::after {
+    content: "";
+    width: 54px;
+    height: 2px;
+    background: currentColor;
+    opacity: 0.55;
+}
+
+.title {
+    max-width: 856px;
+    font-weight: 850;
+    font-size: 150px;
+    line-height: 0.9;
+    letter-spacing: -0.035em;
+    text-transform: uppercase;
+    text-wrap: balance;
+    background: linear-gradient(180deg, #ffffff 18%, var(--ink) 100%);
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+    filter: drop-shadow(0 6px 24px rgba(0, 0, 0, 0.45));
+    padding: 0 0.04em 0.06em;
+}
+
+.subtitle {
+    font-weight: 600;
+    font-size: 31px;
+    letter-spacing: 0.06em;
+    color: color-mix(in oklab, var(--ink) 74%, transparent);
+}
+
+.mark {
+    left: 478px;
+    bottom: 64px;
+    width: 44px;
+    height: 44px;
+    opacity: 0.92;
+}
+
+.grain {
+    inset: 0;
+    opacity: 0.1;
+    mix-blend-mode: overlay;
+    pointer-events: none;
+    background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='320' height='320'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 1 0 0 0 0 1 0 0 0 0 1 0 0 0 0.9 0'/></filter><rect width='100%25' height='100%25' filter='url(%23n)'/></svg>");
+}

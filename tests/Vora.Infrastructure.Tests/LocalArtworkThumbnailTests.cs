@@ -33,7 +33,8 @@ public class LocalArtworkThumbnailTests : IDisposable
             new RemoteImageRegistry(),
             Options.Create(new StoragePathsOptions { CustomArtwork = _serverFolder }),
             NullLogger<ArtworkThumbnailService>.Instance,
-            _localArtwork);
+            _localArtwork,
+            Substitute.For<IVoraPosterCatalog>());
     }
 
     public void Dispose() => Directory.Delete(_root, recursive: true);

@@ -71,6 +71,7 @@ public class ArtworkThumbnailService : IArtworkThumbnailService
     private readonly ISafeImageDownloader _downloader;
     private readonly IRemoteImageRegistry _remoteImages;
     private readonly ILocalArtworkLocator _localArtwork;
+    private readonly IVoraPosterCatalog _posters;
     private readonly ILogger<ArtworkThumbnailService> _logger;
     private readonly string _customArtworkPath;
     private readonly string _cacheRoot;
@@ -81,11 +82,13 @@ public class ArtworkThumbnailService : IArtworkThumbnailService
         IOptions<StoragePathsOptions> storagePaths,
         ILogger<ArtworkThumbnailService> logger,
         ILocalArtworkLocator localArtwork,
+        IVoraPosterCatalog posters,
         TimeProvider? time = null)
     {
         _downloader = downloader;
         _remoteImages = remoteImages;
         _localArtwork = localArtwork;
+        _posters = posters;
         _logger = logger;
         _time = time ?? TimeProvider.System;
 
@@ -287,6 +290,13 @@ public class ArtworkThumbnailService : IArtworkThumbnailService
             var localPath = SafePathResolver.ResolveContainedFilePath(_customArtworkPath, fileName);
             if (localPath == null || !File.Exists(localPath)) return null;
             return await File.ReadAllBytesAsync(localPath, cancellationToken);
+        }
+
+        if (VoraPosterAddress.Is(src))
+        {
+            var posterPath = _posters.Find(src)?.FilePath;
+            if (posterPath == null || !File.Exists(posterPath)) return null;
+            return await File.ReadAllBytesAsync(posterPath, cancellationToken);
         }
 
         if (LocalArtworkAddress.Is(src))

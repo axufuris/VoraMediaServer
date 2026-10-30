@@ -436,4 +436,10 @@
     </None>
   </ItemGroup>
 
+  <ItemGroup>
+    <None Update="Assets\Posters\**\*">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+  </ItemGroup>
+
 </Project>

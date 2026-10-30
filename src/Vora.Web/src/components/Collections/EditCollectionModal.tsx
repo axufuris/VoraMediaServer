@@ -13,6 +13,9 @@ import { errorDetail } from '../../utils/apiError';
 import SeasonalVisibilityFields from './SeasonalVisibilityFields';
 import ContentProviderHelp from './ContentProviderHelp';
 import { seasonalWindowFrom, seasonalWindowRequest, type SeasonalWindow } from './seasonalWindow';
+import VoraPosterPicker from './VoraPosterPicker';
+import { useVoraPosters } from './useVoraPosters';
+import { isVoraPosterUrl, suggestVoraPoster } from '../../utils/voraPosters';
 
 const SMART_CONTENT = '__smart__';
 const defaultSmartDefinition = (): SmartPlaylistDefinition => ({ ...emptyDefinition(), limit: 2000, sortBy: 'DateAdded', sortDirection: 'Desc' });
@@ -81,6 +84,11 @@ export default function EditCollectionModal({
 
     const [lockedFields, setLockedFields] = useState<string[]>(collection.lockedFields || []);
     const [isSaving, setIsSaving] = useState(false);
+    const [posterSource, setPosterSource] = useState<'artwork' | 'vora'>(isVoraPosterUrl(collection.posterUrl) ? 'vora' : 'artwork');
+
+    const voraPosters = useVoraPosters(serverId, isOpen && activeTab === 'poster' && posterSource === 'vora');
+    const theme = contentSyncProviderId && contentSyncProviderId !== SMART_CONTENT ? contentSyncExternalId : undefined;
+    const suggestedPoster = voraPosters.catalog ? suggestVoraPoster(voraPosters.catalog.posters, [title, theme]) : undefined;
 
     const fetchArtworkOptions = useCallback(() => {
         setLoadingArt(true);
@@ -110,6 +118,7 @@ export default function EditCollectionModal({
             setSmartDefinition(parseSmartDefinition(collection.rulesJson));
             setLockedFields(collection.lockedFields || []);
             setActiveTab('general');
+            setPosterSource(isVoraPosterUrl(collection.posterUrl) ? 'vora' : 'artwork');
 
             pluginAdminService.getChronologyProviders(serverId).then(setChronologyProviders).catch(console.error);
             pluginAdminService.getCollectionSyncProviders(serverId).then(setSyncProviders).catch(console.error);
@@ -471,7 +480,40 @@ export default function EditCollectionModal({
                     {(activeTab === 'poster' || activeTab === 'backdrop') && (() => {
                         const isPoster = activeTab === 'poster';
                         const lockField = isPoster ? 'PosterUrl' : 'BackdropUrl';
+                        const sourceSwitch = isPoster && (
+                            <div className="flex flex-wrap items-center gap-2 mb-5" role="group" aria-label="Where the poster comes from">
+                                {([['artwork', 'Your artwork'], ['vora', 'Vora posters']] as const).map(([source, label]) => (
+                                    <button
+                                        key={source}
+                                        type="button"
+                                        data-active={posterSource === source}
+                                        aria-pressed={posterSource === source}
+                                        onClick={() => setPosterSource(source)}
+                                        className="vora-pill cursor-pointer rounded-full px-4 py-1.5 text-sm font-medium"
+                                    >
+                                        {label}
+                                    </button>
+                                ))}
+                            </div>
+                        );
+                        if (isPoster && posterSource === 'vora') {
+                            return (
+                                <>
+                                    {sourceSwitch}
+                                    <VoraPosterPicker
+                                        idPrefix="edit-collection-vora"
+                                        catalog={voraPosters.catalog}
+                                        failed={voraPosters.failed}
+                                        selectedUrl={posterUrl}
+                                        suggestedUrl={suggestedPoster?.url}
+                                        onSelect={url => handleSelectArt(url, 'PosterUrl')}
+                                    />
+                                </>
+                            );
+                        }
                         return (
+                            <>
+                            {sourceSwitch}
                             <ArtworkPicker
                                 artType={isPoster ? 'Poster' : 'Backdrop'}
                                 artwork={artwork}
@@ -504,6 +546,7 @@ export default function EditCollectionModal({
                                     </div>
                                 }
                             />
+                            </>
                         );
                     })()}
                 </div>

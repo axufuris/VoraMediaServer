@@ -43,6 +43,7 @@ public class ArtworkThumbnailSourceAllowlistTests : IDisposable
             Options.Create(new StoragePathsOptions { CustomArtwork = _root }),
             NullLogger<ArtworkThumbnailService>.Instance,
             _localArtwork,
+            Substitute.For<IVoraPosterCatalog>(),
             _clock);
     }
 

@@ -149,6 +149,24 @@ public class CollectionRepository(VoraDbContext context) : ICollectionRepository
             .Where(c => c.Id == collectionId)
             .ExecuteUpdateAsync(s => s.SetProperty(c => c.Description, description));
 
+    public Task<List<CollectionPosterAddress>> GetPosterAddressesStartingWithAsync(string prefix) =>
+        context.Collections
+            .AsNoTracking()
+            .Where(c => c.PosterUrl != null && c.PosterUrl.StartsWith(prefix))
+            .Select(c => new CollectionPosterAddress(c.Id, c.PosterUrl ?? string.Empty))
+            .ToListAsync();
+
+    public async Task SetPosterUrlsAsync(IReadOnlyDictionary<Guid, string> posterUrls)
+    {
+        var ids = posterUrls.Keys.ToList();
+        var collections = await context.Collections.Where(c => ids.Contains(c.Id)).ToListAsync();
+        foreach (var collection in collections)
+        {
+            collection.PosterUrl = posterUrls[collection.Id];
+        }
+        await context.SaveChangesAsync();
+    }
+
     public Task RemoveItemsFromCollectionAsync(Guid collectionId, IEnumerable<Guid> mediaItemIds)
     {
         var ids = mediaItemIds.ToList();

@@ -29,7 +29,8 @@ public class ArtworkThumbnailRemovalTests : IDisposable
             new Vora.Application.Artwork.RemoteImageRegistry(),
             Options.Create(new StoragePathsOptions { CustomArtwork = _root }),
             NullLogger<ArtworkThumbnailService>.Instance,
-            Substitute.For<Vora.Application.Artwork.ILocalArtworkLocator>());
+            Substitute.For<Vora.Application.Artwork.ILocalArtworkLocator>(),
+            Substitute.For<Vora.Application.Artwork.IVoraPosterCatalog>());
     }
 
     public void Dispose()

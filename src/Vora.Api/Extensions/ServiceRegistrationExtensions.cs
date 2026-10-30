@@ -495,6 +495,8 @@ public static class ServiceRegistrationExtensions
         services.AddScoped<Vora.Application.Metadata.Local.ILocalMediaReader, Vora.Application.Metadata.Local.LocalMediaReader>();
         services.AddScoped<Vora.Application.Metadata.Local.ILocalMetadataChangeFinder, Vora.Application.Metadata.Local.LocalMetadataChangeFinder>();
         services.AddSingleton<Vora.Application.Artwork.ILocalArtworkLocator, Vora.Application.Artwork.LocalArtworkLocator>();
+        services.AddSingleton<Vora.Application.Artwork.IVoraPosterCatalog, Vora.Application.Artwork.VoraPosterCatalog>();
+        services.AddScoped<Vora.Application.Artwork.IVoraPosterAddressRefresher, Vora.Application.Artwork.VoraPosterAddressRefresher>();
         services.AddScoped<IMetadataMappingService, MetadataMappingService>();
         services.AddSingleton<Vora.Application.Metadata.ReferenceWriteGate>();
         services.AddScoped<IRequestNotificationService, RequestNotificationService>();
