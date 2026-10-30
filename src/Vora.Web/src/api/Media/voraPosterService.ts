@@ -25,7 +25,7 @@ export function getVoraPosters(serverId?: string): Promise<VoraPosterCatalog> {
     const known = catalogs.get(key);
     if (known) return known;
 
-    const request = apiClient.get<VoraPosterCatalog>('/api/artwork/vora', { serverId }).then(response => response.data);
+    const request = apiClient.get<VoraPosterCatalog>('/artwork/vora', { serverId }).then(response => response.data);
     catalogs.set(key, request);
     request.catch(() => catalogs.delete(key));
     return request;
