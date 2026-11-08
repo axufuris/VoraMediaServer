@@ -205,6 +205,7 @@ public class PlexLibrarySyncProvider : ILibrarySyncProvider
         var owner = await TryFetchOwnerAccountAsync(client, accessToken, clientIdentifier, cancellationToken);
         if (owner is not null)
         {
+            owner.IsSignedIn = true;
             var idx = accounts.FindIndex(a => string.Equals(a.Id, owner.Id, StringComparison.Ordinal));
             if (idx >= 0) accounts[idx] = owner;
             else accounts.Insert(0, owner);
@@ -213,27 +214,36 @@ public class PlexLibrarySyncProvider : ILibrarySyncProvider
         return accounts;
     }
 
-    public async Task<string> ResolveUserTokenAsync(string adminAccessToken, string accountId, string? pin, CancellationToken cancellationToken = default)
+    public async Task<string> ResolveServerTokenAsync(string accessToken, string? accountId, string? pin, string serverClientIdentifier, CancellationToken cancellationToken = default)
     {
-        if (string.IsNullOrWhiteSpace(adminAccessToken))
+        if (string.IsNullOrWhiteSpace(accessToken))
         {
-            throw new ArgumentException("Admin access token is required.", nameof(adminAccessToken));
+            throw new ArgumentException("Access token is required.", nameof(accessToken));
         }
-        if (string.IsNullOrWhiteSpace(accountId))
+        if (string.IsNullOrWhiteSpace(serverClientIdentifier))
         {
-            throw new ArgumentException("Account id is required.", nameof(accountId));
+            throw new ArgumentException("Server id is required.", nameof(serverClientIdentifier));
         }
 
         var clientIdentifier = await GetOrCreateClientIdentifierAsync();
         var client = _httpClientFactory.CreateClient(HttpClientName);
 
-        var owner = await TryFetchOwnerAccountAsync(client, adminAccessToken, clientIdentifier, cancellationToken);
-        if (owner is not null && string.Equals(owner.Id, accountId, StringComparison.Ordinal))
+        var userToken = string.IsNullOrEmpty(accountId)
+            ? accessToken
+            : await SwitchToHomeUserAsync(client, accessToken, accountId, pin, clientIdentifier, cancellationToken);
+
+        return await ServerAccessTokenAsync(client, userToken, serverClientIdentifier, clientIdentifier, cancellationToken);
+    }
+
+    private async Task<string> SwitchToHomeUserAsync(HttpClient client, string accessToken, string accountId, string? pin, string clientIdentifier, CancellationToken cancellationToken)
+    {
+        var signedIn = await TryFetchOwnerAccountAsync(client, accessToken, clientIdentifier, cancellationToken);
+        if (signedIn is not null && string.Equals(signedIn.Id, accountId, StringComparison.Ordinal))
         {
-            return adminAccessToken;
+            return accessToken;
         }
 
-        var uri = $"{PlexApiBaseUrl}home/users/{accountId}/switch";
+        var uri = $"{PlexApiBaseUrl}home/users/{Uri.EscapeDataString(accountId)}/switch";
         if (!string.IsNullOrEmpty(pin))
         {
             uri += $"?pin={Uri.EscapeDataString(pin)}";
@@ -241,37 +251,56 @@ public class PlexLibrarySyncProvider : ILibrarySyncProvider
 
         using var request = new HttpRequestMessage(HttpMethod.Post, uri);
         ApplyPlexHeaders(request, clientIdentifier);
-        request.Headers.Add("X-Plex-Token", adminAccessToken);
+        request.Headers.Add("X-Plex-Token", accessToken);
 
         using var response = await client.SendAsync(request, cancellationToken);
-
         if (!response.IsSuccessStatusCode)
         {
             var body = await response.Content.ReadAsStringAsync(cancellationToken);
             _logger.LogWarning("Plex home user switch returned {StatusCode}: {Body}", (int)response.StatusCode, body);
-
-            if (response.StatusCode == System.Net.HttpStatusCode.Unauthorized
-                || response.StatusCode == System.Net.HttpStatusCode.Forbidden)
-            {
-                throw new InvalidOperationException("The PIN for this user is invalid or missing.");
-            }
-
-            _logger.LogInformation("Plex home user switch unavailable; falling back to the admin token.");
-            return adminAccessToken;
+            throw new InvalidOperationException(response.StatusCode is System.Net.HttpStatusCode.Unauthorized or System.Net.HttpStatusCode.Forbidden
+                ? "Plex wouldn't switch to that Plex Home user: the PIN is wrong or missing."
+                : $"Plex wouldn't switch to that Plex Home user (status {(int)response.StatusCode}), so nothing was imported.");
         }
 
         await using var stream = await response.Content.ReadAsStreamAsync(cancellationToken);
         using var doc = await JsonDocument.ParseAsync(stream, cancellationToken: cancellationToken);
-        var root = doc.RootElement;
+        var token = ReadStringProperty(doc.RootElement, "authToken")
+            ?? throw new InvalidOperationException("Plex switched to that Plex Home user but sent no sign-in for them, so nothing was imported.");
 
-        var token = ReadStringProperty(root, "authToken");
-        if (string.IsNullOrEmpty(token))
+        var switchedTo = await TryFetchOwnerAccountAsync(client, token, clientIdentifier, cancellationToken);
+        if (switchedTo is null || !string.Equals(switchedTo.Id, accountId, StringComparison.Ordinal))
         {
-            _logger.LogWarning("Plex home user switch returned no authToken; falling back to the admin token.");
-            return adminAccessToken;
+            throw new InvalidOperationException("Plex signed in as someone other than the Plex Home user picked, so nothing was imported.");
         }
 
         return token;
+    }
+
+    private async Task<string> ServerAccessTokenAsync(HttpClient client, string userToken, string serverClientIdentifier, string clientIdentifier, CancellationToken cancellationToken)
+    {
+        using var request = new HttpRequestMessage(HttpMethod.Get, $"{PlexApiBaseUrl}resources?includeHttps=1&includeRelay=1");
+        ApplyPlexHeaders(request, clientIdentifier);
+        request.Headers.Add("X-Plex-Token", userToken);
+
+        using var response = await client.SendAsync(request, cancellationToken);
+        if (!response.IsSuccessStatusCode)
+        {
+            throw new InvalidOperationException($"Plex wouldn't list this Plex user's servers (status {(int)response.StatusCode}).");
+        }
+
+        await using var stream = await response.Content.ReadAsStreamAsync(cancellationToken);
+        using var doc = await JsonDocument.ParseAsync(stream, cancellationToken: cancellationToken);
+        if (doc.RootElement.ValueKind == JsonValueKind.Array)
+        {
+            foreach (var element in doc.RootElement.EnumerateArray())
+            {
+                if (!string.Equals(ReadStringProperty(element, "clientIdentifier"), serverClientIdentifier, StringComparison.Ordinal)) continue;
+                return ReadStringProperty(element, "accessToken") ?? userToken;
+            }
+        }
+
+        throw new InvalidOperationException("This Plex user has no access to that Plex server, so there is nothing of theirs to import from it.");
     }
 
     public async Task<string> FindReachableConnectionAsync(string serverClientIdentifier, string accessToken, CancellationToken cancellationToken = default)

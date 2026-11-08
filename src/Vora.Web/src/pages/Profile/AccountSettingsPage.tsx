@@ -11,7 +11,6 @@ import { userImageService } from '../../api/Users/userImageService';
 import { type UserVM, userService } from '../../api/Users/userService';
 import { authService } from '../../api/Auth/authService';
 import { musicService } from '../../api/Music/musicService';
-import PlexImportPanel from '../../components/LibraryMigration/PlexImportPanel';
 import ProviderAccessList from '../../components/Common/ProviderAccessList';
 import Spinner from '../../components/Common/Spinner';
 import { errorDetail } from '../../utils/apiError';
@@ -622,7 +621,6 @@ function ProfileEditor({ profile, user, libraries, iptvPlaylists, serverId, onCl
                         lastFmUsername={profile.lastFmUsername}
                         onChanged={onRefresh}
                     />
-                    <PlexImportPanel serverId={serverId} />
                 </div>
             )}
 

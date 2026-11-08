@@ -15,6 +15,8 @@ public class LibraryMigrationJobRunnerTests
     private readonly Guid _doubleEpisodeId = Guid.NewGuid();
     private readonly Guid _libraryId = Guid.NewGuid();
     private readonly Guid _profileId = Guid.NewGuid();
+    private readonly Guid _accountId = Guid.NewGuid();
+    private readonly Vora.Application.Analysis.IClientNotifier _notifier = Substitute.For<Vora.Application.Analysis.IClientNotifier>();
     private readonly ILibraryMigrationRepository _repository = Substitute.For<ILibraryMigrationRepository>();
     private readonly ITaskQueueManager _taskQueue = Substitute.For<ITaskQueueManager>();
     private readonly ILibrarySyncProvider _plex = Substitute.For<ILibrarySyncProvider>();
@@ -22,7 +24,7 @@ public class LibraryMigrationJobRunnerTests
     public LibraryMigrationJobRunnerTests()
     {
         _plex.Id.Returns("plex");
-        _plex.ResolveUserTokenAsync(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string?>(), Arg.Any<CancellationToken>()).Returns("user-token");
+        _plex.ResolveServerTokenAsync(Arg.Any<string>(), Arg.Any<string?>(), Arg.Any<string?>(), Arg.Any<string>(), Arg.Any<CancellationToken>()).Returns("user-token");
         _plex.FindReachableConnectionAsync("server", "admin-token", Arg.Any<CancellationToken>()).Returns(PlexAddress);
 
         var showIds = new RemoteExternalIdsDto { TmdbId = "126027" };
@@ -41,33 +43,34 @@ public class LibraryMigrationJobRunnerTests
         _repository.BulkSetAdminRatingsAsync(Arg.Any<IReadOnlyCollection<RatingUpsert>>()).Returns(new List<Guid> { _libraryId });
     }
 
-    private async Task<LibraryMigrationJobVM> RunAsync(bool setAdminRatings)
+    private async Task<LibraryMigrationJobVM> RunAsync(bool setAdminRatings, string plexAccountId = "1", string? pin = null)
     {
         var services = new ServiceCollection()
             .AddSingleton(_plex)
             .AddSingleton(_repository)
             .AddSingleton(_taskQueue)
-            .AddSingleton(Substitute.For<Vora.Application.Analysis.IClientNotifier>())
+            .AddSingleton(_notifier)
             .BuildServiceProvider();
         var runner = new LibraryMigrationJobRunner(services.GetRequiredService<IServiceScopeFactory>(), NullLogger<LibraryMigrationJobRunner>.Instance);
 
         var job = runner.StartJob(new LibraryMigrationJobInput
         {
             ProviderId = "plex",
-            AdminAccessToken = "admin-token",
+            AccessToken = "admin-token",
+            RequestedByAccountId = _accountId,
             ServerClientIdentifier = "server",
             ServerName = "AXMediaServer",
             IncludeWatchState = true,
             IncludeRatings = true,
             SetAdminRatings = setAdminRatings,
             LibrarySectionKeys = ["2"],
-            Mappings = [new LibraryMigrationMappingInput { AccountId = "1", AccountName = "Andy Xufuris", ProfileId = _profileId, ProfileName = "AX Media Server" }],
+            Mappings = [new LibraryMigrationMappingInput { AccountId = plexAccountId, AccountName = "Andy Xufuris", ProfileId = _profileId, ProfileName = "AX Media Server", Pin = pin }],
         });
 
         var deadline = DateTime.UtcNow.AddSeconds(10);
         while (DateTime.UtcNow < deadline)
         {
-            var current = runner.GetJob(job.JobId);
+            var current = runner.GetJob(job.JobId, _accountId);
             if (current?.State is LibraryMigrationJobState.Completed or LibraryMigrationJobState.Failed) return current;
             await Task.Delay(20, TestContext.Current.CancellationToken);
         }
@@ -130,5 +133,61 @@ public class LibraryMigrationJobRunnerTests
         await RunAsync(setAdminRatings: true);
 
         _taskQueue.Received(1).QueueGenerateLibraryPosterOverlays(_libraryId, Arg.Any<string?>());
+    }
+
+    [Fact]
+    public async Task The_signed_in_Plex_account_is_read_without_switching_users()
+    {
+        await RunAsync(setAdminRatings: false, plexAccountId: LibraryMigrationMappingInput.SignedInAccount);
+
+        await _plex.Received(1).ResolveServerTokenAsync("admin-token", null, null, "server", Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task A_Plex_Home_user_is_read_as_that_user_with_their_PIN()
+    {
+        await RunAsync(setAdminRatings: false, plexAccountId: "kid-uuid", pin: "1234");
+
+        await _plex.Received(1).ResolveServerTokenAsync("admin-token", "kid-uuid", "1234", "server", Arg.Any<CancellationToken>());
+        await _plex.Received(1).FetchUserDataAsync(PlexAddress, "user-token", Arg.Any<RemoteSyncScopeDto>(), Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task When_Plex_will_not_switch_users_nothing_is_imported_and_the_reason_is_shown()
+    {
+        _plex.ResolveServerTokenAsync(Arg.Any<string>(), Arg.Any<string?>(), Arg.Any<string?>(), Arg.Any<string>(), Arg.Any<CancellationToken>())
+            .Returns(Task.FromException<string>(new InvalidOperationException("Plex wouldn't switch to that Plex Home user: the PIN is wrong or missing.")));
+
+        var user = (await RunAsync(setAdminRatings: false, plexAccountId: "kid-uuid")).Users.Single();
+
+        user.State.Should().Be(LibraryMigrationUserState.Failed);
+        user.ErrorMessage.Should().Be("Plex wouldn't switch to that Plex Home user: the PIN is wrong or missing.");
+        await _plex.DidNotReceive().FetchUserDataAsync(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<RemoteSyncScopeDto>(), Arg.Any<CancellationToken>());
+        await _repository.DidNotReceiveWithAnyArgs().BulkUpsertWatchStatesAsync(default, default!);
+    }
+
+    [Fact]
+    public async Task Progress_goes_only_to_the_account_that_started_the_import()
+    {
+        var job = await RunAsync(setAdminRatings: false);
+
+        await _notifier.Received().NotifyLibraryMigrationUpdatedAsync(_accountId, Arg.Is<LibraryMigrationJobVM>(j => j.JobId == job.JobId));
+        await _notifier.DidNotReceive().NotifyLibraryMigrationUpdatedAsync(Arg.Is<Guid>(id => id != _accountId), Arg.Any<LibraryMigrationJobVM>());
+    }
+
+    [Fact]
+    public async Task Another_account_cannot_read_the_job()
+    {
+        var services = new ServiceCollection().AddSingleton(_plex).AddSingleton(_repository).AddSingleton(_taskQueue).AddSingleton(_notifier).BuildServiceProvider();
+        var runner = new LibraryMigrationJobRunner(services.GetRequiredService<IServiceScopeFactory>(), NullLogger<LibraryMigrationJobRunner>.Instance);
+        var job = runner.StartJob(new LibraryMigrationJobInput
+        {
+            ProviderId = "plex", AccessToken = "admin-token", RequestedByAccountId = _accountId, ServerClientIdentifier = "server", ServerName = "AXMediaServer",
+            IncludeWatchState = true, IncludeRatings = true, LibrarySectionKeys = ["2"],
+            Mappings = [new LibraryMigrationMappingInput { AccountId = "1", AccountName = "Andy", ProfileId = _profileId, ProfileName = "Andy" }],
+        });
+
+        runner.GetJob(job.JobId, Guid.NewGuid()).Should().BeNull();
+        runner.GetJob(job.JobId, _accountId).Should().NotBeNull();
     }
 }

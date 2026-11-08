@@ -1,4 +1,4 @@
-import type { LibraryMigrationUserStatusVM } from '../api/LibraryMigration/libraryMigrationService';
+import type { LibraryMigrationUserStatusVM } from '../api/LibraryMigration/libraryImportService';
 
 type ImportCounts = Pick<LibraryMigrationUserStatusVM,
     'watchStatesFetched' | 'watchStatesImported' | 'watchStatesMerged' | 'ratingsFetched' | 'ratingsImported' | 'ratingsMerged'>;

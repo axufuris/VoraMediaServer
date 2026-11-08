@@ -85,6 +85,6 @@ public class SignalRClientNotifier(IHubContext<VoraHub> hubContext) : IClientNot
     public Task NotifyBackupRestoredAsync(string fileName, IReadOnlyList<string> restoredSectionKeys) =>
         hubContext.Clients.Group(VoraHub.AdminGroupName).SendAsync("BackupRestored", new { fileName, sectionKeys = restoredSectionKeys });
 
-    public Task NotifyLibraryMigrationUpdatedAsync(LibraryMigrationJobVM job) =>
-        hubContext.Clients.Group(VoraHub.AdminGroupName).SendAsync("LibraryMigrationUpdated", job);
+    public Task NotifyLibraryMigrationUpdatedAsync(Guid accountId, LibraryMigrationJobVM job) =>
+        hubContext.Clients.Group(VoraHub.UserGroupName(accountId)).SendAsync("LibraryMigrationUpdated", job);
 }
