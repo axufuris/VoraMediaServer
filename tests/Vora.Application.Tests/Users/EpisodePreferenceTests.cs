@@ -21,11 +21,11 @@ public class EpisodePreferenceTests
     }
 
     [Fact]
-    public async Task A_new_profile_plays_episodes_in_order_and_shows_them_as_a_row()
+    public async Task A_new_profile_plays_from_where_it_left_off_and_shows_episodes_as_a_row()
     {
         var prefs = await _manager.GetPlaybackPreferencesAsync(_profile.Id);
 
-        prefs.UpNextOrder.Should().Be(UpNextOrder.InOrder);
+        prefs.UpNextOrder.Should().Be(UpNextOrder.WhereILeftOff);
         prefs.EpisodeLayout.Should().Be(EpisodeLayout.Row);
     }
 
@@ -34,23 +34,23 @@ public class EpisodePreferenceTests
     {
         var saved = await _manager.SavePlaybackPreferencesAsync(_profile.Id, new PlaybackPreferencesVM
         {
-            MinimumCreditsSceneSeconds = 20, UpNextOrder = UpNextOrder.WhereILeftOff, EpisodeLayout = EpisodeLayout.List,
+            MinimumCreditsSceneSeconds = 20, UpNextOrder = UpNextOrder.InOrder, EpisodeLayout = EpisodeLayout.List,
         });
 
-        (saved.UpNextOrder, saved.EpisodeLayout).Should().Be((UpNextOrder.WhereILeftOff, EpisodeLayout.List));
-        (_profile.UpNextOrder, _profile.EpisodeLayout).Should().Be((UpNextOrder.WhereILeftOff, EpisodeLayout.List));
+        (saved.UpNextOrder, saved.EpisodeLayout).Should().Be((UpNextOrder.InOrder, EpisodeLayout.List));
+        (_profile.UpNextOrder, _profile.EpisodeLayout).Should().Be((UpNextOrder.InOrder, EpisodeLayout.List));
         await _repo.Received(1).UpdateProfileAsync(_profile);
     }
 
     [Fact]
     public async Task An_app_that_does_not_send_them_leaves_them_as_they_were()
     {
-        _profile.UpNextOrder = UpNextOrder.WhereILeftOff;
+        _profile.UpNextOrder = UpNextOrder.InOrder;
         _profile.EpisodeLayout = EpisodeLayout.List;
 
         var saved = await _manager.SavePlaybackPreferencesAsync(_profile.Id, new PlaybackPreferencesVM { AutoSkipIntro = true, MinimumCreditsSceneSeconds = 15 });
 
-        (saved.UpNextOrder, saved.EpisodeLayout).Should().Be((UpNextOrder.WhereILeftOff, EpisodeLayout.List));
+        (saved.UpNextOrder, saved.EpisodeLayout).Should().Be((UpNextOrder.InOrder, EpisodeLayout.List));
     }
 
     [Fact]
