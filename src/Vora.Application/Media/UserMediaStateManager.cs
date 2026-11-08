@@ -1,4 +1,5 @@
 ﻿using Vora.Application.Analysis;
+using Vora.Application.Media.Requests;
 using Vora.Application.Media.ViewModels;
 using Vora.Plugins.Interfaces;
 
@@ -9,6 +10,8 @@ public interface IUserMediaStateManager
     Task<UpNextResultVM> GetUpNextAsync(Guid mediaId, string? contextType, Guid? contextId, Guid? profileId);
     Task SetMediaPlayedStateAsync(Guid mediaItemId, Guid profileId, bool isPlayed);
     Task<SetMediaRatingResult> SetMediaRatingAsync(Guid mediaItemId, Guid profileId, decimal? rating, bool isAdmin);
+    Task<ViewingHistoryVM?> GetViewingHistoryAsync(Guid profileId);
+    Task<ClearedViewingHistoryVM?> ClearViewingHistoryAsync(Guid profileId, ClearViewingHistoryRequest request);
 }
 
 public class UserMediaStateManager : IUserMediaStateManager
@@ -55,5 +58,21 @@ public class UserMediaStateManager : IUserMediaStateManager
         }
 
         return result;
+    }
+
+    public Task<ViewingHistoryVM?> GetViewingHistoryAsync(Guid profileId) => _repository.GetViewingHistoryAsync(profileId);
+
+    public async Task<ClearedViewingHistoryVM?> ClearViewingHistoryAsync(Guid profileId, ClearViewingHistoryRequest request)
+    {
+        if (!request.WatchHistory && !request.Ratings)
+        {
+            throw new ArgumentException("Pick the watch history, the ratings or both.", nameof(request));
+        }
+
+        var cleared = await _repository.ClearViewingHistoryAsync(profileId, request.WatchHistory, request.Ratings);
+        if (cleared is null) return null;
+
+        await _notifier.NotifyUserMediaStateUpdatedAsync(profileId);
+        return cleared;
     }
 }

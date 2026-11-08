@@ -33,6 +33,22 @@ export interface ShowtimesLocationDto {
     location?: string | null;
 }
 
+export interface ViewingHistoryVM {
+    watchedCount: number;
+    inProgressCount: number;
+    ratingCount: number;
+}
+
+export interface ClearViewingHistoryRequest {
+    watchHistory: boolean;
+    ratings: boolean;
+}
+
+export interface ClearedViewingHistoryVM {
+    watchStatesRemoved: number;
+    ratingsRemoved: number;
+}
+
 export type UpNextOrder = 'InOrder' | 'WhereILeftOff';
 
 export type EpisodeLayout = 'Row' | 'List';
@@ -135,6 +151,16 @@ export const profileService = {
             { location },
             { serverId }
         );
+        return response.data;
+    },
+
+    adminGetViewingHistory: async (profileId: string, serverId?: string): Promise<ViewingHistoryVM> => {
+        const response = await apiClient.get<ViewingHistoryVM>(`/users/profiles/${profileId}/viewing-history`, { serverId });
+        return response.data;
+    },
+
+    adminClearViewingHistory: async (profileId: string, request: ClearViewingHistoryRequest, serverId?: string): Promise<ClearedViewingHistoryVM> => {
+        const response = await apiClient.post<ClearedViewingHistoryVM>(`/users/profiles/${profileId}/viewing-history/clear`, request, { serverId });
         return response.data;
     },
 

@@ -14,6 +14,9 @@ public interface IUserMediaStateRepository
 
     Task<Dictionary<Guid, decimal>> GetMediaRatingsAsync(Guid profileId, IEnumerable<Guid> mediaItemIds);
     Task<SetMediaRatingResult> SetMediaRatingAsync(Guid profileId, Guid mediaItemId, decimal? rating, bool isAdmin);
+
+    Task<ViewingHistoryVM?> GetViewingHistoryAsync(Guid profileId);
+    Task<ClearedViewingHistoryVM?> ClearViewingHistoryAsync(Guid profileId, bool watchHistory, bool ratings);
 }
 
 public sealed class SetMediaRatingResult

@@ -9,6 +9,7 @@ import { profileService, type UserProfileVM } from '../../api/Users/profileServi
 import PageHeader from '../../components/Admin/Primitives/PageHeader';
 import HealthBadge from '../../components/Admin/Primitives/HealthBadge';
 import AddUserModal from '../../components/Admin/Users/AddUserModal';
+import ClearViewingHistoryModal from '../../components/Admin/Users/ClearViewingHistoryModal';
 import SignUpCard from '../../components/Admin/Users/SignUpCard';
 
 export default function UserManagementPage() {
@@ -22,6 +23,7 @@ export default function UserManagementPage() {
 
     const [editingUser, setEditingUser] = useState<UserVM | null>(null);
     const [editingShowtimes, setEditingShowtimes] = useState<UserProfileVM | null>(null);
+    const [clearingHistory, setClearingHistory] = useState<UserProfileVM | null>(null);
 
     const loadData = useCallback(async () => {
         try {
@@ -162,6 +164,14 @@ export default function UserManagementPage() {
                                                 >
                                                     Showtimes
                                                 </button>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => setClearingHistory(profile)}
+                                                    title={`Clear ${profile.name}'s watch history and ratings`}
+                                                    className="mt-1.5 text-[10px] font-semibold px-2 py-0.5 rounded border border-[var(--vora-border-subtle)] text-[var(--vora-text-secondary)] hover:text-[var(--vora-danger-text)] hover:border-[var(--vora-danger-500)] cursor-pointer"
+                                                >
+                                                    Clear history
+                                                </button>
                                             </div>
                                         ))
                                     )}
@@ -192,6 +202,9 @@ export default function UserManagementPage() {
             )}
             {addingUser && (
                 <AddUserModal serverId={serverId} onClose={() => setAddingUser(false)} onCreated={() => { void loadData(); }} />
+            )}
+            {clearingHistory && (
+                <ClearViewingHistoryModal profile={clearingHistory} serverId={serverId} onClose={() => setClearingHistory(null)} />
             )}
         </div>
     );
