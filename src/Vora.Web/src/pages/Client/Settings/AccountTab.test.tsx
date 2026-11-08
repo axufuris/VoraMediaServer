@@ -11,6 +11,7 @@ const profile = vi.hoisted(() => ({
 }));
 
 vi.mock('../../../api/Users/profileService', () => ({ profileService: profile }));
+vi.mock('../../../components/LibraryMigration/PlexImportPanel', () => ({ default: () => <section>Import from Plex</section> }));
 
 beforeEach(() => {
     profile.getMyShowtimesLocation.mockResolvedValue({ location: null });
@@ -23,6 +24,7 @@ it('leaves account, play history and switching profile to the profile menu', asy
     render(<DialogProvider><AccountTab serverId="home" /></DialogProvider>);
 
     expect(await screen.findByText('Movie showtimes location')).toBeInTheDocument();
+    expect(screen.getByText('Import from Plex')).toBeInTheDocument();
     expect(screen.queryByText('Manage your profile')).toBeNull();
     expect(screen.queryByRole('link')).toBeNull();
 });

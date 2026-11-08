@@ -3,6 +3,7 @@ import { profileService, type EpisodeLayout, type UpNextOrder } from '../../../a
 import { useDialog } from '../../../dialogs';
 import { StorageKeys } from '../../../utils/storageKeys';
 import LibrarySortSection from './LibrarySortSection';
+import PlexImportPanel from '../../../components/LibraryMigration/PlexImportPanel';
 
 const selectClass = 'w-full cursor-pointer rounded-md p-2.5 text-sm outline-none';
 const selectStyle = { background: 'var(--vora-bg-surface)', border: '1px solid var(--vora-border-subtle)', color: 'var(--vora-text-primary)' } as const;
@@ -33,6 +34,7 @@ export default function AccountTab({ serverId }: { serverId?: string }) {
             <LibrarySortSection serverId={serverId} />
             <ShowtimesLocationSection serverId={serverId} />
             <PlaybackPreferencesSection serverId={serverId} />
+            <PlexImportPanel serverId={serverId} />
         </div>
     );
 }

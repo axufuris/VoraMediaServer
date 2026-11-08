@@ -63,7 +63,7 @@ export default function ClearViewingHistoryModal({ profile, serverId, onClose }:
             {cleared ? (
                 <div className="space-y-4 px-5">
                     <p role="status" className="text-sm text-[var(--vora-text-primary)]">{cleared}</p>
-                    <p className="text-xs text-[var(--vora-text-muted)]">They can import their own history again from Account settings, signed in to their own Plex account.</p>
+                    <p className="text-xs text-[var(--vora-text-muted)]">They can import their own history again from Settings → Account → Import from Plex. A Plex Home user's history, such as a child's, is imported from the account's main profile.</p>
                     <div className="flex justify-end">
                         <button type="button" onClick={onClose} className="vora-button-primary">Done</button>
                     </div>

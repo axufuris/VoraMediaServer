@@ -31,5 +31,5 @@ public interface IClientNotifier
     Task NotifyClientTemplateChangedForProfileAsync(Guid profileId);
     Task NotifyBackupCreatedAsync(string fileName);
     Task NotifyBackupRestoredAsync(string fileName, IReadOnlyList<string> restoredSectionKeys);
-    Task NotifyLibraryMigrationUpdatedAsync(LibraryMigrationJobVM job);
+    Task NotifyLibraryMigrationUpdatedAsync(Guid accountId, LibraryMigrationJobVM job);
 }
