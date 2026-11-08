@@ -34,3 +34,11 @@ After this landed, a library scan followed by running the migration again picks 
 ## Ratings and poster overlays
 
 A profile's ratings go to `UserMediaRatings`. With **Set admin ratings** ticked, they also become the item's `ServerAdminRating`, which is the rating poster overlays draw. The import marks each item whose server rating changed as needing a new overlay (`LastOverlayGeneratedAt = null`) and queues one **Generate Poster Overlays** task per library it touched. That sync redraws only the items marked this way, rather than queueing a task per item. Ratings set from the app queue the item's overlay the same way (`UserMediaStateManager`). An import run before this marking existed left server ratings that a later run finds unchanged, so it marks nothing; the overlay layout bump to `v9` redraws those posters once (`docs/artwork-image-cache.md`).
+
+## Starting a profile over
+
+An import into the wrong profile (discussion #244: the admin ran the import for each of three Plex users and every Vora profile got the admin's history) is undone from **Users & Access**: each profile tile has **Clear history**, admins only. The dialog shows what the profile has (`GET /api/users/profiles/{id}/viewing-history` → `ViewingHistoryVM`: titles watched, in progress, ratings) and clears the watch history, the ratings or both (`POST …/viewing-history/clear` with `{ watchHistory, ratings }` → `ClearedViewingHistoryVM`; nothing picked is a 400).
+
+- **What goes.** The profile's `UserMediaStates` (played marks, resume points, Continue Watching) and `UserMediaRatings`, which are the two tables an import writes. Its `PreservedUserMediaData` loses the same halves, and a row with nothing left is deleted, so a title brought back from Media Trash doesn't restore the history that was just cleared. Music, podcasts, playlists and the watchlist are left alone.
+- **What stays.** A title's `ServerAdminRating` (from **Set admin ratings**, or ratings the admin sets in the app) belongs to the server, not to a profile, so clearing the admin's own ratings doesn't touch it or the poster overlays.
+- **After.** `UserMediaStateUpdated` goes to the profile's apps, so a web Home page that is open reloads its rows. The person can then import their own history, signed in to their own Plex account.

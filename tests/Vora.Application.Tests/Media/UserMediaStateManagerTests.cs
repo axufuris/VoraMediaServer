@@ -1,5 +1,7 @@
 using Vora.Application.Analysis;
 using Vora.Application.Media;
+using Vora.Application.Media.Requests;
+using Vora.Application.Media.ViewModels;
 using Vora.Application.Tasks;
 
 namespace Vora.Application.Tests.Media;
@@ -119,5 +121,38 @@ public class UserMediaStateManagerTests
         await _manager.SetMediaRatingAsync(Guid.NewGuid(), Guid.NewGuid(), 7m, isAdmin: false);
 
         _tasks.DidNotReceiveWithAnyArgs().QueueGeneratePosterOverlays(default);
+    }
+
+    [Fact]
+    public async Task Clearing_a_profiles_history_tells_its_apps_to_reload()
+    {
+        var profileId = Guid.NewGuid();
+        _repo.ClearViewingHistoryAsync(profileId, true, false)
+            .Returns(new ClearedViewingHistoryVM { WatchStatesRemoved = 12, RatingsRemoved = 0 });
+
+        var cleared = await _manager.ClearViewingHistoryAsync(profileId, new ClearViewingHistoryRequest { WatchHistory = true });
+
+        cleared!.WatchStatesRemoved.Should().Be(12);
+        await _notifier.Received(1).NotifyUserMediaStateUpdatedAsync(profileId);
+    }
+
+    [Fact]
+    public async Task Clearing_with_nothing_picked_is_refused()
+    {
+        var clear = () => _manager.ClearViewingHistoryAsync(Guid.NewGuid(), new ClearViewingHistoryRequest());
+
+        await clear.Should().ThrowAsync<ArgumentException>();
+        await _repo.DidNotReceiveWithAnyArgs().ClearViewingHistoryAsync(default, default, default);
+    }
+
+    [Fact]
+    public async Task Clearing_an_unknown_profile_tells_nobody()
+    {
+        _repo.ClearViewingHistoryAsync(Arg.Any<Guid>(), Arg.Any<bool>(), Arg.Any<bool>()).Returns((ClearedViewingHistoryVM?)null);
+
+        var cleared = await _manager.ClearViewingHistoryAsync(Guid.NewGuid(), new ClearViewingHistoryRequest { WatchHistory = true, Ratings = true });
+
+        cleared.Should().BeNull();
+        await _notifier.DidNotReceiveWithAnyArgs().NotifyUserMediaStateUpdatedAsync(default);
     }
 }

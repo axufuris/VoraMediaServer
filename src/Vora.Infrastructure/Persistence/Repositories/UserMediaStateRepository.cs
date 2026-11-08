@@ -658,4 +658,52 @@ public class UserMediaStateRepository : IUserMediaStateRepository
         await _context.SaveChangesAsync();
         return new SetMediaRatingResult { Found = true, ServerAdminRatingChanged = serverAdminChanged };
     }
+
+    public async Task<ViewingHistoryVM?> GetViewingHistoryAsync(Guid profileId)
+    {
+        if (!await _context.UserProfiles.AnyAsync(p => p.Id == profileId)) return null;
+
+        var states = _context.UserMediaStates.Where(s => s.ProfileId == profileId);
+        return new ViewingHistoryVM
+        {
+            WatchedCount = await states.CountAsync(s => s.IsPlayed),
+            InProgressCount = await states.CountAsync(s => !s.IsPlayed && s.ResumePositionSeconds > 0),
+            RatingCount = await _context.UserMediaRatings.CountAsync(r => r.ProfileId == profileId)
+        };
+    }
+
+    public async Task<ClearedViewingHistoryVM?> ClearViewingHistoryAsync(Guid profileId, bool watchHistory, bool ratings)
+    {
+        if (!await _context.UserProfiles.AnyAsync(p => p.Id == profileId)) return null;
+
+        var states = watchHistory
+            ? await _context.UserMediaStates.Where(s => s.ProfileId == profileId).ToListAsync()
+            : new List<UserMediaState>();
+        var profileRatings = ratings
+            ? await _context.UserMediaRatings.Where(r => r.ProfileId == profileId).ToListAsync()
+            : new List<UserMediaRating>();
+        _context.UserMediaStates.RemoveRange(states);
+        _context.UserMediaRatings.RemoveRange(profileRatings);
+
+        foreach (var archive in await _context.PreservedUserMediaData.Where(p => p.ProfileId == profileId).ToListAsync())
+        {
+            if (watchHistory)
+            {
+                archive.HasState = false;
+                archive.ResumePositionSeconds = 0;
+                archive.IsPlayed = false;
+                archive.IsHiddenFromContinueWatching = false;
+                archive.LastPlayedAt = null;
+            }
+            if (ratings)
+            {
+                archive.Rating = null;
+                archive.RatedAt = null;
+            }
+            if (!archive.HasState && archive.Rating is null) _context.PreservedUserMediaData.Remove(archive);
+        }
+
+        await _context.SaveChangesAsync();
+        return new ClearedViewingHistoryVM { WatchStatesRemoved = states.Count, RatingsRemoved = profileRatings.Count };
+    }
 }

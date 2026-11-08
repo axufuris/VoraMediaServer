@@ -2,6 +2,9 @@
 using System.Text.Json;
 using Vora.Api.Extensions;
 using Vora.Application.Iptv;
+using Vora.Application.Media;
+using Vora.Application.Media.Requests;
+using Vora.Application.Media.ViewModels;
 using Vora.Application.Streaming;
 using Vora.Application.Streaming.Requests;
 using Vora.Application.Streaming.ViewModels;
@@ -164,6 +167,18 @@ public static class ProfileEndpoints
             .RequireAuthorization("AdminOnly")
             .Produces<ShowtimesLocationDto>(StatusCodes.Status200OK);
 
+        group.MapGet("/profiles/{profileId:guid}/viewing-history", GetViewingHistoryAsync)
+            .RequireAuthorization("AdminOnly")
+            .WithName("GetProfileViewingHistory")
+            .Produces<ViewingHistoryVM>(StatusCodes.Status200OK)
+            .Produces(StatusCodes.Status404NotFound);
+        group.MapPost("/profiles/{profileId:guid}/viewing-history/clear", ClearViewingHistoryAsync)
+            .RequireAuthorization("AdminOnly")
+            .WithName("ClearProfileViewingHistory")
+            .Produces<ClearedViewingHistoryVM>(StatusCodes.Status200OK)
+            .ProducesProblem(StatusCodes.Status400BadRequest)
+            .Produces(StatusCodes.Status404NotFound);
+
         // The account that owns the profile (AccountOwnershipFilter), so a parent
         // can switch it off for a child's profile.
         group.MapPut("/profiles/{profileId:guid}/ai-playlists", SetAiPlaylistsAsync)
@@ -324,6 +339,25 @@ public static class ProfileEndpoints
         if (!profileId.HasValue) return Results.Unauthorized();
         await manager.SaveShowtimesLocationAsync(profileId.Value, body.Location);
         return Results.Ok(new ShowtimesLocationDto { Location = string.IsNullOrWhiteSpace(body.Location) ? null : body.Location.Trim() });
+    }
+
+    private static async Task<IResult> GetViewingHistoryAsync(Guid profileId, IUserMediaStateManager manager)
+    {
+        var history = await manager.GetViewingHistoryAsync(profileId);
+        return history is null ? Results.NotFound() : Results.Ok(history);
+    }
+
+    private static async Task<IResult> ClearViewingHistoryAsync(Guid profileId, [FromBody] ClearViewingHistoryRequest body, IUserMediaStateManager manager)
+    {
+        try
+        {
+            var cleared = await manager.ClearViewingHistoryAsync(profileId, body);
+            return cleared is null ? Results.NotFound() : Results.Ok(cleared);
+        }
+        catch (ArgumentException ex)
+        {
+            return Results.Problem(ex.Message, statusCode: StatusCodes.Status400BadRequest);
+        }
     }
 
     private static async Task<IResult> AdminSetShowtimesLocationAsync(Guid profileId, [FromBody] ShowtimesLocationDto body, IUserManager manager)
