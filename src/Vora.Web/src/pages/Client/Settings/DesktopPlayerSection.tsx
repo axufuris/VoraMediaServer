@@ -48,6 +48,7 @@ export default function DesktopPlayerSection() {
     }
 
     const update = (patch: Partial<DesktopSettings>) => setForm({ ...shown, ...patch });
+    const offersStartFullScreen = 'startFullScreen' in shown;
 
     const save = async () => {
         if (!form) return;
@@ -108,6 +109,15 @@ export default function DesktopPlayerSection() {
                 <input id="desktop-hdr-output" type="checkbox" checked={shown.hdrOutput} onChange={e => update({ hdrOutput: e.target.checked })} className="h-4 w-4 cursor-pointer" />
                 <span className="text-sm" style={{ color: 'var(--vora-text-primary)' }}>Send HDR to an HDR display</span>
             </label>
+            {offersStartFullScreen && (
+                <div className="mt-3">
+                    <label className="flex cursor-pointer items-center gap-3">
+                        <input id="desktop-start-full-screen" type="checkbox" checked={shown.startFullScreen} onChange={e => update({ startFullScreen: e.target.checked })} className="h-4 w-4 cursor-pointer" />
+                        <span className="text-sm" style={{ color: 'var(--vora-text-primary)' }}>Start videos in full screen</span>
+                    </label>
+                    <p className={`${hintClass} ml-7`} style={{ color: 'var(--vora-text-muted)' }}>Turn it off to play videos in a window. F, F11 or a double-click still switches while a video plays.</p>
+                </div>
+            )}
             <div className="mt-5 flex justify-end">
                 <button type="button" onClick={save} disabled={saving || !form} className="vora-button-primary cursor-pointer disabled:cursor-not-allowed disabled:opacity-50">
                     {saving ? 'Saving…' : 'Save desktop player'}

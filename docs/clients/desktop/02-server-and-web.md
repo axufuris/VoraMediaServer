@@ -143,9 +143,12 @@ track switching); ping cadence is tested on `PlayerContext` with a fake transpor
 
 - **Settings → Playback → Desktop player** (`DesktopPlayerSection`), shown only in the
   app: Use the Vora player (on), Audio passthrough (Off / AC-3 and DTS / All incl.
-  TrueHD, DTS-HD, E-AC-3), HDR output (on), Hardware decoding (Automatic / Off), Open
-  mpv settings folder (`bridge.settings.openAdvancedFolder`). The same controls as the
-  other client settings sections, saved through `bridge.settings`.
+  TrueHD, DTS-HD, E-AC-3), HDR output (on), Hardware decoding (Automatic / Off), Start
+  videos in full screen (on), Open mpv settings folder
+  (`bridge.settings.openAdvancedFolder`). The same controls as the other client settings
+  sections, saved through `bridge.settings`, so the app keeps them per computer. Start in
+  full screen (bridge version 2) shows only when the app's settings carry
+  `startFullScreen`, so an older app is never sent a setting it would refuse.
 - **mpv missing banner** (Linux only, `MpvMissingBanner`): a dismissible notice
   (`desktop_mpv_notice_dismissed`) that video plays in the built-in player, with
   `bridge.mpv.reason`. It goes away by itself when the shell reports mpv found.

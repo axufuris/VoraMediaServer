@@ -29,7 +29,7 @@ osd-bar=no
 input-default-bindings=no
 input-conf=<resources>/player/input.conf
 title=Vora
-fullscreen=yes
+fullscreen=yes                  # 'no' when startFullScreen = false, with autofit-larger=90%x90%
 # video
 vo=gpu-next
 hwdec=auto-safe                 # 'no' when hardwareDecoding = off
@@ -197,4 +197,4 @@ that choice in the checklist. At minimum:
 - [ ] Extras/trailers play in the same player without touching the parent's watch state
 - [ ] Buffering indicator; friendly error with "play with the built-in player" fallback
 - [ ] Volume + mute (desktop-only addition)
-- [ ] Desktop-only: windowed/fullscreen toggle
+- [ ] Desktop-only: windowed/fullscreen toggle, and Start videos in full screen (on by default)

@@ -22,6 +22,7 @@ export const desktopSettings: DesktopSettings = {
     audioPassthrough: 'off',
     hdrOutput: true,
     hardwareDecoding: 'auto',
+    startFullScreen: true,
 };
 
 export interface FakeDesktopBridge {
@@ -36,7 +37,7 @@ export function fakeDesktopBridge(overrides: Partial<Omit<VoraDesktopBridge, 'pl
     let saved = settings;
 
     const bridge: VoraDesktopBridge = {
-        bridgeVersion: 1,
+        bridgeVersion: 2,
         shellVersion: '1.0.0',
         channel: 'prod',
         platform: 'linux',
