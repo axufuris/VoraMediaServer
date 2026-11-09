@@ -1,12 +1,12 @@
 import { useEffect, useRef, useState } from 'react';
 import { Modal, ModalBody, ModalFooter, ModalHeader } from '../Common/Modal';
 import {
-    libraryMigrationService,
+    libraryImportService,
     type LibrarySyncPinStatus,
     type LibrarySyncPinStatusVM,
     type LibrarySyncPinVM,
     type LibrarySyncTokenVM
-} from '../../api/LibraryMigration/libraryMigrationService';
+} from '../../api/LibraryMigration/libraryImportService';
 
 const POLL_INTERVAL_MS = 2000;
 
@@ -28,8 +28,8 @@ export function LibrarySyncPinModal({
     providerId,
     providerName,
     serverId,
-    createPin = libraryMigrationService.createPin,
-    pollPin = libraryMigrationService.pollPin,
+    createPin = libraryImportService.createPin,
+    pollPin = libraryImportService.pollPin,
     onClose,
     onAuthorized
 }: LibrarySyncPinModalProps) {

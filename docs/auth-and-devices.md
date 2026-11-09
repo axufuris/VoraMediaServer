@@ -108,7 +108,6 @@ These are the canonical keys. Don't invent new ones in a vacuum.
 | `calendar_view_mode_v2` | Release Calendar layout — `month`, `week`, or `day`. Device-local, not mirrored: it is a display preference, not a profile setting. Nothing saved, or an unrecognised value, opens on `week`. Renamed from `calendar_view_mode` when the default changed from Month, so a Month saved under the old default doesn't pin existing browsers there; the old key is simply ignored. | `CalendarPage` |
 | `sidebar_collapsed` | `"true"` while the client sidebar is folded to its icons (tablet width and up); anything else, or nothing, shows it in full. Device-local. | `MainLayout` (`layouts/parts/useSidebarCollapsed.ts`) |
 | `desktop_mpv_notice_dismissed` | `"true"` once a Vora Desktop user on Linux dismissed the notice that mpv is missing and videos play in the built-in player. Device-local. | `MainLayout` (`components/Desktop/MpvMissingBanner.tsx`) |
-| `vora_library_migration_job_id` | Active library-migration job id. Lets the admin reload `/admin/library-migration` and re-attach to the running job. Cleared on "Run again" / "Start over" or when the backend returns 404 (job evicted on server restart). | `LibraryMigrationPage` |
 | Server vault keys | Managed by `utils/serverVault.ts` (`VAULT_KEY`, `ACTIVE_SERVER_KEY`) | `serverVault` |
 
 **`is_admin` is dead.** It is never written by any current code. If you find code reading `is_admin`, replace it with `is_server_admin`.

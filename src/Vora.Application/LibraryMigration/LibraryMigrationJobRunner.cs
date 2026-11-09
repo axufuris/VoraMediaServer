@@ -12,7 +12,7 @@ namespace Vora.Application.LibraryMigration;
 public interface ILibraryMigrationJobRunner
 {
     LibraryMigrationJobVM StartJob(LibraryMigrationJobInput input);
-    LibraryMigrationJobVM? GetJob(Guid jobId);
+    LibraryMigrationJobVM? GetJob(Guid jobId, Guid accountId);
 }
 
 public class LibraryMigrationJobRunner : ILibraryMigrationJobRunner
@@ -24,6 +24,7 @@ public class LibraryMigrationJobRunner : ILibraryMigrationJobRunner
     private readonly ILogger<LibraryMigrationJobRunner> _logger;
     private readonly ConcurrentDictionary<Guid, LibraryMigrationJobVM> _jobs = new();
     private readonly ConcurrentDictionary<Guid, object> _jobLocks = new();
+    private readonly ConcurrentDictionary<Guid, Guid> _jobAccounts = new();
 
     public LibraryMigrationJobRunner(IServiceScopeFactory scopeFactory, ILogger<LibraryMigrationJobRunner> logger)
     {
@@ -59,6 +60,7 @@ public class LibraryMigrationJobRunner : ILibraryMigrationJobRunner
 
         _jobs[jobId] = job;
         _jobLocks[jobId] = new object();
+        _jobAccounts[jobId] = input.RequestedByAccountId;
 
         _ = Task.Run(async () =>
         {
@@ -81,9 +83,9 @@ public class LibraryMigrationJobRunner : ILibraryMigrationJobRunner
         return Snapshot(job);
     }
 
-    public LibraryMigrationJobVM? GetJob(Guid jobId)
+    public LibraryMigrationJobVM? GetJob(Guid jobId, Guid accountId)
     {
-        if (_jobs.TryGetValue(jobId, out var job))
+        if (_jobAccounts.TryGetValue(jobId, out var owner) && owner == accountId && _jobs.TryGetValue(jobId, out var job))
         {
             var lockObj = _jobLocks.GetOrAdd(jobId, _ => new object());
             lock (lockObj)
@@ -113,12 +115,12 @@ public class LibraryMigrationJobRunner : ILibraryMigrationJobRunner
                 j.CompletedAt = DateTime.UtcNow;
                 j.ErrorMessage = $"No provider registered with id '{input.ProviderId}'.";
             });
-            await notifier.NotifyLibraryMigrationUpdatedAsync(GetSnapshot(jobId));
+            await notifier.NotifyLibraryMigrationUpdatedAsync(input.RequestedByAccountId, GetSnapshot(jobId));
             return;
         }
 
         UpdateJob(jobId, j => j.State = LibraryMigrationJobState.Running);
-        await notifier.NotifyLibraryMigrationUpdatedAsync(GetSnapshot(jobId));
+        await notifier.NotifyLibraryMigrationUpdatedAsync(input.RequestedByAccountId, GetSnapshot(jobId));
 
         var connectionUri = await FindConnectionAsync(jobId, input, notifier);
         if (connectionUri is null)
@@ -136,7 +138,7 @@ public class LibraryMigrationJobRunner : ILibraryMigrationJobRunner
         foreach (var mapping in input.Mappings)
         {
             UpdateUser(jobId, mapping.AccountId, u => u.State = LibraryMigrationUserState.Running);
-            await notifier.NotifyLibraryMigrationUpdatedAsync(GetSnapshot(jobId));
+            await notifier.NotifyLibraryMigrationUpdatedAsync(input.RequestedByAccountId, GetSnapshot(jobId));
 
             try
             {
@@ -149,13 +151,13 @@ public class LibraryMigrationJobRunner : ILibraryMigrationJobRunner
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Library migration job {JobId} failed for account {AccountId}.", jobId, mapping.AccountId);
+                _logger.LogError(ex, "Library migration job {JobId} failed for profile {ProfileId}.", jobId, mapping.ProfileId);
                 UpdateUser(jobId, mapping.AccountId, u =>
                 {
                     u.State = LibraryMigrationUserState.Failed;
                     u.ErrorMessage = ex.Message;
                 });
-                await notifier.NotifyLibraryMigrationUpdatedAsync(GetSnapshot(jobId));
+                await notifier.NotifyLibraryMigrationUpdatedAsync(input.RequestedByAccountId, GetSnapshot(jobId));
             }
         }
 
@@ -164,7 +166,7 @@ public class LibraryMigrationJobRunner : ILibraryMigrationJobRunner
             j.State = LibraryMigrationJobState.Completed;
             j.CompletedAt = DateTime.UtcNow;
         });
-        await notifier.NotifyLibraryMigrationUpdatedAsync(GetSnapshot(jobId));
+        await notifier.NotifyLibraryMigrationUpdatedAsync(input.RequestedByAccountId, GetSnapshot(jobId));
     }
 
     private async Task<string?> FindConnectionAsync(Guid jobId, LibraryMigrationJobInput input, IClientNotifier notifier)
@@ -175,7 +177,7 @@ public class LibraryMigrationJobRunner : ILibraryMigrationJobRunner
             var provider = scope.ServiceProvider
                 .GetRequiredService<IEnumerable<ILibrarySyncProvider>>()
                 .First(p => p.Id.Equals(input.ProviderId, StringComparison.OrdinalIgnoreCase));
-            return await provider.FindReachableConnectionAsync(input.ServerClientIdentifier, input.AdminAccessToken);
+            return await provider.FindReachableConnectionAsync(input.ServerClientIdentifier, input.AccessToken);
         }
         catch (Exception ex)
         {
@@ -186,7 +188,7 @@ public class LibraryMigrationJobRunner : ILibraryMigrationJobRunner
                 j.CompletedAt = DateTime.UtcNow;
                 j.ErrorMessage = ex.Message;
             });
-            await notifier.NotifyLibraryMigrationUpdatedAsync(GetSnapshot(jobId));
+            await notifier.NotifyLibraryMigrationUpdatedAsync(input.RequestedByAccountId, GetSnapshot(jobId));
             return null;
         }
     }
@@ -203,9 +205,11 @@ public class LibraryMigrationJobRunner : ILibraryMigrationJobRunner
     {
         var repository = scopedServices.GetRequiredService<ILibraryMigrationRepository>();
 
-        var userToken = input.SelfService
-            ? input.AdminAccessToken
-            : await provider.ResolveUserTokenAsync(input.AdminAccessToken, mapping.AccountId, mapping.Pin);
+        var userToken = await provider.ResolveServerTokenAsync(
+            input.AccessToken,
+            mapping.AccountId == LibraryMigrationMappingInput.SignedInAccount ? null : mapping.AccountId,
+            mapping.Pin,
+            input.ServerClientIdentifier);
         var userData = await provider.FetchUserDataAsync(connectionUri, userToken, scope);
 
         UpdateUser(jobId, mapping.AccountId, u =>
@@ -355,7 +359,7 @@ public class LibraryMigrationJobRunner : ILibraryMigrationJobRunner
             u.Skipped = watchSkipped + ratingsSkipped;
             u.SkippedSamples = skippedSamples;
         });
-        await notifier.NotifyLibraryMigrationUpdatedAsync(GetSnapshot(jobId));
+        await notifier.NotifyLibraryMigrationUpdatedAsync(input.RequestedByAccountId, GetSnapshot(jobId));
     }
 
     private static WatchStateUpsert MergeWatchStates(Guid mediaItemId, IEnumerable<RemoteWatchStateDto> entries)
@@ -501,6 +505,7 @@ public class LibraryMigrationJobRunner : ILibraryMigrationJobRunner
             {
                 _jobs.TryRemove(kvp.Key, out _);
                 _jobLocks.TryRemove(kvp.Key, out _);
+                _jobAccounts.TryRemove(kvp.Key, out _);
             }
         }
     }

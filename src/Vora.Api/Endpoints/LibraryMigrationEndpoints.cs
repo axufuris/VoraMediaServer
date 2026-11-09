@@ -2,6 +2,7 @@ using System.Security.Claims;
 using Microsoft.AspNetCore.Mvc;
 using Vora.Api.Extensions;
 using Vora.Application.LibraryMigration;
+using Vora.Application.LibraryMigration.Requests;
 using Vora.Application.LibraryMigration.ViewModels;
 
 namespace Vora.Api.Endpoints;
@@ -22,44 +23,11 @@ public class ListSyncLibrariesRequest
     public required string ServerClientIdentifier { get; set; }
 }
 
-public class RunLibraryMigrationRequest
-{
-    public required string AccessToken { get; set; }
-    public required string ServerClientIdentifier { get; set; }
-    public required string ServerName { get; set; }
-    public bool IncludeWatchState { get; set; } = true;
-    public bool IncludeRatings { get; set; } = true;
-    public required List<string> LibrarySectionKeys { get; set; }
-    public required List<RunLibraryMigrationMapping> Mappings { get; set; }
-    public bool SetAdminRatings { get; set; }
-}
-
-public class RunLibraryMigrationMapping
-{
-    public required string AccountId { get; set; }
-    public required string AccountName { get; set; }
-    public required Guid ProfileId { get; set; }
-    public required string ProfileName { get; set; }
-    public string? Pin { get; set; }
-}
-
-public class RunSelfLibraryImportRequest
-{
-    public required string AccessToken { get; set; }
-    public required string ServerClientIdentifier { get; set; }
-    public required string ServerName { get; set; }
-    public bool IncludeWatchState { get; set; } = true;
-    public bool IncludeRatings { get; set; } = true;
-    public required List<string> LibrarySectionKeys { get; set; }
-    public string? PlexUsername { get; set; }
-    public bool SetAdminRatings { get; set; }
-}
-
 public static class LibraryMigrationEndpoints
 {
     public static RouteGroupBuilder MapLibraryMigrationEndpoints(this IEndpointRouteBuilder routes)
     {
-        var group = routes.MapGroup("/api/library-migration").WithTags("Library Migration").RequireAuthorization("AdminOnly");
+        var group = routes.MapGroup("/api/library-import").WithTags("Library Import").RequireAuthorization();
 
         group.MapGet("/providers", GetProviders)
             .Produces<IEnumerable<LibrarySyncProviderVM>>(StatusCodes.Status200OK);
@@ -87,52 +55,18 @@ public static class LibraryMigrationEndpoints
             .Produces(StatusCodes.Status400BadRequest)
             .Produces(StatusCodes.Status404NotFound);
 
-        group.MapPost("/providers/{providerId}/run", RunMigrationAsync)
+        group.MapPost("/providers/{providerId}/run", StartImportAsync)
             .Produces<LibraryMigrationJobVM>(StatusCodes.Status202Accepted)
-            .Produces(StatusCodes.Status400BadRequest);
+            .Produces(StatusCodes.Status400BadRequest)
+            .Produces(StatusCodes.Status401Unauthorized)
+            .Produces(StatusCodes.Status403Forbidden)
+            .Produces(StatusCodes.Status404NotFound);
 
         group.MapGet("/jobs/{jobId:guid}", GetJob)
             .Produces<LibraryMigrationJobVM>(StatusCodes.Status200OK)
             .Produces(StatusCodes.Status404NotFound);
 
-        MapSelfServiceImportEndpoints(routes);
-
         return group;
-    }
-
-    private static void MapSelfServiceImportEndpoints(IEndpointRouteBuilder routes)
-    {
-        var self = routes.MapGroup("/api/library-import").WithTags("Library Import (Self-Service)").RequireAuthorization();
-
-        self.MapGet("/providers", GetProviders)
-            .Produces<IEnumerable<LibrarySyncProviderVM>>(StatusCodes.Status200OK);
-
-        self.MapPost("/providers/{providerId}/pin", CreatePinAsync)
-            .Produces<LibrarySyncPinVM>(StatusCodes.Status200OK)
-            .Produces(StatusCodes.Status404NotFound);
-
-        self.MapGet("/providers/{providerId}/pin/{pinId}", PollPinAsync)
-            .Produces<LibrarySyncPinStatusVM>(StatusCodes.Status200OK)
-            .Produces(StatusCodes.Status404NotFound);
-
-        self.MapPost("/providers/{providerId}/servers", ListServersAsync)
-            .Produces<IReadOnlyList<RemoteServerVM>>(StatusCodes.Status200OK)
-            .Produces(StatusCodes.Status400BadRequest)
-            .Produces(StatusCodes.Status404NotFound);
-
-        self.MapPost("/providers/{providerId}/libraries", ListLibrariesAsync)
-            .Produces<IReadOnlyList<RemoteLibraryVM>>(StatusCodes.Status200OK)
-            .Produces(StatusCodes.Status400BadRequest)
-            .Produces(StatusCodes.Status404NotFound);
-
-        self.MapPost("/providers/{providerId}/run", RunSelfImportAsync)
-            .Produces<LibraryMigrationJobVM>(StatusCodes.Status202Accepted)
-            .Produces(StatusCodes.Status400BadRequest)
-            .Produces(StatusCodes.Status401Unauthorized);
-
-        self.MapGet("/jobs/{jobId:guid}", GetJob)
-            .Produces<LibraryMigrationJobVM>(StatusCodes.Status200OK)
-            .Produces(StatusCodes.Status404NotFound);
     }
 
     private static IResult GetProviders(ILibraryMigrationManager manager)
@@ -237,112 +171,38 @@ public static class LibraryMigrationEndpoints
         }
     }
 
-    private static IResult RunMigrationAsync(string providerId, [FromBody] RunLibraryMigrationRequest request, ILibraryMigrationJobRunner runner)
+    private static async Task<IResult> StartImportAsync(string providerId, [FromBody] StartLibraryImportRequest request, ClaimsPrincipal user, ILibraryMigrationManager manager)
     {
-        if (string.IsNullOrWhiteSpace(request.AccessToken))
-        {
-            return Results.BadRequest(new { error = "accessToken is required." });
-        }
-        if (string.IsNullOrWhiteSpace(request.ServerClientIdentifier))
-        {
-            return Results.BadRequest(new { error = "serverClientIdentifier is required." });
-        }
-        if (request.Mappings.Count == 0)
-        {
-            return Results.BadRequest(new { error = "At least one mapping is required." });
-        }
-        if (!request.IncludeWatchState && !request.IncludeRatings)
-        {
-            return Results.BadRequest(new { error = "At least one of IncludeWatchState or IncludeRatings must be true." });
-        }
-        if (request.LibrarySectionKeys.Count == 0)
-        {
-            return Results.BadRequest(new { error = "At least one library section must be selected." });
-        }
-
-        var input = new LibraryMigrationJobInput
-        {
-            ProviderId = providerId,
-            AdminAccessToken = request.AccessToken,
-            ServerClientIdentifier = request.ServerClientIdentifier,
-            ServerName = request.ServerName,
-            IncludeWatchState = request.IncludeWatchState,
-            IncludeRatings = request.IncludeRatings,
-            LibrarySectionKeys = request.LibrarySectionKeys,
-            Mappings = request.Mappings
-                .Select(m => new LibraryMigrationMappingInput
-                {
-                    AccountId = m.AccountId,
-                    AccountName = m.AccountName,
-                    ProfileId = m.ProfileId,
-                    ProfileName = m.ProfileName,
-                    Pin = string.IsNullOrEmpty(m.Pin) ? null : m.Pin
-                })
-                .ToList(),
-            SetAdminRatings = request.SetAdminRatings
-        };
-
-        var job = runner.StartJob(input);
-        return Results.Accepted($"/api/library-migration/jobs/{job.JobId}", job);
-    }
-
-    private static IResult RunSelfImportAsync(string providerId, [FromBody] RunSelfLibraryImportRequest request, ClaimsPrincipal user, ILibraryMigrationJobRunner runner)
-    {
+        var accountId = user.GetAccountId();
         var profileId = user.GetProfileId();
-        if (profileId is null)
+        if (accountId is null || profileId is null)
         {
             return Results.Unauthorized();
         }
-        if (string.IsNullOrWhiteSpace(request.AccessToken))
-        {
-            return Results.BadRequest(new { error = "accessToken is required." });
-        }
-        if (string.IsNullOrWhiteSpace(request.ServerClientIdentifier))
-        {
-            return Results.BadRequest(new { error = "serverClientIdentifier is required." });
-        }
-        if (!request.IncludeWatchState && !request.IncludeRatings)
-        {
-            return Results.BadRequest(new { error = "At least one of IncludeWatchState or IncludeRatings must be true." });
-        }
-        if (request.LibrarySectionKeys.Count == 0)
-        {
-            return Results.BadRequest(new { error = "At least one library section must be selected." });
-        }
 
-        var displayName = string.IsNullOrWhiteSpace(request.PlexUsername) ? "Your Plex account" : request.PlexUsername;
-
-        var input = new LibraryMigrationJobInput
+        try
         {
-            ProviderId = providerId,
-            AdminAccessToken = request.AccessToken,
-            ServerClientIdentifier = request.ServerClientIdentifier,
-            ServerName = request.ServerName,
-            IncludeWatchState = request.IncludeWatchState,
-            IncludeRatings = request.IncludeRatings,
-            LibrarySectionKeys = request.LibrarySectionKeys,
-            SelfService = true,
-            SetAdminRatings = request.SetAdminRatings && user.IsAdmin(),
-            Mappings = new List<LibraryMigrationMappingInput>
-            {
-                new()
-                {
-                    AccountId = "self",
-                    AccountName = displayName,
-                    ProfileId = profileId.Value,
-                    ProfileName = "Your library",
-                    Pin = null
-                }
-            }
-        };
-
-        var job = runner.StartJob(input);
-        return Results.Accepted($"/api/library-import/jobs/{job.JobId}", job);
+            var job = await manager.StartImportAsync(providerId, request, accountId.Value, profileId.Value, user.IsAdmin());
+            return Results.Accepted($"/api/library-import/jobs/{job.JobId}", job);
+        }
+        catch (KeyNotFoundException)
+        {
+            return Results.NotFound();
+        }
+        catch (UnauthorizedAccessException)
+        {
+            return Results.Forbid();
+        }
+        catch (ArgumentException ex)
+        {
+            return Results.BadRequest(new { error = ex.Message });
+        }
     }
 
-    private static IResult GetJob(Guid jobId, ILibraryMigrationJobRunner runner)
+    private static IResult GetJob(Guid jobId, ClaimsPrincipal user, ILibraryMigrationJobRunner runner)
     {
-        var job = runner.GetJob(jobId);
+        var accountId = user.GetAccountId();
+        var job = accountId is null ? null : runner.GetJob(jobId, accountId.Value);
         return job is null ? Results.NotFound() : Results.Ok(job);
     }
 }
