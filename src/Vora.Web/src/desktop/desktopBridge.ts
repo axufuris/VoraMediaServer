@@ -1,4 +1,4 @@
-export const DESKTOP_BRIDGE_VERSION = 1;
+export const DESKTOP_BRIDGE_VERSION = 2;
 
 export type DesktopChannel = 'qa' | 'prod';
 
@@ -29,6 +29,7 @@ export interface DesktopSettings {
     audioPassthrough: AudioPassthrough;
     hdrOutput: boolean;
     hardwareDecoding: HardwareDecoding;
+    startFullScreen: boolean;
 }
 
 export interface TrackRef {

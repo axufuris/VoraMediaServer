@@ -146,6 +146,7 @@ interface DesktopSettings {
   audioPassthrough: 'off' | 'core' | 'all'; // core = ac3,dts ; all = + eac3,truehd,dts-hd
   hdrOutput: boolean;                    // default true → target-colorspace-hint
   hardwareDecoding: 'auto' | 'off';      // auto → hwdec=auto-safe
+  startFullScreen: boolean;              // default true → fullscreen=yes; off opens mpv in a window
 }
 ```
 

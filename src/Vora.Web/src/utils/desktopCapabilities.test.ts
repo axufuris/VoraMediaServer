@@ -19,7 +19,7 @@ async function freshModules() {
 function useBridge(settings?: Partial<DesktopSettings>, mpvAvailable = true) {
     const fake = fakeDesktopBridge(
         { mpv: { available: mpvAvailable, version: mpvAvailable ? '0.39.0' : null, reason: mpvAvailable ? null : 'Install mpv with sudo apt install mpv.' } },
-        { useMpvForVideo: true, audioPassthrough: 'off', hdrOutput: true, hardwareDecoding: 'auto', ...settings },
+        { useMpvForVideo: true, audioPassthrough: 'off', hdrOutput: true, hardwareDecoding: 'auto', startFullScreen: true, ...settings },
     );
     window.voraDesktop = fake.bridge;
     return fake;
