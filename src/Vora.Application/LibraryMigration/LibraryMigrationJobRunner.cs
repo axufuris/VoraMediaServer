@@ -151,7 +151,7 @@ public class LibraryMigrationJobRunner : ILibraryMigrationJobRunner
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Library migration job {JobId} failed for account {AccountId}.", jobId, mapping.AccountId);
+                _logger.LogError(ex, "Library migration job {JobId} failed for profile {ProfileId}.", jobId, mapping.ProfileId);
                 UpdateUser(jobId, mapping.AccountId, u =>
                 {
                     u.State = LibraryMigrationUserState.Failed;

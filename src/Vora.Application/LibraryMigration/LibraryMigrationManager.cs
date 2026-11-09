@@ -154,7 +154,7 @@ public class LibraryMigrationManager(
         var plexAccountId = string.IsNullOrWhiteSpace(request.PlexAccountId) ? LibraryMigrationMappingInput.SignedInAccount : request.PlexAccountId;
         var ownHistoryIntoOwnProfile = target.Id == profileId && plexAccountId == LibraryMigrationMappingInput.SignedInAccount;
 
-        logger.LogInformation("Starting a {ProviderId} import into profile {ProfileId} for account {AccountId}.", providerId, target.Id, accountId);
+        logger.LogInformation("Starting a {ProviderId} import into profile {ProfileId}.", providerId, target.Id);
 
         return runner.StartJob(new LibraryMigrationJobInput
         {
