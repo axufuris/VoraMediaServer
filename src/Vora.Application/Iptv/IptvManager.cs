@@ -581,7 +581,12 @@ public class IptvManager : IIptvManager
         args.Add("-reconnect_delay_max"); args.Add("5");
         args.Add("-i"); args.Add(streamUrl);
         foreach (var argument in video.Video) args.Add(argument);
+        // Stereo AAC. ffmpeg's AAC encoder writes a 5.1(side) source (the usual
+        // layout of a channel's AC-3 surround) with a program config element
+        // and channel count 0 in every ADTS header, which Android's decoder
+        // fails on (ERROR_CODE_DECODING_FAILED); 128k is a stereo bitrate anyway.
         args.Add("-c:a"); args.Add("aac");
+        args.Add("-ac"); args.Add("2");
         args.Add("-b:a"); args.Add("128k");
         args.Add("-f"); args.Add("hls");
         args.Add("-hls_time"); args.Add("4");
