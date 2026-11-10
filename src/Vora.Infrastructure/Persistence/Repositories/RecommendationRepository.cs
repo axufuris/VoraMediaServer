@@ -1,6 +1,9 @@
 ﻿using Microsoft.EntityFrameworkCore;
+using Pgvector.EntityFrameworkCore;
+using Vora.Application.Ai;
 using Vora.Application.Libraries.ViewModels;
 using Vora.Application.Recommendations;
+using Vora.Domain.Entities.Ai;
 using Vora.Domain.Entities.Media;
 using Vora.Infrastructure.Persistence.Extensions;
 
@@ -8,6 +11,10 @@ namespace Vora.Infrastructure.Persistence.Repositories;
 
 public class RecommendationRepository(VoraDbContext context) : IRecommendationRepository
 {
+    // Looser than the AI rows' 0.80: a title is compared with other titles here,
+    // not with a few words describing a mood.
+    private const double SimilarDistanceThreshold = 0.70;
+
     public async Task<List<LibraryItemVM>> GetHydratedMediaItemsAsync(
         Guid profileId,
         List<Guid> localItemIds,
@@ -34,47 +41,82 @@ public class RecommendationRepository(VoraDbContext context) : IRecommendationRe
             .ToListAsync();
     }
 
-    public Task<List<Guid>> GetPlayedMediaIdsAsync(Guid profileId) =>
-        context.UserMediaStates
-            .AsNoTracking()
-            .Where(s => s.ProfileId == profileId && s.IsPlayed)
-            .Select(s => s.MediaItemId)
-            .ToListAsync();
+    public Task<List<WatchedTitle>> GetWatchedTitlesAsync(Guid profileId, Guid? libraryId) =>
+        RecommendationQueries.WatchedTitlesAsync(context, profileId, libraryId);
 
-    public async Task<List<(int Id, string Name)>> GetTopGenresAsync(List<Guid> playedMediaIds, int count)
+    public async Task<List<TitleGenre>> GetGenresAsync(IReadOnlyCollection<Guid> titleIds)
     {
-        var topGenres = await context.MediaItems
-            .AsNoTracking()
-            .Where(m => playedMediaIds.Contains(m.Id))
-            .SelectMany(m => m.Genres)
-            .GroupBy(g => new { g.Id, g.Name })
-            .OrderByDescending(g => g.Count())
-            .Take(count)
-            .Select(g => new { g.Key.Id, g.Key.Name })
-            .ToListAsync();
+        if (titleIds.Count == 0) return new List<TitleGenre>();
 
-        return topGenres.Select(g => (g.Id, g.Name)).ToList();
+        var rows = await context.MediaItems
+            .AsNoTracking()
+            .Where(m => titleIds.Contains(m.Id))
+            .SelectMany(m => m.Genres.Select(g => new { TitleId = m.Id, GenreId = g.Id, g.Name }))
+            .ToListAsync();
+        return rows.Select(r => new TitleGenre(r.TitleId, r.GenreId, r.Name)).ToList();
     }
 
-    public Task<List<Guid>> GetTopUnwatchedMediaByGenreAsync(int genreId, Guid profileId, Guid? libraryId, int count)
+    public Task<List<Guid>> GetTopUnwatchedByGenreAsync(int genreId, Guid profileId, Guid? libraryId, int count) =>
+        BestRated(Unwatched(profileId, libraryId).Where(m => m.Genres.Any(g => g.Id == genreId)), count);
+
+    public Task<List<Guid>> GetTopUnwatchedAsync(Guid profileId, Guid? libraryId, int count) =>
+        BestRated(Unwatched(profileId, libraryId), count);
+
+    public async Task<List<Guid>> GetSimilarUnwatchedAsync(Guid titleId, Guid profileId, Guid? libraryId, int count)
+    {
+        var seed = await context.Set<MediaItemEmbedding>()
+            .AsNoTracking()
+            .Where(e => e.MediaItemId == titleId && e.Embedding != null)
+            .Select(e => new { e.Embedding, e.Model })
+            .FirstOrDefaultAsync();
+        if (seed?.Embedding == null) return new List<Guid>();
+
+        // Compared only with vectors the same model made. One with no model
+        // recorded was made by OpenAI's, before models were recorded, which is
+        // most titles on a server that has been running a while.
+        var vector = seed.Embedding;
+        var model = seed.Model;
+        var legacyModel = AiConnection.OpenAiEmbeddingModel;
+        var legacy = model == null || AiConnection.IsLegacyStamp(model);
+        var query = context.Set<MediaItemEmbedding>()
+            .AsNoTracking()
+            .Where(e => e.Embedding != null && e.MediaItemId != titleId)
+            .Where(e => legacy ? e.Model == null || e.Model == legacyModel : e.Model == model)
+            .Where(MediaCapabilities.IsBrowsableTitle.On((MediaItemEmbedding e) => e.MediaItem))
+            .Where(RecommendationQueries.Untouched(context, profileId).On((MediaItemEmbedding e) => e.MediaItem))
+            .Where(e => e.MediaItem.MissingSince == null);
+
+        if (libraryId.HasValue)
+        {
+            query = query.Where(e => e.MediaItem.LibraryId == libraryId.Value);
+        }
+
+        return VectorSearch.WithinDistance(await VectorSearch.WideAsync(context, count * 10, () => query
+            .OrderBy(e => e.Embedding!.CosineDistance(vector))
+            .Take(count)
+            .Select(e => new VectorSearch.Hit(e.MediaItemId, e.Embedding!.CosineDistance(vector)))
+            .ToListAsync()), SimilarDistanceThreshold);
+    }
+
+    private IQueryable<MediaItem> Unwatched(Guid profileId, Guid? libraryId)
     {
         var query = context.MediaItems
             .AsNoTracking()
             .Where(MediaCapabilities.IsBrowsableTitle)
-            .Where(m => m.MissingSince == null && m.Genres.Any(g => g.Id == genreId));
+            .Where(m => m.MissingSince == null)
+            .Where(RecommendationQueries.Untouched(context, profileId));
 
-        if (libraryId.HasValue)
-        {
-            query = query.Where(m => m.LibraryId == libraryId.Value);
-        }
+        return libraryId.HasValue ? query.Where(m => m.LibraryId == libraryId.Value) : query;
+    }
 
-        query = query.Where(m =>
-            !context.UserMediaStates.Any(s => s.ProfileId == profileId && s.MediaItemId == m.Id && s.IsPlayed));
-
-        return query
-            .OrderByDescending(m => m.ThirdPartyRating1)
+    // Unrated titles last. Postgres puts NULL first in a descending sort, so the
+    // rows used to open with whatever had no score at all.
+    private static Task<List<Guid>> BestRated(IQueryable<MediaItem> query, int count) =>
+        query
+            .OrderBy(m => m.ThirdPartyRating1 == null)
+            .ThenByDescending(m => m.ThirdPartyRating1)
+            .ThenBy(m => m.Title)
             .Take(count)
             .Select(m => m.Id)
             .ToListAsync();
-    }
 }

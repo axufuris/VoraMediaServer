@@ -2,6 +2,7 @@ using System.Globalization;
 using System.Text.RegularExpressions;
 using System.Xml.Linq;
 using Vora.Plugins.Dtos;
+using Vora.Plugins.Providers.Tmdb;
 
 namespace Vora.Plugins.Providers.Local;
 
@@ -12,18 +13,6 @@ public static partial class LocalNfoReader
     private const string SeasonRoot = "season";
     private const string EpisodeRoot = "episodedetails";
     private const string NfoExtension = ".nfo";
-
-    private static readonly Dictionary<string, int> Genres = new(StringComparer.OrdinalIgnoreCase)
-    {
-        ["Action"] = 28, ["Adventure"] = 12, ["Animation"] = 16, ["Comedy"] = 35,
-        ["Crime"] = 80, ["Documentary"] = 99, ["Drama"] = 18, ["Family"] = 10751,
-        ["Fantasy"] = 14, ["History"] = 36, ["Horror"] = 27, ["Music"] = 10402,
-        ["Mystery"] = 9648, ["Romance"] = 10749, ["Science Fiction"] = 878,
-        ["TV Movie"] = 10770, ["Thriller"] = 53, ["War"] = 10752, ["Western"] = 37,
-        ["Action & Adventure"] = 10759, ["Kids"] = 10762, ["News"] = 10763,
-        ["Reality"] = 10764, ["Sci-Fi & Fantasy"] = 10765, ["Soap"] = 10766,
-        ["Talk"] = 10767, ["War & Politics"] = 10768
-    };
 
     public static MetadataResult? ReadMovie(string path, LocalMediaFolders folders) =>
         MovieDocuments(path, folders)
@@ -134,8 +123,7 @@ public static partial class LocalNfoReader
         if (decimal.TryParse(Text(root, "rating"), NumberStyles.AllowDecimalPoint, CultureInfo.InvariantCulture, out var rating))
             result.Rating = rating;
 
-        result.GenreIds = root.Elements("genre").Select(node => node.Value.Trim())
-            .Where(Genres.ContainsKey).Select(name => Genres[name]).Distinct().ToList();
+        result.GenreIds = TmdbGenres.IdsFor(root.Elements("genre").Select(node => node.Value));
 
         foreach (var actor in root.Elements("actor"))
         {

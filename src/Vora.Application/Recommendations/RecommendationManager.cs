@@ -1,4 +1,5 @@
-﻿using Vora.Application.Media;
+﻿using Microsoft.Extensions.Logging;
+using Vora.Application.Media;
 using Vora.Application.Recommendations.ViewModels;
 using Vora.Application.Settings;
 using Vora.Plugins.Interfaces;
@@ -16,12 +17,14 @@ public class RecommendationManager : IRecommendationManager
     private readonly IEnumerable<IRecommendationProvider> _providers;
     private readonly ISystemSettingsRepository _settingsRepo;
     private readonly IRecommendationRepository _recommendationRepo;
+    private readonly ILogger<RecommendationManager> _logger;
 
-    public RecommendationManager(IEnumerable<IRecommendationProvider> providers, ISystemSettingsRepository settingsRepo, IRecommendationRepository recommendationRepo)
+    public RecommendationManager(IEnumerable<IRecommendationProvider> providers, ISystemSettingsRepository settingsRepo, IRecommendationRepository recommendationRepo, ILogger<RecommendationManager> logger)
     {
         _providers = providers;
         _settingsRepo = settingsRepo;
         _recommendationRepo = recommendationRepo;
+        _logger = logger;
     }
 
     public async Task<List<RecommendationListVM>> GetRecommendationsAsync(Guid profileId, Guid? libraryId, bool hasAllAccess, List<Guid> allowedLibs, List<string> allowedMovieRatings, List<string> allowedTvRatings, bool blockUnrated, string? targetProviderId = null)
@@ -61,12 +64,16 @@ public class RecommendationManager : IRecommendationManager
                     }
                 }
             }
-            catch
+            catch (Exception ex)
             {
+                // One provider failing (the AI's token limit, a timeout) leaves the
+                // others' rows, but it is said, not swallowed.
+                _logger.LogWarning(ex, "For You provider {Provider} failed for profile {Profile}.", provider.Id, profileId);
             }
         }
 
-        return allLists.OrderByDescending(l => l.Weight).ToList();
+        // A list's weight is its place on the page, as the clients sort it.
+        return allLists.OrderBy(l => l.Weight).ToList();
     }
 
     public async Task<List<string>> GetActiveProviderIdsAsync()
