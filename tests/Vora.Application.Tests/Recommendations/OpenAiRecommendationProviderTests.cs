@@ -23,7 +23,8 @@ public class OpenAiRecommendationProviderTests
     public OpenAiRecommendationProviderTests()
     {
         _repository.IsAiEnabledForProfileAsync(_profile).Returns(true);
-        _repository.GetRecentWatchHistoryContextAsync(_profile, 5).Returns(new List<string> { "Heat (1995)", "Arrival (2016)" });
+        _repository.GetTasteContextAsync(_profile, Arg.Any<Guid?>(), Arg.Any<int>(), Arg.Any<int>())
+            .Returns(new TasteContext(new[] { "Heat (1995)", "Arrival (2016)" }, new[] { "Alien (1979)" }, "movies"));
         _repository.VectorSearchUnwatchedMediaAsync(_profile, Arg.Any<Guid?>(), Arg.Any<float[]>(), Arg.Any<int>(), Arg.Any<string>())
             .Returns(new List<Guid> { _movie });
         _openAi.IsConfiguredAsync().Returns(true);
@@ -43,7 +44,7 @@ public class OpenAiRecommendationProviderTests
         var lists = (await Provider().GetRecommendationsAsync(_profile, null, TestContext.Current.CancellationToken)).ToList();
 
         lists.Select(l => l.Title).Should().Equal("AI: Gritty Heists", "AI: Cozy Sci-Fi");
-        lists.Select(l => l.Weight).Should().Equal(90, 89);
+        lists.Select(l => l.Weight).Should().Equal(1, 2);
         lists[0].LocalItemIds.Should().Equal(_movie);
         await _openAi.Received(1).CompleteJsonAsync(
             Arg.Is(AiConnection.PluginId),
@@ -52,6 +53,52 @@ public class OpenAiRecommendationProviderTests
             Arg.Is<double?>(t => t == null),
             Arg.Is<string?>(key => key == null),
             Arg.Is<Guid?>(id => id == _profile));
+    }
+
+    // Most plays are episodes, so the model used to be told "Pilot (2019)". It
+    // is told the titles watched lately and the ones rated highest, in the
+    // library being looked at, and asked for five rows of what that library holds.
+    [Fact]
+    public async Task The_model_is_told_what_was_watched_lately_and_rated_highly_and_asked_for_five_rows_of_this_library()
+    {
+        var library = Guid.NewGuid();
+
+        await Provider().GetRecommendationsAsync(_profile, library, TestContext.Current.CancellationToken);
+
+        await _repository.Received(1).GetTasteContextAsync(_profile, library, OpenAiRecommendationProvider.RecentTitles, OpenAiRecommendationProvider.LovedTitles);
+        await _openAi.Received(1).CompleteJsonAsync(
+            Arg.Any<string>(),
+            Arg.Is<string>(p => p.Contains("You are a curator of movies.")
+                && p.Contains("They recently watched: Heat (1995), Arrival (2016).")
+                && p.Contains("They rated these highly: Alien (1979).")
+                && p.Contains("Invent 5 highly specific")),
+            Arg.Any<CancellationToken>(), Arg.Any<double?>(), Arg.Any<string?>(), Arg.Any<Guid?>());
+    }
+
+    [Fact]
+    public async Task Nothing_watched_or_rated_asks_nothing()
+    {
+        _repository.GetTasteContextAsync(_profile, Arg.Any<Guid?>(), Arg.Any<int>(), Arg.Any<int>())
+            .Returns(new TasteContext(Array.Empty<string>(), Array.Empty<string>(), "movies"));
+
+        (await Provider().GetRecommendationsAsync(_profile, null, TestContext.Current.CancellationToken)).Should().BeEmpty();
+
+        await _openAi.DidNotReceive().CompleteJsonAsync(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<CancellationToken>(), Arg.Any<double?>(), Arg.Any<string?>(), Arg.Any<Guid?>());
+    }
+
+    // Keeping an empty answer for twelve hours meant one bad search hid the AI
+    // rows for the rest of the day.
+    [Fact]
+    public async Task Rows_that_found_nothing_are_not_kept()
+    {
+        _repository.VectorSearchUnwatchedMediaAsync(_profile, Arg.Any<Guid?>(), Arg.Any<float[]>(), Arg.Any<int>(), Arg.Any<string>())
+            .Returns(new List<Guid>());
+        var provider = Provider();
+
+        await provider.GetRecommendationsAsync(_profile, null, TestContext.Current.CancellationToken);
+        await provider.GetRecommendationsAsync(_profile, null, TestContext.Current.CancellationToken);
+
+        await _openAi.Received(2).CompleteJsonAsync(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<CancellationToken>(), Arg.Any<double?>(), Arg.Any<string?>(), Arg.Any<Guid?>());
     }
 
     [Fact]

@@ -11,6 +11,9 @@ public class OpenAiRecommendationProvider : IRecommendationProvider, IPluginConn
     public const string ModelSettingType = "model";
 
     private const int ItemsPerCategory = 15;
+    internal const int Categories = 5;
+    internal const int RecentTitles = 12;
+    internal const int LovedTitles = 8;
 
     private static readonly List<string> ChatModels = new() { "gpt-4o-mini", "gpt-4o", "gpt-4.1-mini", "gpt-4.1", "gpt-5-nano", "gpt-5-mini", "gpt-5" };
     private static readonly List<string> EmbeddingModels = new() { AiConnection.OpenAiEmbeddingModel };
@@ -71,20 +74,16 @@ public class OpenAiRecommendationProvider : IRecommendationProvider, IPluginConn
         var embeddingModel = await _openAi.GetEmbeddingModelAsync();
         if (string.IsNullOrEmpty(embeddingModel) || !await _openAi.IsConfiguredAsync()) return lists;
 
-        var recentWatches = await _repository.GetRecentWatchHistoryContextAsync(profileId, 5);
-        if (!recentWatches.Any()) return lists;
+        var taste = await _repository.GetTasteContextAsync(profileId, libraryId, RecentTitles, LovedTitles);
+        if (taste.Recent.Count == 0 && taste.Loved.Count == 0) return lists;
 
-        var prompt = "You are a movie/tv curator. The user recently watched: " + string.Join(", ", recentWatches) +
-                     ". Invent 3 highly specific, creative recommendation category titles (e.g. 'Gritty Heists', 'Cozy Sci-Fi') they would love. " +
-                     "Output valid JSON ONLY: { \"categories\": [ { \"title\": \"...\", \"description\": \"...\", \"vibe_keywords\": \"...\" } ] }";
+        var prompt = Prompt(taste);
 
         var categories = ParseCategories(await _openAi.CompleteJsonAsync(Id, prompt, cancellationToken, profileId: profileId));
         if (categories.Count == 0) return lists;
 
         var vectors = await _openAi.EmbedAsync(Id, categories.Select(c => $"{c.Title} {c.Description} {c.Vibe_Keywords}").ToList(), cancellationToken);
         if (vectors == null) return lists;
-
-        int weight = 90;
 
         for (var i = 0; i < categories.Count && i < vectors.Count; i++)
         {
@@ -99,15 +98,29 @@ public class OpenAiRecommendationProvider : IRecommendationProvider, IPluginConn
                 {
                     Title = $"AI: {categories[i].Title}",
                     Description = categories[i].Description,
-                    Weight = weight--,
+                    // The row's place: the clients sort ascending.
+                    Weight = lists.Count + 1,
                     LocalItemIds = localMediaIds
                 });
             }
         }
 
-        _cache.Set(cacheKey, lists, TimeSpan.FromHours(12));
+        // Nothing found is not kept, so the next look tries again rather than
+        // showing no AI rows for twelve hours.
+        if (lists.Count > 0) _cache.Set(cacheKey, lists, TimeSpan.FromHours(12));
 
         return lists;
+    }
+
+    internal static string Prompt(TasteContext taste)
+    {
+        var seen = new List<string>();
+        if (taste.Recent.Count > 0) seen.Add("They recently watched: " + string.Join(", ", taste.Recent) + ".");
+        if (taste.Loved.Count > 0) seen.Add("They rated these highly: " + string.Join(", ", taste.Loved) + ".");
+
+        return $"You are a curator of {taste.Kind}. " + string.Join(" ", seen) +
+               $" Invent {Categories} highly specific, creative recommendation category titles for {taste.Kind} (e.g. 'Gritty Heists', 'Cozy Sci-Fi') they would love, each different from the others. " +
+               "Output valid JSON ONLY: { \"categories\": [ { \"title\": \"...\", \"description\": \"...\", \"vibe_keywords\": \"...\" } ] }";
     }
 
     internal static List<CategoryDto> ParseCategories(string? json)

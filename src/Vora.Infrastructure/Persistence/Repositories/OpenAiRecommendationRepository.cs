@@ -13,14 +13,27 @@ public class OpenAiRecommendationRepository(VoraDbContext context) : IOpenAiReco
 {
     private const double CosineDistanceThreshold = 0.80;
 
-    public Task<List<string>> GetRecentWatchHistoryContextAsync(Guid profileId, int count) =>
-        context.UserMediaStates
-            .AsNoTracking()
-            .Where(s => s.ProfileId == profileId && s.IsPlayed)
-            .OrderByDescending(s => s.LastPlayedAt)
-            .Take(count)
-            .Select(s => $"{s.MediaItem.Title} ({(s.MediaItem.ReleaseDate.HasValue ? s.MediaItem.ReleaseDate.Value.Year.ToString() : "Unknown")})")
-            .ToListAsync();
+    // Shows by their own name rather than the last episode's: "Pilot (2019)"
+    // told the model nothing, and most of a profile's plays are episodes.
+    public async Task<TasteContext> GetTasteContextAsync(Guid profileId, Guid? libraryId, int recentCount, int lovedCount)
+    {
+        var titles = await RecommendationQueries.WatchedTitlesAsync(context, profileId, libraryId);
+        static string Name(WatchedTitle t) => t.Year.HasValue ? $"{t.Title} ({t.Year})" : t.Title;
+
+        var recent = titles
+            .Where(t => t.LastWatchedAt.HasValue && !(t.Rating <= TasteRatings.Disliked))
+            .OrderByDescending(t => t.LastWatchedAt)
+            .Take(recentCount)
+            .ToList();
+        var loved = titles
+            .Where(t => t.Rating >= TasteRatings.Loved && !recent.Contains(t))
+            .OrderByDescending(t => t.Rating)
+            .ThenByDescending(t => t.RatedAt)
+            .Take(lovedCount)
+            .ToList();
+
+        return new TasteContext(recent.Select(Name).ToList(), loved.Select(Name).ToList(), await RecommendationQueries.TitleKindAsync(context, libraryId));
+    }
 
     public async Task LogAiUsageAsync(AiUsageLog log)
     {
@@ -44,15 +57,15 @@ public class OpenAiRecommendationRepository(VoraDbContext context) : IOpenAiReco
             query = query.Where(e => e.MediaItem.LibraryId == libraryId.Value);
         }
 
-        query = query.Where(e =>
-            !context.UserMediaStates.Any(s => s.ProfileId == profileId && s.MediaItemId == e.MediaItemId && s.IsPlayed));
+        query = query
+            .Where(RecommendationQueries.Untouched(context, profileId).On((MediaItemEmbedding e) => e.MediaItem))
+            .Where(e => e.MediaItem.MissingSince == null);
 
-        return await VectorSearch.WideAsync(context, limit * 10, () => query
-            .Where(e => e.Embedding!.CosineDistance(pgVector) < CosineDistanceThreshold)
+        return VectorSearch.WithinDistance(await VectorSearch.WideAsync(context, limit * 10, () => query
             .OrderBy(e => e.Embedding!.CosineDistance(pgVector))
             .Take(limit)
-            .Select(e => e.MediaItemId)
-            .ToListAsync());
+            .Select(e => new VectorSearch.Hit(e.MediaItemId, e.Embedding!.CosineDistance(pgVector)))
+            .ToListAsync()), CosineDistanceThreshold);
     }
 
     public Task<List<MediaItemForEmbeddingDto>> GetMediaItemsMissingEmbeddingsAsync(int batchSize, string embeddingModel)
