@@ -16,7 +16,7 @@ export interface GuidePrefs {
     hideEmpty: boolean;
 }
 
-const emptyPrefs = (): GuidePrefs => ({
+export const emptyGuidePrefs = (): GuidePrefs => ({
     enabledProviders: [],
     hiddenChannels: [],
     favoriteChannels: [],
@@ -30,8 +30,8 @@ export function parseGuidePrefs(json: string | null | undefined): GuidePrefs | n
     if (!json || json === '[]') return null;
     try {
         const raw = JSON.parse(json) as Partial<GuidePrefs> | string[] | null;
-        if (Array.isArray(raw)) return { ...emptyPrefs(), enabledProviders: raw.filter(id => typeof id === 'string') };
-        if (raw && typeof raw === 'object') return { ...emptyPrefs(), ...raw };
+        if (Array.isArray(raw)) return { ...emptyGuidePrefs(), enabledProviders: raw.filter(id => typeof id === 'string') };
+        if (raw && typeof raw === 'object') return { ...emptyGuidePrefs(), ...raw };
     } catch {
         /* a corrupt save reads as no save */
     }
@@ -58,7 +58,7 @@ export function useGuideData(serverId: string | undefined, timelineStart: Date, 
     const [guideData, setGuideData] = useState<Record<string, IptvProgramDto[]>>({});
     const [recordingSessions, setRecordingSessions] = useState<IptvRecordingSessionVM[]>([]);
     const [isLoading, setIsLoading] = useState(true);
-    const [prefs, setPrefs] = useState<GuidePrefs>(emptyPrefs());
+    const [prefs, setPrefs] = useState<GuidePrefs>(emptyGuidePrefs());
     const lastLocalSaveAt = useRef(0);
 
     useSignalREvent("DvrSessionsUpdated", useCallback(() => {
@@ -121,7 +121,7 @@ export function useGuideData(serverId: string | undefined, timelineStart: Date, 
                 ]);
 
                 if (serverPrefs) localStorage.setItem(cacheKey, serverPrefs);
-                const currentPrefs = parseGuidePrefs(serverPrefs ?? localStorage.getItem(cacheKey)) ?? emptyPrefs();
+                const currentPrefs = parseGuidePrefs(serverPrefs ?? localStorage.getItem(cacheKey)) ?? emptyGuidePrefs();
 
                 currentPrefs.enabledProviders = currentPrefs.enabledProviders.filter(id => allProviders.some(p => p.id === id));
 

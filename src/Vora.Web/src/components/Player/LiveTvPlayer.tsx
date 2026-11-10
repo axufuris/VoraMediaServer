@@ -10,6 +10,9 @@ import { passthroughService } from '../../api/Iptv/passthroughService';
 import { serverVault } from '../../utils/serverVault';
 import { StorageKeys, decodeJwtPayload, getProfileIdFromToken } from '../../utils/storageKeys';
 import LiveTvGuide from '../../pages/Client/LiveTv/LiveTvGuide';
+import { parseGuidePrefs } from '../../pages/Client/LiveTv/hooks/useGuideData';
+import { setChannelFavorite } from '../../pages/Client/LiveTv/hooks/channelFavorites';
+import { profileDeviceSettingsService } from '../../api/Users/profileDeviceSettingsService';
 import { useSignalREvent } from '../../hooks/useSignalREvent';
 import { useAutoHideControls } from './Controls/useAutoHideControls';
 import { useFullscreen } from './Controls/useFullscreen';
@@ -72,6 +75,10 @@ export default function LiveTvPlayer() {
     const [recordingSessions, setRecordingSessions] = useState<IptvRecordingSessionVM[]>([]); // <-- NEW
     const [showRecordModal, setShowRecordModal] = useState(false);
     const [recordRetention, setRecordRetention] = useState(0);
+    // The profile's TV favourites (external channel ids), for the heart.
+    const [favoriteChannels, setFavoriteChannels] = useState<string[]>([]);
+    const [savingFavorite, setSavingFavorite] = useState(false);
+    const lastFavoriteSaveAt = useRef(0);
 
     useEffect(() => { ccEnabledRef.current = ccEnabled; }, [ccEnabled]);
 
@@ -106,6 +113,12 @@ export default function LiveTvPlayer() {
 
                 const activeChannels = allProviders.filter(p => enabledProviderIds.includes(p.id)).flatMap(p => p.channels || []);
                 setChannels(activeChannels);
+
+                // Favourites belong to the profile: the server's list, else this
+                // device's last copy.
+                profileDeviceSettingsService.getIptvPrefs(activeProfileId, deviceId, activeServer.id)
+                    .then(json => setFavoriteChannels(parseGuidePrefs(json)?.favoriteChannels ?? []))
+                    .catch(() => setFavoriteChannels(parseGuidePrefs(savedIptv)?.favoriteChannels ?? []));
 
                 const now = new Date();
                 const start = new Date(now.getTime() - 2 * 60 * 60 * 1000);
@@ -289,6 +302,20 @@ export default function LiveTvPlayer() {
         return () => window.removeEventListener('pagehide', handlePageHide);
     }, [canTimeshift, currentMedia?.id]);
 
+    // Another device (or the guide) changed this profile's favourites. The
+    // echo of the heart's own save is skipped, as the guide does.
+    useSignalREvent('ChannelFavoritesUpdated', useCallback((eventProfileId: string) => {
+        const activeServer = serverVault.getActiveServer();
+        if (!activeServer) return;
+        const profileId = getProfileIdFromToken(localStorage.getItem(StorageKeys.profileToken)) ?? activeServer.profileId;
+        if (eventProfileId.toLowerCase() !== profileId.toLowerCase()) return;
+        if (Date.now() - lastFavoriteSaveAt.current < 2000) return;
+        const deviceId = localStorage.getItem(StorageKeys.deviceId) || 'unknown';
+        profileDeviceSettingsService.getIptvPrefs(profileId, deviceId, activeServer.id)
+            .then(json => { const fresh = parseGuidePrefs(json); if (fresh) setFavoriteChannels(fresh.favoriteChannels); })
+            .catch(console.error);
+    }, []));
+
     const handleChannelChange = (direction: 'next' | 'prev') => {
         if (!channels.length || !currentMedia) return;
         const currentIndex = channels.findIndex(c => c.id === currentMedia.id);
@@ -358,6 +385,30 @@ export default function LiveTvPlayer() {
     };
 
     const currentChannel = useMemo(() => channels.find(c => c.id === currentMedia?.id), [channels, currentMedia?.id]);
+    const isFavorite = !!currentChannel && favoriteChannels.includes(currentChannel.externalChannelId);
+
+    // The heart: shows the change at once, saves it on top of the server's
+    // current prefs, and puts it back when the save fails.
+    const toggleFavorite = async () => {
+        const activeServer = serverVault.getActiveServer();
+        if (!currentChannel || !activeServer || savingFavorite) return;
+        const externalId = currentChannel.externalChannelId;
+        const on = !favoriteChannels.includes(externalId);
+        const before = favoriteChannels;
+        setFavoriteChannels(on ? [...before.filter(id => id !== externalId), externalId] : before.filter(id => id !== externalId));
+        setSavingFavorite(true);
+        lastFavoriteSaveAt.current = Date.now();
+        try {
+            const profileId = getProfileIdFromToken(localStorage.getItem(StorageKeys.profileToken)) ?? activeServer.profileId;
+            const deviceId = localStorage.getItem(StorageKeys.deviceId) || 'unknown';
+            setFavoriteChannels(await setChannelFavorite(profileId, deviceId, externalId, on, activeServer.id));
+        } catch (error) {
+            console.error('Failed to save the favourite', error);
+            setFavoriteChannels(before);
+        } finally {
+            setSavingFavorite(false);
+        }
+    };
 
     const activeProgram = useMemo(() => {
         const internalNow = new Date();
@@ -565,6 +616,20 @@ export default function LiveTvPlayer() {
                             </div>
 
                             <div className="flex w-1/3 items-center justify-end gap-3 max-md:w-full max-md:flex-wrap max-md:justify-center">
+                                {currentChannel && (
+                                    <button
+                                        type="button"
+                                        onClick={toggleFavorite}
+                                        disabled={savingFavorite}
+                                        aria-label={isFavorite ? 'Remove from favorites' : 'Add to favorites'}
+                                        aria-pressed={isFavorite}
+                                        title={isFavorite ? 'Remove from favorites' : 'Add to favorites'}
+                                        className="vora-icon-button inline-flex cursor-pointer items-center justify-center rounded-md bg-[color-mix(in_srgb,var(--vora-bg-canvas)_72%,transparent)] px-2.5 py-1.5 backdrop-blur-md transition-colors disabled:cursor-default"
+                                        style={{ border: '1px solid color-mix(in srgb, var(--vora-text-primary) 18%, transparent)', color: isFavorite ? 'var(--vora-accent-500)' : 'var(--vora-text-primary)' }}
+                                    >
+                                        <svg width="16" height="16" viewBox="0 0 24 24" fill={isFavorite ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth="2" strokeLinejoin="round" aria-hidden="true"><path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54z" /></svg>
+                                    </button>
+                                )}
                                 {canRecord && isActivelyRecording ? (
                                     <div
                                         className="inline-flex cursor-default items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-bold uppercase tracking-wider backdrop-blur-md"
@@ -664,33 +729,36 @@ export default function LiveTvPlayer() {
                 >
                     <div className="flex h-[40vh] shrink-0" style={{ borderBottom: '1px solid var(--vora-border-subtle)' }}>
                         <div className="relative w-1/2 bg-[var(--vora-bg-canvas)] lg:w-[40%]" />
-                        <div className="relative flex-1 overflow-y-auto p-8" style={{ background: 'var(--vora-bg-surface)' }}>
+                        {/* Compact under 500px tall (a phone on its side): the full sizes
+                            filled the panel's 40% of the height and pushed the
+                            description out of sight. */}
+                        <div className="relative flex-1 overflow-y-auto p-8 [@media(max-height:500px)]:p-3" style={{ background: 'var(--vora-bg-surface)' }}>
                             <button
                                 type="button"
                                 onClick={() => { setShowOverlayGuide(false); setHoveredGuideItem(null); }}
-                                className="vora-pill absolute right-6 top-6 inline-flex cursor-pointer items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-semibold"
+                                className="vora-pill absolute right-6 top-6 inline-flex cursor-pointer items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-semibold [@media(max-height:500px)]:right-2 [@media(max-height:500px)]:top-2"
                             >
                                 Close
                                 <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>
                             </button>
-                            <div className="mb-4 flex items-center gap-4">
+                            <div className="mb-4 flex items-center gap-4 pr-20 [@media(max-height:500px)]:mb-1 [@media(max-height:500px)]:gap-2">
                                 <div
-                                    className="relative flex h-16 w-16 items-center justify-center overflow-hidden rounded-full"
+                                    className="relative flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-full [@media(max-height:500px)]:h-8 [@media(max-height:500px)]:w-8"
                                     style={{ background: 'var(--vora-bg-sunken)', border: '1px solid var(--vora-border-subtle)' }}
                                 >
                                     {displayChannel?.logoUrl && <img src={secureImageUrl(displayChannel.logoUrl)} alt="" className="max-h-[80%] max-w-[80%] object-contain" />}
                                 </div>
                                 <div>
-                                    <h2 className="m-0 text-2xl font-semibold" style={{ color: 'var(--vora-text-primary)', letterSpacing: '-0.01em' }}>{displayChannel?.name || currentMedia.title}</h2>
+                                    <h2 className="m-0 text-2xl font-semibold [@media(max-height:500px)]:text-base" style={{ color: 'var(--vora-text-primary)', letterSpacing: '-0.01em' }}>{displayChannel?.name || currentMedia.title}</h2>
                                     {displayChannel?.groupTitle && (
-                                        <span className="text-[10px] font-semibold uppercase tracking-widest" style={{ color: 'var(--vora-accent-text)' }}>
+                                        <span className="text-[10px] font-semibold uppercase tracking-widest [@media(max-height:500px)]:text-[9px]" style={{ color: 'var(--vora-accent-text)' }}>
                                             {displayChannel.groupTitle.replace(/;/g, ' • ')}
                                         </span>
                                     )}
                                 </div>
                             </div>
-                            <h3 className="m-0 mb-2 text-xl font-semibold" style={{ color: 'var(--vora-text-secondary)' }}>{displayProgram?.title || 'Live TV'}</h3>
-                            <p className="m-0 max-w-3xl text-sm leading-relaxed" style={{ color: 'var(--vora-text-muted)' }}>{displayProgram?.description}</p>
+                            <h3 className="m-0 mb-2 text-xl font-semibold [@media(max-height:500px)]:mb-0.5 [@media(max-height:500px)]:text-sm" style={{ color: 'var(--vora-text-secondary)' }}>{displayProgram?.title || 'Live TV'}</h3>
+                            <p className="m-0 max-w-3xl text-sm leading-relaxed [@media(max-height:500px)]:text-xs [@media(max-height:500px)]:leading-snug" style={{ color: 'var(--vora-text-muted)' }}>{displayProgram?.description}</p>
                         </div>
                     </div>
                     <div className="h-[60vh] w-full flex-1">

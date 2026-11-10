@@ -650,10 +650,8 @@ export default function LiveTvGuide({ isEmbedded = false, currentPlayingChannelI
                             {cat.key !== 'All' && cat.key !== 'Favorites' && (
                                 <span
                                     className="rounded-full px-1.5 py-0.5 text-[9px] font-semibold"
-                                    style={{
-                                        background: isActive ? 'color-mix(in srgb, var(--vora-accent-contrast) 18%, transparent)' : 'color-mix(in srgb, var(--vora-text-primary) 6%, transparent)',
-                                        color: isActive ? 'var(--vora-accent-contrast)' : 'var(--vora-text-muted)',
-                                    }}
+                                    // The label's colour on a tint of it, legible on every fill.
+                                    style={{ background: 'color-mix(in srgb, currentColor 20%, transparent)', color: 'inherit' }}
                                 >
                                     {cat.count}
                                 </span>

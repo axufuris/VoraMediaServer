@@ -1,6 +1,7 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, type DragEvent } from 'react';
 import type { SmartListClientDto } from '../../api/Collections/smartListService';
 import { Modal } from '../Common/Modal';
+import { reorderListProps, reorderRowProps, useTouchReorder } from '../../hooks/useTouchReorder';
 
 export interface HomeLayoutItem {
     listId: string;
@@ -18,6 +19,7 @@ interface ClientHomeCustomizeModalProps {
 
 export default function HomeCustomizeModal({ isOpen, onClose, activeLists, savedLayout, onSave }: ClientHomeCustomizeModalProps) {
     const [workingLayout, setWorkingLayout] = useState<HomeLayoutItem[]>([]);
+    const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
 
     useEffect(() => {
         if (isOpen) {
@@ -42,14 +44,24 @@ export default function HomeCustomizeModal({ isOpen, onClose, activeLists, saved
         }
     }, [isOpen, activeLists, savedLayout]);
 
-    const moveItem = (index: number, direction: -1 | 1) => {
-        if (index + direction < 0 || index + direction >= workingLayout.length) return;
-        const newLayout = [...workingLayout];
-        const temp = newLayout[index];
-        newLayout[index] = newLayout[index + direction];
-        newLayout[index + direction] = temp;
-        newLayout.forEach((item, i) => item.orderIndex = i);
-        setWorkingLayout(newLayout);
+    // Drag a row to a new place, as in Customize Discovery and the sidebar:
+    // the mouse drags the whole row, a finger drags its handle.
+    const moveItem = (from: number, to: number) => {
+        if (from === to) return;
+        setWorkingLayout(prev => {
+            const next = [...prev];
+            const [moved] = next.splice(from, 1);
+            next.splice(to, 0, moved);
+            return next.map((item, i) => ({ ...item, orderIndex: i }));
+        });
+    };
+
+    const touch = useTouchReorder(moveItem);
+
+    const handleDrop = (e: DragEvent, dropIndex: number) => {
+        e.preventDefault();
+        if (draggedIndex !== null) moveItem(draggedIndex, dropIndex);
+        setDraggedIndex(null);
     };
 
     const toggleItem = (index: number) => {
@@ -78,12 +90,12 @@ export default function HomeCustomizeModal({ isOpen, onClose, activeLists, saved
             <div className="p-6 border-b border-[var(--vora-border-subtle)] flex justify-between items-center bg-[var(--vora-bg-canvas)] shrink-0">
                 <div>
                     <h2 className="text-2xl font-bold text-[var(--vora-text-primary)] mb-1">Customize Home Screen</h2>
-                    <p className="text-xs text-[var(--vora-text-muted)]">Reorder or hide lists. Continue Watching is always pinned to the top.</p>
+                    <p className="text-xs text-[var(--vora-text-muted)]">Drag to reorder, or untick a list to hide it. Continue Watching is always pinned to the top.</p>
                 </div>
                 <button onClick={onClose} className="text-[var(--vora-text-muted)] hover:text-[var(--vora-text-primary)] transition-colors cursor-pointer text-xl font-bold">✕</button>
             </div>
 
-            <div className="p-6 overflow-y-auto custom-scrollbar flex-1 space-y-3">
+            <div {...reorderListProps} className="p-6 overflow-y-auto custom-scrollbar flex-1 space-y-3">
                 <div className="flex items-center justify-between p-4 rounded-lg bg-[var(--vora-bg-sunken)]/30 border border-[var(--vora-border-subtle)] opacity-70">
                     <span className="font-bold text-[var(--vora-text-muted)]">Continue Watching</span>
                     <span className="text-[10px] uppercase font-bold text-[var(--vora-text-muted)] bg-[var(--vora-bg-sunken)] px-2 py-1 rounded">Pinned</span>
@@ -94,14 +106,24 @@ export default function HomeCustomizeModal({ isOpen, onClose, activeLists, saved
                     if (!listDetails) return null;
 
                     return (
-                        <div key={item.listId} className={`flex items-center justify-between p-4 rounded-lg border transition-colors ${item.isEnabled ? 'bg-[var(--vora-bg-sunken)] border-[var(--vora-border-subtle)]' : 'bg-[var(--vora-bg-raised)] border-[var(--vora-border-subtle)] opacity-60'}`}>
+                        <div
+                            key={item.listId}
+                            {...reorderRowProps(index)}
+                            data-testid={`home-layout-row-${item.listId}`}
+                            style={touch.rowStyle(index)}
+                            draggable
+                            onDragStart={e => { setDraggedIndex(index); e.dataTransfer.effectAllowed = 'move'; e.dataTransfer.setData('text/plain', String(index)); }}
+                            onDragOver={e => e.preventDefault()}
+                            onDrop={e => handleDrop(e, index)}
+                            onDragEnd={() => setDraggedIndex(null)}
+                            className={`flex cursor-grab items-center justify-between p-4 rounded-lg border transition-colors ${draggedIndex === index ? 'border-[var(--vora-accent-500)] opacity-50' : 'border-[var(--vora-border-subtle)]'} ${item.isEnabled ? 'bg-[var(--vora-bg-sunken)]' : 'bg-[var(--vora-bg-raised)] opacity-60'}`}
+                        >
                             <div className="flex items-center gap-4 flex-1 overflow-hidden">
-                                <input type="checkbox" checked={item.isEnabled} onChange={() => toggleItem(index)} className="w-5 h-5 accent-[var(--vora-accent-500)] cursor-pointer shrink-0" />
+                                <span {...touch.handleProps(index)} aria-hidden="true" className="flex shrink-0 touch-none">
+                                    <svg className="w-5 h-5 text-[var(--vora-text-muted)]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 8h16M4 16h16" /></svg>
+                                </span>
+                                <input type="checkbox" checked={item.isEnabled} onChange={() => toggleItem(index)} aria-label={`Show ${listDetails.title}`} className="w-5 h-5 accent-[var(--vora-accent-500)] cursor-pointer shrink-0" />
                                 <span className={`font-bold truncate ${item.isEnabled ? 'text-[var(--vora-text-primary)]' : 'text-[var(--vora-text-muted)] line-through'}`}>{listDetails.title}</span>
-                            </div>
-                            <div className="flex items-center gap-1 shrink-0 ml-4">
-                                <button onClick={() => moveItem(index, -1)} disabled={index === 0} className="p-1.5 bg-[var(--vora-bg-raised)] hover:bg-[var(--vora-bg-raised)] disabled:opacity-30 rounded text-[var(--vora-text-muted)] transition-colors cursor-pointer">▲</button>
-                                <button onClick={() => moveItem(index, 1)} disabled={index === workingLayout.length - 1} className="p-1.5 bg-[var(--vora-bg-raised)] hover:bg-[var(--vora-bg-raised)] disabled:opacity-30 rounded text-[var(--vora-text-muted)] transition-colors cursor-pointer">▼</button>
                             </div>
                         </div>
                     );
