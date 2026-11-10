@@ -66,19 +66,18 @@ export default function GuideRow({
                     ) : (
                         <span className="text-[9px]" style={{ color: 'var(--vora-text-disabled)' }}>No logo</span>
                     )}
-                    {isFavorite && (
-                        <span
-                            className="absolute -top-0.5 -right-0.5 flex h-4 w-4 items-center justify-center rounded-full"
-                            style={{ background: 'var(--vora-accent-500)', color: 'var(--vora-accent-contrast)' }}
-                        >
-                            <svg width="9" height="9" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M3.172 5.172a4 4 0 015.656 0L10 6.343l1.172-1.171a4 4 0 115.656 5.656L10 17.657l-6.828-6.829a4 4 0 010-5.656z" clipRule="evenodd" /></svg>
-                        </span>
-                    )}
                 </div>
                 <div className="min-w-0 flex-1 max-md:w-full max-md:flex-none">
                     <div className="flex items-center justify-between gap-1.5 max-md:justify-center">
+                        {/* The favourite mark leads the name: inside the round logo
+                            the circle cut it off. */}
+                        {isFavorite && (
+                            <svg width="12" height="12" viewBox="0 0 20 20" fill="currentColor" role="img" aria-label="Favorite" className="shrink-0" style={{ color: 'var(--vora-accent-500)' }}>
+                                <path fillRule="evenodd" d="M3.172 5.172a4 4 0 015.656 0L10 6.343l1.172-1.171a4 4 0 115.656 5.656L10 17.657l-6.828-6.829a4 4 0 010-5.656z" clipRule="evenodd" />
+                            </svg>
+                        )}
                         <h3
-                            className="m-0 truncate text-sm font-semibold max-md:text-[11px]"
+                            className="m-0 min-w-0 flex-1 truncate text-sm font-semibold max-md:flex-none max-md:text-[11px]"
                             style={{ color: isCurrentlyPlaying ? 'var(--vora-accent-text)' : 'var(--vora-text-primary)' }}
                         >
                             {channel.name}
