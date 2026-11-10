@@ -653,6 +653,43 @@ public class PostgresMigrationHistoryTests(PostgresDatabase database) : IClassFi
         (await after.CollectionThemeVerdicts.CountAsync(cancellationToken)).Should().Be(0);
     }
 
+    [Fact]
+    public async Task A_database_on_the_theme_collections_migration_keeps_its_listening_history_with_no_source()
+    {
+        Assert.SkipUnless(PostgresDatabase.IsConfigured, PostgresDatabase.SkipReason);
+        var cancellationToken = TestContext.Current.CancellationToken;
+        await using var legacy = new LegacyDatabase();
+        var profileId = Guid.NewGuid();
+        var trackId = Guid.NewGuid();
+        var playId = Guid.NewGuid();
+        var playedAt = new DateTime(2026, 11, 1, 20, 0, 0, DateTimeKind.Utc);
+        await legacy.BuildThemeCollectionsStateAsync(async db =>
+        {
+            var library = new MediaLibrary { Name = "Music", Type = LibraryType.Music, FolderPaths = new List<string> { "/music" } };
+            db.Add(library);
+            db.Add(new Track { Id = trackId, Title = "Song", LibraryId = library.Id });
+            db.Add(new TrackPlayHistory { Id = playId, ProfileId = profileId, TrackId = trackId, PlayedAt = playedAt, DurationListenedSeconds = 200, Completed = true });
+            await db.SaveChangesAsync(cancellationToken);
+        }, cancellationToken);
+
+        await using (var before = legacy.NewContext())
+        {
+            (await before.Database.GetPendingMigrationsAsync(cancellationToken)).Should().Equal(MigrationHistoryTests.ChangesSinceInitial);
+            (await ColumnsAsync(before, "TrackPlayHistory", cancellationToken)).Should().NotContain(new[] { "Source", "SourceId" });
+        }
+
+        await legacy.MigrateAsync(cancellationToken);
+
+        await using var after = legacy.NewContext();
+        (await after.Database.GetPendingMigrationsAsync(cancellationToken)).Should().BeEmpty();
+        var play = await after.TrackPlayHistory.AsNoTracking().SingleAsync(p => p.Id == playId, cancellationToken);
+        play.TrackId.Should().Be(trackId);
+        play.PlayedAt.Should().Be(playedAt);
+        play.Completed.Should().BeTrue();
+        play.Source.Should().Be(MusicPlaySource.None);
+        play.SourceId.Should().BeNull();
+    }
+
     private static Task<List<string>> ColumnsAsync(VoraDbContext db, string table, CancellationToken cancellationToken) =>
         db.Database
             .SqlQueryRaw<string>("SELECT column_name AS \"Value\" FROM information_schema.columns WHERE table_schema = current_schema() AND table_name = {0}", table)

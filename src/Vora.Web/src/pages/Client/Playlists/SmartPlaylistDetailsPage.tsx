@@ -80,7 +80,8 @@ export default function SmartPlaylistDetailsPage() {
             streamUrl: musicService.getTrackStreamUrl(t.id, baseUrl, audioQualityStore.get()),
             serverId: server?.id,
             container: 'audio',
-            playbackContextType: 'Music'
+            playbackContextType: 'Music',
+            musicSource: id ? { type: 'SmartPlaylist', id } : undefined
         }));
     };
 

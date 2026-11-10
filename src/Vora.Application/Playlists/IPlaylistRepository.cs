@@ -12,6 +12,7 @@ public interface IPlaylistRepository
     Task<List<PlaylistSummaryVM>> GetPlaylistsAsync(Guid profileId, PlaylistAccessFilter access);
     Task<PlaylistDetailsVM?> GetPlaylistDetailsAsync(Guid id, Guid viewerProfileId, PlaylistAccessFilter access);
     Task<List<PlaylistSummaryVM>> GetSharedByOthersAsync(Guid viewerProfileId, PlaylistAccessFilter access);
+    Task<List<PlaylistSummaryVM>> GetVisibleSummariesAsync(IReadOnlyCollection<Guid> ids, Guid viewerProfileId, PlaylistAccessFilter access);
     Task<bool> SetSharedAsync(Guid id, Guid ownerProfileId, bool isShared);
     Task<Guid?> CopyPlaylistAsync(Guid sourceId, Guid viewerProfileId, PlaylistAccessFilter access);
     Task<Guid> CreatePlaylistAsync(Playlist playlist);

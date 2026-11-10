@@ -6,6 +6,7 @@ import {
     type GeneratedMixSummaryVM,
     type MoodSummaryVM,
     type BecauseYouPlayedRowVM,
+    type RecentlyPlayedItemVM,
     type StationVM,
     type ServerPlaybackSessionVM,
 } from '../../../../api/Music/musicService';
@@ -15,6 +16,7 @@ import { useDialog } from '../../../../dialogs';
 import MediaCard from '../../../../components/Client/Primitives/MediaCard';
 import MediaRow, { MediaRowItem } from '../../../../components/Client/Primitives/MediaRow';
 import AiPlaylistsSection from './AiPlaylistsSection';
+import RecentlyPlayedRow, { type RecentlyPlayedSource } from './RecentlyPlayedRow';
 import { MadeForYouRow, MixRow } from './MixRow';
 import EmptyState from '../../../../components/Client/Primitives/EmptyState';
 import { type MusicNavState } from './musicNavState';
@@ -30,7 +32,7 @@ interface MusicForYouViewProps {
     dailyMixes: GeneratedMixSummaryVM[];
     stations: StationVM[];
     becauseYouPlayed: BecauseYouPlayedRowVM[];
-    recentlyPlayed: ArtistTrackVM[];
+    recentlyPlayed: RecentlyPlayedItemVM[];
     recentlyAddedAlbums: AlbumVM[];
     topArtists: ArtistVM[];
     topTracks: ArtistTrackVM[];
@@ -40,6 +42,8 @@ interface MusicForYouViewProps {
     aiPlaylists: AiPlaylistsVM | null;
     moods?: MoodSummaryVM[];
     updateNav: (next: MusicNavState) => void;
+    // A playlist or smart playlist from Recently Played; mixes open in place.
+    openPlaylist: (kind: 'Playlist' | 'SmartPlaylist', id: string) => void;
     playArtistTrackList: (tracks: ArtistTrackVM[], startIndex: number) => void;
     startStationRadio: (station: StationVM) => Promise<void>;
     deleteStation: (stationId: string) => Promise<void>;
@@ -87,6 +91,7 @@ export default function MusicForYouView({
     aiPlaylists,
     moods = [],
     updateNav,
+    openPlaylist,
     playArtistTrackList,
     startStationRadio,
     deleteStation,
@@ -115,6 +120,10 @@ export default function MusicForYouView({
     const moodMixes = dailyMixes.filter(m => m.kind === 'MoodMix');
     const recapYear = availableYears[0] ?? new Date().getFullYear();
     const openMix = (mix: GeneratedMixSummaryVM) => updateNav({ view: 'mix', mixId: mix.id });
+    const openRecent = (kind: RecentlyPlayedSource, id: string) => {
+        if (kind === 'Mix') updateNav({ view: 'mix', mixId: id });
+        else openPlaylist(kind, id);
+    };
 
     return (
         <div className="space-y-8">
@@ -174,6 +183,8 @@ export default function MusicForYouView({
                     )}
                 </div>
             </section>
+
+            <RecentlyPlayedRow items={recentlyPlayed} onOpen={openRecent} onPlaySongs={playArtistTrackList} />
 
             <AiPlaylistsSection data={aiPlaylists} updateNav={updateNav} />
 
@@ -237,23 +248,6 @@ export default function MusicForYouView({
                     ))}
                 </MediaRow>
             ))}
-
-            {recentlyPlayed.length > 0 && (
-                <MediaRow title="Recently Played">
-                    {recentlyPlayed.map((t, idx) => (
-                        <MediaRowItem key={t.id}>
-                            <MediaCard
-                                item={trackCaption(t)}
-                                captionExtra={<LastFmCount value={t.globalListeners} unit="listeners" />}
-                                imageUrl={t.albumArtworkUrl}
-                                shape="square"
-                                size="xs"
-                                onClick={() => playArtistTrackList(recentlyPlayed, idx)}
-                            />
-                        </MediaRowItem>
-                    ))}
-                </MediaRow>
-            )}
 
             <MediaRow title="Recently Added">
                 {recentlyAddedAlbums.map(album => (

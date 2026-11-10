@@ -6,6 +6,7 @@ using Vora.Application.Media.ViewModels;
 using Vora.Application.Settings;
 using Vora.Application.Users;
 using Vora.Domain.Entities.Media;
+using Vora.Domain.Enums;
 using Vora.Plugins.Interfaces;
 
 namespace Vora.Application.Tests.Media;
@@ -134,5 +135,18 @@ public class RecordTrackPlayGateTests
         outcome.Should().Be(RecordPlayOutcome.UnknownTrack);
         await _repository.DidNotReceive().RecordPlayAsync(
             Arg.Any<Guid>(), Arg.Any<Guid>(), Arg.Any<int>(), Arg.Any<bool>());
+    }
+
+    // Recently Played groups a playlist's or a mix's plays into one tile, so
+    // what the client says the song was played from has to reach the row.
+    [Fact]
+    public async Task What_the_song_was_played_from_is_recorded_with_the_play()
+    {
+        GivenTrackOfLength(200);
+        var mixId = Guid.NewGuid();
+
+        await _manager.RecordTrackPlayAsync(_profileId, _trackId, 200, true, MusicPlaySource.Mix, mixId);
+
+        await _repository.Received(1).RecordPlayAsync(_profileId, _trackId, 200, true, MusicPlaySource.Mix, mixId);
     }
 }

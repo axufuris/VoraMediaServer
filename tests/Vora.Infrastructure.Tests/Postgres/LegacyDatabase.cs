@@ -161,12 +161,24 @@ public sealed class LegacyDatabase : IAsyncDisposable
         ALTER TABLE "Collections" ADD COLUMN IF NOT EXISTS "VisibleEveryYear" boolean NOT NULL DEFAULT FALSE;
         """;
 
+    public const string ThemeCollectionsMigration = "20261029013035_ChangesSinceInitial";
+
+    private const string PlaySourceColumns = """
+        ALTER TABLE "TrackPlayHistory" ADD COLUMN IF NOT EXISTS "Source" integer NOT NULL DEFAULT 0;
+        ALTER TABLE "TrackPlayHistory" ADD COLUMN IF NOT EXISTS "SourceId" uuid;
+        """;
+
+    private const string ColumnsSinceThemeCollections = """
+        ALTER TABLE "TrackPlayHistory" DROP COLUMN IF EXISTS "Source";
+        ALTER TABLE "TrackPlayHistory" DROP COLUMN IF EXISTS "SourceId";
+        """;
+
     private const string ColumnsSinceChannelVideoFormat = """
         DROP TABLE IF EXISTS "CollectionThemeVerdicts";
         DROP TABLE IF EXISTS "CollectionThemes";
         ALTER TABLE "MediaItems" DROP COLUMN IF EXISTS "Keywords";
         ALTER TABLE "Collections" DROP COLUMN IF EXISTS "VisibleEveryYear";
-        """;
+        """ + ColumnsSinceThemeCollections;
 
     private const string ColumnsSinceThirdRelease = """
         ALTER TABLE "IptvChannels" DROP COLUMN "VideoCodec";
@@ -304,7 +316,7 @@ public sealed class LegacyDatabase : IAsyncDisposable
     public async Task SeedAsync(Func<VoraDbContext, Task> seed, CancellationToken cancellationToken)
     {
         await using var db = NewContext();
-        await db.Database.ExecuteSqlRawAsync(RememberedChoicesProfileColumns + LibrarySortProfileColumns + KeepHdrSettingColumns + AutoPlayProfileColumns + UpNextProfileColumns + ImageSubtitleDeviceColumns + LiveVideoChannelColumns + ThemeCollectionColumns, cancellationToken);
+        await db.Database.ExecuteSqlRawAsync(RememberedChoicesProfileColumns + LibrarySortProfileColumns + KeepHdrSettingColumns + AutoPlayProfileColumns + UpNextProfileColumns + ImageSubtitleDeviceColumns + LiveVideoChannelColumns + ThemeCollectionColumns + PlaySourceColumns, cancellationToken);
         await seed(db);
         await db.Database.ExecuteSqlRawAsync(ColumnsSinceRememberedChoices + ColumnsSinceVideoDimensions, cancellationToken);
     }
@@ -406,6 +418,15 @@ public sealed class LegacyDatabase : IAsyncDisposable
         await seed(db);
         await db.Database.ExecuteSqlRawAsync(ColumnsSinceChannelVideoFormat, cancellationToken);
         await ReplaceCombinedMigrationAsync(db, ChannelVideoFormatMigration, "10.0.9", cancellationToken);
+    }
+
+    public async Task BuildThemeCollectionsStateAsync(Func<VoraDbContext, Task> seed, CancellationToken cancellationToken)
+    {
+        await using var db = NewContext();
+        await db.Database.MigrateAsync(cancellationToken);
+        await seed(db);
+        await db.Database.ExecuteSqlRawAsync(ColumnsSinceThemeCollections, cancellationToken);
+        await ReplaceCombinedMigrationAsync(db, ThemeCollectionsMigration, "10.0.9", cancellationToken);
     }
 
     private static async Task ReplaceCombinedMigrationAsync(VoraDbContext db, string migrationId, string productVersion, CancellationToken cancellationToken)

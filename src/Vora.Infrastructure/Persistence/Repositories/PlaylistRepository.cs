@@ -54,6 +54,19 @@ public class PlaylistRepository : IPlaylistRepository
                 .ToList()
         });
 
+    // The viewer's own playlists and anyone's shared ones, by id. A playlist that
+    // has since been unshared or deleted is simply not returned.
+    public async Task<List<PlaylistSummaryVM>> GetVisibleSummariesAsync(IReadOnlyCollection<Guid> ids, Guid viewerProfileId, PlaylistAccessFilter access)
+    {
+        if (ids.Count == 0) return new List<PlaylistSummaryVM>();
+        var visible = PlaylistVisibility.VisibleMediaIds(_context, access);
+        return await Summaries(
+                _context.Playlists.AsNoTracking().Where(p => ids.Contains(p.Id) && (p.ProfileId == viewerProfileId || p.IsShared)),
+                visible,
+                viewerProfileId)
+            .ToListAsync();
+    }
+
     public async Task<List<PlaylistSummaryVM>> GetPlaylistsAsync(Guid profileId, PlaylistAccessFilter access)
     {
         var visible = PlaylistVisibility.VisibleMediaIds(_context, access);

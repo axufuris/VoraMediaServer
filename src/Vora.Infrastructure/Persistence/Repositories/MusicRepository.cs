@@ -314,18 +314,45 @@ public class MusicRepository : IMusicRepository
         return await ordered.ToListAsync();
     }
 
-    public async Task RecordPlayAsync(Guid profileId, Guid trackId, int durationListenedSeconds, bool completed)
+    public async Task RecordPlayAsync(Guid profileId, Guid trackId, int durationListenedSeconds, bool completed, MusicPlaySource source = MusicPlaySource.None, Guid? sourceId = null)
     {
+        // A source without its id says nothing, so it is stored as no source.
+        var known = source != MusicPlaySource.None && sourceId is not null && sourceId != Guid.Empty;
         var entry = new TrackPlayHistory
         {
             ProfileId = profileId,
             TrackId = trackId,
             PlayedAt = DateTime.UtcNow,
             DurationListenedSeconds = Math.Max(0, durationListenedSeconds),
-            Completed = completed
+            Completed = completed,
+            Source = known ? source : MusicPlaySource.None,
+            SourceId = known ? sourceId : null
         };
         await _context.TrackPlayHistory.AddAsync(entry);
         await _context.SaveChangesAsync();
+    }
+
+    public Task<List<RecentPlay>> GetRecentPlaysAsync(Guid profileId, int limit) =>
+        _context.TrackPlayHistory
+            .AsNoTracking()
+            .Where(h => h.ProfileId == profileId)
+            .OrderByDescending(h => h.PlayedAt)
+            .Take(Math.Max(1, limit))
+            .Select(h => new RecentPlay(h.TrackId, h.PlayedAt, h.Source, h.SourceId))
+            .ToListAsync();
+
+    public async Task<List<Track>> GetTracksByIdsAsync(IReadOnlyCollection<Guid> trackIds, MusicAccessFilter access)
+    {
+        if (trackIds.Count == 0) return new List<Track>();
+
+        IQueryable<Track> query = _context.Tracks
+            .AsNoTracking()
+            .Include(t => t.Album)
+            .ThenInclude(a => a!.Artist)
+            .Where(t => trackIds.Contains(t.Id));
+        query = ApplyLibraryFilter(query, access);
+        query = query.ApplyMusicRatings(access);
+        return await query.ToListAsync();
     }
 
     public async Task<List<Track>> GetRecentlyPlayedTracksAsync(Guid profileId, MusicAccessFilter access, int limit)

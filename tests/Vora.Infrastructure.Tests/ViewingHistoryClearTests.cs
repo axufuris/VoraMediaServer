@@ -56,9 +56,9 @@ public class ViewingHistoryClearTests
         var cleared = await Repository().ClearViewingHistoryAsync(_sam, watchHistory: true, ratings: true);
 
         cleared.Should().BeEquivalentTo(new { WatchStatesRemoved = 4, RatingsRemoved = 2 });
-        (await _db.UserMediaStates.CountAsync(s => s.ProfileId == _sam)).Should().Be(0);
-        (await _db.UserMediaRatings.CountAsync(r => r.ProfileId == _sam)).Should().Be(0);
-        (await _db.PreservedUserMediaData.CountAsync(p => p.ProfileId == _sam)).Should().Be(0);
+        (await _db.UserMediaStates.CountAsync(s => s.ProfileId == _sam, TestContext.Current.CancellationToken)).Should().Be(0);
+        (await _db.UserMediaRatings.CountAsync(r => r.ProfileId == _sam, TestContext.Current.CancellationToken)).Should().Be(0);
+        (await _db.PreservedUserMediaData.CountAsync(p => p.ProfileId == _sam, TestContext.Current.CancellationToken)).Should().Be(0);
     }
 
     [Fact]
@@ -66,9 +66,9 @@ public class ViewingHistoryClearTests
     {
         await Repository().ClearViewingHistoryAsync(_sam, watchHistory: true, ratings: true);
 
-        (await _db.UserMediaStates.CountAsync(s => s.ProfileId == _andy)).Should().Be(1);
-        (await _db.UserMediaRatings.CountAsync(r => r.ProfileId == _andy)).Should().Be(1);
-        (await _db.PreservedUserMediaData.SingleAsync(p => p.ProfileId == _andy)).Should().BeEquivalentTo(new { HasState = true, IsPlayed = true, Rating = 9m });
+        (await _db.UserMediaStates.CountAsync(s => s.ProfileId == _andy, TestContext.Current.CancellationToken)).Should().Be(1);
+        (await _db.UserMediaRatings.CountAsync(r => r.ProfileId == _andy, TestContext.Current.CancellationToken)).Should().Be(1);
+        (await _db.PreservedUserMediaData.SingleAsync(p => p.ProfileId == _andy, TestContext.Current.CancellationToken)).Should().BeEquivalentTo(new { HasState = true, IsPlayed = true, Rating = 9m });
     }
 
     [Fact]
@@ -77,9 +77,9 @@ public class ViewingHistoryClearTests
         var cleared = await Repository().ClearViewingHistoryAsync(_sam, watchHistory: true, ratings: false);
 
         cleared.Should().BeEquivalentTo(new { WatchStatesRemoved = 4, RatingsRemoved = 0 });
-        (await _db.UserMediaStates.CountAsync(s => s.ProfileId == _sam)).Should().Be(0);
-        (await _db.UserMediaRatings.CountAsync(r => r.ProfileId == _sam)).Should().Be(2);
-        var archived = await _db.PreservedUserMediaData.Where(p => p.ProfileId == _sam).OrderBy(p => p.ContentKey).ToListAsync();
+        (await _db.UserMediaStates.CountAsync(s => s.ProfileId == _sam, TestContext.Current.CancellationToken)).Should().Be(0);
+        (await _db.UserMediaRatings.CountAsync(r => r.ProfileId == _sam, TestContext.Current.CancellationToken)).Should().Be(2);
+        var archived = await _db.PreservedUserMediaData.Where(p => p.ProfileId == _sam).OrderBy(p => p.ContentKey).ToListAsync(TestContext.Current.CancellationToken);
         archived.Select(p => (p.ContentKey, p.HasState, p.IsPlayed, p.LastPlayedAt, p.Rating)).Should().Equal(
             ("both", false, false, (DateTime?)null, (decimal?)7m),
             ("rated", false, false, (DateTime?)null, (decimal?)5m));
@@ -91,9 +91,9 @@ public class ViewingHistoryClearTests
         var cleared = await Repository().ClearViewingHistoryAsync(_sam, watchHistory: false, ratings: true);
 
         cleared.Should().BeEquivalentTo(new { WatchStatesRemoved = 0, RatingsRemoved = 2 });
-        (await _db.UserMediaStates.CountAsync(s => s.ProfileId == _sam)).Should().Be(4);
-        (await _db.UserMediaRatings.CountAsync(r => r.ProfileId == _sam)).Should().Be(0);
-        var archived = await _db.PreservedUserMediaData.Where(p => p.ProfileId == _sam).OrderBy(p => p.ContentKey).ToListAsync();
+        (await _db.UserMediaStates.CountAsync(s => s.ProfileId == _sam, TestContext.Current.CancellationToken)).Should().Be(4);
+        (await _db.UserMediaRatings.CountAsync(r => r.ProfileId == _sam, TestContext.Current.CancellationToken)).Should().Be(0);
+        var archived = await _db.PreservedUserMediaData.Where(p => p.ProfileId == _sam).OrderBy(p => p.ContentKey).ToListAsync(TestContext.Current.CancellationToken);
         archived.Select(p => (p.ContentKey, p.HasState, p.Rating, p.RatedAt)).Should().Equal(
             ("both", true, (decimal?)null, (DateTime?)null),
             ("watched", true, (decimal?)null, (DateTime?)null));

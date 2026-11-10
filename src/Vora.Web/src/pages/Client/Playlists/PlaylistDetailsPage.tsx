@@ -173,7 +173,8 @@ export default function PlaylistDetailsPage() {
             streamUrl: musicService.getTrackStreamUrl(t.mediaItemId, baseUrl, audioQualityStore.get()),
             serverId: server?.id,
             container: 'audio' as const,
-            playbackContextType: 'Music' as const
+            playbackContextType: 'Music' as const,
+            musicSource: { type: 'Playlist' as const, id: playlist.id }
         }));
     };
 

@@ -154,6 +154,10 @@ public static class MusicEndpoints
             .RequireAuthorization()
             .WithName("ListRecentlyPlayedTracks")
             .Produces<IEnumerable<ArtistTrackVM>>(StatusCodes.Status200OK);
+        group.MapGet("/history/recently-played", GetRecentlyPlayedItemsAsync)
+            .RequireAuthorization()
+            .WithName("ListRecentlyPlayedItems")
+            .Produces<IEnumerable<RecentlyPlayedItemVM>>(StatusCodes.Status200OK);
         group.MapGet("/history/top-tracks", GetTopTracksAsync)
             .RequireAuthorization()
             .WithName("ListTopTracks")
@@ -562,6 +566,12 @@ public static class MusicEndpoints
     {
         public int DurationListenedSeconds { get; set; }
         public bool Completed { get; set; }
+
+        // What the song was played from: Album, Playlist, SmartPlaylist or Mix
+        // (AI playlists are mixes), with its id. Both optional; Recently
+        // Played shows a playlist or mix once, and any other play as its song.
+        public MusicPlaySource? Source { get; set; }
+        public Guid? SourceId { get; set; }
     }
 
     private static async Task<IResult> RecordTrackPlayAsync(Guid trackId, [FromBody] RecordPlayRequest request, ClaimsPrincipal user, IMusicManager manager)
@@ -574,7 +584,8 @@ public static class MusicEndpoints
         // so it cannot be a 4xx — but saying nothing meant a client posting at the
         // wrong moment saw success and no history, with nothing on either side to
         // connect the two.
-        var outcome = await manager.RecordTrackPlayAsync(profileId.Value, trackId, request.DurationListenedSeconds, request.Completed);
+        var outcome = await manager.RecordTrackPlayAsync(profileId.Value, trackId, request.DurationListenedSeconds, request.Completed,
+            request.Source ?? MusicPlaySource.None, request.SourceId);
         return Results.Ok(new RecordPlayResponse
         {
             Recorded = outcome == RecordPlayOutcome.Recorded,
@@ -627,6 +638,16 @@ public static class MusicEndpoints
         if (profileId == null) return Results.Forbid();
         var tracks = await manager.GetRecentlyPlayedAsync(profileId.Value, user.GetMusicAccessFilter(), limit ?? 20);
         return Results.Ok(tracks);
+    }
+
+    // For You's Recently Played row: playlists and mixes as themselves, other
+    // plays as their songs. Up to RecentlyPlayedManager.MaxLimit tiles.
+    private static async Task<IResult> GetRecentlyPlayedItemsAsync([FromQuery] int? limit, ClaimsPrincipal user, IRecentlyPlayedManager manager)
+    {
+        var profileId = user.GetProfileId();
+        if (profileId == null) return Results.Forbid();
+        var items = await manager.GetAsync(profileId.Value, user.GetPlaylistAccessFilter(), limit ?? RecentlyPlayedManager.DefaultLimit);
+        return Results.Ok(items);
     }
 
     private static async Task<IResult> GetTopTracksAsync([FromQuery] int? limit, ClaimsPrincipal user, IMusicManager manager)

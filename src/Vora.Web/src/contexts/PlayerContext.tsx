@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect, useCallback, useMemo, type ReactNode } from 'react';
 import { streamingService } from '../api/Streaming/streamingService';
 import { useSignalREvent } from '../hooks/useSignalREvent';
-import { musicService, type AudioQualityVM, type RadioSeed } from '../api/Music/musicService';
+import { musicService, type AudioQualityVM, type MusicSource, type RadioSeed } from '../api/Music/musicService';
 import { serverVault } from '../utils/serverVault';
 import { audioQualityStore, crossfadeStore, eqPresetStore, EQ_PRESETS } from '../utils/audioQuality';
 import { StorageKeys } from '../utils/storageKeys';
@@ -26,6 +26,7 @@ interface PendingPlay {
     furthestSeconds: number;
     trackDuration: number;
     completed: boolean;
+    source?: MusicSource;
 }
 
 export function PlayerProvider({ children }: { children: ReactNode }) {
@@ -106,7 +107,7 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
         if (!playQualifies(pending.furthestSeconds, pending.trackDuration)) return;
 
         musicService
-            .recordPlay(pending.trackId, Math.floor(pending.furthestSeconds), pending.completed, pending.serverId)
+            .recordPlay(pending.trackId, Math.floor(pending.furthestSeconds), pending.completed, pending.serverId, pending.source)
             .catch(() => { /* ignore */ });
     }, []);
 
@@ -114,6 +115,10 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
     useEffect(() => {
         currentServerIdRef.current = currentMedia?.serverId;
     }, [currentMedia?.serverId]);
+    // Plain values rather than the object, so the same track queued again from
+    // the same place is not a new listen.
+    const musicSourceType = currentMedia?.musicSource?.type;
+    const musicSourceId = currentMedia?.musicSource?.id;
     useEffect(() => {
         // Runs after currentMedia has already changed, so the pending listen still
         // belongs to the track being left.
@@ -125,10 +130,11 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
                 furthestSeconds: 0,
                 trackDuration: 0,
                 completed: false,
+                source: musicSourceType && musicSourceId ? { type: musicSourceType, id: musicSourceId } : undefined,
             };
             musicService.updateNowPlaying(currentMedia.id, currentMedia.serverId).catch(() => { /* ignore */ });
         }
-    }, [currentMedia?.id, currentMedia?.serverId, currentMedia?.playbackContextType, flushPendingPlay]);
+    }, [currentMedia?.id, currentMedia?.serverId, currentMedia?.playbackContextType, musicSourceType, musicSourceId, flushPendingPlay]);
 
     // Closing the tab mid-track would otherwise throw the listen away, and a
     // track someone played out and then closed is the strongest signal there is.
