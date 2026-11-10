@@ -9,7 +9,7 @@ public class DvrPostProcessingArgumentsTests
 {
     private const string Input = "/app/data/iptv/dvr/News at 6 \"Live\".ts";
     private const string Output = "/app/data/iptv/dvr/News at 6 \"Live\".mp4";
-    private const string AudioAndOutput = "-c:a aac -b:a 128k -movflags +faststart -y";
+    private const string AudioAndOutput = "-c:a aac -ac 2 -b:a 128k -movflags +faststart -y";
 
     private static ServerSetting Settings(int x264Preset = 2, int hevc = 0) => new() { BackgroundX264Preset = x264Preset, EnableHevcEncoding = hevc };
 

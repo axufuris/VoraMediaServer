@@ -168,7 +168,9 @@ public class DvrPostProcessingWorker : BackgroundService
             HardwareAccelerationType.Vaapi => ["-vf", "format=nv12,hwupload", "-c:v", useHevc ? "hevc_vaapi" : "h264_vaapi", "-qp", "28"],
             _ => ["-c:v", useHevc ? "libx265" : "libx264", "-preset", preset, "-crf", "23"]
         });
-        args.AddRange(["-c:a", "aac", "-b:a", "128k", "-movflags", "+faststart", "-y", outputPath]);
+        // Stereo, as timeshift: a 5.1(side) source would otherwise be written
+        // with channel count 0, which Android can't decode.
+        args.AddRange(["-c:a", "aac", "-ac", "2", "-b:a", "128k", "-movflags", "+faststart", "-y", outputPath]);
         return args;
     }
 

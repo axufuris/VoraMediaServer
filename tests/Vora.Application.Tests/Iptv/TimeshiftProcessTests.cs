@@ -16,7 +16,7 @@ public class TimeshiftProcessTests
     }
 
     [Fact]
-    public void A_copy_runs_exactly_the_command_timeshift_has_always_run()
+    public void A_copy_copies_the_video_and_encodes_stereo_aac()
     {
         Arguments(TimeshiftVideoArguments.Copy).Should().Equal(
             "-reconnect", "1",
@@ -25,6 +25,7 @@ public class TimeshiftProcessTests
             "-i", StreamUrl,
             "-c:v", "copy",
             "-c:a", "aac",
+            "-ac", "2",
             "-b:a", "128k",
             "-f", "hls",
             "-hls_time", "4",
@@ -51,6 +52,7 @@ public class TimeshiftProcessTests
             "-i", StreamUrl,
             "-vf", "format=nv12,hwupload", "-c:v", "h264_vaapi", "-qp", "28", "-profile:v", "high", "-level", "41", "-force_key_frames", "expr:gte(t,n_forced*4)",
             "-c:a", "aac",
+            "-ac", "2",
             "-b:a", "128k",
             "-f", "hls",
             "-hls_time", "4",
