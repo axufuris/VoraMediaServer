@@ -17,7 +17,9 @@ public interface IMusicRepository
     Task<SetMusicRatingResult> SetAlbumRatingAsync(Guid profileId, Guid albumId, decimal? rating, bool isAdmin);
     Task<SetMusicRatingResult> SetArtistRatingAsync(Guid profileId, Guid artistId, decimal? rating, bool isAdmin);
 
-    Task RecordPlayAsync(Guid profileId, Guid trackId, int durationListenedSeconds, bool completed);
+    Task RecordPlayAsync(Guid profileId, Guid trackId, int durationListenedSeconds, bool completed, MusicPlaySource source = MusicPlaySource.None, Guid? sourceId = null);
+    Task<List<RecentPlay>> GetRecentPlaysAsync(Guid profileId, int limit);
+    Task<List<Track>> GetTracksByIdsAsync(IReadOnlyCollection<Guid> trackIds, MusicAccessFilter access);
     Task<List<Track>> GetRecentlyPlayedTracksAsync(Guid profileId, MusicAccessFilter access, int limit);
     Task<List<Track>> GetTopPlayedTracksAsync(Guid profileId, MusicAccessFilter access, int limit);
     Task<List<Artist>> GetTopPlayedArtistsAsync(Guid profileId, MusicAccessFilter access, int limit);
@@ -195,3 +197,5 @@ public sealed record TrackDescriptor(
     string? EmbeddedModel);
 
 public sealed record TrackEmbeddingUpdate(Guid TrackId, float[] Vector, string SourceHash, string Model);
+
+public sealed record RecentPlay(Guid TrackId, DateTime PlayedAt, MusicPlaySource Source, Guid? SourceId);

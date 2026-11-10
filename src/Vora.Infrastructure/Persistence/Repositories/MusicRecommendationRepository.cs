@@ -29,6 +29,15 @@ public class MusicRecommendationRepository : IMusicRecommendationRepository
             .FirstOrDefaultAsync(m => m.Id == mixId && m.ProfileId == profileId);
     }
 
+    public async Task<List<GeneratedMix>> GetMixesByIdsAsync(IReadOnlyCollection<Guid> mixIds, Guid profileId)
+    {
+        if (mixIds.Count == 0) return new List<GeneratedMix>();
+        return await _context.GeneratedMixes
+            .AsNoTracking()
+            .Where(m => m.ProfileId == profileId && mixIds.Contains(m.Id))
+            .ToListAsync();
+    }
+
     public async Task SaveMixAsync(GeneratedMix mix)
     {
         var existing = await _context.GeneratedMixes

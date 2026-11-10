@@ -91,6 +91,32 @@ export interface TrackVM {
     lockedFields: string[];
 }
 
+// Where a song was played from, sent with its play: Recently Played shows a
+// playlist or a mix (AI playlists are mixes) once, and any other play as its song.
+export type MusicPlaySource = 'Album' | 'Playlist' | 'SmartPlaylist' | 'Mix';
+
+export interface MusicSource {
+    type: MusicPlaySource;
+    id: string;
+}
+
+export type RecentlyPlayedKind = 'Track' | 'Playlist' | 'SmartPlaylist' | 'Mix';
+
+export interface RecentlyPlayedItemVM {
+    kind: RecentlyPlayedKind;
+    // The mix, playlist or smart playlist to open, or the song to play.
+    id: string;
+    title: string;
+    // Where a playlist tile is from, or a song's album.
+    subtitle?: string | null;
+    artworkUrl?: string | null;
+    artworkUrls: string[];
+    mixKind?: string | null;
+    trackCount: number;
+    playedAt: string;
+    track?: ArtistTrackVM | null;
+}
+
 export interface ArtistTrackVM {
     id: string;
     title: string;
@@ -691,8 +717,20 @@ export const musicService = {
         }
     },
 
-    recordPlay: async (trackId: string, durationListenedSeconds: number, completed: boolean, serverId?: string): Promise<RecordPlayResponse> => {
-        const response = await apiClient.post<RecordPlayResponse>(`/music/tracks/${trackId}/played`, { durationListenedSeconds, completed }, { serverId });
+    recordPlay: async (trackId: string, durationListenedSeconds: number, completed: boolean, serverId?: string, source?: MusicSource): Promise<RecordPlayResponse> => {
+        const body = source
+            ? { durationListenedSeconds, completed, source: source.type, sourceId: source.id }
+            : { durationListenedSeconds, completed };
+        const response = await apiClient.post<RecordPlayResponse>(`/music/tracks/${trackId}/played`, body, { serverId });
+        return response.data;
+    },
+
+    // For You's Recently Played row, newest first.
+    getRecentlyPlayedItems: async (limit?: number, serverId?: string): Promise<RecentlyPlayedItemVM[]> => {
+        const response = await apiClient.get<RecentlyPlayedItemVM[]>(`/music/history/recently-played`, {
+            params: limit ? { limit } : undefined,
+            serverId
+        });
         return response.data;
     },
 

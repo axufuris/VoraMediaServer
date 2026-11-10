@@ -238,11 +238,23 @@ CREATE TABLE IF NOT EXISTS ""CollectionThemeVerdicts"" (
 );
 
 CREATE INDEX IF NOT EXISTS ""IX_CollectionThemeVerdicts_MediaItemId"" ON ""CollectionThemeVerdicts"" (""MediaItemId"");");
+
+            migrationBuilder.Sql(@"
+ALTER TABLE ""TrackPlayHistory"" ADD COLUMN IF NOT EXISTS ""Source"" integer NOT NULL DEFAULT 0;
+ALTER TABLE ""TrackPlayHistory"" ADD COLUMN IF NOT EXISTS ""SourceId"" uuid;");
         }
 
         /// <inheritdoc />
         protected override void Down(MigrationBuilder migrationBuilder)
         {
+            migrationBuilder.DropColumn(
+                name: "Source",
+                table: "TrackPlayHistory");
+
+            migrationBuilder.DropColumn(
+                name: "SourceId",
+                table: "TrackPlayHistory");
+
             migrationBuilder.DropTable(
                 name: "CollectionThemeVerdicts");
 

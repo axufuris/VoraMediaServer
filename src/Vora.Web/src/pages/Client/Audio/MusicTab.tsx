@@ -1,7 +1,7 @@
 import { useEffect, useState, useCallback, useMemo, useRef } from 'react';
 import { useLocation, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { StorageKeys, SessionKeys, getProfileIdFromToken } from '../../../utils/storageKeys';
-import { musicService, type ArtistVM, type AlbumVM, type TrackVM, type ArtistTrackVM, type MusicSearchResultVM, type GeneratedMixSummaryVM, type GeneratedMixDetailVM, type BecauseYouPlayedRowVM, type RadioSeed, type StationVM, type YearRecapVM, type GenreSummaryVM, type GenreContentVM, type MoodSummaryVM, type ServerPlaybackSessionVM, type AudioQualityVM } from '../../../api/Music/musicService';
+import { musicService, type ArtistVM, type AlbumVM, type TrackVM, type ArtistTrackVM, type MusicSearchResultVM, type GeneratedMixSummaryVM, type GeneratedMixDetailVM, type BecauseYouPlayedRowVM, type RadioSeed, type StationVM, type YearRecapVM, type GenreSummaryVM, type GenreContentVM, type MoodSummaryVM, type ServerPlaybackSessionVM, type AudioQualityVM, type RecentlyPlayedItemVM } from '../../../api/Music/musicService';
 import { mediaService } from '../../../api/Media/mediaService';
 import { usePlayer, type PlayableMedia } from '../../../contexts/usePlayer';
 import { serverVault } from '../../../utils/serverVault';
@@ -99,7 +99,7 @@ export default function MusicTab() {
     const [likedTracks, setLikedTracks] = useState<ArtistTrackVM[]>([]);
     const [likedCount, setLikedCount] = useState(0);
 
-    const [recentlyPlayed, setRecentlyPlayed] = useState<ArtistTrackVM[]>([]);
+    const [recentlyPlayed, setRecentlyPlayed] = useState<RecentlyPlayedItemVM[]>([]);
     const [topTracks, setTopTracks] = useState<ArtistTrackVM[]>([]);
     const [topArtists, setTopArtists] = useState<ArtistVM[]>([]);
     const [recentlyAddedAlbums, setRecentlyAddedAlbums] = useState<AlbumVM[]>([]);
@@ -262,7 +262,7 @@ export default function MusicTab() {
     const loadHomeRows = useCallback(async () => {
         try {
             const [recent, top, artistsTop, recentAlbums, mixes, byp, st, years, moodList] = await Promise.all([
-                musicService.getRecentlyPlayed(12, serverId),
+                musicService.getRecentlyPlayedItems(20, serverId),
                 musicService.getTopTracks(12, serverId),
                 musicService.getTopArtists(8, serverId),
                 musicService.getRecentlyAddedAlbums(12, serverId),
@@ -582,7 +582,8 @@ export default function MusicTab() {
             streamUrl: musicService.getTrackStreamUrl(track.id, baseUrl, audioQualityStore.get()),
             serverId: server?.id,
             container: 'audio',
-            playbackContextType: 'Music'
+            playbackContextType: 'Music',
+            musicSource: { type: 'Album', id: album.id }
         };
     }, [serverId]);
 
@@ -605,9 +606,10 @@ export default function MusicTab() {
             streamUrl: musicService.getTrackStreamUrl(track.id, baseUrl, audioQualityStore.get()),
             serverId: server?.id,
             container: 'audio',
-            playbackContextType: 'Music'
+            playbackContextType: 'Music',
+            musicSource: currentMix ? { type: 'Mix', id: currentMix.id } : undefined
         };
-    }, [serverId, currentMix?.artworkUrl]);
+    }, [serverId, currentMix]);
 
     const playMixFromIndex = (startIndex: number) => {
         if (!currentMix) return;
@@ -856,6 +858,10 @@ export default function MusicTab() {
                         aiPlaylists={aiPlaylists.data}
                         moods={moods}
                         updateNav={updateNav}
+                        openPlaylist={(kind, id) => {
+                            const path = kind === 'Playlist' ? `playlist/${id}` : `smart-playlist/${id}`;
+                            navigate(serverId ? `/server/${serverId}/${path}` : `/${path}`);
+                        }}
                         playArtistTrackList={playArtistTrackList}
                         startStationRadio={startStationRadio}
                         deleteStation={deleteStation}

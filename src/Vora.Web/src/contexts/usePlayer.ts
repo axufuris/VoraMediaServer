@@ -1,5 +1,5 @@
 import { createContext, useContext } from 'react';
-import type { AudioQualityVM, RadioSeed } from '../api/Music/musicService';
+import type { AudioQualityVM, MusicSource, RadioSeed } from '../api/Music/musicService';
 import type { MediaMarker } from '../api/Media/mediaService';
 
 export interface PlayableMedia {
@@ -46,6 +46,8 @@ export interface PlayableMedia {
     reasons?: string[];
     playbackContextType?: string;
     playbackContextId?: string;
+    // A song's album, playlist, smart playlist or mix, reported with its play.
+    musicSource?: MusicSource;
     // True when playing a local movie "extra" (trailer/featurette). Suppresses
     // media-detail track fetches and up-next, and keeps ping from writing
     // watch progress onto the parent movie.

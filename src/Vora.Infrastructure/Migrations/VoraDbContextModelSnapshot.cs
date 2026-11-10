@@ -2368,6 +2368,12 @@ namespace Vora.Infrastructure.Migrations
                     b.Property<Guid>("ProfileId")
                         .HasColumnType("uuid");
 
+                    b.Property<int>("Source")
+                        .HasColumnType("integer");
+
+                    b.Property<Guid?>("SourceId")
+                        .HasColumnType("uuid");
+
                     b.Property<Guid>("TrackId")
                         .HasColumnType("uuid");
 

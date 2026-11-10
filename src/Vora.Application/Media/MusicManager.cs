@@ -55,7 +55,7 @@ public interface IMusicManager
 
     Task<LyricsResult?> GetTrackLyricsAsync(Guid trackId, MusicAccessFilter access, CancellationToken cancellationToken);
 
-    Task<RecordPlayOutcome> RecordTrackPlayAsync(Guid profileId, Guid trackId, int durationListenedSeconds, bool completed);
+    Task<RecordPlayOutcome> RecordTrackPlayAsync(Guid profileId, Guid trackId, int durationListenedSeconds, bool completed, MusicPlaySource source = MusicPlaySource.None, Guid? sourceId = null);
     Task UpdateNowPlayingAsync(Guid profileId, Guid trackId, CancellationToken cancellationToken);
     Task<List<ArtistTrackVM>> GetRecentlyPlayedAsync(Guid profileId, MusicAccessFilter access, int limit);
     Task<List<ArtistTrackVM>> GetTopPlayedTracksAsync(Guid profileId, MusicAccessFilter access, int limit);
@@ -739,7 +739,7 @@ public class MusicManager : IMusicManager
         }).ToList();
     }
 
-    public async Task<RecordPlayOutcome> RecordTrackPlayAsync(Guid profileId, Guid trackId, int durationListenedSeconds, bool completed)
+    public async Task<RecordPlayOutcome> RecordTrackPlayAsync(Guid profileId, Guid trackId, int durationListenedSeconds, bool completed, MusicPlaySource source = MusicPlaySource.None, Guid? sourceId = null)
     {
         // Looked up rather than taken from the scrobble info, which also comes
         // back null for a track that exists but carries no artist tag. Only a
@@ -763,7 +763,7 @@ public class MusicManager : IMusicManager
             return RecordPlayOutcome.BelowThreshold;
         }
 
-        await _repository.RecordPlayAsync(profileId, trackId, durationListenedSeconds, completed);
+        await _repository.RecordPlayAsync(profileId, trackId, durationListenedSeconds, completed, source, sourceId);
 
         // The play is stored either way. Scrobbling is a side effect that must
         // not change what the caller is told about its own request.
@@ -1070,23 +1070,26 @@ public class MusicManager : IMusicManager
     private async Task<List<ArtistTrackVM>> MapArtistTracksWithLikesAsync(Guid profileId, List<Domain.Entities.Media.Track> tracks)
     {
         var likedIds = await _repository.GetLikedTrackIdsAsync(profileId, tracks.Select(t => t.Id));
-        return tracks.Select(t => new ArtistTrackVM
-        {
-            Id = t.Id,
-            Title = t.Title,
-            Artist = t.Artist,
-            TrackNumber = t.TrackNumber,
-            DiscNumber = t.DiscNumber,
-            DurationSeconds = t.DurationSeconds,
-            ContentRating = t.ContentRating,
-            AlbumId = t.AlbumId,
-            AlbumTitle = t.Album?.Title,
-            AlbumArtworkUrl = AlbumCoverArt.For(t.Album),
-            IsLiked = likedIds.Contains(t.Id),
-            GlobalListeners = t.GlobalListeners,
-            GlobalPlays = t.GlobalPlays
-        }).ToList();
+        return tracks.Select(t => ToArtistTrack(t, likedIds.Contains(t.Id))).ToList();
     }
+
+    // Needs the track's album loaded for the album title and cover.
+    public static ArtistTrackVM ToArtistTrack(Domain.Entities.Media.Track t, bool isLiked) => new()
+    {
+        Id = t.Id,
+        Title = t.Title,
+        Artist = t.Artist,
+        TrackNumber = t.TrackNumber,
+        DiscNumber = t.DiscNumber,
+        DurationSeconds = t.DurationSeconds,
+        ContentRating = t.ContentRating,
+        AlbumId = t.AlbumId,
+        AlbumTitle = t.Album?.Title,
+        AlbumArtworkUrl = AlbumCoverArt.For(t.Album),
+        IsLiked = isLiked,
+        GlobalListeners = t.GlobalListeners,
+        GlobalPlays = t.GlobalPlays
+    };
 
     public async Task<LyricsResult?> GetTrackLyricsAsync(Guid trackId, MusicAccessFilter access, CancellationToken cancellationToken)
     {
