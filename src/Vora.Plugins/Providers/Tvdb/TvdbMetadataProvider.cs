@@ -4,6 +4,7 @@ using System.Text.Json;
 using System.Text;
 using Vora.Plugins.Dtos;
 using Vora.Plugins.Interfaces;
+using Vora.Plugins.Providers.Tmdb;
 
 namespace Vora.Plugins.Providers.Tvdb;
 
@@ -335,13 +336,7 @@ public class TvdbMetadataProvider : IMetadataProvider, IPluginConnectionTest
             }
         }
 
-        if (data.TryGetProperty("genres", out var genres) && genres.ValueKind == JsonValueKind.Array)
-        {
-            foreach (var genre in genres.EnumerateArray())
-            {
-                if (genre.TryGetProperty("id", out var gid) && gid.ValueKind == JsonValueKind.Number) result.GenreIds.Add(gid.GetInt32());
-            }
-        }
+        result.GenreIds = GenreIds(data);
 
         if (data.TryGetProperty("tags", out var tags) && tags.ValueKind == JsonValueKind.Array)
         {
@@ -508,13 +503,7 @@ public class TvdbMetadataProvider : IMetadataProvider, IPluginConnectionTest
             }
         }
 
-        if (data.TryGetProperty("genres", out var genres) && genres.ValueKind == JsonValueKind.Array)
-        {
-            foreach (var genre in genres.EnumerateArray())
-            {
-                if (genre.TryGetProperty("id", out var gid) && gid.ValueKind == JsonValueKind.Number) result.GenreIds.Add(gid.GetInt32());
-            }
-        }
+        result.GenreIds = GenreIds(data);
 
         if (data.TryGetProperty("seasons", out var seasons) && seasons.ValueKind == JsonValueKind.Array)
         {
@@ -786,6 +775,14 @@ public class TvdbMetadataProvider : IMetadataProvider, IPluginConnectionTest
         catch (HttpRequestException) { }
         catch (TaskCanceledException) { }
     }
+
+    // By name: the Genres table holds TMDB's ids, and TVDB's own ids mean
+    // other genres there (its 12 is Drama, TMDB's 12 Adventure).
+    internal static List<int> GenreIds(JsonElement data) =>
+        data.TryGetProperty("genres", out var genres) && genres.ValueKind == JsonValueKind.Array
+            ? TmdbGenres.IdsFor(genres.EnumerateArray()
+                .Select(g => g.ValueKind == JsonValueKind.Object && g.TryGetProperty("name", out var name) && name.ValueKind == JsonValueKind.String ? name.GetString() : null))
+            : new List<int>();
 
     private static CastRole MapPeopleTypeToRole(string? peopleType) => peopleType switch
     {
