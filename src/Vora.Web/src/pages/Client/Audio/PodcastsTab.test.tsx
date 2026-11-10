@@ -122,6 +122,15 @@ describe('PodcastsTab subscriptions', () => {
 });
 
 describe('PodcastsTab new episodes', () => {
+    it('opens on New Episodes, the first tab', async () => {
+        render(<MemoryRouter><PodcastsTab /></MemoryRouter>);
+
+        expect(await screen.findByText('Planting garlic')).toBeTruthy();
+        const tabs = ['New Episodes', 'Subscriptions', 'Browse Catalog'].map(label => screen.getByRole('button', { name: label }));
+        expect(tabs[0].compareDocumentPosition(tabs[1]) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+        expect(tabs[1].compareDocumentPosition(tabs[2]) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    });
+
     it('plays an episode from the server it came from', async () => {
         renderTab('recent');
 

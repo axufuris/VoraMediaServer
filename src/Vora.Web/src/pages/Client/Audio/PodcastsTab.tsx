@@ -67,7 +67,8 @@ export default function PodcastsTab() {
     const [viewMode, setViewMode] = useState<PodcastViewMode>(() => {
         const stored = sessionStorage.getItem(VIEW_MODE_STORAGE_KEY);
         if (stored === 'recent' || stored === 'subscriptions' || stored === 'catalog') return stored;
-        return canAddCustomFeeds ? 'subscriptions' : 'catalog';
+        // New Episodes first: what's new from the shows you follow.
+        return 'recent';
     });
     const [recentEpisodes, setRecentEpisodes] = useState<ServerPodcastFeedEpisode[]>([]);
     const [recentFailedServerIds, setRecentFailedServerIds] = useState<string[]>([]);
@@ -497,16 +498,16 @@ export default function PodcastsTab() {
                 <>
                     <div className="flex items-center gap-2 mb-6 max-md:flex-wrap">
                         <button
-                            onClick={() => switchViewMode('subscriptions')}
-                            className={`px-4 py-2 text-sm font-bold rounded transition-colors cursor-pointer max-md:whitespace-nowrap ${viewMode === 'subscriptions' ? 'bg-[var(--vora-accent-500)] text-[var(--vora-accent-contrast)]' : 'bg-[var(--vora-bg-sunken)]/60 text-[var(--vora-text-secondary)] hover:text-[var(--vora-text-primary)] hover:bg-[var(--vora-bg-surface)]'}`}
-                        >
-                            Subscriptions
-                        </button>
-                        <button
                             onClick={() => switchViewMode('recent')}
                             className={`px-4 py-2 text-sm font-bold rounded transition-colors cursor-pointer max-md:whitespace-nowrap ${viewMode === 'recent' ? 'bg-[var(--vora-accent-500)] text-[var(--vora-accent-contrast)]' : 'bg-[var(--vora-bg-sunken)]/60 text-[var(--vora-text-secondary)] hover:text-[var(--vora-text-primary)] hover:bg-[var(--vora-bg-surface)]'}`}
                         >
                             New Episodes
+                        </button>
+                        <button
+                            onClick={() => switchViewMode('subscriptions')}
+                            className={`px-4 py-2 text-sm font-bold rounded transition-colors cursor-pointer max-md:whitespace-nowrap ${viewMode === 'subscriptions' ? 'bg-[var(--vora-accent-500)] text-[var(--vora-accent-contrast)]' : 'bg-[var(--vora-bg-sunken)]/60 text-[var(--vora-text-secondary)] hover:text-[var(--vora-text-primary)] hover:bg-[var(--vora-bg-surface)]'}`}
+                        >
+                            Subscriptions
                         </button>
                         <button
                             onClick={() => switchViewMode('catalog')}
