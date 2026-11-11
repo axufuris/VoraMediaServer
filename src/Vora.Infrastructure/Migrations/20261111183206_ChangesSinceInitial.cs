@@ -249,11 +249,39 @@ ALTER TABLE ""TrackPlayHistory"" ADD COLUMN IF NOT EXISTS ""SourceId"" uuid;");
             migrationBuilder.Sql(@"
 CREATE INDEX IF NOT EXISTS ""IX_MediaItems_PresentByReleaseDate"" ON ""MediaItems"" ((""ReleaseDate"" IS NOT NULL), ""ReleaseDate"") WHERE ""MissingSince"" IS NULL;
 CREATE INDEX IF NOT EXISTS ""IX_MediaItems_PresentByDateAdded"" ON ""MediaItems"" ((COALESCE(""LastContentAddedAt"", ""AddedAt""))) WHERE ""MissingSince"" IS NULL;");
+
+            // Search's trigram indexes (docs/database.md). They are only an
+            // accelerator: search runs the same ILIKE with or without them.
+            // pg_trgm ships with Postgres and is a trusted extension, but a
+            // server without it, or a database user who may not install
+            // it, must still start. So any error here is a warning and the
+            // migration carries on without them. Never take this out of
+            // its block, and never declare the extension in the model:
+            // EF would then emit a CREATE EXTENSION that can fail.
+            migrationBuilder.Sql(@"
+DO $$
+BEGIN
+    CREATE EXTENSION IF NOT EXISTS pg_trgm;
+    CREATE INDEX IF NOT EXISTS ""IX_MediaItems_TitleTrigram"" ON ""MediaItems"" USING gin (""Title"" gin_trgm_ops);
+    CREATE INDEX IF NOT EXISTS ""IX_Actors_NameTrigram"" ON ""Actors"" USING gin (""Name"" gin_trgm_ops);
+    CREATE INDEX IF NOT EXISTS ""IX_Artists_NameTrigram"" ON ""Artists"" USING gin (""Name"" gin_trgm_ops);
+    CREATE INDEX IF NOT EXISTS ""IX_Albums_TitleTrigram"" ON ""Albums"" USING gin (""Title"" gin_trgm_ops);
+EXCEPTION WHEN OTHERS THEN
+    RAISE WARNING 'Vora skipped the search indexes, so search reads every title: %', SQLERRM;
+END
+$$;");
         }
 
         /// <inheritdoc />
         protected override void Down(MigrationBuilder migrationBuilder)
         {
+            // The extension stays: something else in the database may use it.
+            migrationBuilder.Sql(@"
+DROP INDEX IF EXISTS ""IX_Albums_TitleTrigram"";
+DROP INDEX IF EXISTS ""IX_Artists_NameTrigram"";
+DROP INDEX IF EXISTS ""IX_Actors_NameTrigram"";
+DROP INDEX IF EXISTS ""IX_MediaItems_TitleTrigram"";");
+
             migrationBuilder.Sql(@"
 DROP INDEX IF EXISTS ""IX_MediaItems_PresentByDateAdded"";
 DROP INDEX IF EXISTS ""IX_MediaItems_PresentByReleaseDate"";");
