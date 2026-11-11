@@ -242,11 +242,22 @@ CREATE INDEX IF NOT EXISTS ""IX_CollectionThemeVerdicts_MediaItemId"" ON ""Colle
             migrationBuilder.Sql(@"
 ALTER TABLE ""TrackPlayHistory"" ADD COLUMN IF NOT EXISTS ""Source"" integer NOT NULL DEFAULT 0;
 ALTER TABLE ""TrackPlayHistory"" ADD COLUMN IF NOT EXISTS ""SourceId"" uuid;");
+
+            // The home rows' sort indexes (docs/database.md). EF can't model
+            // an expression index, so each must stay the exact ORDER BY that
+            // SmartListRepository.ApplySortOrder produces.
+            migrationBuilder.Sql(@"
+CREATE INDEX IF NOT EXISTS ""IX_MediaItems_PresentByReleaseDate"" ON ""MediaItems"" ((""ReleaseDate"" IS NOT NULL), ""ReleaseDate"") WHERE ""MissingSince"" IS NULL;
+CREATE INDEX IF NOT EXISTS ""IX_MediaItems_PresentByDateAdded"" ON ""MediaItems"" ((COALESCE(""LastContentAddedAt"", ""AddedAt""))) WHERE ""MissingSince"" IS NULL;");
         }
 
         /// <inheritdoc />
         protected override void Down(MigrationBuilder migrationBuilder)
         {
+            migrationBuilder.Sql(@"
+DROP INDEX IF EXISTS ""IX_MediaItems_PresentByDateAdded"";
+DROP INDEX IF EXISTS ""IX_MediaItems_PresentByReleaseDate"";");
+
             migrationBuilder.DropColumn(
                 name: "Source",
                 table: "TrackPlayHistory");

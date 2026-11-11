@@ -171,6 +171,15 @@ public sealed class LegacyDatabase : IAsyncDisposable
     private const string ColumnsSinceThemeCollections = """
         ALTER TABLE "TrackPlayHistory" DROP COLUMN IF EXISTS "Source";
         ALTER TABLE "TrackPlayHistory" DROP COLUMN IF EXISTS "SourceId";
+        """ + IndexesSincePlaySource;
+
+    public const string PlaySourceMigration = "20261110034736_ChangesSinceInitial";
+
+    public static readonly string[] HomeRowIndexes = { "IX_MediaItems_PresentByReleaseDate", "IX_MediaItems_PresentByDateAdded" };
+
+    private const string IndexesSincePlaySource = """
+        DROP INDEX IF EXISTS "IX_MediaItems_PresentByReleaseDate";
+        DROP INDEX IF EXISTS "IX_MediaItems_PresentByDateAdded";
         """;
 
     private const string ColumnsSinceChannelVideoFormat = """
@@ -427,6 +436,15 @@ public sealed class LegacyDatabase : IAsyncDisposable
         await seed(db);
         await db.Database.ExecuteSqlRawAsync(ColumnsSinceThemeCollections, cancellationToken);
         await ReplaceCombinedMigrationAsync(db, ThemeCollectionsMigration, "10.0.9", cancellationToken);
+    }
+
+    public async Task BuildPlaySourceStateAsync(Func<VoraDbContext, Task> seed, CancellationToken cancellationToken)
+    {
+        await using var db = NewContext();
+        await db.Database.MigrateAsync(cancellationToken);
+        await seed(db);
+        await db.Database.ExecuteSqlRawAsync(IndexesSincePlaySource, cancellationToken);
+        await ReplaceCombinedMigrationAsync(db, PlaySourceMigration, "10.0.9", cancellationToken);
     }
 
     private static async Task ReplaceCombinedMigrationAsync(VoraDbContext db, string migrationId, string productVersion, CancellationToken cancellationToken)

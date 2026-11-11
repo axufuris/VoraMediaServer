@@ -690,6 +690,40 @@ public class PostgresMigrationHistoryTests(PostgresDatabase database) : IClassFi
         play.SourceId.Should().BeNull();
     }
 
+    [Fact]
+    public async Task A_database_on_the_play_source_migration_gains_the_home_row_sort_indexes_and_keeps_its_titles()
+    {
+        Assert.SkipUnless(PostgresDatabase.IsConfigured, PostgresDatabase.SkipReason);
+        var cancellationToken = TestContext.Current.CancellationToken;
+        await using var legacy = new LegacyDatabase();
+        var movieId = Guid.NewGuid();
+        await legacy.BuildPlaySourceStateAsync(async db =>
+        {
+            var library = new MediaLibrary { Name = "Movies", Type = LibraryType.Movie, FolderPaths = new List<string> { "/movies" } };
+            db.Add(library);
+            db.Add(new Movie { Id = movieId, Title = "Sicario", LibraryId = library.Id, ReleaseDate = new DateOnly(2015, 9, 18) });
+            await db.SaveChangesAsync(cancellationToken);
+        }, cancellationToken);
+
+        await using (var before = legacy.NewContext())
+        {
+            (await before.Database.GetPendingMigrationsAsync(cancellationToken)).Should().Equal(MigrationHistoryTests.ChangesSinceInitial);
+            (await IndexesAsync(before, "MediaItems", cancellationToken)).Should().NotContain(LegacyDatabase.HomeRowIndexes);
+        }
+
+        await legacy.MigrateAsync(cancellationToken);
+
+        await using var after = legacy.NewContext();
+        (await after.Database.GetPendingMigrationsAsync(cancellationToken)).Should().BeEmpty();
+        (await IndexesAsync(after, "MediaItems", cancellationToken)).Should().Contain(LegacyDatabase.HomeRowIndexes);
+        (await after.MediaItems.AsNoTracking().SingleAsync(m => m.Id == movieId, cancellationToken)).ReleaseDate.Should().Be(new DateOnly(2015, 9, 18));
+    }
+
+    private static Task<List<string>> IndexesAsync(VoraDbContext db, string table, CancellationToken cancellationToken) =>
+        db.Database
+            .SqlQueryRaw<string>("SELECT indexname AS \"Value\" FROM pg_indexes WHERE schemaname = current_schema() AND tablename = {0}", table)
+            .ToListAsync(cancellationToken);
+
     private static Task<List<string>> ColumnsAsync(VoraDbContext db, string table, CancellationToken cancellationToken) =>
         db.Database
             .SqlQueryRaw<string>("SELECT column_name AS \"Value\" FROM information_schema.columns WHERE table_schema = current_schema() AND table_name = {0}", table)

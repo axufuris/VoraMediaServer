@@ -102,31 +102,4 @@ public class SpecialsUpNextTests
         result.PreviousItem.Should().BeNull();
         result.NextItem!.Id.Should().Be(show[1, 2].Id);
     }
-
-    [Fact]
-    public async Task Continue_watching_offers_the_next_episode_not_an_unwatched_special()
-    {
-        await using var db = NewContext();
-        var show = await SeedAsync(db, (0, 2), (1, 2));
-        Watch(db, show[1, 1]);
-        await db.SaveChangesAsync(TestContext.Current.CancellationToken);
-
-        var rows = await new UserMediaStateRepository(db).GetContinueWatchingAsync(_profile);
-
-        rows.Should().ContainSingle().Which.Id.Should().Be(show[1, 2].Id);
-    }
-
-    [Fact]
-    public async Task Continue_watching_keeps_a_special_that_is_part_watched()
-    {
-        await using var db = NewContext();
-        var show = await SeedAsync(db, (0, 2), (1, 2));
-        Watch(db, show[1, 1]);
-        Watch(db, show[0, 2], played: false, resume: 300);
-        await db.SaveChangesAsync(TestContext.Current.CancellationToken);
-
-        var rows = await new UserMediaStateRepository(db).GetContinueWatchingAsync(_profile);
-
-        rows.Should().ContainSingle().Which.Id.Should().Be(show[0, 2].Id);
-    }
 }

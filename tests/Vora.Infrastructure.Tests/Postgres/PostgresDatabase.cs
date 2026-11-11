@@ -25,10 +25,13 @@ public sealed class PostgresDatabase : IAsyncLifetime
         await context.Database.MigrateAsync();
     }
 
-    public VoraDbContext NewContext() =>
+    public VoraDbContext NewContext() => NewContext(Array.Empty<IInterceptor>());
+
+    public VoraDbContext NewContext(params IInterceptor[] interceptors) =>
         new(new DbContextOptionsBuilder<VoraDbContext>()
             .UseNpgsql(_connectionString, npgsql => npgsql.UseVector())
             .ConfigureWarnings(w => w.Throw(RelationalEventId.MultipleCollectionIncludeWarning))
+            .AddInterceptors(interceptors)
             .Options);
 
     public async ValueTask DisposeAsync()
