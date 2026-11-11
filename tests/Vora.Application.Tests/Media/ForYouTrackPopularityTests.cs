@@ -33,7 +33,6 @@ public class ForYouTrackPopularityTests
         var manager = new MusicManager(
             _music,
             Substitute.For<IUserRepository>(),
-            Substitute.For<IUserMediaStateRepository>(),
             Array.Empty<IMusicArtworkProvider>(),
             Array.Empty<ILyricsProvider>(),
             Array.Empty<IListeningDataProvider>(),

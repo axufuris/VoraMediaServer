@@ -101,7 +101,6 @@ public class MusicManager : IMusicManager
 
     private readonly IMusicRepository _repository;
     private readonly IUserRepository _userRepository;
-    private readonly IUserMediaStateRepository _userMediaStateRepository;
     private readonly IEnumerable<IMusicArtworkProvider> _artworkProviders;
     private readonly IEnumerable<ILyricsProvider> _lyricsProviders;
     private readonly IEnumerable<IListeningDataProvider> _listeningProviders;
@@ -110,12 +109,11 @@ public class MusicManager : IMusicManager
     private readonly ILogger<MusicManager> _logger;
     private readonly string _artworkBasePath;
 
-    public MusicManager(IMusicRepository repository, IUserRepository userRepository, IUserMediaStateRepository userMediaStateRepository, IEnumerable<IMusicArtworkProvider> artworkProviders, IEnumerable<ILyricsProvider> lyricsProviders, IEnumerable<IListeningDataProvider> listeningProviders, IClientNotifier notifier, IOptions<StoragePathsOptions> storagePaths, Vora.Plugins.Interfaces.ITaskProgressReporter progress, ILogger<MusicManager> logger)
+    public MusicManager(IMusicRepository repository, IUserRepository userRepository, IEnumerable<IMusicArtworkProvider> artworkProviders, IEnumerable<ILyricsProvider> lyricsProviders, IEnumerable<IListeningDataProvider> listeningProviders, IClientNotifier notifier, IOptions<StoragePathsOptions> storagePaths, Vora.Plugins.Interfaces.ITaskProgressReporter progress, ILogger<MusicManager> logger)
     {
         _progress = progress;
         _repository = repository;
         _userRepository = userRepository;
-        _userMediaStateRepository = userMediaStateRepository;
         _artworkProviders = artworkProviders;
         _lyricsProviders = lyricsProviders;
         _listeningProviders = listeningProviders;
@@ -138,33 +136,23 @@ public class MusicManager : IMusicManager
 
     public async Task<ArtistDetailVM?> GetArtistDetailAsync(Guid artistId, Guid? profileId, MusicAccessFilter access)
     {
-        var artist = await _repository.GetArtistByIdAsync(artistId, access);
-        if (artist == null) return null;
+        var page = await _repository.GetArtistPageAsync(artistId, profileId, access);
+        if (page == null) return null;
 
-        var albums = await _repository.GetAlbumsForArtistAsync(artistId, access);
-        var artistVm = MapArtist(artist);
-        var albumVms = albums.Select(a => MapAlbum(a, artist.Name, artist.ArtworkUrl)).ToList();
-
-        if (profileId.HasValue)
-        {
-            var artistRatings = await _repository.GetArtistRatingsAsync(profileId.Value, new[] { artistId });
-            if (artistRatings.TryGetValue(artistId, out var ar)) artistVm.MyRating = ar;
-
-            if (albumVms.Count > 0)
-            {
-                var albumRatings = await _repository.GetAlbumRatingsAsync(profileId.Value, albumVms.Select(a => a.Id));
-                foreach (var av in albumVms)
-                {
-                    if (albumRatings.TryGetValue(av.Id, out var rating)) av.MyRating = rating;
-                }
-            }
-        }
+        var albums = await _repository.GetAlbumsForArtistAsync(artistId, profileId, access);
+        var artistVm = MapArtist(page.Artist);
+        artistVm.MyRating = page.MyRating;
 
         return new ArtistDetailVM
         {
             Artist = artistVm,
-            Albums = albumVms,
-            Tags = await _repository.GetArtistTagNamesAsync(artistId)
+            Albums = albums.Select(a =>
+            {
+                var vm = MapAlbum(a.Album, page.Artist.Name, page.Artist.ArtworkUrl);
+                vm.MyRating = a.MyRating;
+                return vm;
+            }).ToList(),
+            Tags = page.Tags
         };
     }
 
@@ -192,50 +180,37 @@ public class MusicManager : IMusicManager
 
     public async Task<AlbumDetailVM?> GetAlbumDetailAsync(Guid albumId, Guid? profileId, MusicAccessFilter access)
     {
-        var album = await _repository.GetAlbumByIdAsync(albumId, access);
-        if (album == null) return null;
+        var page = await _repository.GetAlbumPageAsync(albumId, profileId, access);
+        if (page == null) return null;
 
-        var tracks = await _repository.GetTracksForAlbumAsync(albumId, access);
-        var likedIds = profileId.HasValue
-            ? await _repository.GetLikedTrackIdsAsync(profileId.Value, tracks.Select(t => t.Id))
-            : new HashSet<Guid>();
-
-        var trackRatings = profileId.HasValue
-            ? await _userMediaStateRepository.GetMediaRatingsAsync(profileId.Value, tracks.Select(t => t.Id))
-            : new Dictionary<Guid, decimal>();
-
+        var album = page.Album;
+        var tracks = await _repository.GetTracksForAlbumAsync(albumId, profileId, access);
         var trackVms = tracks.Select(t =>
         {
-            var vm = MapTrack(t);
-            vm.IsLiked = likedIds.Contains(t.Id);
-            if (trackRatings.TryGetValue(t.Id, out var r)) vm.MyRating = r;
+            var vm = MapTrack(t.Track);
+            vm.IsLiked = t.IsLiked;
+            vm.MyRating = t.MyRating;
             return vm;
         }).ToList();
 
         var albumVm = MapAlbum(album, album.Artist?.Name ?? string.Empty, album.Artist?.ArtworkUrl);
-        if (profileId.HasValue)
-        {
-            var ratings = await _repository.GetAlbumRatingsAsync(profileId.Value, new[] { albumId });
-            if (ratings.TryGetValue(albumId, out var rating)) albumVm.MyRating = rating;
-        }
+        albumVm.MyRating = page.MyRating;
 
-        // Only when the album has nothing of its own, so the common path costs
-        // no extra query. Through the access filter, so a profile that cannot see
-        // the artist gets null rather than a leaked url.
-        string? artistBackgroundUrl = null;
-        if (string.IsNullOrWhiteSpace(album.BackgroundUrl) && album.ArtistId != Guid.Empty)
-        {
-            var artist = await _repository.GetArtistByIdAsync(album.ArtistId, access);
-            artistBackgroundUrl = artist?.BackgroundUrl;
-        }
+        // Only when the album has nothing of its own. The page loaded the
+        // artist's through the access filter, so a profile that cannot see the
+        // artist gets null rather than a leaked url.
+        var artistBackgroundUrl = string.IsNullOrWhiteSpace(album.BackgroundUrl) && album.ArtistId != Guid.Empty
+            ? page.ArtistBackgroundUrl
+            : null;
 
+        var songs = tracks.Select(t => t.Track).ToList();
         return new AlbumDetailVM
         {
             Album = albumVm,
             Tracks = trackVms,
             ArtistBackgroundUrl = artistBackgroundUrl,
-            Quality = AudioQuality.ForAlbum(tracks),
-            Moods = CommonMoods(tracks)
+            Quality = AudioQuality.ForAlbum(songs),
+            Moods = CommonMoods(songs)
         };
     }
 
@@ -272,20 +247,27 @@ public class MusicManager : IMusicManager
 
     public async Task<List<ArtistTrackVM>> GetTracksForArtistAsync(Guid artistId, Guid? profileId, MusicAccessFilter access)
     {
-        var tracks = await _repository.GetTracksForArtistAsync(artistId, access);
-        return await HydrateArtistTracksAsync(tracks, profileId);
+        var tracks = await _repository.GetTracksForArtistAsync(artistId, profileId, access);
+        return ArtistTracks(tracks);
     }
 
-    private async Task<List<ArtistTrackVM>> HydrateArtistTracksAsync(List<Domain.Entities.Media.Track> tracks, Guid? profileId)
-    {
-        var likedIds = profileId.HasValue
-            ? await _repository.GetLikedTrackIdsAsync(profileId.Value, tracks.Select(t => t.Id))
-            : new HashSet<Guid>();
-        var ratings = profileId.HasValue
-            ? await _userMediaStateRepository.GetMediaRatingsAsync(profileId.Value, tracks.Select(t => t.Id))
-            : new Dictionary<Guid, decimal>();
+    private static List<ArtistTrackVM> ArtistTracks(List<ViewerTrack> tracks) => tracks.Select(ArtistTrack).ToList();
 
-        return tracks.Select(t => new ArtistTrackVM
+    // For songs chosen by another query: the profile's marks in one more.
+    private async Task<List<ArtistTrackVM>> WithMarksAsync(List<Domain.Entities.Media.Track> tracks, Guid? profileId)
+    {
+        var marks = profileId.HasValue
+            ? await _repository.GetTrackMarksAsync(profileId.Value, tracks.Select(t => t.Id).ToList())
+            : new Dictionary<Guid, TrackMarks>();
+        return tracks
+            .Select(t => ArtistTrack(marks.TryGetValue(t.Id, out var m) ? new ViewerTrack(t, m.IsLiked, m.MyRating) : new ViewerTrack(t, false, null)))
+            .ToList();
+    }
+
+    private static ArtistTrackVM ArtistTrack(ViewerTrack viewed)
+    {
+        var t = viewed.Track;
+        return new ArtistTrackVM
         {
             Id = t.Id,
             Title = t.Title,
@@ -297,18 +279,18 @@ public class MusicManager : IMusicManager
             AlbumId = t.AlbumId,
             AlbumTitle = t.Album?.Title,
             AlbumArtworkUrl = AlbumCoverArt.For(t.Album),
-            IsLiked = likedIds.Contains(t.Id),
+            IsLiked = viewed.IsLiked,
             ServerAdminRating = t.ServerAdminRating,
             GlobalListeners = t.GlobalListeners,
             GlobalPlays = t.GlobalPlays,
-            MyRating = ratings.TryGetValue(t.Id, out var r) ? r : (decimal?)null
-        }).ToList();
+            MyRating = viewed.MyRating
+        };
     }
 
     public async Task<List<ArtistTrackVM>> GetTopTracksForArtistAsync(Guid artistId, Guid? profileId, MusicAccessFilter access, int limit)
     {
-        var tracks = await _repository.GetTopTracksForArtistAsync(artistId, access, limit);
-        return await HydrateArtistTracksAsync(tracks, profileId);
+        var tracks = await _repository.GetTopTracksForArtistAsync(artistId, profileId, access, limit);
+        return ArtistTracks(tracks);
     }
 
     public Task<string?> GetTrackFilePathAsync(Guid trackId, MusicAccessFilter access) =>
@@ -992,7 +974,7 @@ public class MusicManager : IMusicManager
             Mood = key,
             Name = SongMoods.DisplayName(key),
             TotalCount = total,
-            Tracks = await HydrateArtistTracksAsync(tracks, profileId)
+            Tracks = await WithMarksAsync(tracks, profileId)
         };
     }
 
@@ -1002,7 +984,7 @@ public class MusicManager : IMusicManager
         if (key == null) return null;
 
         var tracks = await _repository.GetRandomTracksForMoodAsync(key, access, Math.Clamp(count, 1, MaxMoodTracks));
-        return await HydrateArtistTracksAsync(tracks, profileId);
+        return await WithMarksAsync(tracks, profileId);
     }
 
     public async Task<GenreContentVM?> GetGenreContentAsync(string genre, MusicAccessFilter access)

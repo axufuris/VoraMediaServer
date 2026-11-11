@@ -1,3 +1,4 @@
+using Vora.Application.Media;
 using Vora.Domain.Entities.Library;
 using Vora.Domain.Entities.Media;
 using Vora.Domain.Enums;
@@ -24,7 +25,7 @@ public class PostgresArtistTagTests(PostgresDatabase database) : IClassFixture<P
         await repository.StageArtistTagsAsync(artist.Id, new[] { "pop punk", "rock", "alternative" });
         await repository.SaveMusicChangesAsync(TestContext.Current.CancellationToken);
 
-        (await new MusicRepository(database.NewContext()).GetArtistTagNamesAsync(artist.Id))
-            .Should().Equal("pop punk", "rock", "alternative");
+        (await new MusicRepository(database.NewContext()).GetArtistPageAsync(artist.Id, null, MusicAccessFilter.Unrestricted))!
+            .Tags.Should().Equal("pop punk", "rock", "alternative");
     }
 }

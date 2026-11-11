@@ -30,7 +30,6 @@ public class RecordTrackPlayGateTests
         _manager = new MusicManager(
             _repository,
             Substitute.For<IUserRepository>(),
-            Substitute.For<IUserMediaStateRepository>(),
             Array.Empty<IMusicArtworkProvider>(),
             Array.Empty<ILyricsProvider>(),
             Array.Empty<IListeningDataProvider>(),
