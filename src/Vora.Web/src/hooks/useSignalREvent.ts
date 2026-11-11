@@ -42,6 +42,7 @@ export const VORA_EVENTS = {
     MusicArtistUpdated: 'MusicArtistUpdated',
     MusicAlbumUpdated: 'MusicAlbumUpdated',
     MusicMixesUpdated: 'MusicMixesUpdated',
+    MusicHistoryUpdated: 'MusicHistoryUpdated',
     ServerPlaybackUpdated: 'ServerPlaybackUpdated',
     AdminAlert: 'AdminAlert',
     AdminAlertUnreadChanged: 'AdminAlertUnreadChanged',
