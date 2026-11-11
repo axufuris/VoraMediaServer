@@ -15,6 +15,30 @@ No splitting behaviour is set globally. A query that loads two or more collectio
 - Combine `Take`/`Skip` with a split query only after an `OrderBy` on a unique key. Each split query reruns the filter, and without a stable order each one can pick different rows.
 - `PostgresDatabase.NewContext()` turns the warning into an exception, so a database test that runs an unsplit query fails. `PostgresQuerySplittingTests` covers the queries that needed it: the user lists, playlist summaries, titles waiting for an embedding, and the duplicate-show merge.
 
+## The detail page in two queries
+
+A split query runs once per collection, so a projection with many lists costs many queries. `GET /api/media/{id}` (`MediaRepository.GetMediaDetailsAsync`) is two:
+
+1. `MediaDetailsVM.Fields`: the item's own fields, and what it shows of its season's and show's, through `ApplyAccessFilters`. A title the viewer may not see stops here.
+2. `MediaDetailsQuery`: one statement that returns every list as one JSON document. It returns:
+   - the genres, studios, directors and cast, each from the first of the item, its season and its show that has any (`docs/frontend-client-ui.md`, Inherited facts)
+   - the videos, extras, markers, and files with their tracks
+   - a show's seasons, or a season's episodes
+   - the profile's watch state and ratings
+   - the show's episodes on disk, which come off its Upcoming list
+
+   It is keyed by what the first query found, so it reads only what the item's type shows.
+
+As a single projection holding every list, the page cost 26 split queries whatever the item was:
+- a list for each fallback: an episode's own genres, its season's and its show's
+- a show's seasons and a season's episodes even on a movie's page
+- each of those joining the item, its season, its show and its library again
+
+Then came 2 to 6 more for the watch state. On a copy of QA that took 35–56 ms; the two queries take 6–10 ms.
+
+- `PostgresMediaDetailsTests` loads every page of eight random libraries both ways and checks they match. `MediaDetailsOracle` is the old projection and watch-state code, kept verbatim. The tests also pin the page at two queries.
+- Audio and subtitle tracks come in the file's stream order, with embedded subtitles before sidecars. The old projection gave them no order, and on QA most files' audio tracks came back shuffled.
+
 ## Migrations
 
 - Migrations live in `/src/Vora.Infrastructure/Migrations`.

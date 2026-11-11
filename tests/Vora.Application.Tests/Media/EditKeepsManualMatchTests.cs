@@ -20,7 +20,6 @@ public class EditKeepsManualMatchTests
 
     private MediaManager Manager() => new(
         _repository,
-        Substitute.For<IUserMediaStateRepository>(),
         Substitute.For<IClientNotifier>(),
         Substitute.For<ITaskQueueManager>(),
         Substitute.For<ISystemSettingsRepository>(),

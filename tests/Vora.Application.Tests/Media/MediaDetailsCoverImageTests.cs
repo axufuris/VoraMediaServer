@@ -1,4 +1,3 @@
-using System.Linq.Expressions;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 using Vora.Application.Analysis;
@@ -8,7 +7,6 @@ using Vora.Application.Settings;
 using Vora.Application.Subtitles;
 using Vora.Application.Tasks;
 using Vora.Application.Thumbnails;
-using Vora.Domain.Entities.Media;
 using Vora.Plugins.Interfaces;
 
 namespace Vora.Application.Tests.Media;
@@ -19,7 +17,6 @@ public class MediaDetailsCoverImageTests
 
     private MediaManager Manager() => new(
         _repository,
-        Substitute.For<IUserMediaStateRepository>(),
         Substitute.For<IClientNotifier>(),
         Substitute.For<ITaskQueueManager>(),
         Substitute.For<ISystemSettingsRepository>(),
@@ -38,9 +35,8 @@ public class MediaDetailsCoverImageTests
     };
 
     private void Stored(MediaDetailsVM details) =>
-        _repository.GetProjectedAsync(details.Id, Arg.Any<Expression<Func<MediaItem, MediaDetailsVM>>>(),
-                Arg.Any<bool>(), Arg.Any<List<Guid>?>(), Arg.Any<List<string>?>(), Arg.Any<List<string>?>(), Arg.Any<bool>())
-            .Returns(details);
+        _repository.GetMediaDetailsAsync(details.Id, Arg.Any<Guid?>(), Arg.Any<bool>(), Arg.Any<List<Guid>?>(), Arg.Any<List<string>?>(), Arg.Any<List<string>?>(), Arg.Any<bool>())
+            .Returns(new MediaDetailsLoad(details, []));
 
     [Fact]
     public async Task A_cover_image_is_not_offered_as_a_video_track()

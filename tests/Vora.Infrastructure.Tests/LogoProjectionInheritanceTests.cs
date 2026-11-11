@@ -54,7 +54,7 @@ public class LogoProjectionInheritanceTests
         db.MediaItems.AsNoTracking().Where(m => m.Id == id).Select(LibraryItemVM.Projection).FirstOrDefaultAsync();
 
     private static Task<MediaDetailsVM?> DetailsAsync(VoraDbContext db, Guid id) =>
-        db.MediaItems.AsNoTracking().Where(m => m.Id == id).Select(MediaDetailsVM.Projection).FirstOrDefaultAsync();
+        db.MediaItems.AsNoTracking().Where(m => m.Id == id).Select(MediaDetailsVM.Fields).FirstOrDefaultAsync();
 
     [Fact]
     public async Task A_movie_carries_its_own_logo()

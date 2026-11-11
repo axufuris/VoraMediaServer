@@ -13,6 +13,11 @@ public interface IMediaRepository
     Task<MediaMatchInfoDto?> GetMediaMatchInfoAsync(Guid mediaItemId);
     Task<List<Guid>> GetEpisodeIdsForSeasonAsync(Guid seasonId);
     Task<List<HeldEpisode>> GetHeldEpisodesForShowAsync(Guid tvShowId);
+
+    // The detail page in two queries: the item through the access filter, then
+    // its lists and, given a profile, its watch state and ratings. Null when the
+    // item is missing or the viewer may not see it.
+    Task<MediaDetailsLoad?> GetMediaDetailsAsync(Guid id, Guid? profileId, bool hasAllAccess = true, List<Guid>? allowedLibs = null, List<string>? allowedMovieRatings = null, List<string>? allowedTvRatings = null, bool blockUnrated = false);
     Task<List<Guid>> GetEpisodeIdsForShowAsync(Guid tvShowId);
     Task<List<string>> GetEpisodeFilePathsForShowAsync(Guid tvShowId);
     Task<Guid?> GetMovieIdByTitleAndYearAsync(string title, int? year, Guid libraryId, string? tmdbId = null, string? imdbId = null);
