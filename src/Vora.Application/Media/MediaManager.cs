@@ -38,7 +38,6 @@ public class MediaManager : IMediaManager
     private const string CustomArtworkUrlPrefix = "/api/artwork/custom/";
 
     private readonly IMediaRepository _repository;
-    private readonly IUserMediaStateRepository _stateRepository;
     private readonly IClientNotifier _notifier;
     private readonly ITaskQueueManager _taskQueueManager;
     private readonly ISystemSettingsRepository _settingsRepository;
@@ -52,7 +51,6 @@ public class MediaManager : IMediaManager
 
     public MediaManager(
         IMediaRepository repository,
-        IUserMediaStateRepository stateRepository,
         IClientNotifier notifier,
         ITaskQueueManager taskQueueManager,
         ISystemSettingsRepository settingsRepository,
@@ -64,7 +62,6 @@ public class MediaManager : IMediaManager
         ILogger<MediaManager> logger)
     {
         _repository = repository;
-        _stateRepository = stateRepository;
         _notifier = notifier;
         _taskQueueManager = taskQueueManager;
         _settingsRepository = settingsRepository;
@@ -76,15 +73,8 @@ public class MediaManager : IMediaManager
         _logger = logger;
     }
 
-    public async Task<MediaDetailsVM?> GetMediaItemAsync(Guid id, Guid? profileId, bool hasAllAccess, List<Guid> allowedLibs, List<string> allowedMovieRatings, List<string> allowedTvRatings, bool blockUnrated)
-    {
-        var vm = await WithoutHeldUpcomingAsync(ReadyForDisplay(await _repository.GetProjectedAsync(id, MediaDetailsVM.Projection, hasAllAccess, allowedLibs, allowedMovieRatings, allowedTvRatings, blockUnrated)));
-
-        if (vm == null || !profileId.HasValue) return vm;
-
-        await _stateRepository.AttachUserMediaStateAsync(vm, profileId.Value);
-        return vm;
-    }
+    public async Task<MediaDetailsVM?> GetMediaItemAsync(Guid id, Guid? profileId, bool hasAllAccess, List<Guid> allowedLibs, List<string> allowedMovieRatings, List<string> allowedTvRatings, bool blockUnrated) =>
+        Shown(await _repository.GetMediaDetailsAsync(id, profileId, hasAllAccess, allowedLibs, allowedMovieRatings, allowedTvRatings, blockUnrated));
 
     public async Task<IEnumerable<LibraryItemVM>> GetLibraryContentAsync(Guid libraryId, Guid? profileId, bool hasAllAccess, List<Guid> allowedLibs, List<string> allowedMovieRatings, List<string> allowedTvRatings, bool blockUnrated)
     {
@@ -93,14 +83,14 @@ public class MediaManager : IMediaManager
     }
 
     public async Task<MediaDetailsVM?> GetMediaItemAsync(Guid id) =>
-        await WithoutHeldUpcomingAsync(ReadyForDisplay(await _repository.GetProjectedAsync(id, MediaDetailsVM.Projection)));
+        Shown(await _repository.GetMediaDetailsAsync(id, profileId: null));
 
-    private async Task<MediaDetailsVM?> WithoutHeldUpcomingAsync(MediaDetailsVM? details)
+    private static MediaDetailsVM? Shown(MediaDetailsLoad? loaded)
     {
-        var showId = details?.Type == "TvShow" ? details.Id : details?.TvShowId;
-        if (details == null || showId is not Guid tvShowId) return details;
+        var details = ReadyForDisplay(loaded?.Details);
+        if (details == null) return null;
 
-        details.UpcomingEpisodesJson = await WithoutHeldUpcomingAsync(details.UpcomingEpisodesJson, tvShowId);
+        details.UpcomingEpisodesJson = UpcomingEpisodes.WithoutHeld(details.UpcomingEpisodesJson, loaded!.HeldEpisodes);
         return details;
     }
 

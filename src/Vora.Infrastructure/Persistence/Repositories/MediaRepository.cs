@@ -881,6 +881,18 @@ public partial class MediaRepository : IMediaRepository
         return await query.Select(projection).FirstOrDefaultAsync();
     }
 
+    public async Task<MediaDetailsLoad?> GetMediaDetailsAsync(Guid id, Guid? profileId, bool hasAllAccess = true, List<Guid>? allowedLibs = null, List<string>? allowedMovieRatings = null, List<string>? allowedTvRatings = null, bool blockUnrated = false)
+    {
+        var details = await GetProjectedAsync(id, MediaDetailsVM.Fields, hasAllAccess, allowedLibs, allowedMovieRatings, allowedTvRatings, blockUnrated);
+        if (details == null) return null;
+
+        var json = await _context.Database
+            .SqlQueryRaw<string>(MediaDetailsQuery.Sql, MediaDetailsQuery.Parameters(details, profileId))
+            .ToListAsync();
+        var held = MediaDetailsQuery.Fill(details, json.Single(), profileId.HasValue);
+        return new MediaDetailsLoad(details, held);
+    }
+
     internal static IQueryable<MediaItem> TitlesInLibrary(IQueryable<MediaItem> items, Guid libraryId) =>
         items.Where(m => m.LibraryId == libraryId).Where(MediaCapabilities.IsListedInItsLibrary);
 

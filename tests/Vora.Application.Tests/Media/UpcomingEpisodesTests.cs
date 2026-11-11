@@ -88,7 +88,6 @@ public class UpcomingEpisodesTests
 
     private MediaManager Manager() => new(
         _repository,
-        Substitute.For<IUserMediaStateRepository>(),
         Substitute.For<IClientNotifier>(),
         Substitute.For<ITaskQueueManager>(),
         Substitute.For<ISystemSettingsRepository>(),
@@ -103,14 +102,12 @@ public class UpcomingEpisodesTests
     public async Task A_show_page_leaves_out_the_upcoming_episodes_the_library_holds()
     {
         var show = new MediaDetailsVM { Id = Guid.NewGuid(), Title = "The Terminal List", Type = "TvShow", UpcomingEpisodesJson = Upcoming((2, 1, "ROMULUS S.V.", "2026-10-21")) };
-        _repository.GetProjectedAsync(show.Id, Arg.Any<Expression<Func<MediaItem, MediaDetailsVM>>>(),
-                Arg.Any<bool>(), Arg.Any<List<Guid>?>(), Arg.Any<List<string>?>(), Arg.Any<List<string>?>(), Arg.Any<bool>())
-            .Returns(show);
-        _repository.GetHeldEpisodesForShowAsync(show.Id).Returns([new HeldEpisode(2, 1, null)]);
+        _repository.GetMediaDetailsAsync(show.Id, null, Arg.Any<bool>(), Arg.Any<List<Guid>?>(), Arg.Any<List<string>?>(), Arg.Any<List<string>?>(), Arg.Any<bool>())
+            .Returns(new MediaDetailsLoad(show, [new HeldEpisode(2, 1, null)]));
 
         var shown = await Manager().GetMediaItemAsync(show.Id);
 
-        shown?.UpcomingEpisodesJson.Should().Be("[]");
+        shown!.UpcomingEpisodesJson.Should().Be("[]");
     }
 
     [Fact]
