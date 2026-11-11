@@ -1,6 +1,6 @@
 # For You
 
-The For You rows on Home and on each library's For You tab. `GET /api/recommendations/global` and `GET /api/libraries/{id}/recommendations` both call `RecommendationManager`, the second narrowed to one library. The clients ask once per provider (`?providerId=`), put the AI provider's rows first, and sort each provider's rows by `weight` **ascending**. So a row's weight is its place on the page, starting at 1, and `RecommendationManager` returns them in that order too. A provider that throws is logged as a warning and the other providers' rows still come.
+The For You rows on Home and on each library's For You tab. `GET /api/recommendations/global` and `GET /api/libraries/{id}/recommendations` both call `RecommendationManager`, the second narrowed to one library. The clients ask once per provider (`?providerId=`), put the AI provider's rows first, and sort each provider's rows by `weight` **ascending**. So a row's weight is its place on the page, starting at 1, and `RecommendationManager` returns them in that order too. A provider that throws is logged as a warning and the other providers' rows still come. The tiles of every row of library titles are loaded in one query (`GetHydratedMediaItemsAsync` with all their ids); a row at a time made For You fifteen tile queries. A row named by TMDB ids (the AI provider's) is matched on its own, since a tile doesn't carry the id it matched by.
 
 ## What has been seen
 

@@ -58,12 +58,12 @@ public class MusicMoodTests
     [Fact]
     public async Task Moods_come_in_list_order_and_only_with_enough_songs()
     {
-        _repository.GetMoodTrackCountsAsync(Arg.Any<MusicAccessFilter>()).Returns(new Dictionary<string, int>
+        _repository.GetMoodSamplesAsync(Arg.Any<MusicAccessFilter>(), MusicManager.MoodArtworkCandidates).Returns(new Dictionary<string, MoodSample>
         {
-            ["sad"] = 40,
-            ["happy"] = 12,
-            ["epic"] = SongMoods.MinTracksToBrowse - 1,
-            ["warm"] = 300
+            ["sad"] = new(40, new List<string?>()),
+            ["happy"] = new(12, new List<string?>()),
+            ["epic"] = new(SongMoods.MinTracksToBrowse - 1, new List<string?>()),
+            ["warm"] = new(300, new List<string?>())
         });
 
         var moods = await _manager.GetMoodsAsync(MusicAccessFilter.Unrestricted);
@@ -76,11 +76,11 @@ public class MusicMoodTests
     [Fact]
     public async Task Each_mood_tile_gets_a_cover_the_others_have_not_used()
     {
-        _repository.GetMoodTrackCountsAsync(Arg.Any<MusicAccessFilter>()).Returns(new Dictionary<string, int> { ["happy"] = 10, ["upbeat"] = 10 });
-        _repository.GetTracksForMoodAsync("happy", Arg.Any<MusicAccessFilter>(), 0, MusicManager.MoodArtworkCandidates)
-            .Returns(new List<Track> { Song("Hit", "/hit.jpg") });
-        _repository.GetTracksForMoodAsync("upbeat", Arg.Any<MusicAccessFilter>(), 0, MusicManager.MoodArtworkCandidates)
-            .Returns(new List<Track> { Song("Hit", "/hit.jpg"), Song("No cover", null), Song("Other", "/other.jpg") });
+        _repository.GetMoodSamplesAsync(Arg.Any<MusicAccessFilter>(), MusicManager.MoodArtworkCandidates).Returns(new Dictionary<string, MoodSample>
+        {
+            ["happy"] = new(10, new List<string?> { "/hit.jpg" }),
+            ["upbeat"] = new(10, new List<string?> { "/hit.jpg", null, "/other.jpg" })
+        });
 
         var moods = await _manager.GetMoodsAsync(MusicAccessFilter.Unrestricted);
 

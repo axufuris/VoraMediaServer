@@ -1058,17 +1058,48 @@ public class MusicRepository : IMusicRepository
         }).ToList();
     }
 
-    public async Task<Dictionary<string, int>> GetMoodTrackCountsAsync(MusicAccessFilter access)
+    public async Task<Dictionary<string, MoodSample>> GetMoodSamplesAsync(MusicAccessFilter access, int coversPerMood)
     {
         IQueryable<Track> query = _context.Tracks.AsNoTracking().Where(t => t.Moods != null);
         query = ApplyLibraryFilter(query, access);
         query = query.ApplyMusicRatings(access);
 
-        var moods = await query.Select(t => t.Moods).ToListAsync();
-        return moods
-            .SelectMany(m => m ?? new List<string>())
-            .GroupBy(m => m, StringComparer.Ordinal)
-            .ToDictionary(g => g.Key, g => g.Count(), StringComparer.Ordinal);
+        // Every mood-tagged track the viewer may hear, most played first (the
+        // order a mood's page lists them), with just its moods and album. The
+        // counts and each mood's first albums come from this one read; asking
+        // per mood loaded ten whole tracks for each of 22 moods.
+        var tracks = await query
+            .OrderByDescending(t => t.GlobalListeners.HasValue)
+            .ThenByDescending(t => t.GlobalListeners)
+            .ThenBy(t => t.Title)
+            .ThenBy(t => t.Id)
+            .Select(t => new { t.Moods, t.AlbumId })
+            .ToListAsync();
+
+        var counts = new Dictionary<string, int>(StringComparer.Ordinal);
+        var firstAlbums = new Dictionary<string, List<Guid?>>(StringComparer.Ordinal);
+        foreach (var track in tracks)
+        {
+            foreach (var mood in (track.Moods ?? new List<string>()).Distinct(StringComparer.Ordinal))
+            {
+                counts[mood] = counts.GetValueOrDefault(mood) + 1;
+                if (!firstAlbums.TryGetValue(mood, out var albums)) firstAlbums[mood] = albums = new List<Guid?>();
+                if (albums.Count < coversPerMood) albums.Add(track.AlbumId);
+            }
+        }
+
+        var albumIds = firstAlbums.Values.SelectMany(a => a).OfType<Guid>().Distinct().ToList();
+        var covers = albumIds.Count == 0
+            ? new Dictionary<Guid, string?>()
+            : await _context.Albums.AsNoTracking()
+                .Where(a => albumIds.Contains(a.Id))
+                .Select(a => new { a.Id, a.ArtworkUrl, ArtistArtworkUrl = a.Artist.ArtworkUrl })
+                .ToDictionaryAsync(a => a.Id, a => AlbumCoverArt.Resolve(a.ArtworkUrl, a.ArtistArtworkUrl));
+
+        return counts.ToDictionary(
+            c => c.Key,
+            c => new MoodSample(c.Value, firstAlbums[c.Key].Select(id => id is Guid albumId ? covers.GetValueOrDefault(albumId) : null).ToList()),
+            StringComparer.Ordinal);
     }
 
     public Task<int> CountTracksForMoodAsync(string mood, MusicAccessFilter access) =>

@@ -961,19 +961,19 @@ public class MusicManager : IMusicManager
 
     public async Task<List<MoodSummaryVM>> GetMoodsAsync(MusicAccessFilter access)
     {
-        var counts = await _repository.GetMoodTrackCountsAsync(access);
+        var samples = await _repository.GetMoodSamplesAsync(access, MoodArtworkCandidates);
         var usedArtwork = new HashSet<string>(StringComparer.Ordinal);
         var moods = new List<MoodSummaryVM>();
         foreach (var mood in SongMoods.All)
         {
-            if (!counts.TryGetValue(mood, out var count) || count < SongMoods.MinTracksToBrowse) continue;
+            if (!samples.TryGetValue(mood, out var sample) || sample.TrackCount < SongMoods.MinTracksToBrowse) continue;
 
-            var popular = await _repository.GetTracksForMoodAsync(mood, access, 0, MoodArtworkCandidates);
-            var covers = popular.Select(t => AlbumCoverArt.For(t.Album)).OfType<string>().ToList();
+            // A cover no earlier mood took, from its most played tracks.
+            var covers = sample.Covers.OfType<string>().ToList();
             var artwork = covers.FirstOrDefault(c => !usedArtwork.Contains(c)) ?? covers.FirstOrDefault();
             if (artwork != null) usedArtwork.Add(artwork);
 
-            moods.Add(new MoodSummaryVM { Mood = mood, Name = SongMoods.DisplayName(mood), TrackCount = count, SampleArtworkUrl = artwork });
+            moods.Add(new MoodSummaryVM { Mood = mood, Name = SongMoods.DisplayName(mood), TrackCount = sample.TrackCount, SampleArtworkUrl = artwork });
         }
         return moods;
     }
