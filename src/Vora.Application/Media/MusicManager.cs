@@ -765,10 +765,26 @@ public class MusicManager : IMusicManager
 
         await _repository.RecordPlayAsync(profileId, trackId, durationListenedSeconds, completed, source, sourceId);
 
-        // The play is stored either way. Scrobbling is a side effect that must
-        // not change what the caller is told about its own request.
+        // The play is stored either way. Telling the profile's devices and
+        // scrobbling are side effects that must not change what the caller is
+        // told about its own request.
+        await NotifyHistoryUpdatedAsync(profileId);
         await ScrobbleAsync(profileId, trackId);
         return RecordPlayOutcome.Recorded;
+    }
+
+    // Every device on the profile reloads its Recently Played row, so a
+    // playlist being played shows up without leaving the page.
+    private async Task NotifyHistoryUpdatedAsync(Guid profileId)
+    {
+        try
+        {
+            await _notifier.NotifyMusicHistoryUpdatedAsync(profileId);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Could not tell profile {Profile}'s devices about a new play", profileId);
+        }
     }
 
     private async Task ScrobbleAsync(Guid profileId, Guid trackId)

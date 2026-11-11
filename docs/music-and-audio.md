@@ -106,6 +106,8 @@ Returns `200 { recorded, outcome }`, where `outcome` is `Recorded`, `BelowThresh
 
 A tile whose source has gone is left out and older history fills the row: a weekly AI playlist replaced by the next week's, a playlist deleted or no longer shared, a song the profile may no longer play. The clients put the row first on For You, right after the shortcut tiles and above Made for you by AI, and hide it when it is empty. `GET /history/recent` (songs only) is unchanged for older clients.
 
+Each play `RecordTrackPlayAsync` stores sends **`MusicHistoryUpdated`** (SignalR, the profile's group, payload the profile id). The clients reload only this row when it arrives, so a playlist being played shows up on For You without leaving the page, on the device playing it and any other on the profile. A play is posted when the song ends or is skipped, so the row moves with the first song saved, not when playback starts. A failed send is logged and the play is still `Recorded`. The web's `useRecentlyPlayed` hook holds the row and its reload.
+
 ### What counts as a play
 
 `PlayQualification` in `Vora.Domain` is authoritative and `MusicManager.RecordTrackPlayAsync` enforces it — a post below the bar is **discarded, not stored** (logged at Debug, and reported as `BelowThreshold`). A client that posts at its own threshold loses those plays; check `recorded` while building one.

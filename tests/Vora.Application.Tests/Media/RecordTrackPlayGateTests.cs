@@ -19,6 +19,7 @@ namespace Vora.Application.Tests.Media;
 public class RecordTrackPlayGateTests
 {
     private readonly IMusicRepository _repository = Substitute.For<IMusicRepository>();
+    private readonly IClientNotifier _notifier = Substitute.For<IClientNotifier>();
     private readonly MusicManager _manager;
 
     private readonly Guid _profileId = Guid.NewGuid();
@@ -33,7 +34,7 @@ public class RecordTrackPlayGateTests
             Array.Empty<IMusicArtworkProvider>(),
             Array.Empty<ILyricsProvider>(),
             Array.Empty<IListeningDataProvider>(),
-            Substitute.For<IClientNotifier>(),
+            _notifier,
             Options.Create(new StoragePathsOptions()),
             new NullTaskProgressReporter(),
             NullLogger<MusicManager>.Instance);
@@ -148,5 +149,41 @@ public class RecordTrackPlayGateTests
         await _manager.RecordTrackPlayAsync(_profileId, _trackId, 200, true, MusicPlaySource.Mix, mixId);
 
         await _repository.Received(1).RecordPlayAsync(_profileId, _trackId, 200, true, MusicPlaySource.Mix, mixId);
+    }
+
+    // The profile's devices reload Recently Played when told, so a playlist
+    // being played shows up on the page without leaving it.
+    [Fact]
+    public async Task A_recorded_play_tells_the_profiles_devices()
+    {
+        GivenTrackOfLength(120);
+
+        await Play(60);
+
+        await _notifier.Received(1).NotifyMusicHistoryUpdatedAsync(_profileId);
+    }
+
+    [Fact]
+    public async Task A_play_that_is_not_recorded_tells_no_one()
+    {
+        GivenTrackOfLength(120);
+        await Play(30);
+
+        _repository.GetTrackByIdAsync(_trackId, Arg.Any<MusicAccessFilter>()).Returns((Track?)null);
+        await Play(120, completed: true);
+
+        await _notifier.DidNotReceive().NotifyMusicHistoryUpdatedAsync(Arg.Any<Guid>());
+    }
+
+    // The play is stored; a hub that fails must not turn that into an error.
+    [Fact]
+    public async Task A_play_is_still_recorded_when_the_devices_cannot_be_told()
+    {
+        GivenTrackOfLength(120);
+        _notifier.NotifyMusicHistoryUpdatedAsync(_profileId).Returns(Task.FromException(new InvalidOperationException("hub down")));
+
+        var outcome = await Play(60);
+
+        outcome.Should().Be(RecordPlayOutcome.Recorded);
     }
 }
