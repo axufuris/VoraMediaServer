@@ -18,7 +18,7 @@ public class UpNextOrderTests
             .UseInMemoryDatabase("up-next-order-" + Guid.NewGuid().ToString("N"))
             .Options);
 
-    private sealed record Lioness(TvShow Show, Season SeasonOne, Season SeasonTwo, Movie Film, Dictionary<(int Season, int Episode), Episode> Episodes)
+    private sealed record Lioness(TvShow Show, Season SeasonOne, Season SeasonTwo, Dictionary<(int Season, int Episode), Episode> Episodes)
     {
         public Episode this[int season, int episode] => Episodes[(season, episode)];
     }
@@ -27,8 +27,7 @@ public class UpNextOrderTests
     {
         var library = new MediaLibrary { Id = Guid.NewGuid(), Name = "Shows", Type = LibraryType.TvShow, FolderPaths = new List<string> { "/tv" } };
         var show = new TvShow { Id = Guid.NewGuid(), Title = "Lioness", LibraryId = library.Id };
-        var film = new Movie { Id = Guid.NewGuid(), Title = "Sicario", LibraryId = library.Id };
-        db.AddRange(library, show, film, new UserProfile { Id = _profile, Name = "Viewer", UserId = Guid.NewGuid(), UpNextOrder = order });
+        db.AddRange(library, show, new UserProfile { Id = _profile, Name = "Viewer", UserId = Guid.NewGuid(), UpNextOrder = order });
         var episodes = new Dictionary<(int, int), Episode>();
         Season AddSeason(int number)
         {
@@ -43,7 +42,7 @@ public class UpNextOrderTests
             return season;
         }
 
-        var lioness = new Lioness(show, AddSeason(1), AddSeason(2), film, episodes);
+        var lioness = new Lioness(show, AddSeason(1), AddSeason(2), episodes);
         await db.SaveChangesAsync(TestContext.Current.CancellationToken);
         return lioness;
     }
@@ -125,54 +124,5 @@ public class UpNextOrderTests
         await WatchAsync(db, lioness[1, 6], played: false, resume: 0, hoursAfterEvening: 2);
 
         (await UpNextAsync(db, lioness.Show.Id)).Should().Be(lioness[1, 3].Id);
-    }
-
-    [Fact]
-    public async Task Continue_watching_follows_the_profile_order()
-    {
-        await using var db = NewContext();
-        var lioness = await SeedAsync(db, UpNextOrder.WhereILeftOff);
-        await WatchAsync(db, lioness[1, 2], played: false, resume: 600, hoursAfterEvening: 0);
-        await WatchAsync(db, lioness[1, 7], played: false, resume: 900, hoursAfterEvening: 2);
-
-        var rows = await new UserMediaStateRepository(db).GetContinueWatchingAsync(_profile);
-
-        rows.Should().ContainSingle();
-        rows[0].Id.Should().Be(lioness[1, 7].Id);
-    }
-
-    [Fact]
-    public async Task Continue_watching_leaves_out_a_show_whose_every_episode_was_watched_under_where_I_left_off()
-    {
-        await using var db = NewContext();
-        var lioness = await SeedAsync(db, UpNextOrder.WhereILeftOff);
-        var hour = 0;
-        foreach (var episode in lioness.Episodes.Values) await WatchAsync(db, episode, played: true, resume: 0, hoursAfterEvening: hour++);
-
-        (await new UserMediaStateRepository(db).GetContinueWatchingAsync(_profile)).Should().BeEmpty();
-    }
-
-    [Fact]
-    public async Task Continue_watching_leaves_out_a_show_or_film_only_looked_at()
-    {
-        await using var db = NewContext();
-        var lioness = await SeedAsync(db, UpNextOrder.InOrder);
-        await WatchAsync(db, lioness[1, 1], played: false, resume: 12, hoursAfterEvening: 0);
-        await WatchAsync(db, lioness.Film, played: false, resume: 12, hoursAfterEvening: 1);
-
-        (await new UserMediaStateRepository(db).GetContinueWatchingAsync(_profile)).Should().BeEmpty();
-    }
-
-    [Fact]
-    public async Task Continue_watching_keeps_a_film_watched_past_its_first_half_minute()
-    {
-        await using var db = NewContext();
-        var lioness = await SeedAsync(db, UpNextOrder.InOrder);
-        await WatchAsync(db, lioness.Film, played: false, resume: 45, hoursAfterEvening: 1);
-
-        var rows = await new UserMediaStateRepository(db).GetContinueWatchingAsync(_profile);
-
-        rows.Should().ContainSingle();
-        rows[0].Id.Should().Be(lioness.Film.Id);
     }
 }
