@@ -14,7 +14,7 @@ using Vora.Infrastructure.Persistence;
 namespace Vora.Infrastructure.Migrations
 {
     [DbContext(typeof(VoraDbContext))]
-    [Migration("20261111053514_ChangesSinceInitial")]
+    [Migration("20261111183206_ChangesSinceInitial")]
     partial class ChangesSinceInitial
     {
         /// <inheritdoc />

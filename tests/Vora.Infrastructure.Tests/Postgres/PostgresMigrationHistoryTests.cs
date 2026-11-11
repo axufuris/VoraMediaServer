@@ -691,6 +691,38 @@ public class PostgresMigrationHistoryTests(PostgresDatabase database) : IClassFi
     }
 
     [Fact]
+    public async Task A_database_on_the_home_row_index_migration_gains_the_search_indexes_and_keeps_its_titles()
+    {
+        Assert.SkipUnless(PostgresDatabase.IsConfigured, PostgresDatabase.SkipReason);
+        var cancellationToken = TestContext.Current.CancellationToken;
+        await using var legacy = new LegacyDatabase();
+        var movieId = Guid.NewGuid();
+        await legacy.BuildHomeRowIndexStateAsync(async db =>
+        {
+            var library = new MediaLibrary { Name = "Movies", Type = LibraryType.Movie, FolderPaths = new List<string> { "/movies" } };
+            db.Add(library);
+            db.Add(new Movie { Id = movieId, Title = "Sicario", LibraryId = library.Id });
+            await db.SaveChangesAsync(cancellationToken);
+        }, cancellationToken);
+
+        await using (var before = legacy.NewContext())
+        {
+            (await before.Database.GetPendingMigrationsAsync(cancellationToken)).Should().Equal(MigrationHistoryTests.ChangesSinceInitial);
+            (await IndexesAsync(before, "MediaItems", cancellationToken)).Should().NotContain(LegacyDatabase.SearchIndexes[0]);
+        }
+
+        await legacy.MigrateAsync(cancellationToken);
+
+        await using var after = legacy.NewContext();
+        (await after.Database.GetPendingMigrationsAsync(cancellationToken)).Should().BeEmpty();
+        (await IndexesAsync(after, "MediaItems", cancellationToken)).Should().Contain(LegacyDatabase.SearchIndexes[0]);
+        (await IndexesAsync(after, "Actors", cancellationToken)).Should().Contain(LegacyDatabase.SearchIndexes[1]);
+        (await IndexesAsync(after, "Artists", cancellationToken)).Should().Contain(LegacyDatabase.SearchIndexes[2]);
+        (await IndexesAsync(after, "Albums", cancellationToken)).Should().Contain(LegacyDatabase.SearchIndexes[3]);
+        (await after.MediaItems.AsNoTracking().SingleAsync(m => m.Id == movieId, cancellationToken)).Title.Should().Be("Sicario");
+    }
+
+    [Fact]
     public async Task A_database_on_the_play_source_migration_gains_the_home_row_sort_indexes_and_keeps_its_titles()
     {
         Assert.SkipUnless(PostgresDatabase.IsConfigured, PostgresDatabase.SkipReason);
