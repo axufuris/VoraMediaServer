@@ -72,7 +72,12 @@ public interface IMusicRepository
     Task<List<GenreSummary>> GetGenreSummariesAsync(MusicAccessFilter access);
     Task<GenreContent> GetGenreContentAsync(string genre, MusicAccessFilter access);
 
-    Task<Dictionary<string, int>> GetMoodTrackCountsAsync(MusicAccessFilter access);
+    /// <summary>
+    /// Each mood's track count and the album covers of its most played tracks
+    /// (up to <paramref name="coversPerMood"/>, in the order a mood's page
+    /// lists them; null where a track has no cover), in two queries.
+    /// </summary>
+    Task<Dictionary<string, MoodSample>> GetMoodSamplesAsync(MusicAccessFilter access, int coversPerMood);
     Task<int> CountTracksForMoodAsync(string mood, MusicAccessFilter access);
     Task<List<Track>> GetTracksForMoodAsync(string mood, MusicAccessFilter access, int skip, int take);
     Task<List<Track>> GetRandomTracksForMoodAsync(string mood, MusicAccessFilter access, int count);
@@ -122,6 +127,8 @@ public sealed class AdminProfilePlayCount
     public required string ProfileName { get; init; }
     public int PlayCount { get; init; }
 }
+
+public sealed record MoodSample(int TrackCount, IReadOnlyList<string?> Covers);
 
 public sealed class GenreSummary
 {

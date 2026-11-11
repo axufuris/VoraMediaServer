@@ -335,7 +335,7 @@ public static class ServiceRegistrationExtensions
     {
         services.AddDbContextPool<VoraDbContext>(options =>
             options.UseNpgsql(
-                configuration.GetConnectionString("DefaultConnection"),
+                VoraConnectionString.WithJitOff(configuration.GetConnectionString("DefaultConnection")),
                 npgsql => npgsql.UseVector()));
         return services;
     }

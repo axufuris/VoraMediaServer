@@ -1,4 +1,5 @@
 ﻿using Microsoft.Extensions.Logging;
+using Vora.Application.Libraries.ViewModels;
 using Vora.Application.Media;
 using Vora.Application.Recommendations.ViewModels;
 using Vora.Application.Settings;
@@ -45,12 +46,31 @@ public class RecommendationManager : IRecommendationManager
         {
             try
             {
-                var providerLists = await provider.GetRecommendationsAsync(profileId, libraryId);
+                var providerLists = (await provider.GetRecommendationsAsync(profileId, libraryId)).ToList();
+
+                // Every row of library titles is loaded in one query: a row at a
+                // time made For You fifteen tile queries. A row named by TMDB ids
+                // (an AI provider's) is matched on its own, since a tile doesn't
+                // carry the id it matched by.
+                var localIds = providerLists
+                    .Where(l => l.ExternalTmdbIds.Count == 0)
+                    .SelectMany(l => l.LocalItemIds)
+                    .Distinct()
+                    .ToList();
+                var local = localIds.Count == 0
+                    ? new Dictionary<Guid, LibraryItemVM>()
+                    : (await _recommendationRepo.GetHydratedMediaItemsAsync(
+                        profileId, localIds, new List<string>(), libraryId, hasAllAccess, allowedLibs, allowedMovieRatings, allowedTvRatings, blockUnrated))
+                        .ToDictionary(m => m.Id);
 
                 foreach (var list in providerLists)
                 {
-                    var matchedItems = await _recommendationRepo.GetHydratedMediaItemsAsync(
-                        profileId, list.LocalItemIds, list.ExternalTmdbIds, libraryId, hasAllAccess, allowedLibs, allowedMovieRatings, allowedTvRatings, blockUnrated);
+                    var matchedItems = list.ExternalTmdbIds.Count == 0
+                        ? list.LocalItemIds.Distinct().Where(local.ContainsKey).Select(id => local[id]).ToList()
+                        : (await _recommendationRepo.GetHydratedMediaItemsAsync(
+                            profileId, list.LocalItemIds, list.ExternalTmdbIds, libraryId, hasAllAccess, allowedLibs, allowedMovieRatings, allowedTvRatings, blockUnrated))
+                            .OrderBy(m => list.LocalItemIds.IndexOf(m.Id))
+                            .ToList();
 
                     if (matchedItems.Any())
                     {
@@ -59,7 +79,7 @@ public class RecommendationManager : IRecommendationManager
                             Title = list.Title,
                             Description = list.Description,
                             Weight = list.Weight,
-                            Items = matchedItems.OrderBy(m => list.LocalItemIds.IndexOf(m.Id)).ToList()
+                            Items = matchedItems
                         });
                     }
                 }
