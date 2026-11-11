@@ -12,8 +12,6 @@ public interface IMusicRepository
     Task<HashSet<Guid>> GetLikedTrackIdsAsync(Guid profileId, IEnumerable<Guid> trackIds);
     Task<List<Track>> GetLikedTracksAsync(Guid profileId, MusicAccessFilter access);
 
-    Task<Dictionary<Guid, decimal>> GetAlbumRatingsAsync(Guid profileId, IEnumerable<Guid> albumIds);
-    Task<Dictionary<Guid, decimal>> GetArtistRatingsAsync(Guid profileId, IEnumerable<Guid> artistIds);
     Task<SetMusicRatingResult> SetAlbumRatingAsync(Guid profileId, Guid albumId, decimal? rating, bool isAdmin);
     Task<SetMusicRatingResult> SetArtistRatingAsync(Guid profileId, Guid artistId, decimal? rating, bool isAdmin);
 
@@ -42,12 +40,20 @@ public interface IMusicRepository
     Task<List<Artist>> GetArtistsAsync(Guid? libraryId, MusicAccessFilter access, int? limit = null);
     Task<List<Guid>> GetArtistIdsForArtworkRefreshAsync(Guid libraryId, bool force, DateTime checkedBefore);
     Task<List<Guid>> GetAlbumIdsForArtworkRefreshAsync(Guid libraryId, bool force, DateTime checkedBefore);
-    Task<List<Album>> GetAlbumsForArtistAsync(Guid artistId, MusicAccessFilter access);
     Task<Artist?> GetArtistByIdAsync(Guid artistId, MusicAccessFilter access);
     Task<Album?> GetAlbumByIdAsync(Guid albumId, MusicAccessFilter access);
-    Task<List<Track>> GetTracksForAlbumAsync(Guid albumId, MusicAccessFilter access);
-    Task<List<Track>> GetTracksForArtistAsync(Guid artistId, MusicAccessFilter access);
-    Task<List<Track>> GetTopTracksForArtistAsync(Guid artistId, MusicAccessFilter access, int limit);
+
+    // The artist and album pages. Each is one query and carries the profile's
+    // own marks (likes, ratings) with it; with no profile, there are none.
+    Task<ArtistPage?> GetArtistPageAsync(Guid artistId, Guid? profileId, MusicAccessFilter access);
+    Task<List<ViewerAlbum>> GetAlbumsForArtistAsync(Guid artistId, Guid? profileId, MusicAccessFilter access);
+    Task<AlbumPage?> GetAlbumPageAsync(Guid albumId, Guid? profileId, MusicAccessFilter access);
+    Task<List<ViewerTrack>> GetTracksForAlbumAsync(Guid albumId, Guid? profileId, MusicAccessFilter access);
+    Task<List<ViewerTrack>> GetTracksForArtistAsync(Guid artistId, Guid? profileId, MusicAccessFilter access);
+    Task<List<ViewerTrack>> GetTopTracksForArtistAsync(Guid artistId, Guid? profileId, MusicAccessFilter access, int limit);
+
+    // The profile's likes and ratings of songs already chosen, in one query.
+    Task<Dictionary<Guid, TrackMarks>> GetTrackMarksAsync(Guid profileId, IReadOnlyCollection<Guid> trackIds);
     Task<Track?> GetTrackByIdAsync(Guid trackId, MusicAccessFilter access);
     Task<string?> GetTrackFilePathAsync(Guid trackId, MusicAccessFilter access);
 
@@ -56,7 +62,6 @@ public interface IMusicRepository
     Task<List<PopularityRefreshTarget>> GetLibraryArtistsForPopularityRefreshAsync(Guid libraryId, DateTime refreshedBefore);
     Task<Artist?> GetArtistCatalogForUpdateAsync(Guid artistId);
     Task StageArtistTagsAsync(Guid artistId, IReadOnlyList<string> tags);
-    Task<List<string>> GetArtistTagNamesAsync(Guid artistId);
     Task SaveMusicChangesAsync(CancellationToken cancellationToken);
     Task<List<ContentRatingTarget>> GetAlbumsDueForContentRatingAsync(DateTime recheckBefore, int limit);
     Task<List<TrackForProfile>> GetTracksNeedingProfilesAsync();
@@ -206,3 +211,21 @@ public sealed record TrackDescriptor(
 public sealed record TrackEmbeddingUpdate(Guid TrackId, float[] Vector, string SourceHash, string Model);
 
 public sealed record RecentPlay(Guid TrackId, DateTime PlayedAt, MusicPlaySource Source, Guid? SourceId);
+
+// A song with the profile's marks on it.
+public sealed record ViewerTrack(Track Track, bool IsLiked, decimal? MyRating);
+
+public sealed record TrackMarks(bool IsLiked, decimal? MyRating);
+
+// An album with the profile's rating of it.
+public sealed record ViewerAlbum(Album Album, decimal? MyRating);
+
+// The top of an artist's page: the artist, the profile's rating and the
+// artist's tags, heaviest first.
+public sealed record ArtistPage(Artist Artist, decimal? MyRating, List<string> Tags);
+
+// The top of an album's page: the album with its artist and the profile's
+// rating. ArtistBackgroundUrl is the artist's backdrop when the profile may see
+// the artist, for an album with none of its own; MusicManager decides whether
+// to use it.
+public sealed record AlbumPage(Album Album, decimal? MyRating, string? ArtistBackgroundUrl);

@@ -38,7 +38,6 @@ public class AlbumArtistBackgroundFallbackTests
         _manager = new MusicManager(
             _repository,
             Substitute.For<IUserRepository>(),
-            Substitute.For<IUserMediaStateRepository>(),
             Array.Empty<IMusicArtworkProvider>(),
             Array.Empty<ILyricsProvider>(),
             Array.Empty<IListeningDataProvider>(),
@@ -47,28 +46,28 @@ public class AlbumArtistBackgroundFallbackTests
             new NullTaskProgressReporter(),
             NullLogger<MusicManager>.Instance);
 
-        _repository.GetTracksForAlbumAsync(_albumId, Arg.Any<MusicAccessFilter>()).Returns(new List<Track>());
+        _repository.GetTracksForAlbumAsync(_albumId, Arg.Any<Guid?>(), Arg.Any<MusicAccessFilter>()).Returns(new List<ViewerTrack>());
+        _repository.GetAlbumPageAsync(_albumId, Arg.Any<Guid?>(), Arg.Any<MusicAccessFilter>())
+            .Returns(_ => _album == null ? null : new AlbumPage(_album, null, _visibleArtistBackground));
     }
 
-    private Album GivenAlbum(string? albumBackground, Guid? artistId = null)
-    {
-        var album = new Album
+    private Album? _album;
+    private string? _visibleArtistBackground;
+
+    private Album GivenAlbum(string? albumBackground, Guid? artistId = null) =>
+        _album = new Album
         {
             Id = _albumId,
             Title = "Dammit!",
             ArtistId = artistId ?? _artistId,
             BackgroundUrl = albumBackground
         };
-        _repository.GetAlbumByIdAsync(_albumId, Arg.Any<MusicAccessFilter>()).Returns(album);
-        return album;
-    }
 
-    private void GivenArtistIsVisible(string? background) =>
-        _repository.GetArtistByIdAsync(_artistId, Arg.Any<MusicAccessFilter>())
-            .Returns(new Artist { Id = _artistId, Name = "311", BackgroundUrl = background });
+    // The page loads the artist's backdrop through the access filter, in the
+    // same query as the album.
+    private void GivenArtistIsVisible(string? background) => _visibleArtistBackground = background;
 
-    private void GivenArtistIsNotVisible() =>
-        _repository.GetArtistByIdAsync(_artistId, Arg.Any<MusicAccessFilter>()).Returns((Artist?)null);
+    private void GivenArtistIsNotVisible() => _visibleArtistBackground = null;
 
     private async Task<(AlbumVM? Album, List<TrackVM> Tracks, string? ArtistBackgroundUrl)> Detail()
     {
@@ -88,10 +87,9 @@ public class AlbumArtistBackgroundFallbackTests
         album!.BackgroundUrl.Should().BeNull("the album's own value is untouched, including when it is null");
     }
 
-    // The common path must cost nothing extra, and there must be no ambiguity
-    // about which image won.
+    // There must be no ambiguity about which image won.
     [Fact]
-    public async Task An_album_with_its_own_background_is_unchanged_and_asks_for_no_artist()
+    public async Task An_album_with_its_own_background_is_unchanged()
     {
         GivenAlbum(AlbumBackground);
         GivenArtistIsVisible(ArtistBackground);
@@ -100,7 +98,6 @@ public class AlbumArtistBackgroundFallbackTests
 
         album!.BackgroundUrl.Should().Be(AlbumBackground);
         artistBackgroundUrl.Should().BeNull();
-        await _repository.DidNotReceive().GetArtistByIdAsync(Arg.Any<Guid>(), Arg.Any<MusicAccessFilter>());
     }
 
     [Theory]
@@ -155,14 +152,14 @@ public class AlbumArtistBackgroundFallbackTests
     }
 
     [Fact]
-    public async Task An_album_with_no_artist_at_all_is_not_looked_up()
+    public async Task An_album_with_no_artist_at_all_borrows_nothing()
     {
         GivenAlbum(null, artistId: Guid.Empty);
+        GivenArtistIsVisible(ArtistBackground);
 
         var (_, _, artistBackgroundUrl) = await Detail();
 
         artistBackgroundUrl.Should().BeNull();
-        await _repository.DidNotReceive().GetArtistByIdAsync(Arg.Any<Guid>(), Arg.Any<MusicAccessFilter>());
     }
 
     // THE regression this whole design exists to prevent. The edit modal seeds

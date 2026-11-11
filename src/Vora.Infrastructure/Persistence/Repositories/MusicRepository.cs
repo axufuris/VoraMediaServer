@@ -156,7 +156,7 @@ public class MusicRepository : IMusicRepository
         return await ordered.ToListAsync();
     }
 
-    public async Task<List<Album>> GetAlbumsForArtistAsync(Guid artistId, MusicAccessFilter access)
+    public async Task<List<ViewerAlbum>> GetAlbumsForArtistAsync(Guid artistId, Guid? profileId, MusicAccessFilter access)
     {
         var query = _context.Albums.AsNoTracking().Where(a => a.ArtistId == artistId);
         query = ApplyLibraryFilter(query, access);
@@ -170,8 +170,87 @@ public class MusicRepository : IMusicRepository
         return await query
             .OrderBy(a => a.Year)
             .ThenBy(a => a.SortTitle ?? a.Title)
+            .Select(a => new ViewerAlbum(a, _context.UserAlbumRatings
+                .Where(r => r.ProfileId == profileId && r.AlbumId == a.Id)
+                .Select(r => (decimal?)r.Rating)
+                .FirstOrDefault()))
             .ToListAsync();
     }
+
+    public async Task<ArtistPage?> GetArtistPageAsync(Guid artistId, Guid? profileId, MusicAccessFilter access)
+    {
+        var page = await ApplyLibraryFilter(_context.Artists.AsNoTracking().Where(a => a.Id == artistId), access)
+            .Select(a => new
+            {
+                Artist = a,
+                MyRating = _context.UserArtistRatings
+                    .Where(r => r.ProfileId == profileId && r.ArtistId == a.Id)
+                    .Select(r => (decimal?)r.Rating)
+                    .FirstOrDefault(),
+                Tags = _context.ArtistTags
+                    .Where(t => t.ArtistId == a.Id)
+                    .OrderByDescending(t => t.Weight)
+                    .ThenBy(t => t.Tag)
+                    .Select(t => t.Tag)
+                    .ToList()
+            })
+            .FirstOrDefaultAsync();
+        return page == null ? null : new ArtistPage(page.Artist, page.MyRating, page.Tags);
+    }
+
+    public async Task<AlbumPage?> GetAlbumPageAsync(Guid albumId, Guid? profileId, MusicAccessFilter access)
+    {
+        var visibleArtists = ApplyLibraryFilter(_context.Artists.AsNoTracking(), access);
+        var page = await ApplyLibraryFilter(_context.Albums.AsNoTracking().Where(a => a.Id == albumId), access)
+            .Select(a => new
+            {
+                Album = a,
+                a.Artist,
+                MyRating = _context.UserAlbumRatings
+                    .Where(r => r.ProfileId == profileId && r.AlbumId == a.Id)
+                    .Select(r => (decimal?)r.Rating)
+                    .FirstOrDefault(),
+                ArtistBackgroundUrl = visibleArtists
+                    .Where(ar => ar.Id == a.ArtistId)
+                    .Select(ar => ar.BackgroundUrl)
+                    .FirstOrDefault()
+            })
+            .FirstOrDefaultAsync();
+        if (page == null) return null;
+
+        page.Album.Artist = page.Artist;
+        return new AlbumPage(page.Album, page.MyRating, page.ArtistBackgroundUrl);
+    }
+
+    public async Task<Dictionary<Guid, TrackMarks>> GetTrackMarksAsync(Guid profileId, IReadOnlyCollection<Guid> trackIds)
+    {
+        if (trackIds.Count == 0) return new Dictionary<Guid, TrackMarks>();
+
+        var marks = await _context.Tracks
+            .AsNoTracking()
+            .Where(t => trackIds.Contains(t.Id))
+            .Select(t => new
+            {
+                t.Id,
+                IsLiked = _context.TrackLikes.Any(l => l.ProfileId == profileId && l.TrackId == t.Id),
+                MyRating = _context.UserMediaRatings
+                    .Where(r => r.ProfileId == profileId && r.MediaItemId == t.Id)
+                    .Select(r => (decimal?)r.Rating)
+                    .FirstOrDefault()
+            })
+            .ToListAsync();
+        return marks.ToDictionary(m => m.Id, m => new TrackMarks(m.IsLiked, m.MyRating));
+    }
+
+    // Each song with the profile's like and rating, in the same query.
+    private IQueryable<ViewerTrack> ForViewer(IQueryable<Track> tracks, Guid? profileId) =>
+        tracks.Select(t => new ViewerTrack(
+            t,
+            _context.TrackLikes.Any(l => l.ProfileId == profileId && l.TrackId == t.Id),
+            _context.UserMediaRatings
+                .Where(r => r.ProfileId == profileId && r.MediaItemId == t.Id)
+                .Select(r => (decimal?)r.Rating)
+                .FirstOrDefault()));
 
     public async Task<Artist?> GetArtistByIdAsync(Guid artistId, MusicAccessFilter access)
     {
@@ -187,41 +266,38 @@ public class MusicRepository : IMusicRepository
         return await query.FirstOrDefaultAsync();
     }
 
-    public async Task<List<Track>> GetTracksForAlbumAsync(Guid albumId, MusicAccessFilter access)
+    public async Task<List<ViewerTrack>> GetTracksForAlbumAsync(Guid albumId, Guid? profileId, MusicAccessFilter access)
     {
         var query = _context.Tracks.AsNoTracking().Where(t => t.AlbumId == albumId);
         query = ApplyLibraryFilter(query, access);
         query = query.ApplyMusicRatings(access);
 
-        return await query
-            .OrderBy(t => t.DiscNumber)
-            .ThenBy(t => t.TrackNumber)
-            .ToListAsync();
+        return await ForViewer(query.OrderBy(t => t.DiscNumber).ThenBy(t => t.TrackNumber), profileId).ToListAsync();
     }
 
-    public async Task<List<Track>> GetTracksForArtistAsync(Guid artistId, MusicAccessFilter access)
+    public async Task<List<ViewerTrack>> GetTracksForArtistAsync(Guid artistId, Guid? profileId, MusicAccessFilter access)
     {
-        var albumIds = await _context.Albums
-            .AsNoTracking()
-            .Where(a => a.ArtistId == artistId)
-            .Select(a => a.Id)
-            .ToListAsync();
-
-        if (albumIds.Count == 0) return new List<Track>();
-
-        IQueryable<Track> query = _context.Tracks
-            .AsNoTracking()
-            .Include(MusicIncludePaths.TrackAlbumArtist)
-            .Where(t => t.AlbumId != null && albumIds.Contains(t.AlbumId.Value));
+        var query = TracksOfArtist(artistId);
         query = ApplyLibraryFilter(query, access);
         query = query.ApplyMusicRatings(access);
 
-        return await query
+        var ordered = query
             .OrderBy(t => t.Album!.Year)
             .ThenBy(t => t.Album!.SortTitle ?? t.Album!.Title)
             .ThenBy(t => t.DiscNumber)
-            .ThenBy(t => t.TrackNumber)
-            .ToListAsync();
+            .ThenBy(t => t.TrackNumber);
+        return await ForViewer(ordered, profileId).ToListAsync();
+    }
+
+    // The songs on the artist's albums, with their album and its artist. The
+    // album ids are a subquery, not a query of their own first.
+    private IQueryable<Track> TracksOfArtist(Guid artistId)
+    {
+        var albumIds = _context.Albums.Where(a => a.ArtistId == artistId).Select(a => a.Id);
+        return _context.Tracks
+            .AsNoTracking()
+            .Include(MusicIncludePaths.TrackAlbumArtist)
+            .Where(t => t.AlbumId != null && albumIds.Contains(t.AlbumId.Value));
     }
 
     public async Task<Track?> GetTrackByIdAsync(Guid trackId, MusicAccessFilter access)
@@ -419,20 +495,9 @@ public class MusicRepository : IMusicRepository
     // explicitly about everyone. An artist page that looked different to every
     // member of the house would be surprising for no stated benefit. Access
     // filtering is untouched and still per-profile.
-    public async Task<List<Track>> GetTopTracksForArtistAsync(Guid artistId, MusicAccessFilter access, int limit)
+    public async Task<List<ViewerTrack>> GetTopTracksForArtistAsync(Guid artistId, Guid? profileId, MusicAccessFilter access, int limit)
     {
-        var albumIds = await _context.Albums
-            .AsNoTracking()
-            .Where(a => a.ArtistId == artistId)
-            .Select(a => a.Id)
-            .ToListAsync();
-
-        if (albumIds.Count == 0) return new List<Track>();
-
-        IQueryable<Track> tracks = _context.Tracks
-            .AsNoTracking()
-            .Include(MusicIncludePaths.TrackAlbumArtist)
-            .Where(t => t.AlbumId != null && albumIds.Contains(t.AlbumId.Value));
+        var tracks = TracksOfArtist(artistId);
         tracks = ApplyLibraryFilter(tracks, access);
         tracks = tracks.ApplyMusicRatings(access);
 
@@ -466,9 +531,10 @@ public class MusicRepository : IMusicRepository
             .ThenBy(x => x.Track.Album == null ? null : x.Track.Album.Year)
             .ThenBy(x => x.Track.DiscNumber)
             .ThenBy(x => x.Track.TrackNumber)
-            .Select(x => x.Track);
+            .Select(x => x.Track)
+            .Take(Math.Clamp(limit, 1, MaxTopTracks));
 
-        return await query.Take(Math.Clamp(limit, 1, MaxTopTracks)).ToListAsync();
+        return await ForViewer(query, profileId).ToListAsync();
     }
     // Never-refreshed artists first, then the stalest. Ordered so that a batch
     // cut short by its limit or by the provider going away still spends itself on
@@ -632,15 +698,6 @@ public class MusicRepository : IMusicRepository
             FetchedAt = fetchedAt
         }));
     }
-
-    public Task<List<string>> GetArtistTagNamesAsync(Guid artistId) =>
-        _context.ArtistTags
-            .AsNoTracking()
-            .Where(t => t.ArtistId == artistId)
-            .OrderByDescending(t => t.Weight)
-            .ThenBy(t => t.Tag)
-            .Select(t => t.Tag)
-            .ToListAsync();
 
     public async Task<List<Album>> GetRecentlyAddedAlbumsAsync(MusicAccessFilter access, int limit)
     {
@@ -1202,28 +1259,6 @@ public class MusicRepository : IMusicRepository
         return query.Where(t => allowed.Contains(t.LibraryId));
     }
 
-
-    public async Task<Dictionary<Guid, decimal>> GetAlbumRatingsAsync(Guid profileId, IEnumerable<Guid> albumIds)
-    {
-        var idList = albumIds.ToList();
-        if (idList.Count == 0) return new Dictionary<Guid, decimal>();
-
-        return await _context.UserAlbumRatings
-            .AsNoTracking()
-            .Where(r => r.ProfileId == profileId && idList.Contains(r.AlbumId))
-            .ToDictionaryAsync(r => r.AlbumId, r => r.Rating);
-    }
-
-    public async Task<Dictionary<Guid, decimal>> GetArtistRatingsAsync(Guid profileId, IEnumerable<Guid> artistIds)
-    {
-        var idList = artistIds.ToList();
-        if (idList.Count == 0) return new Dictionary<Guid, decimal>();
-
-        return await _context.UserArtistRatings
-            .AsNoTracking()
-            .Where(r => r.ProfileId == profileId && idList.Contains(r.ArtistId))
-            .ToDictionaryAsync(r => r.ArtistId, r => r.Rating);
-    }
 
     public async Task<SetMusicRatingResult> SetAlbumRatingAsync(Guid profileId, Guid albumId, decimal? rating, bool isAdmin)
     {

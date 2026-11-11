@@ -25,7 +25,6 @@ public class AlbumCoverArtistFallbackTests
         _manager = new MusicManager(
             _repository,
             Substitute.For<IUserRepository>(),
-            Substitute.For<IUserMediaStateRepository>(),
             Array.Empty<IMusicArtworkProvider>(),
             Array.Empty<ILyricsProvider>(),
             Array.Empty<IListeningDataProvider>(),
@@ -57,8 +56,8 @@ public class AlbumCoverArtistFallbackTests
     {
         var bare = TrackOn(AlbumWith(null));
         var covered = TrackOn(AlbumWith(AlbumCover));
-        _repository.GetTopTracksForArtistAsync(_artist.Id, Arg.Any<MusicAccessFilter>(), 10)
-            .Returns(new List<Track> { bare, covered });
+        _repository.GetTopTracksForArtistAsync(_artist.Id, Arg.Any<Guid?>(), Arg.Any<MusicAccessFilter>(), 10)
+            .Returns(new List<ViewerTrack> { new(bare, false, null), new(covered, false, null) });
 
         var tracks = await _manager.GetTopTracksForArtistAsync(_artist.Id, null, MusicAccessFilter.Unrestricted, 10);
 
@@ -70,8 +69,8 @@ public class AlbumCoverArtistFallbackTests
     public async Task An_album_tile_keeps_its_own_artwork_empty_and_carries_the_artists_separately()
     {
         var album = AlbumWith(null);
-        _repository.GetArtistByIdAsync(_artist.Id, Arg.Any<MusicAccessFilter>()).Returns(_artist);
-        _repository.GetAlbumsForArtistAsync(_artist.Id, Arg.Any<MusicAccessFilter>()).Returns(new List<Album> { album });
+        _repository.GetArtistPageAsync(_artist.Id, Arg.Any<Guid?>(), Arg.Any<MusicAccessFilter>()).Returns(new ArtistPage(_artist, null, []));
+        _repository.GetAlbumsForArtistAsync(_artist.Id, Arg.Any<Guid?>(), Arg.Any<MusicAccessFilter>()).Returns(new List<ViewerAlbum> { new(album, null) });
 
         var albums = (await _manager.GetArtistDetailAsync(_artist.Id, null, MusicAccessFilter.Unrestricted))!.Albums;
 
@@ -83,8 +82,8 @@ public class AlbumCoverArtistFallbackTests
     public async Task Saving_the_edit_modal_on_an_album_without_cover_does_not_persist_the_artists_image()
     {
         var album = AlbumWith(null);
-        _repository.GetAlbumByIdAsync(album.Id, Arg.Any<MusicAccessFilter>()).Returns(album);
-        _repository.GetTracksForAlbumAsync(album.Id, Arg.Any<MusicAccessFilter>()).Returns(new List<Track>());
+        _repository.GetAlbumPageAsync(album.Id, Arg.Any<Guid?>(), Arg.Any<MusicAccessFilter>()).Returns(new AlbumPage(album, null, null));
+        _repository.GetTracksForAlbumAsync(album.Id, Arg.Any<Guid?>(), Arg.Any<MusicAccessFilter>()).Returns(new List<ViewerTrack>());
         _repository.GetAlbumForUpdateAsync(album.Id).Returns(album);
 
         var detail = await _manager.GetAlbumDetailAsync(album.Id, null, MusicAccessFilter.Unrestricted);

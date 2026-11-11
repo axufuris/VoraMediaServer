@@ -29,7 +29,6 @@ public class ArtistArtworkKindTests : IDisposable
         _manager = new MusicManager(
             _repository,
             Substitute.For<IUserRepository>(),
-            Substitute.For<IUserMediaStateRepository>(),
             new[] { _provider },
             Array.Empty<ILyricsProvider>(),
             Array.Empty<IListeningDataProvider>(),

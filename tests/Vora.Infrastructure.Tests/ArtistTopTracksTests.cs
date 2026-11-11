@@ -94,10 +94,10 @@ public class ArtistTopTracksTests
         AddTrack(db, debut, "I Want You Back", 1);
         await db.SaveChangesAsync(TestContext.Current.CancellationToken);
 
-        var tracks = await new MusicRepository(db).GetTopTracksForArtistAsync(_artistId, AllAccess, 10);
+        var tracks = await new MusicRepository(db).GetTopTracksForArtistAsync(_artistId, null, AllAccess, 10);
 
         tracks.Should().NotBeEmpty("an unplayed artist must not render an empty section");
-        tracks.Select(t => t.Title).Should().Equal("I Want You Back", "Tearin' Up My Heart", "Bye Bye Bye");
+        tracks.Select(t => t.Track.Title).Should().Equal("I Want You Back", "Tearin' Up My Heart", "Bye Bye Bye");
     }
 
     // An artist nobody here has played shows their actual hits, not the first
@@ -114,9 +114,9 @@ public class ArtistTopTracksTests
         hit.GlobalListeners = 1_500_000;
         await db.SaveChangesAsync(TestContext.Current.CancellationToken);
 
-        var tracks = await new MusicRepository(db).GetTopTracksForArtistAsync(_artistId, AllAccess, 10);
+        var tracks = await new MusicRepository(db).GetTopTracksForArtistAsync(_artistId, null, AllAccess, 10);
 
-        tracks.Select(t => t.Title).Should().Equal("Bye Bye Bye", "Deep Cut");
+        tracks.Select(t => t.Track.Title).Should().Equal("Bye Bye Bye", "Deep Cut");
     }
 
     // This server's own listening outranks the world's: the section is about what
@@ -132,9 +132,9 @@ public class ArtistTopTracksTests
         AddPlays(db, localFavourite, 1);
         await db.SaveChangesAsync(TestContext.Current.CancellationToken);
 
-        var tracks = await new MusicRepository(db).GetTopTracksForArtistAsync(_artistId, AllAccess, 10);
+        var tracks = await new MusicRepository(db).GetTopTracksForArtistAsync(_artistId, null, AllAccess, 10);
 
-        tracks.Select(t => t.Title).Should().Equal("Local Favourite", "Global Hit");
+        tracks.Select(t => t.Track.Title).Should().Equal("Local Favourite", "Global Hit");
     }
 
     [Fact]
@@ -147,9 +147,9 @@ public class ArtistTopTracksTests
         known.GlobalListeners = 10;
         await db.SaveChangesAsync(TestContext.Current.CancellationToken);
 
-        var tracks = await new MusicRepository(db).GetTopTracksForArtistAsync(_artistId, AllAccess, 10);
+        var tracks = await new MusicRepository(db).GetTopTracksForArtistAsync(_artistId, null, AllAccess, 10);
 
-        tracks.Select(t => t.Title).Should().Equal("Known", "Unknown To Last.fm");
+        tracks.Select(t => t.Track.Title).Should().Equal("Known", "Unknown To Last.fm");
     }
 
     [Fact]
@@ -164,9 +164,9 @@ public class ArtistTopTracksTests
         AddPlays(db, three, 9);
         await db.SaveChangesAsync(TestContext.Current.CancellationToken);
 
-        var tracks = await new MusicRepository(db).GetTopTracksForArtistAsync(_artistId, AllAccess, 10);
+        var tracks = await new MusicRepository(db).GetTopTracksForArtistAsync(_artistId, null, AllAccess, 10);
 
-        tracks.Select(t => t.Title).Should().Equal("Track Three", "Track Two", "Track One");
+        tracks.Select(t => t.Track.Title).Should().Equal("Track Three", "Track Two", "Track One");
         _ = one;
     }
 
@@ -181,9 +181,9 @@ public class ArtistTopTracksTests
         AddPlays(db, fresh, 3, at: DateTime.UtcNow);
         await db.SaveChangesAsync(TestContext.Current.CancellationToken);
 
-        var tracks = await new MusicRepository(db).GetTopTracksForArtistAsync(_artistId, AllAccess, 10);
+        var tracks = await new MusicRepository(db).GetTopTracksForArtistAsync(_artistId, null, AllAccess, 10);
 
-        tracks.Select(t => t.Title).Take(2).Should().Equal("Fresh", "Stale");
+        tracks.Select(t => t.Track.Title).Take(2).Should().Equal("Fresh", "Stale");
     }
 
     // Unplayed tracks sit behind played ones rather than being dropped, so the
@@ -198,9 +198,9 @@ public class ArtistTopTracksTests
         AddPlays(db, played, 1);
         await db.SaveChangesAsync(TestContext.Current.CancellationToken);
 
-        var tracks = await new MusicRepository(db).GetTopTracksForArtistAsync(_artistId, AllAccess, 10);
+        var tracks = await new MusicRepository(db).GetTopTracksForArtistAsync(_artistId, null, AllAccess, 10);
 
-        tracks.Select(t => t.Title).Should().Equal("Played Once", "Never Played");
+        tracks.Select(t => t.Track.Title).Should().Equal("Played Once", "Never Played");
     }
 
     // Server-wide, not per-profile: this is a household server, and the page
@@ -216,9 +216,9 @@ public class ArtistTopTracksTests
         AddPlays(db, theirs, 4, profileId: Guid.NewGuid());
         await db.SaveChangesAsync(TestContext.Current.CancellationToken);
 
-        var tracks = await new MusicRepository(db).GetTopTracksForArtistAsync(_artistId, AllAccess, 10);
+        var tracks = await new MusicRepository(db).GetTopTracksForArtistAsync(_artistId, null, AllAccess, 10);
 
-        tracks.Select(t => t.Title).Should().Equal("Theirs", "Mine");
+        tracks.Select(t => t.Track.Title).Should().Equal("Theirs", "Mine");
     }
 
     [Fact]
@@ -227,7 +227,7 @@ public class ArtistTopTracksTests
         using var db = NewContext();
         await db.SaveChangesAsync(TestContext.Current.CancellationToken);
 
-        var tracks = await new MusicRepository(db).GetTopTracksForArtistAsync(_artistId, AllAccess, 10);
+        var tracks = await new MusicRepository(db).GetTopTracksForArtistAsync(_artistId, null, AllAccess, 10);
 
         tracks.Should().BeEmpty();
     }
@@ -242,9 +242,9 @@ public class ArtistTopTracksTests
 
         var repository = new MusicRepository(db);
 
-        (await repository.GetTopTracksForArtistAsync(_artistId, AllAccess, 500)).Should().HaveCount(50);
-        (await repository.GetTopTracksForArtistAsync(_artistId, AllAccess, 0)).Should().HaveCount(1);
-        (await repository.GetTopTracksForArtistAsync(_artistId, AllAccess, -5)).Should().HaveCount(1);
+        (await repository.GetTopTracksForArtistAsync(_artistId, null, AllAccess, 500)).Should().HaveCount(50);
+        (await repository.GetTopTracksForArtistAsync(_artistId, null, AllAccess, 0)).Should().HaveCount(1);
+        (await repository.GetTopTracksForArtistAsync(_artistId, null, AllAccess, -5)).Should().HaveCount(1);
     }
 
     // A track the profile may not see is absent, and must not push another track
@@ -261,9 +261,10 @@ public class ArtistTopTracksTests
 
         var tracks = await new MusicRepository(db).GetTopTracksForArtistAsync(
             _artistId,
+            null,
             new MusicAccessFilter { HasAllLibraryAccess = true, BlockUnratedContent = true },
             10);
 
-        tracks.Select(t => t.Title).Should().Equal("Rated Track");
+        tracks.Select(t => t.Track.Title).Should().Equal("Rated Track");
     }
 }

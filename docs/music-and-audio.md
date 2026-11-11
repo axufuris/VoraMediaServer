@@ -23,6 +23,25 @@ Music libraries are filtered out of the left nav (they're surfaced via the Music
 
 Endpoints build it via `AuthExtensions.GetMusicAccessFilter()`. Every music query applies it through `MusicAccessQuery.ApplyMusicAccess` / `ApplyMusicRatings` — the only place the rule is written (`MusicAccessRuleIsWrittenOnceTests` enforces it).
 
+## The profile's likes and ratings on a page
+
+The album and artist pages load the profile's marks with what they show, not after it (`PostgresMusicPageTests`):
+- **Songs:** each song comes with the profile's like and rating (`ViewerTrack`, `MusicRepository.ForViewer`).
+- **Albums and the artist:** each comes with the profile's rating (`ViewerAlbum`, `ArtistPage`, `AlbumPage`).
+
+| Request | Queries |
+|---|---|
+| `GET /api/music/albums/{id}` | 2: the album, its artist, the profile's rating of it and the artist's backdrop; then its songs |
+| `GET /api/music/artists/{id}` | 2: the artist, the profile's rating and its tags; then its albums |
+| `GET /api/music/artists/{id}/tracks` | 1 |
+| `GET /api/music/artists/{id}/top-tracks` | 1 |
+
+Before, each page loaded the songs, then the profile's likes of them, then its ratings of them, and the artist's songs looked up the artist's album ids first: 6, 5, 4 and 4 queries.
+
+A mood's song list and shuffle choose their songs in a query of their own, then take the profile's marks of those songs in one more (`GetTrackMarksAsync`).
+
+The album page borrows the artist's backdrop when the album has none. The backdrop is read through the access filter in the same query, so a profile that may not see the artist gets none.
+
 ## Where a track's Clean / Explicit comes from
 
 1. **The file's tags** (scanner `DetectAdvisory`): MP4 `rtng`; ID3 `TXXX` and Vorbis `ITUNESADVISORY` / `PARENTAL_ADVISORY` / `EXPLICIT`; `[Explicit]` in the title. A tag **always wins** — on rescan it replaces a provider's answer (`Track.ContentRatingProvider` goes back to null). A `LockedFields["ContentRating"]` lock beats both.
