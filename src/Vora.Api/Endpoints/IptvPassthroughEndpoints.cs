@@ -42,7 +42,7 @@ public static class IptvPassthroughEndpoints
         try
         {
             var result = await service.StartPassthroughAsync(request.ChannelId, accountId.Value, user.GetProfileId());
-            return Results.Ok(new PassthroughStartVM { Url = result.Url, StreamType = result.StreamType });
+            return Results.Ok(new PassthroughStartVM { Url = result.Url, StreamType = result.StreamType, AudioFormat = result.AudioFormat });
         }
         catch (UnauthorizedAccessException)
         {

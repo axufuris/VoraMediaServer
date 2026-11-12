@@ -4,4 +4,5 @@ public class PassthroughStartVM
 {
     public string Url { get; set; } = string.Empty;
     public string StreamType { get; set; } = string.Empty;
+    public string? AudioFormat { get; set; }
 }

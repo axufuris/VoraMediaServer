@@ -16,6 +16,7 @@ public class PassthroughStartResult
 {
     public required string Url { get; init; }
     public required string StreamType { get; init; }
+    public string? AudioFormat { get; init; }
 }
 
 public sealed class PassthroughAudioStream : IDisposable
@@ -66,6 +67,9 @@ public class IptvPassthroughService : IIptvPassthroughService
 
     public const string StreamTypeHls = "hls";
     public const string StreamTypeAudio = "audio";
+    public const string AudioFormatMp3 = "mp3";
+    public const string AudioFormatAac = "aac";
+    public const string AudioFormatHls = "hls";
 
     private readonly IIptvRepository _repository;
     private readonly IUserManager _userManager;
@@ -109,6 +113,8 @@ public class IptvPassthroughService : IIptvPassthroughService
 
     private sealed record UpstreamContext(IptvRequestPolicy Policy, int ConnectionLimit, string? Secret);
 
+    private sealed record StreamProbe(string Url, string Type, string? Format);
+
     public async Task<PassthroughStartResult> StartPassthroughAsync(Guid channelId, Guid userId, Guid? profileId)
     {
         var channel = await _repository.GetChannelWithPlaylistAsync(channelId)
@@ -123,7 +129,8 @@ public class IptvPassthroughService : IIptvPassthroughService
         var upstream = _resolver.Resolve(playlist, channel);
         var limit = playlist is null ? 0 : IptvConnectionLimit.Of(playlist);
 
-        var (resolvedUrl, streamType) = await ResolveStreamAsync(upstream.Url, upstream.Policy, channel.Name, depth: 0);
+        var (resolvedUrl, streamType, format) = await ResolveStreamAsync(upstream.Url, upstream.Policy, channel.Name, depth: 0);
+        var audioFormat = channel.Kind == IptvChannelKind.Tv ? null : format;
 
         var viewerKey = profileId ?? Guid.NewGuid();
         var viewerLeases = ViewerLeasePrefix(viewerKey, channel.PlaylistId);
@@ -157,7 +164,8 @@ public class IptvPassthroughService : IIptvPassthroughService
             return new PassthroughStartResult
             {
                 Url = $"{PassthroughBasePath}/audio?t={audioToken}",
-                StreamType = StreamTypeAudio
+                StreamType = StreamTypeAudio,
+                AudioFormat = audioFormat
             };
         }
 
@@ -170,39 +178,40 @@ public class IptvPassthroughService : IIptvPassthroughService
         return new PassthroughStartResult
         {
             Url = $"{PassthroughBasePath}/playlist.m3u8?t={playlistToken}",
-            StreamType = StreamTypeHls
+            StreamType = StreamTypeHls,
+            AudioFormat = audioFormat
         };
     }
 
-    private async Task<(string Url, string Type)> ResolveStreamAsync(string upstreamUrl, IptvRequestPolicy policy, string channelName, int depth, bool assumeAudioIfUnknown = false)
+    private async Task<StreamProbe> ResolveStreamAsync(string upstreamUrl, IptvRequestPolicy policy, string channelName, int depth, bool assumeAudioIfUnknown = false)
     {
         if (depth > 3)
         {
             _logger.LogWarning("Passthrough indirection depth exceeded for {Channel}; defaulting to audio.", channelName);
-            return (upstreamUrl, StreamTypeAudio);
+            return new StreamProbe(upstreamUrl, StreamTypeAudio, null);
         }
 
         var lowerPath = upstreamUrl.ToLowerInvariant();
         var queryIdx = lowerPath.IndexOf('?');
         if (queryIdx >= 0) lowerPath = lowerPath[..queryIdx];
 
-        if (lowerPath.EndsWith(".m3u8")) return (upstreamUrl, StreamTypeHls);
+        if (lowerPath.EndsWith(".m3u8")) return new StreamProbe(upstreamUrl, StreamTypeHls, AudioFormatHls);
         if (lowerPath.EndsWith(".ts") || lowerPath.EndsWith(".mpegts") || lowerPath.EndsWith(".mp4") || lowerPath.EndsWith(".mkv"))
         {
-            return (upstreamUrl, StreamTypeAudio);
+            return new StreamProbe(upstreamUrl, StreamTypeAudio, null);
         }
-        if (lowerPath.EndsWith(".mp3") || lowerPath.EndsWith(".aac")
-            || lowerPath.EndsWith(".ogg") || lowerPath.EndsWith(".opus")
-            || lowerPath.EndsWith(".flac") || lowerPath.EndsWith(".wav"))
+        if (lowerPath.EndsWith(".mp3")) return new StreamProbe(upstreamUrl, StreamTypeAudio, AudioFormatMp3);
+        if (lowerPath.EndsWith(".aac")) return new StreamProbe(upstreamUrl, StreamTypeAudio, AudioFormatAac);
+        if (lowerPath.EndsWith(".ogg") || lowerPath.EndsWith(".opus") || lowerPath.EndsWith(".flac") || lowerPath.EndsWith(".wav"))
         {
-            return (upstreamUrl, StreamTypeAudio);
+            return new StreamProbe(upstreamUrl, StreamTypeAudio, null);
         }
 
         if (lowerPath.EndsWith(".pls"))
         {
             var inner = await FollowIndirectionAsync(upstreamUrl, policy, channelName, ExtractFirstFileFromPls);
             if (inner != null) return await ResolveStreamAsync(inner, policy, channelName, depth + 1, assumeAudioIfUnknown: true);
-            return (upstreamUrl, StreamTypeAudio);
+            return new StreamProbe(upstreamUrl, StreamTypeAudio, null);
         }
 
         if (lowerPath.EndsWith(".m3u"))
@@ -210,16 +219,11 @@ public class IptvPassthroughService : IIptvPassthroughService
             var body = await TryFetchTextAsync(upstreamUrl, policy, channelName);
             if (body != null && body.TrimStart().StartsWith("#EXTM3U", StringComparison.OrdinalIgnoreCase))
             {
-                return (upstreamUrl, StreamTypeHls);
+                return new StreamProbe(upstreamUrl, StreamTypeHls, AudioFormatHls);
             }
             var inner = body == null ? null : ExtractFirstUrlFromShoutcastM3u(body);
             if (inner != null) return await ResolveStreamAsync(inner, policy, channelName, depth + 1, assumeAudioIfUnknown: true);
-            return (upstreamUrl, StreamTypeAudio);
-        }
-
-        if (assumeAudioIfUnknown)
-        {
-            return (upstreamUrl, StreamTypeAudio);
+            return new StreamProbe(upstreamUrl, StreamTypeAudio, null);
         }
 
         var client = _httpClientFactory.CreateClient(IptvManager.HttpClientName);
@@ -229,22 +233,28 @@ public class IptvPassthroughService : IIptvPassthroughService
             using var response = await client.SendAsync(request, HttpCompletionOption.ResponseHeadersRead);
             var contentType = response.Content.Headers.ContentType?.MediaType?.ToLowerInvariant() ?? string.Empty;
 
-            if (contentType.Contains("mpegurl") || contentType.Contains("m3u8")) return (upstreamUrl, StreamTypeHls);
-            if (contentType.Contains("scpls") || contentType.Contains("pls"))
+            if (contentType.Contains("mpegurl") || contentType.Contains("m3u8")) return new StreamProbe(upstreamUrl, StreamTypeHls, AudioFormatHls);
+            if (!assumeAudioIfUnknown && (contentType.Contains("scpls") || contentType.Contains("pls")))
             {
                 var inner = await FollowIndirectionAsync(upstreamUrl, policy, channelName, ExtractFirstFileFromPls);
                 if (inner != null) return await ResolveStreamAsync(inner, policy, channelName, depth + 1, assumeAudioIfUnknown: true);
             }
-            if (contentType.StartsWith("audio/")) return (upstreamUrl, StreamTypeAudio);
 
-            return (upstreamUrl, StreamTypeAudio);
+            return new StreamProbe(upstreamUrl, StreamTypeAudio, AudioFormatOf(contentType));
         }
         catch (Exception ex)
         {
             _logger.LogDebug("Passthrough probe failed for {Channel}; defaulting to audio: {ErrorType}", channelName, ex.GetType().Name);
-            return (upstreamUrl, StreamTypeAudio);
+            return new StreamProbe(upstreamUrl, StreamTypeAudio, null);
         }
     }
+
+    internal static string? AudioFormatOf(string contentType) => contentType switch
+    {
+        "audio/mpeg" or "audio/mp3" or "audio/mpeg3" or "audio/x-mpeg" or "audio/x-mp3" => AudioFormatMp3,
+        "audio/aac" or "audio/aacp" or "audio/x-aac" or "audio/aac-adts" or "audio/vnd.dlna.adts" => AudioFormatAac,
+        _ => null
+    };
 
     private async Task<string?> FollowIndirectionAsync(string url, IptvRequestPolicy policy, string channelName, Func<string, string?> extractor)
     {

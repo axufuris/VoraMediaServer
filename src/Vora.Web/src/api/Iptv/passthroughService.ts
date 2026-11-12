@@ -5,6 +5,7 @@ export type PassthroughStreamType = 'hls' | 'audio';
 export interface PassthroughStartResult {
     url: string;
     streamType: PassthroughStreamType;
+    audioFormat?: 'mp3' | 'aac' | 'hls' | null;
 }
 
 export const passthroughService = {

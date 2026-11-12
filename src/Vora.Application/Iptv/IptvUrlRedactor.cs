@@ -27,14 +27,6 @@ public static class IptvUrlRedactor
         @"(?<kind>/hlsr/)[^/\s?#'""<>]+/[^/\s?#'""<>]+/[^/\s?#'""<>]+/",
         RegexOptions.IgnoreCase | RegexOptions.Compiled);
 
-    private static readonly Regex XtreamStreamPath = new(
-        @"/(?:live|movie|series)/[^/]+/[^/]+/\d+(?:\.[a-z0-9]+)?$|/timeshift/[^/]+/[^/]+/\d+/|/hlsr/[^/]+/[^/]+/[^/]+/",
-        RegexOptions.IgnoreCase | RegexOptions.Compiled);
-
-    private static readonly Regex QueryCredential = new(
-        @"(?:^|[?&;])(?:" + CredentialKeys + @")=[^&#]+",
-        RegexOptions.IgnoreCase | RegexOptions.Compiled);
-
     public static string Redact(string? text, params string?[] secrets)
     {
         if (string.IsNullOrEmpty(text)) return string.Empty;
@@ -56,19 +48,6 @@ public static class IptvUrlRedactor
         }
 
         return redacted;
-    }
-
-    public static bool ContainsCredentials(string? url)
-    {
-        if (string.IsNullOrWhiteSpace(url)) return false;
-        if (!Uri.TryCreate(url.Trim(), UriKind.Absolute, out var uri))
-        {
-            return UserInfo.IsMatch(url) || CredentialQuery.IsMatch(url);
-        }
-
-        return !string.IsNullOrEmpty(uri.UserInfo)
-            || QueryCredential.IsMatch(uri.Query)
-            || XtreamStreamPath.IsMatch(uri.AbsolutePath);
     }
 
     public static string? SchemeAndHost(string? url)

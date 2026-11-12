@@ -50,23 +50,6 @@ public class IptvUrlRedactorTests
     }
 
     [Theory]
-    [InlineData("http://viewer:example-password@iptv.example.com/list.m3u", true)]
-    [InlineData("http://provider.example.com/get.php?username=viewer&password=example-password", true)]
-    [InlineData("http://provider.example.com/playlist.m3u?token=abc", true)]
-    [InlineData("http://provider.example.com:8080/live/viewer/example-password/1001.ts", true)]
-    [InlineData("http://provider.example.com:8080/live/viewer/example-password/1001", true)]
-    [InlineData("https://iptv-org.github.io/iptv/index.m3u", false)]
-    [InlineData("https://stream.example.com/live/radio1/stream/", false)]
-    [InlineData("https://stream.example.com/radio.mp3?sid=1", false)]
-    [InlineData("http://provider.example.com/list.m3u?token=", false)]
-    [InlineData("", false)]
-    [InlineData(null, false)]
-    public void Addresses_that_carry_credentials_are_recognised(string? url, bool expected)
-    {
-        IptvUrlRedactor.ContainsCredentials(url).Should().Be(expected);
-    }
-
-    [Theory]
     [InlineData("http://provider.example.com:8080/get.php?username=a&password=b", "http://provider.example.com")]
     [InlineData("https://viewer:pw@iptv.example.com/list.m3u", "https://iptv.example.com")]
     [InlineData("not a url", null)]

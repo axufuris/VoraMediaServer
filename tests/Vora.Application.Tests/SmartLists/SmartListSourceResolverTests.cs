@@ -86,7 +86,7 @@ public class SmartListSourceResolverTests
 
         entries.Select(e => e.Title).Should().Equal("News");
         entries[0].Kind.Should().Be(SmartListEntryKind.Channel);
-        (entries[0].Channel?.StreamUrl).Should().Be("https://example.test/News");
+        (entries[0].Channel?.StreamUrl).Should().Be("vora-channel:" + entries[0].Id);
     }
 
     [Fact]

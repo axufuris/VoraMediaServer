@@ -326,6 +326,49 @@ public class IptvPassthroughTests
     }
 
     [Theory]
+    [InlineData("https://radio.example.com/jazz.mp3", null, "audio", "mp3")]
+    [InlineData("https://radio.example.com/jazz.aac", null, "audio", "aac")]
+    [InlineData("https://radio.example.com/live/jazz", "audio/mpeg", "audio", "mp3")]
+    [InlineData("https://radio.example.com/live/jazz", "audio/aacp", "audio", "aac")]
+    [InlineData("https://radio.example.com/live/jazz", "application/octet-stream", "audio", null)]
+    [InlineData("https://radio.example.com/live/jazz.ogg", null, "audio", null)]
+    [InlineData("https://radio.example.com/live/jazz.m3u8", null, "hls", "hls")]
+    [InlineData("https://radio.example.com/live/jazz", "application/vnd.apple.mpegurl", "hls", "hls")]
+    public async Task A_radio_stream_says_what_audio_it_carries(string streamUrl, string? contentType, string streamType, string? audioFormat)
+    {
+        var channel = FreeRadioChannel();
+        channel.StreamUrl = streamUrl;
+        if (contentType is not null) _upstream.Respond(_ => true, "bytes", contentType);
+
+        var start = await Service().StartPassthroughAsync(channel.Id, _accountId, _profileId);
+
+        start.StreamType.Should().Be(streamType);
+        start.AudioFormat.Should().Be(audioFormat);
+    }
+
+    [Fact]
+    public async Task A_station_behind_a_pls_file_is_probed_for_its_format()
+    {
+        var channel = FreeRadioChannel();
+        channel.StreamUrl = "https://radio.example.com/listen.pls";
+        _upstream.Respond(uri => uri.AbsolutePath == "/listen.pls", "[playlist]\nFile1=https://radio.example.com:8000/stream\nNumberOfEntries=1\n", "audio/x-scpls");
+        _upstream.Respond(uri => uri.AbsolutePath == "/stream", "aac-bytes", "audio/aacp");
+
+        var start = await Service().StartPassthroughAsync(channel.Id, _accountId, _profileId);
+
+        start.StreamType.Should().Be(IptvPassthroughService.StreamTypeAudio);
+        start.AudioFormat.Should().Be("aac");
+    }
+
+    [Fact]
+    public async Task A_tv_channel_carries_no_audio_format()
+    {
+        var channel = XtreamChannel();
+
+        (await Service().StartPassthroughAsync(channel.Id, _accountId, _profileId)).AudioFormat.Should().BeNull();
+    }
+
+    [Theory]
     [InlineData(IptvChannelKind.Tv, "hls", false)]
     [InlineData(IptvChannelKind.Tv, "audio", true)]
     [InlineData(IptvChannelKind.Radio, "audio", false)]
