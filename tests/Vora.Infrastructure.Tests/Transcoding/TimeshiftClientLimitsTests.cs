@@ -111,7 +111,11 @@ public sealed class TimeshiftClientLimitsTests : IAsyncDisposable
         signer.Sign(default!, default!, default).ReturnsForAnyArgs("token");
 
         var users = Substitute.For<IUserManager>();
-        users.GetUserAccountAsync(Arg.Any<Guid>()).Returns(new UserVM { HasAllIptvAccess = true });
+        users.GetUserAccountAsync(Arg.Any<Guid>()).Returns(new UserVM
+        {
+            HasAllIptvAccess = true,
+            Profiles = new List<UserProfileVM> { new() { Id = _profileId, HasAllIptvAccess = true } }
+        });
         var protector = Substitute.For<IIptvSecretProtector>();
 
         return new IptvManager(

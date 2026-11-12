@@ -110,10 +110,9 @@ public class IptvPassthroughService : IIptvPassthroughService
 
         IptvPlaylist? playlist = channel.Playlist;
         var upstream = _resolver.Resolve(playlist, channel);
-        var secret = SecretOf(playlist);
         var limit = playlist is null ? 0 : IptvConnectionLimit.Of(playlist);
 
-        var (resolvedUrl, streamType) = await ResolveStreamAsync(upstream.Url, upstream.Policy, secret, depth: 0);
+        var (resolvedUrl, streamType) = await ResolveStreamAsync(upstream.Url, upstream.Policy, channel.Name, depth: 0);
 
         var leaseId = Guid.NewGuid().ToString("N");
         if (streamType == StreamTypeAudio)
@@ -145,11 +144,11 @@ public class IptvPassthroughService : IIptvPassthroughService
         };
     }
 
-    private async Task<(string Url, string Type)> ResolveStreamAsync(string upstreamUrl, IptvRequestPolicy policy, string? secret, int depth, bool assumeAudioIfUnknown = false)
+    private async Task<(string Url, string Type)> ResolveStreamAsync(string upstreamUrl, IptvRequestPolicy policy, string channelName, int depth, bool assumeAudioIfUnknown = false)
     {
         if (depth > 3)
         {
-            _logger.LogWarning("Passthrough indirection depth exceeded for {Url}; defaulting to audio.", Redact(upstreamUrl, secret));
+            _logger.LogWarning("Passthrough indirection depth exceeded for {Channel}; defaulting to audio.", channelName);
             return (upstreamUrl, StreamTypeAudio);
         }
 
@@ -167,20 +166,20 @@ public class IptvPassthroughService : IIptvPassthroughService
 
         if (lowerPath.EndsWith(".pls"))
         {
-            var inner = await FollowIndirectionAsync(upstreamUrl, policy, secret, ExtractFirstFileFromPls);
-            if (inner != null) return await ResolveStreamAsync(inner, policy, secret, depth + 1, assumeAudioIfUnknown: true);
+            var inner = await FollowIndirectionAsync(upstreamUrl, policy, channelName, ExtractFirstFileFromPls);
+            if (inner != null) return await ResolveStreamAsync(inner, policy, channelName, depth + 1, assumeAudioIfUnknown: true);
             return (upstreamUrl, StreamTypeAudio);
         }
 
         if (lowerPath.EndsWith(".m3u"))
         {
-            var body = await TryFetchTextAsync(upstreamUrl, policy, secret);
+            var body = await TryFetchTextAsync(upstreamUrl, policy, channelName);
             if (body != null && body.TrimStart().StartsWith("#EXTM3U", StringComparison.OrdinalIgnoreCase))
             {
                 return (upstreamUrl, StreamTypeHls);
             }
             var inner = body == null ? null : ExtractFirstUrlFromShoutcastM3u(body);
-            if (inner != null) return await ResolveStreamAsync(inner, policy, secret, depth + 1, assumeAudioIfUnknown: true);
+            if (inner != null) return await ResolveStreamAsync(inner, policy, channelName, depth + 1, assumeAudioIfUnknown: true);
             return (upstreamUrl, StreamTypeAudio);
         }
 
@@ -199,8 +198,8 @@ public class IptvPassthroughService : IIptvPassthroughService
             if (contentType.Contains("mpegurl") || contentType.Contains("m3u8")) return (upstreamUrl, StreamTypeHls);
             if (contentType.Contains("scpls") || contentType.Contains("pls"))
             {
-                var inner = await FollowIndirectionAsync(upstreamUrl, policy, secret, ExtractFirstFileFromPls);
-                if (inner != null) return await ResolveStreamAsync(inner, policy, secret, depth + 1, assumeAudioIfUnknown: true);
+                var inner = await FollowIndirectionAsync(upstreamUrl, policy, channelName, ExtractFirstFileFromPls);
+                if (inner != null) return await ResolveStreamAsync(inner, policy, channelName, depth + 1, assumeAudioIfUnknown: true);
             }
             if (contentType.StartsWith("audio/")) return (upstreamUrl, StreamTypeAudio);
 
@@ -208,18 +207,18 @@ public class IptvPassthroughService : IIptvPassthroughService
         }
         catch (Exception ex)
         {
-            _logger.LogDebug("Passthrough probe failed for {Url}; defaulting to audio: {Error}", Redact(upstreamUrl, secret), Redact(ex.Message, secret));
+            _logger.LogDebug("Passthrough probe failed for {Channel}; defaulting to audio: {ErrorType}", channelName, ex.GetType().Name);
             return (upstreamUrl, StreamTypeAudio);
         }
     }
 
-    private async Task<string?> FollowIndirectionAsync(string url, IptvRequestPolicy policy, string? secret, Func<string, string?> extractor)
+    private async Task<string?> FollowIndirectionAsync(string url, IptvRequestPolicy policy, string channelName, Func<string, string?> extractor)
     {
-        var body = await TryFetchTextAsync(url, policy, secret);
+        var body = await TryFetchTextAsync(url, policy, channelName);
         return body == null ? null : extractor(body);
     }
 
-    private async Task<string?> TryFetchTextAsync(string url, IptvRequestPolicy policy, string? secret)
+    private async Task<string?> TryFetchTextAsync(string url, IptvRequestPolicy policy, string channelName)
     {
         try
         {
@@ -231,7 +230,7 @@ public class IptvPassthroughService : IIptvPassthroughService
         }
         catch (Exception ex)
         {
-            _logger.LogDebug("Passthrough indirection fetch failed for {Url}: {Error}", Redact(url, secret), Redact(ex.Message, secret));
+            _logger.LogDebug("Passthrough indirection fetch failed for {Channel}: {ErrorType}", channelName, ex.GetType().Name);
             return null;
         }
     }
