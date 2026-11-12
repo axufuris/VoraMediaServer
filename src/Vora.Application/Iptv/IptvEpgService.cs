@@ -8,6 +8,7 @@ using Vora.Application.Iptv.Dtos;
 using Vora.Application.Settings;
 using Vora.Application.Users;
 using Vora.Domain.Entities.Iptv;
+using Vora.Domain.Enums;
 
 namespace Vora.Application.Iptv;
 
@@ -29,6 +30,7 @@ public class IptvSourceSyncStats
     public int MatchedChannels { get; set; }
     public List<string> UnmatchedSamples { get; set; } = new();
     public DateTime SyncedAt { get; set; }
+    public string? Error { get; set; }
 }
 
 public class IptvEpgService : IIptvEpgService
@@ -119,9 +121,14 @@ public class IptvEpgService : IIptvEpgService
 
             using var scope = _scopeFactory.CreateScope();
             var repository = scope.ServiceProvider.GetRequiredService<IIptvRepository>();
+            var resolver = scope.ServiceProvider.GetRequiredService<IIptvUpstreamResolver>();
 
             var sources = await repository.GetActiveEpgSourcesAsync(cancellationToken);
-            if (sources.Count == 0)
+            var providerGuides = (await repository.GetActivePlaylistsAsync(cancellationToken))
+                .Where(p => p.SourceType == IptvSourceType.Xtream && p.UseProviderGuide)
+                .OrderBy(p => p.AddedAt)
+                .ToList();
+            if (sources.Count == 0 && providerGuides.Count == 0)
             {
                 _logger.LogInformation("No active EPG sources configured — skipping sync.");
                 return;
@@ -144,6 +151,11 @@ public class IptvEpgService : IIptvEpgService
                 await SyncSourceAsync(repository, source, allChannels, mergedCache, claimedBy, cutoffTime, maxFutureTime, cancellationToken);
             }
 
+            foreach (var playlist in providerGuides)
+            {
+                await SyncProviderGuideAsync(resolver, playlist, allChannels, mergedCache, claimedBy, cutoffTime, maxFutureTime, cancellationToken);
+            }
+
             foreach (var kvp in mergedCache)
             {
                 kvp.Value.Sort((a, b) => a.StartTime.CompareTo(b.StartTime));
@@ -153,7 +165,7 @@ public class IptvEpgService : IIptvEpgService
             _memoryCache = new ConcurrentDictionary<string, List<IptvProgramDto>>(mergedCache, StringComparer.OrdinalIgnoreCase);
             _channelsCovered = new HashSet<string>(mergedCache.Keys, StringComparer.OrdinalIgnoreCase);
 
-            _logger.LogInformation("Completed EPG sync. {ChannelCount} channels populated from {SourceCount} sources.", mergedCache.Count, sources.Count);
+            _logger.LogInformation("Completed EPG sync. {ChannelCount} channels populated from {SourceCount} sources.", mergedCache.Count, sources.Count + providerGuides.Count);
         }
         finally
         {
@@ -239,7 +251,7 @@ public class IptvEpgService : IIptvEpgService
             response.EnsureSuccessStatusCode();
 
             var stream = await response.Content.ReadAsStreamAsync(cancellationToken);
-            stream = await DecompressIfNeededAsync(stream, source.XmlTvUrl, cancellationToken);
+            stream = await DecompressIfNeededAsync(stream, IsGzip(source.XmlTvUrl, response), cancellationToken);
 
             var stats = await XmlTvParser.ParseAsync(stream, allChannels, parsed, cutoffTime, maxFutureTime, cancellationToken);
 
@@ -268,11 +280,76 @@ public class IptvEpgService : IIptvEpgService
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Failed to process XMLTV for EPG source {Name}.", source.Name);
-            source.LastError = ex.Message;
+            var error = IptvUrlRedactor.Redact(ex.Message);
+            _logger.LogError("Failed to process XMLTV for EPG source {Name} ({ErrorType}): {Error}", source.Name, ex.GetType().Name, error);
+            source.LastError = error;
             await repository.UpdateEpgSourceAsync(source);
         }
     }
+
+    private async Task SyncProviderGuideAsync(
+        IIptvUpstreamResolver resolver,
+        IptvPlaylist playlist,
+        List<IptvChannel> allChannels,
+        Dictionary<string, List<IptvProgramDto>> mergedCache,
+        Dictionary<string, Guid> claimedBy,
+        DateTime cutoffTime,
+        DateTime maxFutureTime,
+        CancellationToken cancellationToken)
+    {
+        string? password = null;
+        try
+        {
+            var account = resolver.XtreamAccountFor(playlist);
+            password = account.Password;
+
+            var httpClient = _httpClientFactory.CreateClient(IptvManager.HttpClientName);
+            using var request = resolver.PolicyFor(playlist).Get(account.XmlTvUrl());
+            using var response = await httpClient.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, cancellationToken);
+            if (!response.IsSuccessStatusCode)
+            {
+                throw new IptvSourceException($"The provider's guide answered HTTP {(int)response.StatusCode}.");
+            }
+
+            var stream = await response.Content.ReadAsStreamAsync(cancellationToken);
+            stream = await DecompressIfNeededAsync(stream, IsGzip(null, response), cancellationToken);
+
+            var parsed = new Dictionary<string, List<IptvProgramDto>>(StringComparer.OrdinalIgnoreCase);
+            var stats = await XmlTvParser.ParseAsync(stream, allChannels, parsed, cutoffTime, maxFutureTime, cancellationToken);
+
+            _syncStats[playlist.Id] = new IptvSourceSyncStats
+            {
+                TotalProgrammes = stats.ProgrammesSeen,
+                MatchedProgrammes = stats.ProgrammesMatched,
+                MatchedChannels = parsed.Count,
+                UnmatchedSamples = stats.UnmatchedIdSamples.ToList(),
+                SyncedAt = DateTime.UtcNow
+            };
+
+            _logger.LogInformation(
+                "Provider guide of {Name}: parsed {Seen} programmes, matched {Matched}.",
+                playlist.Name,
+                stats.ProgrammesSeen,
+                stats.ProgrammesMatched);
+
+            ClaimChannelsForSource(playlist.Id, parsed, mergedCache, claimedBy);
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            throw;
+        }
+        catch (Exception ex)
+        {
+            var error = IptvUrlRedactor.Redact(ex.Message, password);
+            _syncStats[playlist.Id] = new IptvSourceSyncStats { SyncedAt = DateTime.UtcNow, Error = error };
+            _logger.LogWarning("Failed to load the provider guide of {Name} ({ErrorType}): {Error}", playlist.Name, ex.GetType().Name, error);
+        }
+    }
+
+    private static bool IsGzip(string? url, HttpResponseMessage response) =>
+        (url is not null && url.EndsWith(GzipExtension, StringComparison.OrdinalIgnoreCase))
+        || response.Content.Headers.ContentEncoding.Contains("gzip", StringComparer.OrdinalIgnoreCase)
+        || response.Content.Headers.ContentType?.MediaType is "application/gzip" or "application/x-gzip";
 
     internal static void ClaimChannelsForSource(
         Guid sourceId,
@@ -308,9 +385,9 @@ public class IptvEpgService : IIptvEpgService
         }
     }
 
-    private static async Task<Stream> DecompressIfNeededAsync(Stream stream, string url, CancellationToken cancellationToken)
+    private static async Task<Stream> DecompressIfNeededAsync(Stream stream, bool gzip, CancellationToken cancellationToken)
     {
-        if (!url.EndsWith(GzipExtension, StringComparison.OrdinalIgnoreCase))
+        if (!gzip)
         {
             return stream;
         }

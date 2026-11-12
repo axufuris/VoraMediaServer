@@ -71,6 +71,7 @@ public interface ITaskQueueManager
     void QueueOverlayOrphanSweep();
     void QueueUnusedFileRemoval();
     void QueueIptvEpgSync();
+    void QueueIptvScheduledSync();
     void QueueIptvHealthCheck(Guid playlistId, string? playlistName = null);
     void QueueGenerateLibraryVideoThumbnails(Guid libraryId, string? libraryName = null, bool forceOverride = false, bool isScheduleTrigger = false, bool isAdditionTrigger = false);
     void QueueLibraryThumbnails(Guid libraryId, string? libraryName, LibraryThumbnailReason reason, DateTime? since = null);
@@ -952,6 +953,20 @@ public class TaskQueueManager : ITaskQueueManager
 
             await dvrManager.ProcessSchedulesIntoSessionsAsync(ct);
         }, recipe: TaskRecipe.Of(nameof(QueueIptvEpgSync)));
+    }
+
+    public void QueueIptvScheduledSync()
+    {
+        Enqueue("IPTV Channel and EPG Sync", async (ct, sp) =>
+        {
+            var iptvManager = sp.GetRequiredService<IIptvManager>();
+            var epgService = sp.GetRequiredService<IIptvEpgService>();
+            var dvrManager = sp.GetRequiredService<IDvrManager>();
+
+            await iptvManager.RefreshActivePlaylistChannelsAsync(ct);
+            await epgService.SyncEpgDataAsync(ct);
+            await dvrManager.ProcessSchedulesIntoSessionsAsync(ct);
+        }, recipe: TaskRecipe.Of(nameof(QueueIptvScheduledSync)));
     }
 
     public void QueueIptvHealthCheck(Guid playlistId, string? playlistName = null)

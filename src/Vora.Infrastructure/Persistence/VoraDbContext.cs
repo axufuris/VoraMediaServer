@@ -1159,6 +1159,12 @@ public class VoraDbContext : DbContext
         {
             entity.Property(e => e.Name).IsRequired().HasMaxLength(128);
             entity.Property(e => e.M3uUrl).HasMaxLength(1024);
+            entity.Property(e => e.ServerUrl).HasMaxLength(1024);
+            entity.Property(e => e.Username).HasMaxLength(256);
+            entity.Property(e => e.PasswordCiphertext).HasColumnType("text");
+            entity.Property(e => e.UserAgent).HasMaxLength(512);
+            entity.Property(e => e.Referer).HasMaxLength(1024);
+            entity.Property(e => e.AccountStatus).HasMaxLength(32);
             entity.Property(e => e.CountryFilter).HasMaxLength(8);
 
             entity.HasOne(p => p.TunerProfile)
@@ -1181,6 +1187,8 @@ public class VoraDbContext : DbContext
             entity.Property(e => e.ExternalChannelId).IsRequired().HasMaxLength(256);
             entity.Property(e => e.Name).IsRequired().HasMaxLength(256);
             entity.Property(e => e.StreamUrl).IsRequired().HasMaxLength(1024);
+            entity.Property(e => e.UserAgent).HasMaxLength(512);
+            entity.Property(e => e.Referer).HasMaxLength(1024);
             entity.Property(e => e.LogoUrl).HasMaxLength(1024);
             entity.Property(e => e.GroupTitle).HasMaxLength(128);
             entity.Property(e => e.Resolution).HasMaxLength(16);

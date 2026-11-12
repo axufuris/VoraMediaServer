@@ -35,7 +35,12 @@ public static class IptvClientEndpoints
 
     private static async Task<IResult> GetClientPlaylistsAsync(Guid userId, [FromQuery] Guid? profileId, ClaimsPrincipal user, IIptvManager manager, ISystemSettingsRepository settingsRepo)
     {
-        var playlists = await manager.GetClientPlaylistsAsync(userId, profileId);
+        var accountId = user.GetAccountId();
+        if (accountId == null) return Results.Unauthorized();
+
+        var playlists = user.IsAdmin()
+            ? await manager.GetClientPlaylistsAsync(userId, profileId)
+            : await manager.GetClientPlaylistsAsync(accountId.Value, user.GetProfileId());
 
         if (!user.IsAdmin())
         {

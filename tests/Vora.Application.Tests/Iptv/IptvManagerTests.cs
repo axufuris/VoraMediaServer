@@ -1,5 +1,6 @@
 using Microsoft.Extensions.Logging.Abstractions;
 using Vora.Application.Iptv;
+using Vora.Application.Iptv.Dtos;
 using Vora.Application.Streaming;
 using Vora.Application.Tasks;
 using Vora.Application.Users;
@@ -21,8 +22,8 @@ public class IptvManagerTests
     private readonly ITaskQueueManager _tasks;
     private readonly ITimeshiftCoordinator _timeshift;
     private readonly ITunerRegistry _tunerRegistry;
-    private readonly IHttpClientFactory _httpFactory;
     private readonly IStreamingTokenSigner _signer;
+    private readonly IIptvChannelLoader _loader;
     private readonly IptvManager _manager;
 
     public IptvManagerTests()
@@ -33,11 +34,12 @@ public class IptvManagerTests
         _tasks = Substitute.For<ITaskQueueManager>();
         _timeshift = Substitute.For<ITimeshiftCoordinator>();
         _tunerRegistry = new TunerRegistry();
-        _httpFactory = Substitute.For<IHttpClientFactory>();
         _signer = Substitute.For<IStreamingTokenSigner>();
+        _loader = Substitute.For<IIptvChannelLoader>();
+        var protector = new PlainSecretProtector();
 
-        _manager = new IptvManager(_repo, _epg, _users, _tasks, _timeshift, _tunerRegistry, _httpFactory, _signer, Substitute.For<ITimeshiftVideo>(),
-            NullLogger<IptvManager>.Instance);
+        _manager = new IptvManager(_repo, _epg, _users, _tasks, _timeshift, _tunerRegistry, _signer, Substitute.For<ITimeshiftVideo>(),
+            _loader, new IptvUpstreamResolver(protector), protector, NullLogger<IptvManager>.Instance);
     }
 
     [Fact]
@@ -188,7 +190,7 @@ public class IptvManagerTests
     {
         _repo.GetPlaylistByIdAsync(Arg.Any<Guid>()).Returns((IptvPlaylist?)null);
 
-        var act = async () => await _manager.UpdatePlaylistAsync(Guid.NewGuid(), "n", "u", true, 2, true, IptvChannelKind.Tv);
+        var act = async () => await _manager.UpdatePlaylistAsync(Guid.NewGuid(), Settings("n", "u", maxConcurrentStreams: 2));
 
         await act.Should().ThrowAsync<InvalidOperationException>().WithMessage("*Playlist not found*");
     }
@@ -200,8 +202,7 @@ public class IptvManagerTests
         var playlist = new IptvPlaylist { Id = id, Name = "old", M3uUrl = "same", TunerProfile = null };
         _repo.GetPlaylistByIdAsync(id).Returns(playlist);
 
-        await _manager.UpdatePlaylistAsync(id, "new", "same", supportsWebPlayback: true,
-            maxConcurrentStreams: 4, isActive: true, defaultKind: IptvChannelKind.Tv);
+        await _manager.UpdatePlaylistAsync(id, Settings("new", "same", maxConcurrentStreams: 4));
 
         playlist.TunerProfile.Should().NotBeNull();
         playlist.TunerProfile!.MaxConcurrentStreams.Should().Be(4);
@@ -220,11 +221,20 @@ public class IptvManagerTests
         };
         _repo.GetPlaylistByIdAsync(id).Returns(playlist);
 
-        await _manager.UpdatePlaylistAsync(id, "p", "same", supportsWebPlayback: true,
-            maxConcurrentStreams: 8, isActive: true, defaultKind: playlist.DefaultChannelKind);
+        await _manager.UpdatePlaylistAsync(id, Settings("p", "same", maxConcurrentStreams: 8, defaultKind: playlist.DefaultChannelKind));
 
         playlist.TunerProfile!.MaxConcurrentStreams.Should().Be(8);
         // No m3u change, no kind change → no EPG queue
         _tasks.DidNotReceive().QueueIptvEpgSync();
     }
+
+    private static IptvPlaylistSettingsDto Settings(string name, string m3uUrl, int maxConcurrentStreams, IptvChannelKind defaultKind = IptvChannelKind.Tv) => new()
+    {
+        Name = name,
+        M3uUrl = m3uUrl,
+        SupportsWebPlayback = true,
+        MaxConcurrentStreams = maxConcurrentStreams,
+        IsActive = true,
+        DefaultChannelKind = defaultKind
+    };
 }

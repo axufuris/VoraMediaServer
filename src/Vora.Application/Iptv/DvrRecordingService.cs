@@ -5,6 +5,7 @@ using System.Collections.Concurrent;
 using System.Diagnostics;
 using Vora.Application.Analysis;
 using Vora.Application.Settings;
+using Vora.Domain.Entities.Iptv;
 using Vora.Domain.Enums;
 
 namespace Vora.Application.Iptv;
@@ -144,8 +145,26 @@ public class DvrRecordingService : IDvrRecordingService
         }
 
         var playlistId = session.Schedule.Channel.PlaylistId;
-        var tunerProfile = await repo.GetTunerProfileByPlaylistIdAsync(playlistId);
-        var maxConcurrent = tunerProfile?.MaxConcurrentStreams ?? 0;
+        IptvUpstream upstream;
+        string? secret;
+        try
+        {
+            var channel = await repo.GetChannelWithPlaylistAsync(session.Schedule.Channel.Id) ?? session.Schedule.Channel;
+            var resolver = scope.ServiceProvider.GetRequiredService<IIptvUpstreamResolver>();
+            IptvPlaylist? playlist = channel.Playlist;
+            upstream = resolver.Resolve(playlist, channel);
+            secret = playlist is null ? null : resolver.PasswordFor(playlist);
+        }
+        catch (IptvSourceException ex)
+        {
+            _activeRecordings.TryRemove(sessionId, out _);
+            activeRec.Dispose();
+            _logger.LogWarning("[DVR] Session {SessionId} can't reach its provider: {Error}", sessionId, ex.Message);
+            await repo.UpdateSessionStatusAsync(sessionId, IptvRecordingSessionStatus.Failed, errorMessage: ex.Message);
+            return false;
+        }
+
+        var maxConcurrent = await repo.GetConnectionLimitAsync(playlistId);
         if (!_tunerRegistry.TryAcquire(playlistId, maxConcurrent, DvrLeaseKey(sessionId), TunerLeaseKind.Dvr))
         {
             _activeRecordings.TryRemove(sessionId, out _);
@@ -155,7 +174,7 @@ public class DvrRecordingService : IDvrRecordingService
             return false;
         }
 
-        _ = Task.Run(() => RecordingLoopAsync(sessionId, session.Schedule.Channel.StreamUrl, outputPath, session.EndTime, activeRec));
+        _ = Task.Run(() => RecordingLoopAsync(sessionId, upstream, secret, outputPath, session.EndTime, activeRec));
 
         await repo.UpdateSessionStatusAsync(sessionId, IptvRecordingSessionStatus.Recording, outputPath: outputPath);
         var notifier = scope.ServiceProvider.GetRequiredService<IClientNotifier>();
@@ -163,7 +182,7 @@ public class DvrRecordingService : IDvrRecordingService
         return true;
     }
 
-    private async Task RecordingLoopAsync(Guid sessionId, string streamUrl, string outputPath, DateTime endTime, ActiveRecording activeRec)
+    private async Task RecordingLoopAsync(Guid sessionId, IptvUpstream upstream, string? secret, string outputPath, DateTime endTime, ActiveRecording activeRec)
     {
         try
         {
@@ -174,7 +193,7 @@ public class DvrRecordingService : IDvrRecordingService
 
             try
             {
-                await RunRecordingAsync(sessionId, streamUrl, outputPath, endTime, activeRec);
+                await RunRecordingAsync(sessionId, upstream, secret, outputPath, endTime, activeRec);
             }
             catch (OperationCanceledException)
             {
@@ -202,14 +221,14 @@ public class DvrRecordingService : IDvrRecordingService
         }
     }
 
-    private async Task RunRecordingAsync(Guid sessionId, string streamUrl, string outputPath, DateTime endTime, ActiveRecording activeRec)
+    private async Task RunRecordingAsync(Guid sessionId, IptvUpstream upstream, string? secret, string outputPath, DateTime endTime, ActiveRecording activeRec)
     {
         var token = activeRec.Cts.Token;
         using var fs = new FileStream(outputPath, FileMode.Append, FileAccess.Write, FileShare.Read);
 
         while (DateTime.UtcNow < endTime && !token.IsCancellationRequested)
         {
-            var process = new Process { StartInfo = BuildRecordingProcessInfo(streamUrl) };
+            var process = new Process { StartInfo = BuildRecordingProcessInfo(upstream.Url, upstream.Policy) };
             activeRec.AttachProcess(process);
             process.Start();
 
@@ -228,7 +247,7 @@ public class DvrRecordingService : IDvrRecordingService
 
             if (!string.IsNullOrWhiteSpace(stderr))
             {
-                _logger.LogDebug($"[DVR] ffmpeg exited for session {sessionId}: {stderr}");
+                _logger.LogDebug("[DVR] ffmpeg exited for session {SessionId}: {Output}", sessionId, IptvUrlRedactor.Redact(stderr, secret));
             }
 
             _logger.LogWarning($"[DVR] Stream dropped prematurely for Session {sessionId}. Reconnecting in 3 seconds...");
@@ -236,7 +255,7 @@ public class DvrRecordingService : IDvrRecordingService
         }
     }
 
-    private static ProcessStartInfo BuildRecordingProcessInfo(string streamUrl)
+    internal static ProcessStartInfo BuildRecordingProcessInfo(string streamUrl, IptvRequestPolicy policy)
     {
         var psi = new ProcessStartInfo
         {
@@ -252,8 +271,9 @@ public class DvrRecordingService : IDvrRecordingService
         psi.ArgumentList.Add("1");
         psi.ArgumentList.Add("-reconnect_delay_max");
         psi.ArgumentList.Add("5");
+        foreach (var option in policy.FfmpegInputOptions()) psi.ArgumentList.Add(option);
         psi.ArgumentList.Add("-i");
-        psi.ArgumentList.Add(streamUrl);
+        psi.ArgumentList.Add(policy.FfmpegInputUrl(streamUrl));
         psi.ArgumentList.Add("-fflags");
         psi.ArgumentList.Add("+genpts");
         psi.ArgumentList.Add("-c");

@@ -17,17 +17,20 @@ public class IptvHealthCheckService : IIptvHealthCheckService
 
     private readonly IIptvRepository _repository;
     private readonly IHttpClientFactory _httpClientFactory;
+    private readonly IIptvUpstreamResolver _resolver;
     private readonly ITaskProgressReporter _progress;
     private readonly ILogger<IptvHealthCheckService> _logger;
 
     public IptvHealthCheckService(
         IIptvRepository repository,
         IHttpClientFactory httpClientFactory,
+        IIptvUpstreamResolver resolver,
         ITaskProgressReporter progress,
         ILogger<IptvHealthCheckService> logger)
     {
         _repository = repository;
         _httpClientFactory = httpClientFactory;
+        _resolver = resolver;
         _progress = progress;
         _logger = logger;
     }
@@ -37,14 +40,24 @@ public class IptvHealthCheckService : IIptvHealthCheckService
         var playlist = await _repository.GetPlaylistByIdAsync(playlistId);
         if (playlist == null || !playlist.EnableHealthCheck) return;
 
-        var streams = await _repository.GetChannelStreamsForPlaylistAsync(playlistId);
-        if (streams.Count == 0) return;
+        var channels = playlist.Channels.ToList();
+        if (channels.Count == 0) return;
+
+        List<(Guid Id, IptvUpstream Upstream)> streams;
+        try
+        {
+            streams = channels.Select(c => (c.Id, _resolver.Resolve(playlist, c))).ToList();
+        }
+        catch (IptvSourceException ex)
+        {
+            _logger.LogWarning("IPTV health check for '{Playlist}' skipped: {Error}", playlist.Name, ex.Message);
+            return;
+        }
 
         // Probe no wider than the playlist's tuner limit so a health check never
         // out-hammers what the admin already deemed safe for that provider. A
         // "0 = unlimited" tuner setting still gets a conservative cap here.
-        var tuner = await _repository.GetTunerProfileByPlaylistIdAsync(playlistId);
-        var cap = tuner?.MaxConcurrentStreams ?? 0;
+        var cap = IptvConnectionLimit.Of(playlist);
         var parallelism = cap > 0 ? Math.Min(cap, MaxParallelism) : DefaultParallelism;
 
         var client = _httpClientFactory.CreateClient(IptvManager.HttpClientName);
@@ -57,7 +70,7 @@ public class IptvHealthCheckService : IIptvHealthCheckService
             new ParallelOptions { MaxDegreeOfParallelism = parallelism, CancellationToken = cancellationToken },
             async (stream, ct) =>
             {
-                results[stream.Id] = await ProbeAsync(client, stream.StreamUrl, ct);
+                results[stream.Id] = await ProbeAsync(client, stream.Upstream, ct);
                 var n = Interlocked.Increment(ref done);
                 _progress.Report($"Checking {playlist.Name} ({n}/{total})");
             });
@@ -68,8 +81,9 @@ public class IptvHealthCheckService : IIptvHealthCheckService
         _logger.LogInformation("IPTV health check for '{Playlist}': {Unhealthy} of {Total} channel(s) unreachable.", playlist.Name, unhealthy, total);
     }
 
-    private async Task<bool> ProbeAsync(HttpClient client, string url, CancellationToken cancellationToken)
+    private static async Task<bool> ProbeAsync(HttpClient client, IptvUpstream upstream, CancellationToken cancellationToken)
     {
+        var url = upstream.Url;
         // Non-HTTP schemes (rtmp/udp/…) can't be probed over HttpClient — treat
         // as healthy rather than hiding a channel we simply can't test.
         if (string.IsNullOrWhiteSpace(url) || !url.StartsWith("http", StringComparison.OrdinalIgnoreCase))
@@ -81,7 +95,7 @@ public class IptvHealthCheckService : IIptvHealthCheckService
         cts.CancelAfter(ProbeTimeout);
         try
         {
-            using var request = new HttpRequestMessage(HttpMethod.Get, url);
+            using var request = upstream.Policy.Get(url);
             // Ask for just the first bytes so we read headers, not the whole live
             // stream. Servers that ignore Range return 200; both count as alive.
             request.Headers.Range = new System.Net.Http.Headers.RangeHeaderValue(0, 1);

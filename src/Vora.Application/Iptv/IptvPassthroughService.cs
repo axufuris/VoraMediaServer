@@ -1,9 +1,7 @@
-using System.Security.Cryptography;
 using System.Text;
 using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.Options;
-using Vora.Application.Auth;
 using Vora.Application.Users;
+using Vora.Domain.Entities.Iptv;
 
 namespace Vora.Application.Iptv;
 
@@ -19,16 +17,44 @@ public class PassthroughStartResult
     public required string StreamType { get; init; }
 }
 
+public sealed class PassthroughAudioStream : IDisposable
+{
+    private readonly Action _keepAlive;
+    private readonly Action _release;
+    private bool _disposed;
+
+    public PassthroughAudioStream(HttpResponseMessage response, Action keepAlive, Action release)
+    {
+        Response = response;
+        _keepAlive = keepAlive;
+        _release = release;
+    }
+
+    public HttpResponseMessage Response { get; }
+
+    public void KeepAlive() => _keepAlive();
+
+    public void Dispose()
+    {
+        if (_disposed) return;
+        _disposed = true;
+        Response.Dispose();
+        _release();
+    }
+}
+
 public interface IIptvPassthroughService
 {
-    Task<PassthroughStartResult> StartPassthroughAsync(Guid channelId, Guid userId);
+    Task<PassthroughStartResult> StartPassthroughAsync(Guid channelId, Guid userId, Guid? profileId);
     Task<PassthroughPlaylistResult?> GetRewrittenPlaylistAsync(string token);
     Task<HttpResponseMessage?> FetchSegmentAsync(string token, CancellationToken cancellationToken);
-    Task<HttpResponseMessage?> FetchAudioStreamAsync(string token, CancellationToken cancellationToken);
+    Task<PassthroughAudioStream?> FetchAudioStreamAsync(string token, CancellationToken cancellationToken);
 }
 
 public class IptvPassthroughService : IIptvPassthroughService
 {
+    public const string DefaultAudioUserAgent = "WinampMPEG/5.0";
+
     private const string PlaylistTokenTag = "p";
     private const string SegmentTokenTag = "s";
     private const string AudioTokenTag = "a";
@@ -44,8 +70,8 @@ public class IptvPassthroughService : IIptvPassthroughService
     private readonly IUserManager _userManager;
     private readonly IHttpClientFactory _httpClientFactory;
     private readonly ITunerRegistry _tunerRegistry;
-    private readonly IptvPassthroughOptions _passthroughOptions;
-    private readonly JwtOptions _jwtOptions;
+    private readonly IIptvUpstreamResolver _resolver;
+    private readonly IIptvPassthroughTokenProtector _tokens;
     private readonly ILogger<IptvPassthroughService> _logger;
 
     public IptvPassthroughService(
@@ -53,33 +79,52 @@ public class IptvPassthroughService : IIptvPassthroughService
         IUserManager userManager,
         IHttpClientFactory httpClientFactory,
         ITunerRegistry tunerRegistry,
-        IOptions<IptvPassthroughOptions> passthroughOptions,
-        IOptions<JwtOptions> jwtOptions,
+        IIptvUpstreamResolver resolver,
+        IIptvPassthroughTokenProtector tokens,
         ILogger<IptvPassthroughService> logger)
     {
         _repository = repository;
         _userManager = userManager;
         _httpClientFactory = httpClientFactory;
         _tunerRegistry = tunerRegistry;
-        _passthroughOptions = passthroughOptions.Value;
-        _jwtOptions = jwtOptions.Value;
+        _resolver = resolver;
+        _tokens = tokens;
         _logger = logger;
     }
 
-    private static string LiveLeaseKey(string leaseId) => $"live:{leaseId}";
+    public static string LiveLeaseKey(string leaseId) => $"live:{leaseId}";
 
-    public async Task<PassthroughStartResult> StartPassthroughAsync(Guid channelId, Guid userId)
+    private sealed record PassthroughTicket(string Tag, Guid PlaylistId, Guid ChannelId, string LeaseId, string Url);
+
+    private sealed record UpstreamContext(IptvRequestPolicy Policy, int ConnectionLimit, string? Secret);
+
+    public async Task<PassthroughStartResult> StartPassthroughAsync(Guid channelId, Guid userId, Guid? profileId)
     {
-        var channel = await _repository.GetChannelByIdAsync(channelId)
+        var channel = await _repository.GetChannelWithPlaylistAsync(channelId)
             ?? throw new InvalidOperationException("Channel not found.");
 
-        await EnsureUserHasChannelAccessAsync(userId, channel.PlaylistId);
+        if (!await IptvPlaylistAccess.AllowsAsync(_userManager, userId, profileId, channel.PlaylistId))
+        {
+            throw new UnauthorizedAccessException("User does not have access to this IPTV playlist.");
+        }
 
-        var (resolvedUrl, streamType) = await ResolveStreamAsync(channel.StreamUrl, depth: 0);
+        IptvPlaylist? playlist = channel.Playlist;
+        var upstream = _resolver.Resolve(playlist, channel);
+        var secret = SecretOf(playlist);
+        var limit = playlist is null ? 0 : IptvConnectionLimit.Of(playlist);
 
+        var (resolvedUrl, streamType) = await ResolveStreamAsync(upstream.Url, upstream.Policy, secret, depth: 0);
+
+        var leaseId = Guid.NewGuid().ToString("N");
         if (streamType == StreamTypeAudio)
         {
-            var audioToken = SignToken(AudioTokenTag, resolvedUrl, DateTime.UtcNow.AddMinutes(AudioTokenTtlMinutes));
+            var audioLease = limit > 0 ? leaseId : string.Empty;
+            if (audioLease.Length > 0 && !_tunerRegistry.TryAcquire(channel.PlaylistId, limit, LiveLeaseKey(audioLease), TunerLeaseKind.Live))
+            {
+                throw new TunerLimitReachedException();
+            }
+
+            var audioToken = Sign(new PassthroughTicket(AudioTokenTag, channel.PlaylistId, channel.Id, audioLease, resolvedUrl), AudioTokenTtlMinutes);
             return new PassthroughStartResult
             {
                 Url = $"{PassthroughBasePath}/audio?t={audioToken}",
@@ -87,15 +132,12 @@ public class IptvPassthroughService : IIptvPassthroughService
             };
         }
 
-        var tunerProfile = await _repository.GetTunerProfileByPlaylistIdAsync(channel.PlaylistId);
-        var maxConcurrent = tunerProfile?.MaxConcurrentStreams ?? 0;
-        var leaseId = Guid.NewGuid().ToString("N");
-        if (!_tunerRegistry.TryAcquire(channel.PlaylistId, maxConcurrent, LiveLeaseKey(leaseId), TunerLeaseKind.Live))
+        if (!_tunerRegistry.TryAcquire(channel.PlaylistId, limit, LiveLeaseKey(leaseId), TunerLeaseKind.Live))
         {
             throw new TunerLimitReachedException();
         }
 
-        var playlistToken = SignToken(PlaylistTokenTag, $"{leaseId}|{resolvedUrl}", DateTime.UtcNow.AddMinutes(PlaylistTokenTtlMinutes));
+        var playlistToken = Sign(new PassthroughTicket(PlaylistTokenTag, channel.PlaylistId, channel.Id, leaseId, resolvedUrl), PlaylistTokenTtlMinutes);
         return new PassthroughStartResult
         {
             Url = $"{PassthroughBasePath}/playlist.m3u8?t={playlistToken}",
@@ -103,11 +145,11 @@ public class IptvPassthroughService : IIptvPassthroughService
         };
     }
 
-    private async Task<(string Url, string Type)> ResolveStreamAsync(string upstreamUrl, int depth, bool assumeAudioIfUnknown = false)
+    private async Task<(string Url, string Type)> ResolveStreamAsync(string upstreamUrl, IptvRequestPolicy policy, string? secret, int depth, bool assumeAudioIfUnknown = false)
     {
         if (depth > 3)
         {
-            _logger.LogWarning("Passthrough indirection depth exceeded for {Url}; defaulting to audio.", upstreamUrl);
+            _logger.LogWarning("Passthrough indirection depth exceeded for {Url}; defaulting to audio.", Redact(upstreamUrl, secret));
             return (upstreamUrl, StreamTypeAudio);
         }
 
@@ -125,20 +167,20 @@ public class IptvPassthroughService : IIptvPassthroughService
 
         if (lowerPath.EndsWith(".pls"))
         {
-            var inner = await FollowIndirectionAsync(upstreamUrl, ExtractFirstFileFromPls);
-            if (inner != null) return await ResolveStreamAsync(inner, depth + 1, assumeAudioIfUnknown: true);
+            var inner = await FollowIndirectionAsync(upstreamUrl, policy, secret, ExtractFirstFileFromPls);
+            if (inner != null) return await ResolveStreamAsync(inner, policy, secret, depth + 1, assumeAudioIfUnknown: true);
             return (upstreamUrl, StreamTypeAudio);
         }
 
         if (lowerPath.EndsWith(".m3u"))
         {
-            var body = await TryFetchTextAsync(upstreamUrl);
+            var body = await TryFetchTextAsync(upstreamUrl, policy, secret);
             if (body != null && body.TrimStart().StartsWith("#EXTM3U", StringComparison.OrdinalIgnoreCase))
             {
                 return (upstreamUrl, StreamTypeHls);
             }
             var inner = body == null ? null : ExtractFirstUrlFromShoutcastM3u(body);
-            if (inner != null) return await ResolveStreamAsync(inner, depth + 1, assumeAudioIfUnknown: true);
+            if (inner != null) return await ResolveStreamAsync(inner, policy, secret, depth + 1, assumeAudioIfUnknown: true);
             return (upstreamUrl, StreamTypeAudio);
         }
 
@@ -150,14 +192,15 @@ public class IptvPassthroughService : IIptvPassthroughService
         var client = _httpClientFactory.CreateClient(IptvManager.HttpClientName);
         try
         {
-            using var response = await client.GetAsync(upstreamUrl, HttpCompletionOption.ResponseHeadersRead);
+            using var request = policy.Get(upstreamUrl);
+            using var response = await client.SendAsync(request, HttpCompletionOption.ResponseHeadersRead);
             var contentType = response.Content.Headers.ContentType?.MediaType?.ToLowerInvariant() ?? string.Empty;
 
             if (contentType.Contains("mpegurl") || contentType.Contains("m3u8")) return (upstreamUrl, StreamTypeHls);
             if (contentType.Contains("scpls") || contentType.Contains("pls"))
             {
-                var inner = await FollowIndirectionAsync(upstreamUrl, ExtractFirstFileFromPls);
-                if (inner != null) return await ResolveStreamAsync(inner, depth + 1, assumeAudioIfUnknown: true);
+                var inner = await FollowIndirectionAsync(upstreamUrl, policy, secret, ExtractFirstFileFromPls);
+                if (inner != null) return await ResolveStreamAsync(inner, policy, secret, depth + 1, assumeAudioIfUnknown: true);
             }
             if (contentType.StartsWith("audio/")) return (upstreamUrl, StreamTypeAudio);
 
@@ -165,27 +208,30 @@ public class IptvPassthroughService : IIptvPassthroughService
         }
         catch (Exception ex)
         {
-            _logger.LogDebug(ex, "Passthrough probe failed for {Url}; defaulting to audio.", upstreamUrl);
+            _logger.LogDebug("Passthrough probe failed for {Url}; defaulting to audio: {Error}", Redact(upstreamUrl, secret), Redact(ex.Message, secret));
             return (upstreamUrl, StreamTypeAudio);
         }
     }
 
-    private async Task<string?> FollowIndirectionAsync(string url, Func<string, string?> extractor)
+    private async Task<string?> FollowIndirectionAsync(string url, IptvRequestPolicy policy, string? secret, Func<string, string?> extractor)
     {
-        var body = await TryFetchTextAsync(url);
+        var body = await TryFetchTextAsync(url, policy, secret);
         return body == null ? null : extractor(body);
     }
 
-    private async Task<string?> TryFetchTextAsync(string url)
+    private async Task<string?> TryFetchTextAsync(string url, IptvRequestPolicy policy, string? secret)
     {
         try
         {
             var client = _httpClientFactory.CreateClient(IptvManager.HttpClientName);
-            return await client.GetStringAsync(url);
+            using var request = policy.Get(url);
+            using var response = await client.SendAsync(request, HttpCompletionOption.ResponseContentRead);
+            response.EnsureSuccessStatusCode();
+            return await response.Content.ReadAsStringAsync();
         }
         catch (Exception ex)
         {
-            _logger.LogDebug(ex, "Passthrough indirection fetch failed for {Url}.", url);
+            _logger.LogDebug("Passthrough indirection fetch failed for {Url}: {Error}", Redact(url, secret), Redact(ex.Message, secret));
             return null;
         }
     }
@@ -219,94 +265,110 @@ public class IptvPassthroughService : IIptvPassthroughService
         return null;
     }
 
-    public async Task<HttpResponseMessage?> FetchAudioStreamAsync(string token, CancellationToken cancellationToken)
+    public async Task<PassthroughAudioStream?> FetchAudioStreamAsync(string token, CancellationToken cancellationToken)
     {
-        if (!TryVerifyToken(token, AudioTokenTag, out var upstreamUrl)) return null;
+        if (!TryReadTicket(token, AudioTokenTag, out var ticket)) return null;
 
-        if (!IsHttpUrl(upstreamUrl))
+        var context = await UpstreamContextAsync(ticket);
+        if (context is null) return null;
+
+        if (!IsHttpUrl(ticket.Url))
         {
-            _logger.LogWarning("Passthrough audio token resolved to non-HTTP URL {Url}; refusing.", upstreamUrl);
+            _logger.LogWarning("Passthrough audio token resolved to a non-HTTP address {Url}; refusing.", Redact(ticket.Url, context.Secret));
             return null;
         }
 
-        var client = _httpClientFactory.CreateClient(IptvManager.HttpClientName);
-        var request = new HttpRequestMessage(HttpMethod.Get, upstreamUrl);
-        request.Headers.UserAgent.Clear();
-        request.Headers.TryAddWithoutValidation("User-Agent", "WinampMPEG/5.0");
-        request.Headers.TryAddWithoutValidation("Icy-MetaData", "0");
-        return await client.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, cancellationToken);
+        var leaseKey = ticket.LeaseId.Length > 0 && context.ConnectionLimit > 0 ? LiveLeaseKey(ticket.LeaseId) : null;
+        if (leaseKey is not null && !_tunerRegistry.TryAcquire(ticket.PlaylistId, context.ConnectionLimit, leaseKey, TunerLeaseKind.Live))
+        {
+            throw new TunerLimitReachedException();
+        }
+
+        try
+        {
+            var client = _httpClientFactory.CreateClient(IptvManager.HttpClientName);
+            var request = context.Policy.Get(ticket.Url, DefaultAudioUserAgent);
+            request.Headers.TryAddWithoutValidation("Icy-MetaData", "0");
+            var response = await client.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, cancellationToken);
+            return new PassthroughAudioStream(
+                response,
+                () => { if (leaseKey is not null) _tunerRegistry.Heartbeat(leaseKey); },
+                () => { if (leaseKey is not null) _tunerRegistry.Release(leaseKey); });
+        }
+        catch
+        {
+            if (leaseKey is not null) _tunerRegistry.Release(leaseKey);
+            throw;
+        }
     }
 
     public async Task<PassthroughPlaylistResult?> GetRewrittenPlaylistAsync(string token)
     {
-        if (!TryVerifyToken(token, PlaylistTokenTag, out var payload))
+        if (!TryReadTicket(token, PlaylistTokenTag, out var ticket))
         {
             _logger.LogWarning("Passthrough playlist token verification failed.");
             return null;
         }
 
-        var (leaseId, upstreamUrl) = SplitPlaylistPayload(payload);
-        if (leaseId.Length > 0)
+        if (ticket.LeaseId.Length > 0)
         {
-            _tunerRegistry.Heartbeat(LiveLeaseKey(leaseId));
+            _tunerRegistry.Heartbeat(LiveLeaseKey(ticket.LeaseId));
         }
 
-        _logger.LogDebug("Passthrough fetching upstream playlist: {Url}", upstreamUrl);
+        var context = await UpstreamContextAsync(ticket);
+        if (context is null) return null;
+
+        var upstreamUrl = ticket.Url;
+        _logger.LogDebug("Passthrough fetching upstream playlist: {Url}", Redact(upstreamUrl, context.Secret));
 
         var client = _httpClientFactory.CreateClient(IptvManager.HttpClientName);
 
         HttpResponseMessage response;
         try
         {
-            response = await client.GetAsync(upstreamUrl, HttpCompletionOption.ResponseContentRead);
+            using var request = context.Policy.Get(upstreamUrl);
+            response = await client.SendAsync(request, HttpCompletionOption.ResponseContentRead);
         }
         catch (Exception ex)
         {
-            _logger.LogWarning(ex, "Passthrough upstream fetch threw for {Url}.", upstreamUrl);
+            _logger.LogWarning("Passthrough upstream fetch threw for {Url}: {Error}", Redact(upstreamUrl, context.Secret), Redact(ex.Message, context.Secret));
             return null;
         }
 
-        if (!response.IsSuccessStatusCode)
+        using (response)
         {
-            var snippet = await SafeReadSnippetAsync(response);
-            _logger.LogWarning("Passthrough upstream returned {Status} for {Url}. Body snippet: {Body}", response.StatusCode, upstreamUrl, snippet);
-            return null;
+            if (!response.IsSuccessStatusCode)
+            {
+                var snippet = await SafeReadSnippetAsync(response);
+                _logger.LogWarning("Passthrough upstream returned {Status} for {Url}. Body snippet: {Body}", response.StatusCode, Redact(upstreamUrl, context.Secret), Redact(snippet, context.Secret));
+                return null;
+            }
+
+            var upstreamContentType = response.Content.Headers.ContentType?.MediaType ?? string.Empty;
+            var rawContent = await response.Content.ReadAsStringAsync();
+            var effectiveUrl = response.RequestMessage?.RequestUri?.ToString() ?? upstreamUrl;
+
+            if (!IsHlsPlaylistContent(upstreamContentType, rawContent))
+            {
+                var snippet = rawContent.Length > 200 ? rawContent[..200] : rawContent;
+                _logger.LogWarning("Passthrough upstream {Url} returned 200 but content was not HLS. Content-Type: {Type}. Body snippet: {Body}", Redact(upstreamUrl, context.Secret), upstreamContentType, Redact(snippet, context.Secret));
+                return null;
+            }
+
+            if (!string.Equals(effectiveUrl, upstreamUrl, StringComparison.Ordinal))
+            {
+                _logger.LogDebug("Passthrough master URL was redirected. Requested: {Requested}, Final: {Final}", Redact(upstreamUrl, context.Secret), Redact(effectiveUrl, context.Secret));
+            }
+
+            _logger.LogDebug("Passthrough upstream returned valid HLS ({Length} bytes, type {Type}).", rawContent.Length, upstreamContentType);
+
+            var rewritten = RewritePlaylist(rawContent, effectiveUrl, ticket, context.Secret);
+            return new PassthroughPlaylistResult
+            {
+                Content = rewritten,
+                ContentType = "application/vnd.apple.mpegurl"
+            };
         }
-
-        var upstreamContentType = response.Content.Headers.ContentType?.MediaType ?? string.Empty;
-        var rawContent = await response.Content.ReadAsStringAsync();
-        var effectiveUrl = response.RequestMessage?.RequestUri?.ToString() ?? upstreamUrl;
-
-        if (!IsHlsPlaylistContent(upstreamContentType, rawContent))
-        {
-            var snippet = rawContent.Length > 200 ? rawContent[..200] : rawContent;
-            _logger.LogWarning("Passthrough upstream {Url} returned 200 but content was not HLS. Content-Type: {Type}. Body snippet: {Body}", upstreamUrl, upstreamContentType, snippet);
-            return null;
-        }
-
-        if (!string.Equals(effectiveUrl, upstreamUrl, StringComparison.Ordinal))
-        {
-            _logger.LogDebug("Passthrough master URL was redirected. Requested: {Requested}, Final: {Final}", upstreamUrl, effectiveUrl);
-        }
-
-        _logger.LogDebug("Passthrough upstream returned valid HLS ({Length} bytes, type {Type}).", rawContent.Length, upstreamContentType);
-
-        var rewritten = RewritePlaylist(rawContent, effectiveUrl, leaseId);
-        return new PassthroughPlaylistResult
-        {
-            Content = rewritten,
-            ContentType = "application/vnd.apple.mpegurl"
-        };
-    }
-
-    private static (string LeaseId, string Url) SplitPlaylistPayload(string payload)
-    {
-        var sep = payload.IndexOf('|');
-        if (sep < 0)
-        {
-            return (string.Empty, payload);
-        }
-        return (payload[..sep], payload[(sep + 1)..]);
     }
 
     private static async Task<string> SafeReadSnippetAsync(HttpResponseMessage response)
@@ -324,29 +386,58 @@ public class IptvPassthroughService : IIptvPassthroughService
 
     public async Task<HttpResponseMessage?> FetchSegmentAsync(string token, CancellationToken cancellationToken)
     {
-        if (!TryVerifyToken(token, SegmentTokenTag, out var upstreamUrl)) return null;
+        if (!TryReadTicket(token, SegmentTokenTag, out var ticket)) return null;
 
-        if (!IsHttpUrl(upstreamUrl))
+        var context = await UpstreamContextAsync(ticket);
+        if (context is null) return null;
+
+        if (!IsHttpUrl(ticket.Url))
         {
-            _logger.LogWarning("Passthrough segment token resolved to non-HTTP URL {Url}; refusing.", upstreamUrl);
+            _logger.LogWarning("Passthrough segment token resolved to a non-HTTP address {Url}; refusing.", Redact(ticket.Url, context.Secret));
             return null;
         }
 
         var client = _httpClientFactory.CreateClient(IptvManager.HttpClientName);
-        return await client.GetAsync(upstreamUrl, HttpCompletionOption.ResponseHeadersRead, cancellationToken);
+        using var request = context.Policy.Get(ticket.Url);
+        return await client.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, cancellationToken);
     }
 
-    private async Task EnsureUserHasChannelAccessAsync(Guid userId, Guid playlistId)
+    private async Task<UpstreamContext?> UpstreamContextAsync(PassthroughTicket ticket)
     {
-        var user = await _userManager.GetUserAccountAsync(userId)
-            ?? throw new UnauthorizedAccessException("User not found.");
+        var channel = await _repository.GetChannelWithPlaylistAsync(ticket.ChannelId);
+        if (channel is null || channel.PlaylistId != ticket.PlaylistId) return null;
 
-        if (user.HasAllIptvAccess) return;
-        if (user.AllowedIptvPlaylistIds.Contains(playlistId)) return;
-        throw new UnauthorizedAccessException("User does not have access to this IPTV playlist.");
+        IptvPlaylist? playlist = channel.Playlist;
+        try
+        {
+            return new UpstreamContext(
+                _resolver.PolicyFor(playlist, channel),
+                playlist is null ? 0 : IptvConnectionLimit.Of(playlist),
+                SecretOf(playlist));
+        }
+        catch (IptvSourceException ex)
+        {
+            _logger.LogWarning("Passthrough for {Channel} can't reach its provider: {Error}", channel.Name, ex.Message);
+            return null;
+        }
     }
 
-    private string RewritePlaylist(string content, string upstreamUrl, string leaseId)
+    private string? SecretOf(IptvPlaylist? playlist)
+    {
+        if (playlist is null) return null;
+        try
+        {
+            return _resolver.PasswordFor(playlist);
+        }
+        catch (IptvSourceException)
+        {
+            return null;
+        }
+    }
+
+    private static string Redact(string text, string? secret) => IptvUrlRedactor.Redact(text, secret);
+
+    private string RewritePlaylist(string content, string upstreamUrl, PassthroughTicket ticket, string? secret)
     {
         var baseUri = new Uri(upstreamUrl);
         var sb = new StringBuilder(content.Length + 256);
@@ -363,7 +454,7 @@ public class IptvPassthroughService : IIptvPassthroughService
 
             if (line.StartsWith('#'))
             {
-                sb.Append(RewriteTagAttributes(line, baseUri, leaseId));
+                sb.Append(RewriteTagAttributes(line, baseUri, ticket, secret));
                 sb.Append('\n');
                 continue;
             }
@@ -371,32 +462,32 @@ public class IptvPassthroughService : IIptvPassthroughService
             var absolute = ResolveUri(line, baseUri);
             if (!IsHttpUrl(absolute))
             {
-                _logger.LogWarning("Passthrough playlist contained non-HTTP URL (original {Original}, resolved {Resolved}); leaving line unchanged.", line, absolute);
+                _logger.LogWarning("Passthrough playlist contained a non-HTTP address ({Resolved}); leaving the line unchanged.", Redact(absolute, secret));
                 sb.Append(line);
                 sb.Append('\n');
                 continue;
             }
 
-            sb.Append(RewriteUriLine(absolute, leaseId));
+            sb.Append(RewriteUriLine(absolute, ticket));
             sb.Append('\n');
         }
 
         return sb.ToString();
     }
 
-    private string RewriteUriLine(string absoluteUrl, string leaseId)
+    private string RewriteUriLine(string absoluteUrl, PassthroughTicket ticket)
     {
         if (LooksLikePlaylist(absoluteUrl))
         {
-            var token = SignToken(PlaylistTokenTag, $"{leaseId}|{absoluteUrl}", DateTime.UtcNow.AddMinutes(PlaylistTokenTtlMinutes));
+            var token = Sign(ticket with { Tag = PlaylistTokenTag, Url = absoluteUrl }, PlaylistTokenTtlMinutes);
             return $"playlist.m3u8?t={token}";
         }
 
-        var segmentToken = SignToken(SegmentTokenTag, absoluteUrl, DateTime.UtcNow.AddMinutes(SegmentTokenTtlMinutes));
+        var segmentToken = Sign(ticket with { Tag = SegmentTokenTag, LeaseId = string.Empty, Url = absoluteUrl }, SegmentTokenTtlMinutes);
         return $"segment?t={segmentToken}";
     }
 
-    private string RewriteTagAttributes(string line, Uri baseUri, string leaseId)
+    private string RewriteTagAttributes(string line, Uri baseUri, PassthroughTicket ticket, string? secret)
     {
         const string marker = "URI=\"";
         var idx = line.IndexOf(marker, StringComparison.Ordinal);
@@ -410,11 +501,11 @@ public class IptvPassthroughService : IIptvPassthroughService
         var absolute = ResolveUri(originalUri, baseUri);
         if (!IsHttpUrl(absolute))
         {
-            _logger.LogDebug("Passthrough tag had non-HTTP URI {Uri}; preserving original.", absolute);
+            _logger.LogDebug("Passthrough tag had a non-HTTP address {Uri}; preserving the original.", Redact(absolute, secret));
             return line;
         }
 
-        var rewritten = RewriteUriLine(absolute, leaseId);
+        var rewritten = RewriteUriLine(absolute, ticket);
         return string.Concat(line.AsSpan(0, start), rewritten, line.AsSpan(end));
     }
 
@@ -449,77 +540,23 @@ public class IptvPassthroughService : IIptvPassthroughService
         return content.TrimStart().StartsWith("#EXTM3U", StringComparison.OrdinalIgnoreCase);
     }
 
-    private string SignToken(string tag, string payload, DateTime expiresAt)
+    private string Sign(PassthroughTicket ticket, int ttlMinutes)
     {
-        var exp = ((DateTimeOffset)expiresAt).ToUnixTimeSeconds();
-        var data = $"{tag}|{exp}|{payload}";
-        var key = Encoding.UTF8.GetBytes(GetSecret());
-        using var hmac = new HMACSHA256(key);
-        var sig = hmac.ComputeHash(Encoding.UTF8.GetBytes(data));
-        return $"{Base64UrlEncode(Encoding.UTF8.GetBytes(data))}.{Base64UrlEncode(sig)}";
+        var payload = string.Join('|', ticket.Tag, ticket.PlaylistId.ToString("N"), ticket.ChannelId.ToString("N"), ticket.LeaseId, ticket.Url);
+        return _tokens.Protect(payload, DateTimeOffset.UtcNow.AddMinutes(ttlMinutes));
     }
 
-    private bool TryVerifyToken(string token, string expectedTag, out string payload)
+    private bool TryReadTicket(string token, string expectedTag, out PassthroughTicket ticket)
     {
-        payload = string.Empty;
-        if (string.IsNullOrEmpty(token)) return false;
+        ticket = new PassthroughTicket(string.Empty, Guid.Empty, Guid.Empty, string.Empty, string.Empty);
+        if (string.IsNullOrEmpty(token) || !_tokens.TryUnprotect(token, out var payload)) return false;
 
-        var parts = token.Split('.');
-        if (parts.Length != 2) return false;
+        var parts = payload.Split('|', 5);
+        if (parts.Length != 5) return false;
+        if (!string.Equals(parts[0], expectedTag, StringComparison.Ordinal)) return false;
+        if (!Guid.TryParseExact(parts[1], "N", out var playlistId) || !Guid.TryParseExact(parts[2], "N", out var channelId)) return false;
 
-        try
-        {
-            var dataBytes = Base64UrlDecode(parts[0]);
-            var providedSig = Base64UrlDecode(parts[1]);
-            var key = Encoding.UTF8.GetBytes(GetSecret());
-            using var hmac = new HMACSHA256(key);
-            var expectedSig = hmac.ComputeHash(dataBytes);
-
-            if (!CryptographicOperations.FixedTimeEquals(providedSig, expectedSig)) return false;
-
-            var data = Encoding.UTF8.GetString(dataBytes);
-            var firstSep = data.IndexOf('|');
-            if (firstSep < 0) return false;
-            var secondSep = data.IndexOf('|', firstSep + 1);
-            if (secondSep < 0) return false;
-
-            var tag = data[..firstSep];
-            if (!string.Equals(tag, expectedTag, StringComparison.Ordinal)) return false;
-
-            var expString = data.Substring(firstSep + 1, secondSep - firstSep - 1);
-            if (!long.TryParse(expString, out var exp)) return false;
-            if (DateTimeOffset.UtcNow.ToUnixTimeSeconds() > exp) return false;
-
-            payload = data[(secondSep + 1)..];
-            return true;
-        }
-        catch (Exception ex)
-        {
-            _logger.LogDebug(ex, "Passthrough token verification failed.");
-            return false;
-        }
-    }
-
-    private string GetSecret()
-    {
-        if (!string.IsNullOrWhiteSpace(_passthroughOptions.SecretKey))
-        {
-            return _passthroughOptions.SecretKey;
-        }
-        return _jwtOptions.SecretKey ?? string.Empty;
-    }
-
-    private static string Base64UrlEncode(byte[] data) =>
-        Convert.ToBase64String(data).TrimEnd('=').Replace('+', '-').Replace('/', '_');
-
-    private static byte[] Base64UrlDecode(string input)
-    {
-        var s = input.Replace('-', '+').Replace('_', '/');
-        switch (s.Length % 4)
-        {
-            case 2: s += "=="; break;
-            case 3: s += "="; break;
-        }
-        return Convert.FromBase64String(s);
+        ticket = new PassthroughTicket(parts[0], playlistId, channelId, parts[3], parts[4]);
+        return true;
     }
 }

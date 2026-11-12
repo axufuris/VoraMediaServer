@@ -2,6 +2,7 @@ using Microsoft.Extensions.Logging;
 using Vora.Application.Analysis;
 using Vora.Application.Iptv.Dtos;
 using Vora.Application.Settings;
+using Vora.Application.Users;
 using Vora.Domain.Entities.Iptv;
 using Vora.Domain.Enums;
 
@@ -23,14 +24,16 @@ public class DvrManager : IDvrManager
 
     private readonly IIptvRepository _repository;
     private readonly IIptvEpgService _epgService;
+    private readonly IUserManager _userManager;
     private readonly ILogger<DvrManager> _logger;
     private readonly IClientNotifier _notifier;
     private readonly ISystemSettingsRepository _settingsRepo;
 
-    public DvrManager(IIptvRepository repository, IIptvEpgService epgService, ILogger<DvrManager> logger, IClientNotifier notifier, ISystemSettingsRepository settingsRepo)
+    public DvrManager(IIptvRepository repository, IIptvEpgService epgService, IUserManager userManager, ILogger<DvrManager> logger, IClientNotifier notifier, ISystemSettingsRepository settingsRepo)
     {
         _repository = repository;
         _epgService = epgService;
+        _userManager = userManager;
         _logger = logger;
         _notifier = notifier;
         _settingsRepo = settingsRepo;
@@ -47,6 +50,14 @@ public class DvrManager : IDvrManager
         if (!profile.IsAdmin && !profile.CanRecordLiveTv)
         {
             throw new UnauthorizedAccessException("This profile does not have DVR permissions.");
+        }
+
+        var channel = await _repository.GetChannelByIdAsync(channelId)
+            ?? throw new UnauthorizedAccessException("Channel not found.");
+
+        if (!await IptvPlaylistAccess.AllowsAsync(_userManager, profile.UserId, profileId, channel.PlaylistId))
+        {
+            throw new UnauthorizedAccessException("This profile does not have access to the channel's playlist.");
         }
 
         var schedule = new IptvRecordingSchedule
@@ -180,8 +191,7 @@ public class DvrManager : IDvrManager
         var playlistId = schedule.Channel?.PlaylistId;
         if (playlistId.HasValue && settings.DvrConflictPolicy != DvrConflictPolicy.AlwaysRecord)
         {
-            var tunerProfile = await _repository.GetTunerProfileByPlaylistIdAsync(playlistId.Value);
-            var maxStreams = tunerProfile?.MaxConcurrentStreams ?? 0;
+            var maxStreams = await _repository.GetConnectionLimitAsync(playlistId.Value);
             if (maxStreams > 0)
             {
                 var overlapping = await _repository.GetPendingSessionsOverlappingAsync(playlistId.Value, startTime, endTime);

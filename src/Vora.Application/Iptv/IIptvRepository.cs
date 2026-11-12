@@ -17,7 +17,6 @@ public interface IIptvRepository
     Task UpdatePlaylistAsync(IptvPlaylist playlist);
     Task DeletePlaylistAsync(Guid id);
     Task UpdateChannelsAsync(Guid playlistId, List<IptvChannel> newChannels);
-    Task<List<(Guid Id, string StreamUrl)>> GetChannelStreamsForPlaylistAsync(Guid playlistId);
     Task UpdateChannelHealthAsync(IReadOnlyDictionary<Guid, bool> results, DateTime checkedAt);
     Task UpdateChannelVideoFormatAsync(Guid channelId, LiveVideoFormat format, DateTime seenAt);
     Task ToggleChannelVisibilityAsync(Guid channelId);
@@ -49,6 +48,8 @@ public interface IIptvRepository
     Task<IptvRecordingSchedule?> GetScheduleWithSessionsAsync(Guid scheduleId);
     Task DeleteSessionAsync(Guid sessionId);
     Task<IptvChannel?> GetChannelByIdAsync(Guid id);
+    Task<IptvChannel?> GetChannelWithPlaylistAsync(Guid id);
+    Task<int> GetConnectionLimitAsync(Guid playlistId);
     Task<ServerSetting> GetServerSettingsAsync();
     Task<UserProfile?> GetUserProfileAsync(Guid profileId);
     Task<List<IptvRecordingSession>> GetCompletedRawSessionsAsync();

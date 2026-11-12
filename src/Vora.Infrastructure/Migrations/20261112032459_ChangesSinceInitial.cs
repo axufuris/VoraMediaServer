@@ -284,11 +284,82 @@ CREATE TABLE IF NOT EXISTS ""RecommendationSnapshots"" (
     CONSTRAINT ""PK_RecommendationSnapshots"" PRIMARY KEY (""ProfileId"", ""LibraryScope"", ""ProviderId""),
     CONSTRAINT ""FK_RecommendationSnapshots_UserProfiles_ProfileId"" FOREIGN KEY (""ProfileId"") REFERENCES ""UserProfiles"" (""Id"") ON DELETE CASCADE
 );");
+
+            // Providers that need an account (docs/iptv-and-dvr.md). Every
+            // playlist stays the M3U playlist it was, with no credentials and
+            // no headers. The provider's guide is on, which only an Xtream
+            // Codes account reads.
+            migrationBuilder.Sql(@"
+ALTER TABLE ""IptvPlaylists"" ADD COLUMN IF NOT EXISTS ""SourceType"" integer NOT NULL DEFAULT 0;
+ALTER TABLE ""IptvPlaylists"" ADD COLUMN IF NOT EXISTS ""ServerUrl"" character varying(1024);
+ALTER TABLE ""IptvPlaylists"" ADD COLUMN IF NOT EXISTS ""Username"" character varying(256);
+ALTER TABLE ""IptvPlaylists"" ADD COLUMN IF NOT EXISTS ""PasswordCiphertext"" text;
+ALTER TABLE ""IptvPlaylists"" ADD COLUMN IF NOT EXISTS ""UserAgent"" character varying(512);
+ALTER TABLE ""IptvPlaylists"" ADD COLUMN IF NOT EXISTS ""Referer"" character varying(1024);
+ALTER TABLE ""IptvPlaylists"" ADD COLUMN IF NOT EXISTS ""UseProviderGuide"" boolean NOT NULL DEFAULT TRUE;
+ALTER TABLE ""IptvPlaylists"" ADD COLUMN IF NOT EXISTS ""AccountStatus"" character varying(32);
+ALTER TABLE ""IptvPlaylists"" ADD COLUMN IF NOT EXISTS ""AccountExpiresAt"" timestamp with time zone;
+ALTER TABLE ""IptvPlaylists"" ADD COLUMN IF NOT EXISTS ""AccountMaxConnections"" integer;
+ALTER TABLE ""IptvPlaylists"" ADD COLUMN IF NOT EXISTS ""AccountCheckedAt"" timestamp with time zone;
+ALTER TABLE ""IptvChannels"" ADD COLUMN IF NOT EXISTS ""UserAgent"" character varying(512);
+ALTER TABLE ""IptvChannels"" ADD COLUMN IF NOT EXISTS ""Referer"" character varying(1024);");
         }
 
         /// <inheritdoc />
         protected override void Down(MigrationBuilder migrationBuilder)
         {
+            migrationBuilder.DropColumn(
+                name: "Referer",
+                table: "IptvChannels");
+
+            migrationBuilder.DropColumn(
+                name: "UserAgent",
+                table: "IptvChannels");
+
+            migrationBuilder.DropColumn(
+                name: "AccountCheckedAt",
+                table: "IptvPlaylists");
+
+            migrationBuilder.DropColumn(
+                name: "AccountMaxConnections",
+                table: "IptvPlaylists");
+
+            migrationBuilder.DropColumn(
+                name: "AccountExpiresAt",
+                table: "IptvPlaylists");
+
+            migrationBuilder.DropColumn(
+                name: "AccountStatus",
+                table: "IptvPlaylists");
+
+            migrationBuilder.DropColumn(
+                name: "UseProviderGuide",
+                table: "IptvPlaylists");
+
+            migrationBuilder.DropColumn(
+                name: "Referer",
+                table: "IptvPlaylists");
+
+            migrationBuilder.DropColumn(
+                name: "UserAgent",
+                table: "IptvPlaylists");
+
+            migrationBuilder.DropColumn(
+                name: "PasswordCiphertext",
+                table: "IptvPlaylists");
+
+            migrationBuilder.DropColumn(
+                name: "Username",
+                table: "IptvPlaylists");
+
+            migrationBuilder.DropColumn(
+                name: "ServerUrl",
+                table: "IptvPlaylists");
+
+            migrationBuilder.DropColumn(
+                name: "SourceType",
+                table: "IptvPlaylists");
+
             migrationBuilder.DropTable(
                 name: "RecommendationSnapshots");
 

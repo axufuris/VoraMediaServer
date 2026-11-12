@@ -274,9 +274,9 @@ public class ScheduledJobWorker : BackgroundService
 
         if (_iptvSync.IsDue(settings.IptvSyncTime, now))
         {
-            _logger.LogInformation("Triggering Scheduled IPTV EPG Sync.");
+            _logger.LogInformation("Triggering Scheduled IPTV Channel and EPG Sync.");
 
-            taskQueue.QueueIptvEpgSync();
+            taskQueue.QueueIptvScheduledSync();
 
             _iptvSync.MarkRan(now);
         }

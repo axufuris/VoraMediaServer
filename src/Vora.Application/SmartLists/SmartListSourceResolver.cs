@@ -68,7 +68,7 @@ public class SmartListSourceResolver(
             Title = f.Channel.Name,
             Subtitle = nowPlaying.TryGetValue(f.Channel.ExternalChannelId, out var program) ? program : f.Channel.GroupTitle,
             ImageUrl = f.Channel.LogoUrl,
-            Channel = IptvChannelVM.FromEntity(f.Channel, f.Channel.Playlist.Name)
+            Channel = IptvPlaylistView.ClientChannel(f.Channel, f.Channel.Playlist)
         }).ToList();
     }
 
@@ -104,9 +104,7 @@ public class SmartListSourceResolver(
         }
 
         var profile = viewer.ProfileId is { } profileId ? user.Profiles.FirstOrDefault(p => p.Id == profileId) : null;
-        return playlistId =>
-            (user.IsAdmin || user.HasAllIptvAccess || user.AllowedIptvPlaylistIds.Contains(playlistId))
-            && (profile == null || profile.IsAdmin || profile.HasAllIptvAccess || profile.AllowedIptvPlaylistIds.Contains(playlistId));
+        return playlistId => IptvPlaylistAccess.Allows(user, profile, playlistId);
     }
 
     private async Task<Dictionary<string, string>> NowPlayingAsync(SmartListViewer viewer, List<string> externalChannelIds)

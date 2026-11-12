@@ -52,6 +52,7 @@ using Vora.Application.Watchers;
 using Vora.Infrastructure.Analysis;
 using Vora.Infrastructure.Email;
 using Vora.Infrastructure.FileSystem;
+using Vora.Infrastructure.Iptv;
 using Vora.Infrastructure.Persistence;
 using Vora.Infrastructure.Persistence.Repositories;
 using Vora.Infrastructure.Settings;
@@ -184,7 +185,6 @@ public static class ServiceRegistrationExtensions
     {
         services.Configure<Vora.Application.Auth.JwtOptions>(configuration.GetSection(Vora.Application.Auth.JwtOptions.SectionName));
         services.Configure<Vora.Application.Settings.StoragePathsOptions>(configuration.GetSection(Vora.Application.Settings.StoragePathsOptions.SectionName));
-        services.Configure<Vora.Application.Iptv.IptvPassthroughOptions>(configuration.GetSection(Vora.Application.Iptv.IptvPassthroughOptions.SectionName));
         services.Configure<Vora.Application.Settings.ForwardedHeadersConfigOptions>(configuration.GetSection(Vora.Application.Settings.ForwardedHeadersConfigOptions.SectionName));
         services.Configure<Vora.Application.Settings.CorsConfigOptions>(configuration.GetSection(Vora.Application.Settings.CorsConfigOptions.SectionName));
         return services;
@@ -490,6 +490,10 @@ public static class ServiceRegistrationExtensions
         services.AddScoped<ICollectionArtworkService, CollectionArtworkService>();
         services.AddScoped<IIptvEpgService, IptvEpgService>();
         services.AddScoped<IIptvPassthroughService, IptvPassthroughService>();
+        services.AddSingleton<IIptvSecretProtector, DataProtectionIptvSecretProtector>();
+        services.AddSingleton<IIptvPassthroughTokenProtector, DataProtectionPassthroughTokenProtector>();
+        services.AddSingleton<IIptvUpstreamResolver, IptvUpstreamResolver>();
+        services.AddScoped<IIptvChannelLoader, IptvChannelLoader>();
         services.AddScoped<IMediaAnalyzerService, FFmpegAnalyzerService>();
         services.AddScoped<IMediaEmbeddingService, MediaEmbeddingService>();
         services.AddScoped<IMediaIngestionService, MediaIngestionService>();

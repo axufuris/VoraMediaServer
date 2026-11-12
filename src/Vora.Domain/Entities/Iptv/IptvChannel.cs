@@ -10,6 +10,9 @@ public class IptvChannel
     public required string Name { get; set; }
     public required string StreamUrl { get; set; }
 
+    public string? UserAgent { get; set; }
+    public string? Referer { get; set; }
+
     public string? LogoUrl { get; set; }
     public string? GroupTitle { get; set; }
     public string? Resolution { get; set; }

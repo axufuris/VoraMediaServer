@@ -7,6 +7,7 @@ using Vora.Application.Settings;
 using Vora.Application.Streaming;
 using Vora.Application.Tasks;
 using Vora.Application.Users;
+using Vora.Application.Users.ViewModels;
 using Vora.Domain.Entities.Iptv;
 using Vora.Domain.Entities.Settings;
 using Vora.Infrastructure.Transcoding;
@@ -109,16 +110,22 @@ public sealed class TimeshiftClientLimitsTests : IAsyncDisposable
         var signer = Substitute.For<IStreamingTokenSigner>();
         signer.Sign(default!, default!, default).ReturnsForAnyArgs("token");
 
+        var users = Substitute.For<IUserManager>();
+        users.GetUserAccountAsync(Arg.Any<Guid>()).Returns(new UserVM { HasAllIptvAccess = true });
+        var protector = Substitute.For<IIptvSecretProtector>();
+
         return new IptvManager(
             _repository,
             Substitute.For<IIptvEpgService>(),
-            Substitute.For<IUserManager>(),
+            users,
             Substitute.For<ITaskQueueManager>(),
             _coordinator,
             new TunerRegistry(),
-            Substitute.For<IHttpClientFactory>(),
             signer,
             new TimeshiftVideo(settings, Substitute.For<IHardwareCapabilityService>(), NullLogger<TimeshiftVideo>.Instance),
+            Substitute.For<IIptvChannelLoader>(),
+            new IptvUpstreamResolver(protector),
+            protector,
             NullLogger<IptvManager>.Instance);
     }
 
@@ -163,7 +170,7 @@ public sealed class TimeshiftClientLimitsTests : IAsyncDisposable
             VideoFrameRate = known?.FrameRate,
             VideoInterlaced = known?.Interlaced,
         };
-        _repository.GetChannelByIdAsync(channel.Id).Returns(channel);
+        _repository.GetChannelWithPlaylistAsync(channel.Id).Returns(channel);
         return channel;
     }
 

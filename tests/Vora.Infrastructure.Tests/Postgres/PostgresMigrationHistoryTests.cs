@@ -691,6 +691,76 @@ public class PostgresMigrationHistoryTests(PostgresDatabase database) : IClassFi
     }
 
     [Fact]
+    public async Task A_database_on_the_for_you_rows_migration_keeps_its_playlists_as_m3u_without_credentials_and_gains_the_provider_columns()
+    {
+        Assert.SkipUnless(PostgresDatabase.IsConfigured, PostgresDatabase.SkipReason);
+        var cancellationToken = TestContext.Current.CancellationToken;
+        await using var legacy = new LegacyDatabase();
+        var playlistId = Guid.NewGuid();
+        var channelId = Guid.NewGuid();
+        await legacy.BuildForYouRowsStateAsync(async db =>
+        {
+            var playlist = new IptvPlaylist
+            {
+                Id = playlistId,
+                Name = "Provider",
+                M3uUrl = "https://iptv.example.com/list.m3u",
+                TunerProfile = new IptvTunerProfile { PlaylistId = playlistId, MaxConcurrentStreams = 2 }
+            };
+            playlist.Channels.Add(new IptvChannel { Id = channelId, ExternalChannelId = "action24", Name = "Action 24", StreamUrl = "https://iptv.example.com/action24.ts", PlaylistId = playlistId });
+            db.Add(playlist);
+            await db.SaveChangesAsync(cancellationToken);
+        }, cancellationToken);
+
+        await using (var before = legacy.NewContext())
+        {
+            (await before.Database.GetPendingMigrationsAsync(cancellationToken)).Should().Equal(MigrationHistoryTests.ChangesSinceInitial);
+            (await ColumnsAsync(before, "IptvPlaylists", cancellationToken)).Should().NotContain(["SourceType", "ServerUrl", "Username", "PasswordCiphertext", "UserAgent", "Referer", "UseProviderGuide", "AccountMaxConnections"]);
+            (await ColumnsAsync(before, "IptvChannels", cancellationToken)).Should().NotContain(["UserAgent", "Referer"]);
+        }
+
+        await legacy.MigrateAsync(cancellationToken);
+
+        await using (var after = legacy.NewContext())
+        {
+            (await after.Database.GetPendingMigrationsAsync(cancellationToken)).Should().BeEmpty();
+            var playlist = await after.IptvPlaylists.AsNoTracking().Include(p => p.TunerProfile).SingleAsync(p => p.Id == playlistId, cancellationToken);
+            playlist.SourceType.Should().Be(IptvSourceType.M3u);
+            playlist.M3uUrl.Should().Be("https://iptv.example.com/list.m3u");
+            playlist.ServerUrl.Should().BeNull();
+            playlist.Username.Should().BeNull();
+            playlist.PasswordCiphertext.Should().BeNull();
+            playlist.UserAgent.Should().BeNull();
+            playlist.Referer.Should().BeNull();
+            playlist.UseProviderGuide.Should().BeTrue();
+            playlist.AccountMaxConnections.Should().BeNull();
+            playlist.TunerProfile!.MaxConcurrentStreams.Should().Be(2);
+
+            var channel = await after.IptvChannels.AsNoTracking().SingleAsync(c => c.Id == channelId, cancellationToken);
+            channel.StreamUrl.Should().Be("https://iptv.example.com/action24.ts");
+            channel.UserAgent.Should().BeNull();
+            channel.Referer.Should().BeNull();
+
+            after.IptvPlaylists.Add(new IptvPlaylist
+            {
+                Name = "Paid provider",
+                SourceType = IptvSourceType.Xtream,
+                ServerUrl = "http://provider.example.com:8080",
+                Username = "viewer",
+                PasswordCiphertext = "ciphertext",
+                UserAgent = "VLC/3.0",
+                AccountMaxConnections = 1
+            });
+            await after.SaveChangesAsync(cancellationToken);
+        }
+
+        await using var reread = legacy.NewContext();
+        var xtream = await reread.IptvPlaylists.AsNoTracking().SingleAsync(p => p.SourceType == IptvSourceType.Xtream, cancellationToken);
+        xtream.Username.Should().Be("viewer");
+        xtream.AccountMaxConnections.Should().Be(1);
+    }
+
+    [Fact]
     public async Task A_database_on_the_search_index_migration_gains_the_for_you_rows_table_empty_and_keeps_its_profiles()
     {
         Assert.SkipUnless(PostgresDatabase.IsConfigured, PostgresDatabase.SkipReason);

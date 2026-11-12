@@ -6,17 +6,20 @@ using Vora.Application.Streaming;
 using Vora.Application.Tasks;
 using Vora.Application.Users;
 using Vora.Domain.Entities.Iptv;
+using Vora.Domain.Enums;
 
 namespace Vora.Application.Iptv;
 
 public interface IIptvManager
 {
-    Task<List<IptvPlaylistVM>> GetAllPlaylistsAsync(Vora.Domain.Enums.IptvChannelKind? kind = null);
+    Task<List<IptvPlaylistVM>> GetAllPlaylistsAsync(IptvChannelKind? kind = null);
     Task<List<IptvPlaylistVM>> GetClientPlaylistsAsync(Guid userId, Guid? profileId = null);
-    Task<IptvPlaylistVM> AddPlaylistAsync(string name, string m3uUrl, bool supportsWebPlayback, int maxConcurrentStreams, Vora.Domain.Enums.IptvChannelKind defaultKind, string? countryFilter = null, bool enableHealthCheck = false);
-    Task<IptvPlaylistVM> UpdatePlaylistAsync(Guid id, string name, string m3uUrl, bool supportsWebPlayback, int maxConcurrentStreams, bool isActive, Vora.Domain.Enums.IptvChannelKind defaultKind, string? countryFilter = null, bool enableHealthCheck = false);
+    Task<IptvPlaylistVM> AddPlaylistAsync(IptvPlaylistSettingsDto settings);
+    Task<IptvPlaylistVM> UpdatePlaylistAsync(Guid id, IptvPlaylistSettingsDto settings);
+    Task<IptvConnectionTestVM> TestConnectionAsync(IptvPlaylistSettingsDto settings, Guid? existingId, CancellationToken cancellationToken = default);
     Task DeletePlaylistAsync(Guid id);
     Task RefreshPlaylistAsync(Guid id);
+    Task RefreshActivePlaylistChannelsAsync(CancellationToken cancellationToken = default);
 
     Task<List<IptvEpgSourceVM>> GetAllEpgSourcesAsync();
     Task<IptvEpgSourceVM> AddEpgSourceAsync(string name, string xmlTvUrl, int priority);
@@ -27,7 +30,7 @@ public interface IIptvManager
 
     Task<Dictionary<string, List<IptvProgramDto>>> GetFilteredGuideAsync(Guid userId, Guid profileId, List<string> requestedChannelIds, DateTime startTime, DateTime endTime);
     Task ToggleChannelVisibilityAsync(Guid channelId);
-    Task SetChannelKindAsync(Guid channelId, Vora.Domain.Enums.IptvChannelKind kind);
+    Task SetChannelKindAsync(Guid channelId, IptvChannelKind kind);
     Task<string?> StartTimeshiftSessionAsync(Guid channelId, Guid userId, Guid profileId, LiveVideoLimits? limits);
     Task StopTimeshiftSessionAsync(Guid profileId);
     void PingTimeshiftSession(Guid profileId);
@@ -44,6 +47,7 @@ public class IptvManager : IIptvManager
     private const string FirstSegmentFileName = "seg_000.ts";
     private const string SecondSegmentFileName = "seg_001.ts";
     private const string TimeshiftTokenScope = "timeshift";
+    private const string ProviderGuideSuffix = " (provider guide)";
     private const int InitializationRetryDelayMs = 500;
     private static readonly TimeSpan InitializationTimeout = TimeSpan.FromSeconds(20);
     private static readonly TimeSpan TimeshiftTokenTtl = TimeSpan.FromHours(4);
@@ -54,9 +58,11 @@ public class IptvManager : IIptvManager
     private readonly ITaskQueueManager _taskQueue;
     private readonly ITimeshiftCoordinator _timeshiftCoordinator;
     private readonly ITunerRegistry _tunerRegistry;
-    private readonly IHttpClientFactory _httpClientFactory;
     private readonly IStreamingTokenSigner _tokenSigner;
     private readonly ITimeshiftVideo _timeshiftVideo;
+    private readonly IIptvChannelLoader _channelLoader;
+    private readonly IIptvUpstreamResolver _upstreamResolver;
+    private readonly IIptvSecretProtector _secretProtector;
     private readonly ILogger<IptvManager> _logger;
 
     public IptvManager(
@@ -66,9 +72,11 @@ public class IptvManager : IIptvManager
         ITaskQueueManager taskQueue,
         ITimeshiftCoordinator timeshiftCoordinator,
         ITunerRegistry tunerRegistry,
-        IHttpClientFactory httpClientFactory,
         IStreamingTokenSigner tokenSigner,
         ITimeshiftVideo timeshiftVideo,
+        IIptvChannelLoader channelLoader,
+        IIptvUpstreamResolver upstreamResolver,
+        IIptvSecretProtector secretProtector,
         ILogger<IptvManager> logger)
     {
         _repository = repository;
@@ -77,39 +85,30 @@ public class IptvManager : IIptvManager
         _taskQueue = taskQueue;
         _timeshiftCoordinator = timeshiftCoordinator;
         _tunerRegistry = tunerRegistry;
-        _httpClientFactory = httpClientFactory;
         _tokenSigner = tokenSigner;
         _timeshiftVideo = timeshiftVideo;
+        _channelLoader = channelLoader;
+        _upstreamResolver = upstreamResolver;
+        _secretProtector = secretProtector;
         _logger = logger;
     }
 
     public static string TimeshiftLeaseKey(Guid profileId) => $"timeshift:{profileId}";
 
-    public async Task<List<IptvPlaylistVM>> GetAllPlaylistsAsync(Vora.Domain.Enums.IptvChannelKind? kind = null)
+    public async Task<List<IptvPlaylistVM>> GetAllPlaylistsAsync(IptvChannelKind? kind = null)
     {
         var playlists = await _repository.GetAllPlaylistsAsync(kind);
-        return playlists.Select(p => MapToViewModel(p)).ToList();
+        return playlists.Select(IptvPlaylistView.ForAdmin).ToList();
     }
 
-    public async Task<IptvPlaylistVM> AddPlaylistAsync(string name, string m3uUrl, bool supportsWebPlayback, int maxConcurrentStreams, Vora.Domain.Enums.IptvChannelKind defaultKind, string? countryFilter = null, bool enableHealthCheck = false)
+    public async Task<IptvPlaylistVM> AddPlaylistAsync(IptvPlaylistSettingsDto settings)
     {
-        var playlist = new IptvPlaylist
-        {
-            Name = name,
-            M3uUrl = m3uUrl,
-            IsActive = true,
-            SupportsWebPlayback = supportsWebPlayback,
-            DefaultChannelKind = defaultKind,
-            CountryFilter = NormalizeCountryFilter(countryFilter),
-            EnableHealthCheck = enableHealthCheck,
-            TunerProfile = new IptvTunerProfile
-            {
-                MaxConcurrentStreams = maxConcurrentStreams
-            }
-        };
+        var playlist = new IptvPlaylist { Name = settings.Name };
+        IptvPlaylistSettings.Apply(playlist, settings, _secretProtector);
+        playlist.IsActive = true;
 
         await _repository.AddPlaylistAsync(playlist);
-        await SyncM3uChannelsAsync(playlist);
+        await SyncChannelsAsync(playlist);
 
         _taskQueue.QueueIptvEpgSync();
         if (playlist.EnableHealthCheck)
@@ -117,58 +116,87 @@ public class IptvManager : IIptvManager
             _taskQueue.QueueIptvHealthCheck(playlist.Id, playlist.Name);
         }
 
-        return MapToViewModel(playlist);
+        return IptvPlaylistView.ForAdmin(playlist);
     }
 
-    public async Task<IptvPlaylistVM> UpdatePlaylistAsync(Guid id, string name, string m3uUrl, bool supportsWebPlayback, int maxConcurrentStreams, bool isActive, Vora.Domain.Enums.IptvChannelKind defaultKind, string? countryFilter = null, bool enableHealthCheck = false)
+    public async Task<IptvPlaylistVM> UpdatePlaylistAsync(Guid id, IptvPlaylistSettingsDto settings)
     {
         var playlist = await _repository.GetPlaylistByIdAsync(id)
             ?? throw new InvalidOperationException("Playlist not found.");
 
-        var m3uChanged = !string.Equals(playlist.M3uUrl, m3uUrl, StringComparison.Ordinal);
-        var defaultKindChanged = playlist.DefaultChannelKind != defaultKind;
-        var healthCheckTurnedOn = enableHealthCheck && !playlist.EnableHealthCheck;
-
-        playlist.Name = name;
-        playlist.M3uUrl = m3uUrl;
-        playlist.SupportsWebPlayback = supportsWebPlayback;
-        playlist.IsActive = isActive;
-        playlist.DefaultChannelKind = defaultKind;
-        playlist.CountryFilter = NormalizeCountryFilter(countryFilter);
-        playlist.EnableHealthCheck = enableHealthCheck;
-
-        if (playlist.TunerProfile == null)
-        {
-            playlist.TunerProfile = new IptvTunerProfile
-            {
-                PlaylistId = playlist.Id,
-                MaxConcurrentStreams = maxConcurrentStreams
-            };
-        }
-        else
-        {
-            playlist.TunerProfile.MaxConcurrentStreams = maxConcurrentStreams;
-        }
+        var healthCheckTurnedOn = settings.EnableHealthCheck && !playlist.EnableHealthCheck;
+        var change = IptvPlaylistSettings.Apply(playlist, settings, _secretProtector);
 
         await _repository.UpdatePlaylistAsync(playlist);
 
-        var channelsResynced = m3uChanged || defaultKindChanged;
-        if (channelsResynced)
+        if (change.SourceChanged)
         {
-            await SyncM3uChannelsAsync(playlist);
+            await SyncChannelsAsync(playlist);
+        }
+
+        if (change.SourceChanged || change.GuideChanged)
+        {
             _taskQueue.QueueIptvEpgSync();
         }
 
-        // Re-check when channels changed OR the admin just switched health checks
-        // on (so the existing channels get their first probe without a re-sync).
-        if (enableHealthCheck && (channelsResynced || healthCheckTurnedOn))
+        if (settings.EnableHealthCheck && (change.SourceChanged || healthCheckTurnedOn))
         {
             _taskQueue.QueueIptvHealthCheck(playlist.Id, playlist.Name);
         }
 
         var refreshed = await _repository.GetPlaylistByIdAsync(playlist.Id) ?? playlist;
-        return MapToViewModel(refreshed);
+        return IptvPlaylistView.ForAdmin(refreshed);
     }
+
+    public async Task<IptvConnectionTestVM> TestConnectionAsync(IptvPlaylistSettingsDto settings, Guid? existingId, CancellationToken cancellationToken = default)
+    {
+        var existing = existingId is { } id ? await _repository.GetPlaylistByIdAsync(id) : null;
+        var candidate = new IptvPlaylist
+        {
+            Id = existing?.Id ?? Guid.NewGuid(),
+            Name = settings.Name,
+            SourceType = existing?.SourceType ?? IptvSourceType.M3u,
+            M3uUrl = existing?.M3uUrl,
+            ServerUrl = existing?.ServerUrl,
+            Username = existing?.Username,
+            PasswordCiphertext = existing?.PasswordCiphertext,
+            UserAgent = existing?.UserAgent,
+            Referer = existing?.Referer
+        };
+
+        string? password = null;
+        try
+        {
+            IptvPlaylistSettings.Apply(candidate, settings, _secretProtector);
+            password = _upstreamResolver.PasswordFor(candidate);
+
+            var load = await _channelLoader.LoadAsync(candidate, cancellationToken);
+            return TestResult(null, load.Account, load.Channels.Count);
+        }
+        catch (XtreamAccountException ex)
+        {
+            return TestResult(ex.Message, ex.Account, 0);
+        }
+        catch (Exception ex) when (ex is IptvSourceException or ArgumentException)
+        {
+            return TestResult(IptvUrlRedactor.Redact(ex.Message, password, settings.NewPassword), null, 0);
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            _logger.LogWarning("Testing the IPTV source {Name} failed with {ErrorType}: {Error}", settings.Name, ex.GetType().Name, IptvUrlRedactor.Redact(ex.Message, password, settings.NewPassword));
+            return TestResult("The source could not be read. The server log has the details.", null, 0);
+        }
+    }
+
+    private static IptvConnectionTestVM TestResult(string? error, XtreamAccountInfo? account, int channelCount) => new()
+    {
+        Succeeded = error is null,
+        Error = error,
+        AccountStatus = account?.Status,
+        AccountExpiresAt = account?.ExpiresAt,
+        AccountMaxConnections = account?.MaxConnections,
+        ChannelCount = channelCount
+    };
 
     public async Task DeletePlaylistAsync(Guid id)
     {
@@ -185,11 +213,23 @@ public class IptvManager : IIptvManager
         var playlist = await _repository.GetPlaylistByIdAsync(id);
         if (playlist == null) return;
 
-        await SyncM3uChannelsAsync(playlist);
+        await SyncChannelsAsync(playlist);
         _taskQueue.QueueIptvEpgSync();
         if (playlist.EnableHealthCheck)
         {
             _taskQueue.QueueIptvHealthCheck(playlist.Id, playlist.Name);
+        }
+    }
+
+    public async Task RefreshActivePlaylistChannelsAsync(CancellationToken cancellationToken = default)
+    {
+        var active = await _repository.GetActivePlaylistsAsync(cancellationToken);
+        foreach (var summary in active)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            var playlist = await _repository.GetPlaylistByIdAsync(summary.Id);
+            if (playlist is null || !playlist.IsActive) continue;
+            await SyncChannelsAsync(playlist, cancellationToken);
         }
     }
 
@@ -271,21 +311,17 @@ public class IptvManager : IIptvManager
             .Select(s =>
             {
                 allStats.TryGetValue(s.Id, out var stats);
-                return new EpgSourceDiagnostics
-                {
-                    SourceId = s.Id,
-                    Name = s.Name,
-                    XmlTvUrl = s.XmlTvUrl,
-                    TotalProgrammes = stats?.TotalProgrammes ?? 0,
-                    MatchedProgrammes = stats?.MatchedProgrammes ?? 0,
-                    MatchedChannels = stats?.MatchedChannels ?? 0,
-                    MatchRate = stats == null || stats.TotalProgrammes == 0 ? 0 : (double)stats.MatchedProgrammes / stats.TotalProgrammes,
-                    UnmatchedSamples = stats?.UnmatchedSamples ?? new List<string>(),
-                    SyncedAt = stats?.SyncedAt ?? s.LastSyncedAt,
-                    LastError = s.LastError
-                };
+                return Diagnostics(s.Id, s.Name, s.XmlTvUrl, stats, stats?.SyncedAt ?? s.LastSyncedAt, s.LastError);
             })
             .ToList();
+
+        sourceDiags.AddRange(playlists
+            .Where(p => p.SourceType == IptvSourceType.Xtream && p.UseProviderGuide)
+            .Select(p =>
+            {
+                allStats.TryGetValue(p.Id, out var stats);
+                return Diagnostics(p.Id, p.Name + ProviderGuideSuffix, IptvUrlRedactor.SchemeAndHost(p.ServerUrl) ?? string.Empty, stats, stats?.SyncedAt, stats?.Error);
+            }));
 
         return new IptvEpgDiagnosticsVM
         {
@@ -301,27 +337,32 @@ public class IptvManager : IIptvManager
         };
     }
 
+    private static EpgSourceDiagnostics Diagnostics(Guid id, string name, string address, IptvSourceSyncStats? stats, DateTime? syncedAt, string? lastError) => new()
+    {
+        SourceId = id,
+        Name = name,
+        XmlTvUrl = address,
+        TotalProgrammes = stats?.TotalProgrammes ?? 0,
+        MatchedProgrammes = stats?.MatchedProgrammes ?? 0,
+        MatchedChannels = stats?.MatchedChannels ?? 0,
+        MatchRate = stats == null || stats.TotalProgrammes == 0 ? 0 : (double)stats.MatchedProgrammes / stats.TotalProgrammes,
+        UnmatchedSamples = stats?.UnmatchedSamples ?? new List<string>(),
+        SyncedAt = syncedAt,
+        LastError = lastError
+    };
+
     public async Task<List<IptvPlaylistVM>> GetClientPlaylistsAsync(Guid userId, Guid? profileId = null)
     {
         var user = await _userManager.GetUserAccountAsync(userId);
+        if (user is null) return new List<IptvPlaylistVM>();
+
+        var profile = profileId is { } id ? user.Profiles.FirstOrDefault(p => p.Id == id) : null;
         var allPlaylists = await _repository.GetAllPlaylistsAsync();
-        var allowed = allPlaylists.AsEnumerable();
 
-        if (user != null && !user.IsAdmin && !user.HasAllIptvAccess)
-        {
-            allowed = allowed.Where(p => user.AllowedIptvPlaylistIds.Contains(p.Id));
-        }
-
-        if (profileId.HasValue && user != null)
-        {
-            var profile = user.Profiles.FirstOrDefault(p => p.Id == profileId.Value);
-            if (profile != null && !profile.IsAdmin && !profile.HasAllIptvAccess)
-            {
-                allowed = allowed.Where(p => profile.AllowedIptvPlaylistIds.Contains(p.Id));
-            }
-        }
-
-        return allowed.Select(p => MapToViewModel(p, forClient: true)).ToList();
+        return allPlaylists
+            .Where(p => IptvPlaylistAccess.Allows(user, profile, p.Id))
+            .Select(IptvPlaylistView.ForClient)
+            .ToList();
     }
 
     public Task<Dictionary<string, List<IptvProgramDto>>> GetFilteredGuideAsync(Guid userId, Guid profileId, List<string> requestedChannelIds, DateTime startTime, DateTime endTime) =>
@@ -330,19 +371,26 @@ public class IptvManager : IIptvManager
     public Task ToggleChannelVisibilityAsync(Guid channelId) =>
         _repository.ToggleChannelVisibilityAsync(channelId);
 
-    public Task SetChannelKindAsync(Guid channelId, Vora.Domain.Enums.IptvChannelKind kind) =>
+    public Task SetChannelKindAsync(Guid channelId, IptvChannelKind kind) =>
         _repository.SetChannelKindAsync(channelId, kind);
 
     public async Task<string?> StartTimeshiftSessionAsync(Guid channelId, Guid userId, Guid profileId, LiveVideoLimits? limits)
     {
-        var channel = await _repository.GetChannelByIdAsync(channelId);
+        var channel = await _repository.GetChannelWithPlaylistAsync(channelId);
         if (channel == null) throw new InvalidOperationException("Channel not found.");
+
+        if (!await IptvPlaylistAccess.AllowsAsync(_userManager, userId, profileId, channel.PlaylistId))
+        {
+            throw new UnauthorizedAccessException("This profile does not have access to the channel's playlist.");
+        }
+
+        IptvPlaylist? playlist = channel.Playlist;
+        var upstream = _upstreamResolver.Resolve(playlist, channel);
 
         await using var profileLock = await _timeshiftCoordinator.LockProfileAsync(profileId);
 
         var leaseKey = TimeshiftLeaseKey(profileId);
-        var tunerProfile = await _repository.GetTunerProfileByPlaylistIdAsync(channel.PlaylistId);
-        var maxConcurrent = tunerProfile?.MaxConcurrentStreams ?? 0;
+        var maxConcurrent = playlist is null ? 0 : IptvConnectionLimit.Of(playlist);
 
         _tunerRegistry.Release(leaseKey);
         if (!_tunerRegistry.TryAcquire(channel.PlaylistId, maxConcurrent, leaseKey, TunerLeaseKind.Timeshift))
@@ -364,7 +412,7 @@ public class IptvManager : IIptvManager
                     channel.Name, video.Encoder, LiveVideoDecision.Mismatch(known, clientLimits));
             }
 
-            var run = await LaunchTimeshiftAsync(profileId, channel.StreamUrl, video);
+            var run = await LaunchTimeshiftAsync(profileId, upstream, video);
             if (run is null)
             {
                 _tunerRegistry.Release(leaseKey);
@@ -381,7 +429,7 @@ public class IptvManager : IIptvManager
                     if (video.Encodes)
                     {
                         _logger.LogInformation("Timeshift of {Channel} restarts to encode with {Encoder}: {Reason}.", channel.Name, video.Encoder, reason);
-                        run = await LaunchTimeshiftAsync(profileId, channel.StreamUrl, video);
+                        run = await LaunchTimeshiftAsync(profileId, upstream, video);
                         if (run is null)
                         {
                             _tunerRegistry.Release(leaseKey);
@@ -397,7 +445,7 @@ public class IptvManager : IIptvManager
             {
                 _logger.LogWarning("Timeshift of {Channel} failed to encode with {Encoder}; retrying on the CPU.", channel.Name, video.Encoder);
                 video = await _timeshiftVideo.EncodeArgumentsAsync(encode, onCpu: true);
-                run = await LaunchTimeshiftAsync(profileId, channel.StreamUrl, video);
+                run = await LaunchTimeshiftAsync(profileId, upstream, video);
                 if (run is null)
                 {
                     _tunerRegistry.Release(leaseKey);
@@ -447,13 +495,13 @@ public class IptvManager : IIptvManager
 
     private sealed record TimeshiftRun(Process Process, string SessionPath, string PlaylistPath, DateTime ReadyBy);
 
-    private async Task<TimeshiftRun?> LaunchTimeshiftAsync(Guid profileId, string streamUrl, TimeshiftVideoArguments video)
+    private async Task<TimeshiftRun?> LaunchTimeshiftAsync(Guid profileId, IptvUpstream upstream, TimeshiftVideoArguments video)
     {
         var sessionPath = await PrepareTimeshiftDirectoryAsync(profileId);
         var outputPath = Path.Combine(sessionPath, PlaylistFileName).Replace("\\", "/");
         var segmentPath = Path.Combine(sessionPath, SegmentFilePattern).Replace("\\", "/");
 
-        var process = BuildTimeshiftProcess(streamUrl, outputPath, segmentPath, video);
+        var process = BuildTimeshiftProcess(upstream.Url, upstream.Policy, outputPath, segmentPath, video);
 
         await _timeshiftCoordinator.StopAsync(profileId);
         if (!_timeshiftCoordinator.TryRegister(profileId, process, sessionPath))
@@ -561,7 +609,7 @@ public class IptvManager : IIptvManager
         }
     }
 
-    internal static Process BuildTimeshiftProcess(string streamUrl, string outputPath, string segmentPath, TimeshiftVideoArguments video)
+    internal static Process BuildTimeshiftProcess(string streamUrl, IptvRequestPolicy policy, string outputPath, string segmentPath, TimeshiftVideoArguments video)
     {
         var process = new Process
         {
@@ -579,7 +627,8 @@ public class IptvManager : IIptvManager
         args.Add("-reconnect"); args.Add("1");
         args.Add("-reconnect_streamed"); args.Add("1");
         args.Add("-reconnect_delay_max"); args.Add("5");
-        args.Add("-i"); args.Add(streamUrl);
+        foreach (var argument in policy.FfmpegInputOptions()) args.Add(argument);
+        args.Add("-i"); args.Add(policy.FfmpegInputUrl(streamUrl));
         foreach (var argument in video.Video) args.Add(argument);
         // Stereo AAC. ffmpeg's AAC encoder writes a 5.1(side) source (the usual
         // layout of a channel's AC-3 surround) with a program config element
@@ -598,94 +647,58 @@ public class IptvManager : IIptvManager
         return process;
     }
 
-    private async Task SyncM3uChannelsAsync(IptvPlaylist playlist)
+    private async Task SyncChannelsAsync(IptvPlaylist playlist, CancellationToken cancellationToken = default)
     {
-        if (string.IsNullOrWhiteSpace(playlist.M3uUrl)) return;
+        if (playlist.SourceType == IptvSourceType.M3u && string.IsNullOrWhiteSpace(playlist.M3uUrl)) return;
 
+        string? password = null;
         try
         {
-            var httpClient = _httpClientFactory.CreateClient(HttpClientName);
-            List<IptvChannel> channels;
+            password = _upstreamResolver.PasswordFor(playlist);
+            var load = await _channelLoader.LoadAsync(playlist, cancellationToken);
+            await _repository.UpdateChannelsAsync(playlist.Id, load.Channels);
 
-            if (IsRadioBrowserUrl(playlist.M3uUrl))
+            if (load.Account is not null)
             {
-                var jsonUrl = ConvertToRadioBrowserJsonUrl(playlist.M3uUrl);
-                var json = await httpClient.GetStringAsync(jsonUrl);
-                channels = RadioBrowserParser.Parse(json, playlist.Id, playlist.DefaultChannelKind);
+                IptvPlaylistSettings.RecordAccount(playlist, load.Account, DateTime.UtcNow);
             }
-            else
-            {
-                var m3uContent = await httpClient.GetStringAsync(playlist.M3uUrl);
-                channels = M3uChannelParser.Parse(m3uContent, playlist.Id, playlist.DefaultChannelKind);
-            }
-
-            await _repository.UpdateChannelsAsync(playlist.Id, channels);
 
             playlist.LastError = null;
             playlist.LastSyncedAt = DateTime.UtcNow;
             await _repository.UpdatePlaylistAsync(playlist);
 
-            _logger.LogInformation("Successfully parsed and saved {ChannelCount} channels for {PlaylistName}.", channels.Count, playlist.Name);
+            _logger.LogInformation("Successfully parsed and saved {ChannelCount} channels for {PlaylistName}.", load.Channels.Count, playlist.Name);
         }
-        catch (HttpRequestException ex)
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
-            playlist.LastError = $"HTTP {(int?)ex.StatusCode}: {ex.Message}";
-            await _repository.UpdatePlaylistAsync(playlist);
-            _logger.LogError(ex, "HTTP Error fetching M3U for {PlaylistName}.", playlist.Name);
+            throw;
+        }
+        catch (XtreamAccountException ex)
+        {
+            IptvPlaylistSettings.RecordAccount(playlist, ex.Account, DateTime.UtcNow);
+            await RecordSyncFailureAsync(playlist, ex.Message);
+        }
+        catch (XtreamAuthenticationException ex)
+        {
+            IptvPlaylistSettings.ForgetAccount(playlist);
+            await RecordSyncFailureAsync(playlist, ex.Message);
+        }
+        catch (IptvSourceException ex)
+        {
+            await RecordSyncFailureAsync(playlist, IptvUrlRedactor.Redact(ex.Message, password));
         }
         catch (Exception ex)
         {
-            playlist.LastError = ex.Message;
-            await _repository.UpdatePlaylistAsync(playlist);
-            _logger.LogError(ex, "Failed to download or parse M3U for {PlaylistName}.", playlist.Name);
+            _logger.LogError("Loading the channels of {PlaylistName} failed with {ErrorType}.", playlist.Name, ex.GetType().Name);
+            await RecordSyncFailureAsync(playlist, IptvUrlRedactor.Redact(ex.Message, password));
         }
     }
 
-    private static bool IsRadioBrowserUrl(string url) =>
-        url.Contains("radio-browser.info", StringComparison.OrdinalIgnoreCase);
-
-    private static string ConvertToRadioBrowserJsonUrl(string url) =>
-        url.Replace("/m3u/", "/json/", StringComparison.OrdinalIgnoreCase);
-
-    private static string? NormalizeCountryFilter(string? value)
+    private async Task RecordSyncFailureAsync(IptvPlaylist playlist, string error)
     {
-        if (string.IsNullOrWhiteSpace(value)) return null;
-        var trimmed = value.Trim();
-        return string.Equals(trimmed, "All", StringComparison.OrdinalIgnoreCase) ? null : trimmed.ToUpperInvariant();
-    }
-
-    // forClient scopes the projection to what a viewer may see: the playlist's
-    // CountryFilter is applied and channels that failed their last health check
-    // are dropped entirely. Admin views leave it off so channel management sees
-    // everything (including unhealthy channels, with their status).
-    private static IptvPlaylistVM MapToViewModel(IptvPlaylist entity, bool forClient = false)
-    {
-        var channels = entity.Channels?.AsEnumerable() ?? Enumerable.Empty<IptvChannel>();
-        if (forClient)
-        {
-            if (!string.IsNullOrWhiteSpace(entity.CountryFilter))
-            {
-                channels = channels.Where(c => string.Equals(c.CountryCode, entity.CountryFilter, StringComparison.OrdinalIgnoreCase));
-            }
-            // Unchecked (null) channels stay visible; only a confirmed failure hides one.
-            channels = channels.Where(c => c.IsHealthy != false);
-        }
-
-        return new()
-        {
-            Id = entity.Id,
-            Name = entity.Name,
-            M3uUrl = entity.M3uUrl,
-            IsActive = entity.IsActive,
-            SupportsWebPlayback = entity.SupportsWebPlayback,
-            MaxConcurrentStreams = entity.TunerProfile?.MaxConcurrentStreams ?? 0,
-            LastError = entity.LastError,
-            LastSyncedAt = entity.LastSyncedAt,
-            DefaultChannelKind = entity.DefaultChannelKind.ToString(),
-            CountryFilter = entity.CountryFilter,
-            EnableHealthCheck = entity.EnableHealthCheck,
-            Channels = channels.Select(c => IptvChannelVM.FromEntity(c, entity.Name)).ToList()
-        };
+        playlist.LastError = error;
+        await _repository.UpdatePlaylistAsync(playlist);
+        _logger.LogError("Failed to load the channels of {PlaylistName}: {Error}", playlist.Name, error);
     }
 
     private static IptvEpgSourceVM MapToViewModel(IptvEpgSource entity) =>

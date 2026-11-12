@@ -105,6 +105,9 @@ public static class TaskRecipes
             case nameof(ITaskQueueManager.QueueIptvEpgSync):
                 queue.QueueIptvEpgSync();
                 return true;
+            case nameof(ITaskQueueManager.QueueIptvScheduledSync):
+                queue.QueueIptvScheduledSync();
+                return true;
             case nameof(ITaskQueueManager.QueueIptvHealthCheck):
                 queue.QueueIptvHealthCheck(r.Guid("playlistId"), r.Text("playlistName"));
                 return true;

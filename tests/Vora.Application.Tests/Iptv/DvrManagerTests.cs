@@ -3,6 +3,8 @@ using Vora.Application.Analysis;
 using Vora.Application.Iptv;
 using Vora.Application.Iptv.Dtos;
 using Vora.Application.Settings;
+using Vora.Application.Users;
+using Vora.Application.Users.ViewModels;
 using Vora.Domain.Entities.Iptv;
 using Vora.Domain.Entities.Settings;
 using Vora.Domain.Entities.Users;
@@ -16,6 +18,7 @@ public class DvrManagerTests
     private readonly IIptvEpgService _epg;
     private readonly IClientNotifier _notifier;
     private readonly ISystemSettingsRepository _settingsRepo;
+    private readonly IUserManager _users;
     private readonly DvrManager _manager;
 
     public DvrManagerTests()
@@ -24,7 +27,65 @@ public class DvrManagerTests
         _epg = Substitute.For<IIptvEpgService>();
         _notifier = Substitute.For<IClientNotifier>();
         _settingsRepo = Substitute.For<ISystemSettingsRepository>();
-        _manager = new DvrManager(_repo, _epg, NullLogger<DvrManager>.Instance, _notifier, _settingsRepo);
+        _users = Substitute.For<IUserManager>();
+        _manager = new DvrManager(_repo, _epg, _users, NullLogger<DvrManager>.Instance, _notifier, _settingsRepo);
+    }
+
+    private void AllowChannel(UserProfile profile, Guid channelId, Guid playlistId, bool accountAllowsPlaylist, bool profileAllowsPlaylist = true)
+    {
+        _repo.GetChannelByIdAsync(channelId).Returns(new IptvChannel { Id = channelId, ExternalChannelId = "ch1", Name = "Channel", StreamUrl = "https://iptv.example.com/ch1.ts", PlaylistId = playlistId });
+        _users.GetUserAccountAsync(profile.UserId).Returns(new UserVM
+        {
+            Id = profile.UserId,
+            HasAllIptvAccess = false,
+            AllowedIptvPlaylistIds = accountAllowsPlaylist ? new List<Guid> { playlistId } : new List<Guid>(),
+            Profiles = new List<UserProfileVM>
+            {
+                new() { Id = profile.Id, HasAllIptvAccess = false, AllowedIptvPlaylistIds = profileAllowsPlaylist ? new List<Guid> { playlistId } : new List<Guid>() }
+            }
+        });
+    }
+
+    [Fact]
+    public async Task ScheduleRecordingAsync_refuses_a_channel_on_a_playlist_the_account_may_not_watch()
+    {
+        var profile = MakeProfile(isAdmin: false, canRecord: true);
+        _repo.GetUserProfileAsync(profile.Id).Returns(profile);
+        var channelId = Guid.NewGuid();
+        AllowChannel(profile, channelId, Guid.NewGuid(), accountAllowsPlaylist: false);
+
+        var act = async () => await _manager.ScheduleRecordingAsync(profile.Id, channelId, "Title", null, false);
+
+        await act.Should().ThrowAsync<UnauthorizedAccessException>().WithMessage("*access to the channel's playlist*");
+        await _repo.DidNotReceiveWithAnyArgs().CreateRecordingScheduleAsync(default!);
+    }
+
+    [Fact]
+    public async Task ScheduleRecordingAsync_refuses_a_channel_on_a_playlist_the_profile_may_not_watch()
+    {
+        var profile = MakeProfile(isAdmin: false, canRecord: true);
+        _repo.GetUserProfileAsync(profile.Id).Returns(profile);
+        var channelId = Guid.NewGuid();
+        AllowChannel(profile, channelId, Guid.NewGuid(), accountAllowsPlaylist: true, profileAllowsPlaylist: false);
+
+        var act = async () => await _manager.ScheduleRecordingAsync(profile.Id, channelId, "Title", null, false);
+
+        await act.Should().ThrowAsync<UnauthorizedAccessException>();
+        await _repo.DidNotReceiveWithAnyArgs().CreateRecordingScheduleAsync(default!);
+    }
+
+    [Fact]
+    public async Task ScheduleRecordingAsync_records_a_channel_both_allowlists_include()
+    {
+        var profile = MakeProfile(isAdmin: false, canRecord: true);
+        _repo.GetUserProfileAsync(profile.Id).Returns(profile);
+        _repo.GetAllActiveSchedulesAsync().Returns(new List<IptvRecordingSchedule>());
+        var channelId = Guid.NewGuid();
+        AllowChannel(profile, channelId, Guid.NewGuid(), accountAllowsPlaylist: true);
+
+        await _manager.ScheduleRecordingAsync(profile.Id, channelId, "Title", null, false);
+
+        await _repo.Received(1).CreateRecordingScheduleAsync(Arg.Is<IptvRecordingSchedule>(s => s.ChannelId == channelId));
     }
 
     private static UserProfile MakeProfile(bool isAdmin = false, bool canRecord = false)
@@ -71,6 +132,7 @@ public class DvrManagerTests
         _settingsRepo.GetSettingsAsync().Returns(new ServerSetting());
 
         var channelId = Guid.NewGuid();
+        AllowChannel(profile, channelId, Guid.NewGuid(), accountAllowsPlaylist: true);
         var schedule = await _manager.ScheduleRecordingAsync(profile.Id, channelId, "Title", "prog-1", true, keepMaxEpisodes: 5);
 
         schedule.Title.Should().Be("Title");
@@ -200,7 +262,7 @@ public class DvrManagerTests
         _settingsRepo.GetSettingsAsync().Returns(new ServerSetting { DvrConflictPolicy = DvrConflictPolicy.DropNewest });
         _epg.GetProgramsForChannels(Arg.Any<List<string>>(), Arg.Any<DateTime>(), Arg.Any<DateTime>())
             .Returns(new Dictionary<string, List<IptvProgramDto>> { ["ch1"] = new() { program } });
-        _repo.GetTunerProfileByPlaylistIdAsync(playlistId).Returns(new IptvTunerProfile { PlaylistId = playlistId, MaxConcurrentStreams = 1 });
+        _repo.GetConnectionLimitAsync(playlistId).Returns(1);
         _repo.GetPendingSessionsOverlappingAsync(playlistId, Arg.Any<DateTime>(), Arg.Any<DateTime>())
             .Returns(new List<IptvRecordingSession>
             {
@@ -231,7 +293,7 @@ public class DvrManagerTests
         _settingsRepo.GetSettingsAsync().Returns(new ServerSetting { DvrConflictPolicy = DvrConflictPolicy.DropOldest });
         _epg.GetProgramsForChannels(Arg.Any<List<string>>(), Arg.Any<DateTime>(), Arg.Any<DateTime>())
             .Returns(new Dictionary<string, List<IptvProgramDto>> { ["ch1"] = new() { program } });
-        _repo.GetTunerProfileByPlaylistIdAsync(playlistId).Returns(new IptvTunerProfile { PlaylistId = playlistId, MaxConcurrentStreams = 1 });
+        _repo.GetConnectionLimitAsync(playlistId).Returns(1);
         _repo.GetPendingSessionsOverlappingAsync(playlistId, Arg.Any<DateTime>(), Arg.Any<DateTime>())
             .Returns(new List<IptvRecordingSession>
             {
