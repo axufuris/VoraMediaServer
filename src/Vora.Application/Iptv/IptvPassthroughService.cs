@@ -125,7 +125,7 @@ public class IptvPassthroughService : IIptvPassthroughService
 
         var (resolvedUrl, streamType) = await ResolveStreamAsync(upstream.Url, upstream.Policy, channel.Name, depth: 0);
 
-        var viewerKey = profileId ?? userId;
+        var viewerKey = profileId ?? Guid.NewGuid();
         var viewerLeases = ViewerLeasePrefix(viewerKey, channel.PlaylistId);
         _tunerRegistry.ReleaseStartingWith(ViewerLiveLeasePrefix(viewerKey, channel.PlaylistId));
 
