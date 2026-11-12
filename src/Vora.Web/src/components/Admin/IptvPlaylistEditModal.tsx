@@ -1,7 +1,11 @@
-import { useState, useEffect } from 'react';
-import { iptvAdminService, type IptvPlaylistVM } from '../../api/Iptv/iptvAdminService';
+import { useState } from 'react';
+import { iptvAdminService, type IptvPlaylistRequest, type IptvPlaylistVM } from '../../api/Iptv/iptvAdminService';
 import { Modal, ModalHeader } from '../Common/Modal';
 import { COUNTRY_OPTIONS } from '../../utils/countries';
+import { errorDetail } from '../../utils/apiError';
+import IptvSourceFields from './Iptv/IptvSourceFields';
+import { AccountBadges } from './Iptv/PlaylistSourceCell';
+import { draftFromPlaylist, missingSourceField, sourceRequestFields, type IptvSourceDraft } from './Iptv/iptvSourceDraft';
 
 interface Props {
     isOpen: boolean;
@@ -32,9 +36,13 @@ function CheckboxCard({ checked, onChange, label, hint }: { checked: boolean, on
     );
 }
 
-export default function IptvPlaylistEditModal({ isOpen, onClose, playlist, serverId, onSaved }: Props) {
+export default function IptvPlaylistEditModal(props: Props) {
+    return <PlaylistEditor key={props.playlist.id} {...props} />;
+}
+
+function PlaylistEditor({ isOpen, onClose, playlist, serverId, onSaved }: Props) {
     const [name, setName] = useState(playlist.name);
-    const [m3uUrl, setM3uUrl] = useState(playlist.m3uUrl || '');
+    const [source, setSource] = useState<IptvSourceDraft>(() => draftFromPlaylist(playlist));
     const [supportsWebPlayback, setSupportsWebPlayback] = useState(playlist.supportsWebPlayback);
     const [maxConcurrentStreams, setMaxConcurrentStreams] = useState(playlist.maxConcurrentStreams);
     const [isActive, setIsActive] = useState(playlist.isActive);
@@ -45,44 +53,35 @@ export default function IptvPlaylistEditModal({ isOpen, onClose, playlist, serve
     const [enableHealthCheck, setEnableHealthCheck] = useState(playlist.enableHealthCheck ?? false);
     const [isSaving, setIsSaving] = useState(false);
     const [error, setError] = useState<string | null>(null);
+    const passwordIsSet = playlist.passwordIsSet ?? false;
+    const missingSource = missingSourceField(source, passwordIsSet);
 
-    useEffect(() => {
-        setName(playlist.name);
-        setM3uUrl(playlist.m3uUrl || '');
-        setSupportsWebPlayback(playlist.supportsWebPlayback);
-        setMaxConcurrentStreams(playlist.maxConcurrentStreams);
-        setIsActive(playlist.isActive);
-        setCountryFilter(playlist.countryFilter ?? '');
-        setEnableHealthCheck(playlist.enableHealthCheck ?? false);
-        setError(null);
-    }, [playlist]);
+    const request = (): IptvPlaylistRequest => ({
+        name: name.trim(),
+        ...sourceRequestFields(source),
+        supportsWebPlayback,
+        maxConcurrentStreams,
+        isActive,
+        defaultChannelKind: playlist.defaultChannelKind,
+        countryFilter: isRadio ? (countryFilter || null) : null,
+        enableHealthCheck,
+    });
 
     const handleSave = async () => {
-        if (!name.trim() || !m3uUrl.trim()) {
-            setError('Both a name and an M3U playlist URL are required.');
+        if (!name.trim() || missingSource) {
+            setError(missingSource ?? 'Give the playlist a name.');
             return;
         }
 
         setIsSaving(true);
         setError(null);
         try {
-            await iptvAdminService.updatePlaylist(
-                playlist.id,
-                name.trim(),
-                m3uUrl.trim(),
-                supportsWebPlayback,
-                maxConcurrentStreams,
-                isActive,
-                playlist.defaultChannelKind,
-                isRadio ? (countryFilter || null) : null,
-                enableHealthCheck,
-                serverId
-            );
+            await iptvAdminService.updatePlaylist(playlist.id, request(), serverId);
             onSaved();
             onClose();
         } catch (err) {
             console.error('Failed to update playlist', err);
-            setError('Failed to update playlist. Check the URL and try again.');
+            setError(errorDetail(err, 'Failed to update playlist'));
         } finally {
             setIsSaving(false);
         }
@@ -122,15 +121,16 @@ export default function IptvPlaylistEditModal({ isOpen, onClose, playlist, serve
                 </div>
 
                 <div>
-                    <FieldLabel>M3U playlist URL</FieldLabel>
-                    <input
-                        type="text"
-                        value={m3uUrl}
-                        onChange={e => setM3uUrl(e.target.value)}
-                        className="vora-input font-mono text-sm"
-                        placeholder="https://…"
+                    <IptvSourceFields
+                        idPrefix={`iptv-edit-${playlist.id}`}
+                        kind={playlist.defaultChannelKind}
+                        draft={source}
+                        onChange={patch => setSource(current => ({ ...current, ...patch }))}
+                        passwordIsSet={passwordIsSet}
+                        onTest={() => iptvAdminService.testConnection(request(), playlist.id, serverId)}
                     />
-                    <p className="text-xs text-[var(--vora-text-muted)] mt-1.5">Changing the URL will trigger a channel re-sync on save.</p>
+                    <p className="text-xs text-[var(--vora-text-muted)] mt-1.5">Changing the source, the login or the headers reloads the channels on save.</p>
+                    <AccountBadges playlist={playlist} />
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -144,7 +144,7 @@ export default function IptvPlaylistEditModal({ isOpen, onClose, playlist, serve
                     <div className="bg-[var(--vora-bg-sunken)] p-3 rounded-[var(--vora-radius-md)] border border-[var(--vora-border-subtle)] flex items-center justify-between gap-3">
                         <div className="flex flex-col min-w-0">
                             <span className="text-sm font-semibold text-[var(--vora-text-primary)]">Max concurrent streams</span>
-                            <span className="text-xs text-[var(--vora-text-muted)]">0 = unlimited.</span>
+                            <span className="text-xs text-[var(--vora-text-muted)]">0 = unlimited, or the account's own limit.</span>
                         </div>
                         <input
                             type="number"
@@ -206,7 +206,7 @@ export default function IptvPlaylistEditModal({ isOpen, onClose, playlist, serve
                 <button
                     type="button"
                     onClick={handleSave}
-                    disabled={isSaving || !name.trim() || !m3uUrl.trim()}
+                    disabled={isSaving || !name.trim() || missingSource !== null}
                     className="vora-button-primary disabled:opacity-50"
                 >
                     {isSaving ? 'Saving…' : 'Save changes'}

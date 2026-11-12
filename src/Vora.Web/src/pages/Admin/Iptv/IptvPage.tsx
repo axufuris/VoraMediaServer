@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useParams } from 'react-router-dom';
-import { iptvAdminService, type IptvPlaylistVM, type IptvChannelKind } from '../../../api/Iptv/iptvAdminService';
+import { iptvAdminService, type IptvPlaylistVM, type IptvChannelKind, type IptvPlaylistRequest } from '../../../api/Iptv/iptvAdminService';
 import { iptvEpgAdminService, type IptvEpgSourceVM } from '../../../api/Iptv/iptvEpgAdminService';
 import { systemSettingsAdminService, type ServerSettings } from '../../../api/System/systemSettingsAdminService';
 import AdminIptvChannelsModal from '../../../components/Admin/IptvChannelsModal';
@@ -13,9 +13,19 @@ import HealthBadge from '../../../components/Admin/Primitives/HealthBadge';
 import { COUNTRY_OPTIONS } from '../../../utils/countries';
 import { useDialog } from '../../../dialogs';
 import { FREE_EPG_SOURCES, FREE_PLAYLISTS } from '../../../utils/iptvPresets';
+import { errorDetail } from '../../../utils/apiError';
+import IptvSourceFields from '../../../components/Admin/Iptv/IptvSourceFields';
+import PlaylistSourceCell from '../../../components/Admin/Iptv/PlaylistSourceCell';
+import { emptySourceDraft, missingSourceField, sourceRequestFields, type IptvSourceDraft } from '../../../components/Admin/Iptv/iptvSourceDraft';
 
 interface IptvPageProps {
     kind: IptvChannelKind;
+}
+
+function limitLabel(playlist: IptvPlaylistVM): string {
+    const limit = playlist.connectionLimit ?? playlist.maxConcurrentStreams;
+    if (!limit) return 'Unlimited';
+    return playlist.maxConcurrentStreams === 0 ? `${limit} (account)` : String(limit);
 }
 
 export default function IptvPage({ kind }: IptvPageProps) {
@@ -27,8 +37,8 @@ export default function IptvPage({ kind }: IptvPageProps) {
     const playlistNoun = isRadio ? 'Radio Playlist' : 'Live TV Playlist';
     const playlistNounPlural = isRadio ? 'Radio Playlists' : 'Live TV Playlists';
     const playlistDescription = isRadio
-        ? 'A playlist is an M3U source that supplies radio stations.'
-        : 'A playlist is an M3U source that supplies channels. Programme guide data is layered on separately from EPG sources below.';
+        ? 'A playlist is an M3U source or an Xtream Codes account that supplies radio stations.'
+        : 'A playlist is an M3U source or an Xtream Codes account that supplies channels. Programme guide data is layered on separately from EPG sources below.';
     const filteredFreePlaylists = FREE_PLAYLISTS.filter(p => p.defaultKind === kind);
 
     const [playlists, setPlaylists] = useState<IptvPlaylistVM[]>([]);
@@ -43,7 +53,8 @@ export default function IptvPage({ kind }: IptvPageProps) {
 
     const [playlistQuickAdd, setPlaylistQuickAdd] = useState('');
     const [playlistName, setPlaylistName] = useState('');
-    const [m3uUrl, setM3uUrl] = useState('');
+    const [sourceDraft, setSourceDraft] = useState<IptvSourceDraft>(emptySourceDraft);
+    const [sourceFieldsKey, setSourceFieldsKey] = useState(0);
     const [supportsWebPlayback, setSupportsWebPlayback] = useState(true);
     const [maxConcurrentStreams, setMaxConcurrentStreams] = useState(0);
     const [countryFilter, setCountryFilter] = useState('');
@@ -121,11 +132,31 @@ export default function IptvPage({ kind }: IptvPageProps) {
         const selected = filteredFreePlaylists.find(p => p.name === val);
         if (selected) {
             setPlaylistName(selected.name);
-            setM3uUrl(selected.m3u);
+            setSourceDraft({ ...emptySourceDraft(), m3uUrl: selected.m3u });
+            setSourceFieldsKey(k => k + 1);
             setSupportsWebPlayback(selected.supportsWeb);
             setMaxConcurrentStreams(selected.maxConnections);
         }
     };
+
+    const changeSource = (patch: Partial<IptvSourceDraft>) => {
+        if (patch.sourceType === 'Xtream' && sourceDraft.sourceType !== 'Xtream') {
+            setEnableHealthCheck(false);
+        }
+        setSourceDraft(current => ({ ...current, ...patch }));
+    };
+
+    const playlistRequest = (): IptvPlaylistRequest => ({
+        name: playlistName.trim(),
+        ...sourceRequestFields(sourceDraft),
+        supportsWebPlayback,
+        maxConcurrentStreams,
+        defaultChannelKind: kind,
+        countryFilter: isRadio ? (countryFilter || null) : null,
+        enableHealthCheck,
+    });
+
+    const missingSource = missingSourceField(sourceDraft, false);
 
     const handleEpgQuickSelect = (e: React.ChangeEvent<HTMLSelectElement>) => {
         const val = e.target.value;
@@ -139,16 +170,17 @@ export default function IptvPage({ kind }: IptvPageProps) {
     };
 
     const handleAddPlaylist = async () => {
-        if (!playlistName || !m3uUrl) {
-            await dialog.alert({ title: "Validation Error", message: "Both a Playlist Name and an M3U Playlist URL are required." });
+        if (!playlistName.trim() || missingSource) {
+            await dialog.alert({ title: "Validation Error", message: missingSource ?? "Give the playlist a name." });
             return;
         }
 
         setIsSavingPlaylist(true);
         try {
-            await iptvAdminService.addPlaylist(playlistName, m3uUrl, supportsWebPlayback, maxConcurrentStreams, kind, isRadio ? (countryFilter || null) : null, enableHealthCheck, serverId);
+            await iptvAdminService.addPlaylist(playlistRequest(), serverId);
             setPlaylistName('');
-            setM3uUrl('');
+            setSourceDraft(emptySourceDraft());
+            setSourceFieldsKey(k => k + 1);
             setSupportsWebPlayback(true);
             setMaxConcurrentStreams(0);
             setCountryFilter('');
@@ -157,7 +189,7 @@ export default function IptvPage({ kind }: IptvPageProps) {
             await loadData();
         } catch (error) {
             console.error("Failed to add playlist", error);
-            await dialog.alert({ title: "Error", message: "Failed to add playlist." });
+            await dialog.alert({ title: "Error", message: errorDetail(error, "Failed to add playlist") });
         } finally {
             setIsSavingPlaylist(false);
         }
@@ -375,27 +407,27 @@ export default function IptvPage({ kind }: IptvPageProps) {
                         </div>
                     )}
 
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-                        <div>
-                            <label className="block text-xs font-bold uppercase tracking-widest text-[var(--vora-text-muted)] mb-1.5">{playlistNoun} name</label>
-                            <input
-                                type="text"
-                                value={playlistName}
-                                onChange={e => setPlaylistName(e.target.value)}
-                                className="vora-input"
-                                placeholder={isRadio ? 'e.g. Top 100 Radio' : 'e.g. US — IPTV Org'}
-                            />
-                        </div>
-                        <div>
-                            <label className="block text-xs font-bold uppercase tracking-widest text-[var(--vora-text-muted)] mb-1.5">M3U URL</label>
-                            <input
-                                type="text"
-                                value={m3uUrl}
-                                onChange={e => setM3uUrl(e.target.value)}
-                                className="vora-input font-mono text-sm"
-                                placeholder="https://…"
-                            />
-                        </div>
+                    <div className="mb-4">
+                        <label htmlFor={`iptv-add-${kind}-name`} className="block text-xs font-bold uppercase tracking-widest text-[var(--vora-text-muted)] mb-1.5">{playlistNoun} name</label>
+                        <input
+                            id={`iptv-add-${kind}-name`}
+                            type="text"
+                            value={playlistName}
+                            onChange={e => setPlaylistName(e.target.value)}
+                            className="vora-input md:max-w-md"
+                            placeholder={isRadio ? 'e.g. Top 100 Radio' : 'e.g. US — IPTV Org'}
+                        />
+                    </div>
+
+                    <div className="mb-5">
+                        <IptvSourceFields
+                            key={sourceFieldsKey}
+                            idPrefix={`iptv-add-${kind}`}
+                            kind={kind}
+                            draft={sourceDraft}
+                            onChange={changeSource}
+                            onTest={() => iptvAdminService.testConnection(playlistRequest(), undefined, serverId)}
+                        />
                     </div>
 
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-5">
@@ -415,7 +447,7 @@ export default function IptvPage({ kind }: IptvPageProps) {
                         <div className="bg-[var(--vora-bg-sunken)] p-3 rounded-[var(--vora-radius-md)] border border-[var(--vora-border-subtle)] flex items-center justify-between gap-3">
                             <div className="flex flex-col min-w-0">
                                 <span className="text-sm font-semibold text-[var(--vora-text-primary)]">Max concurrent streams (tuners)</span>
-                                <span className="text-xs text-[var(--vora-text-muted)]">0 = unlimited. Set this to prevent premium provider bans.</span>
+                                <span className="text-xs text-[var(--vora-text-muted)]">0 = unlimited, or the account's own limit for an Xtream Codes account. Set this to prevent premium provider bans.</span>
                             </div>
                             <input
                                 type="number"
@@ -461,7 +493,7 @@ export default function IptvPage({ kind }: IptvPageProps) {
                         <button
                             type="button"
                             onClick={handleAddPlaylist}
-                            disabled={isSavingPlaylist || !playlistName || !m3uUrl}
+                            disabled={isSavingPlaylist || !playlistName.trim() || missingSource !== null}
                             className="vora-button-primary"
                         >
                             {isSavingPlaylist ? 'Adding & parsing…' : `Add ${playlistNoun}`}
@@ -488,7 +520,7 @@ export default function IptvPage({ kind }: IptvPageProps) {
                             <thead className="bg-[var(--vora-bg-sunken)] border-b border-[var(--vora-border-subtle)] text-[11px] uppercase tracking-wider text-[var(--vora-text-muted)]">
                                 <tr>
                                     <th className="px-4 py-3 font-semibold w-1/4">Name</th>
-                                    <th className="px-4 py-3 font-semibold w-1/4">M3U URL</th>
+                                    <th className="px-4 py-3 font-semibold w-1/4">Source</th>
                                     <th className="px-4 py-3 font-semibold">Channels</th>
                                     <th className="px-4 py-3 font-semibold">Limit</th>
                                     <th className="px-4 py-3 font-semibold">Last Synced</th>
@@ -510,9 +542,9 @@ export default function IptvPage({ kind }: IptvPageProps) {
                                                 </div>
                                             )}
                                         </td>
-                                        <td className="px-4 py-3 text-[var(--vora-text-secondary)] text-sm align-top font-mono break-all">{p.m3uUrl}</td>
+                                        <td className="px-4 py-3 align-top"><PlaylistSourceCell playlist={p} /></td>
                                         <td className="px-4 py-3 text-[var(--vora-text-secondary)] align-top tabular-nums">{p.channels?.length || 0}</td>
-                                        <td className="px-4 py-3 text-[var(--vora-text-secondary)] align-top">{p.maxConcurrentStreams === 0 ? 'Unlimited' : p.maxConcurrentStreams}</td>
+                                        <td className="px-4 py-3 text-[var(--vora-text-secondary)] align-top">{limitLabel(p)}</td>
                                         <td className="px-4 py-3 text-[var(--vora-text-secondary)] align-top text-xs">{p.lastSyncedAt ? new Date(p.lastSyncedAt).toLocaleString() : <span className="italic text-[var(--vora-text-disabled)]">never</span>}</td>
                                         <td className="px-4 py-3 text-right align-top">
                                             <div className="flex justify-end gap-1.5">

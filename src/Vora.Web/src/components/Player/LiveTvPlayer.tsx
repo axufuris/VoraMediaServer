@@ -8,7 +8,7 @@ import { dvrService, type IptvRecordingSessionVM } from '../../api/Iptv/dvrServi
 import { timeshiftService } from '../../api/Iptv/timeshiftService';
 import { passthroughService } from '../../api/Iptv/passthroughService';
 import { serverVault } from '../../utils/serverVault';
-import { StorageKeys, decodeJwtPayload, getProfileIdFromToken } from '../../utils/storageKeys';
+import { StorageKeys, getProfileIdFromToken } from '../../utils/storageKeys';
 import LiveTvGuide from '../../pages/Client/LiveTv/LiveTvGuide';
 import { parseGuidePrefs } from '../../pages/Client/LiveTv/hooks/useGuideData';
 import { setChannelFavorite } from '../../pages/Client/LiveTv/hooks/channelFavorites';
@@ -23,7 +23,7 @@ import LiveTvInfoPanel from './Panels/LiveTvInfoPanel';
 import LiveTvRecordModal from './Panels/LiveTvRecordModal';
 import { useCallback } from 'react';
 import { useDialog } from '../../dialogs';
-import { userService } from '../../api/Users/userService';
+import { useLivePermissions } from './useLivePermissions';
 import { parseServerDate, serverTimeMs } from '../../utils/serverTime';
 import { secureImageUrl } from '../../utils/secureImageUrl';
 
@@ -32,34 +32,7 @@ export default function LiveTvPlayer() {
     const { currentMedia, isPlaying, isMinimized, volume, togglePlayPause, setMinimized, closePlayer, setVolume, videoRef, playMedia, seek, skipForward, skipBackward } = usePlayer();
     const { currentTime, duration } = usePlayerTime();
 
-    const initialPermissions = useMemo(() => {
-        const token = localStorage.getItem(StorageKeys.profileToken);
-        const isServerAdmin = localStorage.getItem(StorageKeys.isServerAdmin) === 'true';
-        if (!token) return { canTimeshift: isServerAdmin, canRecord: isServerAdmin };
-        try {
-            const payload = decodeJwtPayload(token) ?? {};
-            const truthy = (v: unknown) => v === true || v === 'True' || v === 'true' || v === '1' || v === 1;
-            return {
-                canTimeshift: isServerAdmin || truthy(payload.canTimeshiftIptv),
-                canRecord: isServerAdmin || truthy(payload.canRecordLiveTv),
-            };
-        } catch {
-            return { canTimeshift: isServerAdmin, canRecord: isServerAdmin };
-        }
-    }, []);
-    const [canTimeshift, setCanTimeshift] = useState(initialPermissions.canTimeshift);
-    const [canRecord, setCanRecord] = useState(initialPermissions.canRecord);
-
-    useEffect(() => {
-        const userId = localStorage.getItem(StorageKeys.userId);
-        if (!userId) return;
-        userService.getUserAccount(userId, serverVault.getActiveServerId() || undefined)
-            .then(u => {
-                setCanTimeshift(!!u.canTimeshiftIptv || !!u.isAdmin);
-                setCanRecord(!!u.canRecordLiveTv || !!u.isAdmin);
-            })
-            .catch(err => console.warn('Failed to refresh live TV permissions', err));
-    }, []);
+    const { canTimeshift, canRecord } = useLivePermissions();
 
     const playerContainerRef = useRef<HTMLDivElement>(null);
     const [showInfo, setShowInfo] = useState(false);
@@ -719,7 +692,7 @@ export default function LiveTvPlayer() {
             {!isMinimized && !showOverlayGuide && <PlayerKeyIndicator indicator={keyIndicator} />}
 
             {showInfo && !isMinimized && (
-                <LiveTvInfoPanel activeProgram={activeProgram} streamUrl={currentMedia.streamUrl} formatTime={formatTime} />
+                <LiveTvInfoPanel activeProgram={activeProgram} providerName={currentChannel?.playlistName} formatTime={formatTime} />
             )}
 
             {showOverlayGuide && !isMinimized && (
