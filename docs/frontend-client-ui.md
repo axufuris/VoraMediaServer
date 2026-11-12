@@ -127,7 +127,8 @@ Right-clicking a movie, show, season or episode, or holding it on a touch screen
 - **Every new place a title is drawn passes a target.** That is the whole cost of supporting the menu there.
 - **No delete button on a title's poster.** The menu already has **Delete item** for admins, so library posters don't pass `MediaCard`'s `onDelete`. It stays for tiles with no title menu: playlists and music mixes.
 - **`ActionMenu`** (`Primitives/`) opens beside the pointer on a desktop, kept inside the window, and as a sheet from the bottom edge below 48rem. It sits at `z-[150]`: over the header, under modals.
-- **Long press:** 500 ms without moving more than 10 px (`useMediaMenuTrigger`), so scrolling a row never opens it. Lifting that finger still produces a click, so the trigger swallows the next click on the poster, and `ActionMenu` ignores any click that did not start with a press on the menu itself. Without the second, the lift landed on the sheet that had just appeared and closed it, or picked a row.
+- **A tile with a menu of its own** (a radio station's favourite / hide) passes `MediaCard`'s `onMenu={at => …}` instead, and draws its own menu at that point. Both go through `useMenuTrigger` (`hooks/`), which `useMediaMenuTrigger` wraps, so the gestures below are the same.
+- **Long press:** 500 ms without moving more than 10 px (`useMenuTrigger`), so scrolling a row never opens it. Lifting that finger still produces a click, so the trigger swallows the next click on the poster, and `ActionMenu` ignores any click that did not start with a press on the menu itself. Without the second, the lift landed on the sheet that had just appeared and closed it, or picked a row.
 - Actions go to the server the title is on (`target.serverId`), not the one in the address bar: a search result can belong to another server.
 
 ## Video playback: one controller, two engines

@@ -7,7 +7,9 @@ import PosterRemoveButton from './PosterRemoveButton';
 import { CornerChip, PosterCorner, UnplayedCountBadge, WatchedBadge } from './WatchedBadge';
 import { secureImageUrl } from '../../../utils/secureImageUrl';
 import type { MediaMenuTarget } from '../../Media/ItemMenu/mediaItemMenu';
-import { useMediaMenuTrigger } from '../../Media/ItemMenu/useMediaMenuTrigger';
+import { useMediaMenuOpener } from '../../Media/ItemMenu/useMediaMenuTrigger';
+import { useMenuTrigger } from '../../../hooks/useMenuTrigger';
+import type { MenuPoint } from './menuEntries';
 
 export type MediaCardShape = 'poster' | 'still' | 'square' | 'circle';
 export type MediaCardSize = 'xs' | 'sm' | 'md' | 'lg';
@@ -38,7 +40,9 @@ export interface MediaCardProps {
     inWatchlist?: boolean;
     badge?: ReactNode;
     hoverBadge?: ReactNode;
+    topLeftBadge?: ReactNode;
     bottomLeftBadge?: ReactNode;
+    placeholderIcon?: ReactNode;
     onRemove?: (e: React.MouseEvent) => void;
     onDelete?: (e: React.MouseEvent) => void;
     // The library title this card stands for. Right-clicking the card, or
@@ -46,6 +50,7 @@ export interface MediaCardProps {
     // mediaMenuTarget(), which leaves it out for anything that is not a movie,
     // show, season or episode.
     menu?: MediaMenuTarget | null;
+    onMenu?: (at: MenuPoint) => void;
     // The one card a page has chosen, such as the episode a season page
     // describes: ringed in the accent and marked as current.
     selected?: boolean;
@@ -87,9 +92,9 @@ export default function MediaCard({
     item, title, captionLines, captionExtra, imageUrl, imageFit = 'cover', uncachedImage, mosaicUrls,
     shape = 'poster', size = 'md', fill, onClick,
     isPlayed, unplayedCount, progressPercent, inWatchlist,
-    badge, hoverBadge, bottomLeftBadge, onRemove, onDelete, menu, selected, onPlay, playLabel, onFocus, className,
+    badge, hoverBadge, topLeftBadge, bottomLeftBadge, placeholderIcon, onRemove, onDelete, menu, onMenu, selected, onPlay, playLabel, onFocus, className,
 }: MediaCardProps) {
-    const menuTrigger = useMediaMenuTrigger(menu);
+    const menuTrigger = useMenuTrigger(useMediaMenuOpener(menu) ?? onMenu);
     const caption = item ? posterCaption(item) : { title: title ?? '', lines: captionLines ?? [] };
     const lines = captionLines ?? caption.lines;
     const displayTitle = title ?? caption.title;
@@ -162,7 +167,7 @@ export default function MediaCard({
                         className={imageFit === 'contain' ? 'h-full w-full object-contain p-[14%]' : 'h-full w-full object-cover'}
                     />
                 ) : (
-                    <MediaPlaceholder title={displayTitle} variant={round ? 'actor' : shape === 'still' ? 'still' : 'poster'} />
+                    <MediaPlaceholder title={displayTitle} variant={round ? 'actor' : shape === 'still' ? 'still' : 'poster'} icon={placeholderIcon} />
                 )}
 
                 {inWatchlist && (
@@ -173,6 +178,8 @@ export default function MediaCard({
                         <svg width="14" height="14" viewBox="0 0 20 20" fill="currentColor"><path d="M5 4a2 2 0 012-2h6a2 2 0 012 2v14l-5-2.5L5 18V4z" /></svg>
                     </div>
                 )}
+
+                {topLeftBadge && <div className="absolute left-2 top-2 z-10">{topLeftBadge}</div>}
 
                 {statusBadge && <PosterCorner landscape={shape === 'still'}>{statusBadge}</PosterCorner>}
 

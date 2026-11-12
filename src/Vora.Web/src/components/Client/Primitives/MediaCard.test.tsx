@@ -114,6 +114,38 @@ describe('MediaCard', () => {
         expect(onRemove).toHaveBeenCalledOnce();
     });
 
+    it('draws a top-left badge inside the artwork', () => {
+        const { container } = render(<MediaCard {...defaults} topLeftBadge={<span>Fav</span>} />);
+        expect(container.querySelector('.vora-media-card-art')).toContainElement(screen.getByText('Fav'));
+    });
+
+    it('draws the given icon in the placeholder in place of the Vora mark', () => {
+        render(<MediaCard {...defaults} placeholderIcon={<svg data-testid="glyph" />} />);
+        expect(screen.getByRole('img', { name: 'Test Title' })).toContainElement(screen.getByTestId('glyph'));
+    });
+
+    it('draws the artwork rather than the placeholder icon when there is an image', () => {
+        render(<MediaCard {...defaults} imageUrl="/img/logo.png" placeholderIcon={<svg data-testid="glyph" />} />);
+        expect(screen.queryByTestId('glyph')).toBeNull();
+    });
+
+    it('opens its own menu on right-click without activating the card', () => {
+        const onClick = vi.fn();
+        const onMenu = vi.fn();
+        render(<MediaCard {...defaults} onClick={onClick} onMenu={onMenu} />);
+
+        const prevented = !fireEvent.contextMenu(screen.getByRole('button'), { clientX: 30, clientY: 40 });
+
+        expect(prevented).toBe(true);
+        expect(onMenu).toHaveBeenCalledWith({ x: 30, y: 40 });
+        expect(onClick).not.toHaveBeenCalled();
+    });
+
+    it('leaves the browser menu alone without a menu', () => {
+        render(<MediaCard {...defaults} onClick={vi.fn()} />);
+        expect(fireEvent.contextMenu(screen.getByRole('button'))).toBe(true);
+    });
+
     it.each([
         ['poster', '2 / 3'],
         ['still', '16 / 9'],
