@@ -1,4 +1,3 @@
-using Microsoft.Extensions.Caching.Memory;
 using Vora.Application.Ai;
 using Vora.Application.Recommendations;
 using Vora.Application.Recommendations.Providers;
@@ -36,7 +35,7 @@ public class OpenAiRecommendationProviderTests
     }
 
     private OpenAiRecommendationProvider Provider() =>
-        new(_repository, _openAi, _tester, new MemoryCache(new MemoryCacheOptions()));
+        new(_repository, _openAi, _tester);
 
     [Fact]
     public async Task Categories_come_from_the_shared_client_with_the_recommendations_model_and_the_viewers_profile()
@@ -86,19 +85,13 @@ public class OpenAiRecommendationProviderTests
         await _openAi.DidNotReceive().CompleteJsonAsync(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<CancellationToken>(), Arg.Any<double?>(), Arg.Any<string?>(), Arg.Any<Guid?>());
     }
 
-    // Keeping an empty answer for twelve hours meant one bad search hid the AI
-    // rows for the rest of the day.
     [Fact]
-    public async Task Rows_that_found_nothing_are_not_kept()
+    public async Task A_category_with_no_titles_found_gives_no_row()
     {
         _repository.VectorSearchUnwatchedMediaAsync(_profile, Arg.Any<Guid?>(), Arg.Any<float[]>(), Arg.Any<int>(), Arg.Any<string>())
             .Returns(new List<Guid>());
-        var provider = Provider();
 
-        await provider.GetRecommendationsAsync(_profile, null, TestContext.Current.CancellationToken);
-        await provider.GetRecommendationsAsync(_profile, null, TestContext.Current.CancellationToken);
-
-        await _openAi.Received(2).CompleteJsonAsync(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<CancellationToken>(), Arg.Any<double?>(), Arg.Any<string?>(), Arg.Any<Guid?>());
+        (await Provider().GetRecommendationsAsync(_profile, null, TestContext.Current.CancellationToken)).Should().BeEmpty();
     }
 
     [Fact]
@@ -163,15 +156,19 @@ public class OpenAiRecommendationProviderTests
         await _openAi.DidNotReceive().IsConfiguredAsync();
     }
 
+    // The rows used to sit in a memory cache for twelve hours, so the first
+    // For You after every restart waited on the model. For You stores them now
+    // (RecommendationSnapshots) and only calls this in the background.
     [Fact]
-    public async Task Rows_are_kept_so_a_second_look_costs_nothing()
+    public async Task Each_call_asks_the_model_since_for_you_keeps_the_rows()
     {
         var provider = Provider();
 
         await provider.GetRecommendationsAsync(_profile, null, TestContext.Current.CancellationToken);
         await provider.GetRecommendationsAsync(_profile, null, TestContext.Current.CancellationToken);
 
-        await _openAi.Received(1).CompleteJsonAsync(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<CancellationToken>(), Arg.Any<double?>(), Arg.Any<string?>(), Arg.Any<Guid?>());
+        await _openAi.Received(2).CompleteJsonAsync(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<CancellationToken>(), Arg.Any<double?>(), Arg.Any<string?>(), Arg.Any<Guid?>());
+        provider.MakesOutsideCalls.Should().BeTrue();
     }
 
     [Fact]

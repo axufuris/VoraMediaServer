@@ -375,6 +375,7 @@ public static class ServiceRegistrationExtensions
         services.AddScoped<IPodcastRepository, PodcastRepository>();
         services.AddScoped<IProviderConnectionRepository, ProviderConnectionRepository>();
         services.AddScoped<IRecommendationRepository, RecommendationRepository>();
+        services.AddScoped<IRecommendationSnapshotRepository, RecommendationSnapshotRepository>();
         services.AddScoped<IReferenceRepository, ReferenceRepository>();
         services.AddScoped<IRequestRepository, RequestRepository>();
         services.AddScoped<ISearchRepository, SearchRepository>();
@@ -448,6 +449,7 @@ public static class ServiceRegistrationExtensions
         services.AddScoped<IPosterOverlayManager, PosterOverlayManager>();
         services.AddScoped<IProviderConnectionManager, ProviderConnectionManager>();
         services.AddScoped<IRecommendationManager, RecommendationManager>();
+        services.AddSingleton<IForYouRebuildQueue, ForYouRebuildQueue>();
         services.AddScoped<IRemoteAccessManager, RemoteAccessManager>();
         services.AddScoped<IRequestManager, RequestManager>();
         services.AddScoped<ISearchManager, SearchManager>();
@@ -532,6 +534,7 @@ public static class ServiceRegistrationExtensions
         services.AddHostedService<DvrStorageMonitorWorker>();
         services.AddHostedService<DvrWorker>();
         services.AddHostedService<EmailDispatchWorker>();
+        services.AddHostedService<ForYouRebuildWorker>();
         services.AddHostedService<HardwareDetectionWorker>();
         services.AddHostedService<PodcastFeedRefreshWorker>();
         services.AddHostedService<RecommendationRefreshWorker>();

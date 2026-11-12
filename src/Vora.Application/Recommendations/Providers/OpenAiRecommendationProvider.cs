@@ -1,4 +1,3 @@
-using Microsoft.Extensions.Caching.Memory;
 using System.Text.Json;
 using Vora.Application.Ai;
 using Vora.Plugins.Dtos;
@@ -21,7 +20,6 @@ public class OpenAiRecommendationProvider : IRecommendationProvider, IPluginConn
     private readonly IOpenAiRecommendationRepository _repository;
     private readonly IOpenAiClient _openAi;
     private readonly IAiConnectionTester _tester;
-    private readonly IMemoryCache _cache;
 
     public string Id => AiConnection.PluginId;
     public string Name => "AI Smart Recommendations";
@@ -31,12 +29,15 @@ public class OpenAiRecommendationProvider : IRecommendationProvider, IPluginConn
     public bool IsSystemPlugin => true;
     public bool IsAiPlugin => true;
 
-    public OpenAiRecommendationProvider(IOpenAiRecommendationRepository repository, IOpenAiClient openAi, IAiConnectionTester tester, IMemoryCache cache)
+    // A chat completion and an embeddings request: For You only ever builds
+    // these rows in the background, and keeps them twelve hours.
+    public bool MakesOutsideCalls => true;
+
+    public OpenAiRecommendationProvider(IOpenAiRecommendationRepository repository, IOpenAiClient openAi, IAiConnectionTester tester)
     {
         _repository = repository;
         _openAi = openAi;
         _tester = tester;
-        _cache = cache;
     }
 
     public Task<PluginConnectionTestResult> TestConnectionAsync(IReadOnlyDictionary<string, string> settings, CancellationToken cancellationToken = default) =>
@@ -58,14 +59,11 @@ public class OpenAiRecommendationProvider : IRecommendationProvider, IPluginConn
         };
     }
 
+    // Every call asks the model. The rows are kept by RecommendationManager,
+    // which stores them for twelve hours and never calls this while a page
+    // waits (docs/for-you.md).
     public async Task<IEnumerable<RecommendationListDto>> GetRecommendationsAsync(Guid profileId, Guid? libraryId, CancellationToken cancellationToken = default)
     {
-        var cacheKey = $"ai_recs_{profileId}_{libraryId}";
-        if (_cache.TryGetValue(cacheKey, out List<RecommendationListDto>? cachedLists) && cachedLists != null)
-        {
-            return cachedLists;
-        }
-
         var lists = new List<RecommendationListDto>();
 
         var isEnabledForUser = await _repository.IsAiEnabledForProfileAsync(profileId);
@@ -104,10 +102,6 @@ public class OpenAiRecommendationProvider : IRecommendationProvider, IPluginConn
                 });
             }
         }
-
-        // Nothing found is not kept, so the next look tries again rather than
-        // showing no AI rows for twelve hours.
-        if (lists.Count > 0) _cache.Set(cacheKey, lists, TimeSpan.FromHours(12));
 
         return lists;
     }

@@ -382,6 +382,14 @@ public class UserMediaStateRepository : IUserMediaStateRepository
         _context.UserMediaStates.RemoveRange(states);
         _context.UserMediaRatings.RemoveRange(profileRatings);
 
+        // The stored For You rows were built from what is being cleared ("Because
+        // you watched ..."), so they go too and are built again from what is left.
+        if (watchHistory || ratings)
+        {
+            _context.RecommendationSnapshots.RemoveRange(
+                await _context.RecommendationSnapshots.Where(s => s.ProfileId == profileId).ToListAsync());
+        }
+
         foreach (var archive in await _context.PreservedUserMediaData.Where(p => p.ProfileId == profileId).ToListAsync())
         {
             if (watchHistory)

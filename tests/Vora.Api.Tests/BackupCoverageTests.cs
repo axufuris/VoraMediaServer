@@ -95,6 +95,7 @@ public class BackupCoverageTests : IClassFixture<VoraApiTestFactory>
         ["MediaItemAudioFingerprints"] = Derived,
         ["ArtistSimilarities"] = Derived,
         ["ArtistTags"] = Derived,
+        ["RecommendationSnapshots"] = "The For You rows each provider last built, which are built again on the profile's next visit.",
         ["EmailDeliveryLogs"] = ServerLog,
         ["AiUsageLogs"] = ServerLog,
         ["SystemMetrics"] = ServerLog,
