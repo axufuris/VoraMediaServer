@@ -14,7 +14,7 @@ using Vora.Infrastructure.Persistence;
 namespace Vora.Infrastructure.Migrations
 {
     [DbContext(typeof(VoraDbContext))]
-    [Migration("20261111183206_ChangesSinceInitial")]
+    [Migration("20261112020121_ChangesSinceInitial")]
     partial class ChangesSinceInitial
     {
         /// <inheritdoc />
@@ -4204,6 +4204,30 @@ namespace Vora.Infrastructure.Migrations
                     b.ToTable("ProfileTitlePlaybackChoices");
                 });
 
+            modelBuilder.Entity("Vora.Domain.Entities.Users.RecommendationSnapshot", b =>
+                {
+                    b.Property<Guid>("ProfileId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("LibraryScope")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("ProviderId")
+                        .HasMaxLength(128)
+                        .HasColumnType("character varying(128)");
+
+                    b.Property<DateTime>("GeneratedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Rows")
+                        .IsRequired()
+                        .HasColumnType("jsonb");
+
+                    b.HasKey("ProfileId", "LibraryScope", "ProviderId");
+
+                    b.ToTable("RecommendationSnapshots");
+                });
+
             modelBuilder.Entity("Vora.Domain.Entities.Users.RegistrationTicket", b =>
                 {
                     b.Property<Guid>("Id")
@@ -5489,6 +5513,15 @@ namespace Vora.Infrastructure.Migrations
                     b.HasOne("Vora.Domain.Entities.Media.MediaItem", null)
                         .WithMany()
                         .HasForeignKey("TitleId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("Vora.Domain.Entities.Users.RecommendationSnapshot", b =>
+                {
+                    b.HasOne("Vora.Domain.Entities.Users.UserProfile", null)
+                        .WithMany()
+                        .HasForeignKey("ProfileId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
                 });

@@ -270,11 +270,28 @@ EXCEPTION WHEN OTHERS THEN
     RAISE WARNING 'Vora skipped the search indexes, so search reads every title: %', SQLERRM;
 END
 $$;");
+
+            // The For You rows each provider last built, per profile, library
+            // (Guid.Empty for Home) and provider (docs/for-you.md). It starts
+            // empty: each profile's rows are built on its next visit.
+            migrationBuilder.Sql(@"
+CREATE TABLE IF NOT EXISTS ""RecommendationSnapshots"" (
+    ""ProfileId"" uuid NOT NULL,
+    ""LibraryScope"" uuid NOT NULL,
+    ""ProviderId"" character varying(128) NOT NULL,
+    ""Rows"" jsonb NOT NULL,
+    ""GeneratedAt"" timestamp with time zone NOT NULL,
+    CONSTRAINT ""PK_RecommendationSnapshots"" PRIMARY KEY (""ProfileId"", ""LibraryScope"", ""ProviderId""),
+    CONSTRAINT ""FK_RecommendationSnapshots_UserProfiles_ProfileId"" FOREIGN KEY (""ProfileId"") REFERENCES ""UserProfiles"" (""Id"") ON DELETE CASCADE
+);");
         }
 
         /// <inheritdoc />
         protected override void Down(MigrationBuilder migrationBuilder)
         {
+            migrationBuilder.DropTable(
+                name: "RecommendationSnapshots");
+
             // The extension stays: something else in the database may use it.
             migrationBuilder.Sql(@"
 DROP INDEX IF EXISTS ""IX_Albums_TitleTrigram"";

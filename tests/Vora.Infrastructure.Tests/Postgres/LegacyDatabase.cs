@@ -192,6 +192,12 @@ public sealed class LegacyDatabase : IAsyncDisposable
         DROP INDEX IF EXISTS "IX_Artists_NameTrigram";
         DROP INDEX IF EXISTS "IX_Albums_TitleTrigram";
         DROP EXTENSION IF EXISTS pg_trgm;
+        """ + TablesSinceSearchIndexes;
+
+    public const string SearchIndexMigration = "20261111183206_ChangesSinceInitial";
+
+    private const string TablesSinceSearchIndexes = """
+        DROP TABLE IF EXISTS "RecommendationSnapshots";
         """;
 
     private const string ColumnsSinceChannelVideoFormat = """
@@ -466,6 +472,15 @@ public sealed class LegacyDatabase : IAsyncDisposable
         await seed(db);
         await db.Database.ExecuteSqlRawAsync(IndexesSinceHomeRowIndexes, cancellationToken);
         await ReplaceCombinedMigrationAsync(db, HomeRowIndexMigration, "10.0.9", cancellationToken);
+    }
+
+    public async Task BuildSearchIndexStateAsync(Func<VoraDbContext, Task> seed, CancellationToken cancellationToken)
+    {
+        await using var db = NewContext();
+        await db.Database.MigrateAsync(cancellationToken);
+        await seed(db);
+        await db.Database.ExecuteSqlRawAsync(TablesSinceSearchIndexes, cancellationToken);
+        await ReplaceCombinedMigrationAsync(db, SearchIndexMigration, "10.0.9", cancellationToken);
     }
 
     private static async Task ReplaceCombinedMigrationAsync(VoraDbContext db, string migrationId, string productVersion, CancellationToken cancellationToken)

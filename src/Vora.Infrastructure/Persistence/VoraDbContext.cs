@@ -84,6 +84,7 @@ public class VoraDbContext : DbContext
     public DbSet<ProfileAccessSchedule> ProfileAccessSchedules { get; set; }
     public DbSet<ProfileDeviceSetting> ProfileDeviceSettings { get; set; }
     public DbSet<ProfileTitlePlaybackChoice> ProfileTitlePlaybackChoices { get; set; }
+    public DbSet<RecommendationSnapshot> RecommendationSnapshots { get; set; }
     public DbSet<RegistrationTicket> RegistrationTickets { get; set; }
     public DbSet<PasswordResetTicket> PasswordResetTickets { get; set; }
     public DbSet<EmailChangeTicket> EmailChangeTickets { get; set; }
@@ -181,6 +182,7 @@ public class VoraDbContext : DbContext
         ConfigureProfileSchedules(modelBuilder);
         ConfigureProfileDeviceSettings(modelBuilder);
         ConfigureProfileTitlePlaybackChoices(modelBuilder);
+        ConfigureRecommendationSnapshots(modelBuilder);
         ConfigureRegistrationTickets(modelBuilder);
         ConfigurePasswordResetTickets(modelBuilder);
         ConfigureEmailChangeTickets(modelBuilder);
@@ -948,6 +950,23 @@ public class VoraDbContext : DbContext
             entity.HasOne<MediaItem>()
                   .WithMany()
                   .HasForeignKey(e => e.TitleId)
+                  .OnDelete(DeleteBehavior.Cascade);
+        });
+    }
+
+    // The For You rows each provider last built (docs/for-you.md). The key is
+    // the one For You reads by; LibraryScope is Guid.Empty for Home's For You.
+    private static void ConfigureRecommendationSnapshots(ModelBuilder modelBuilder)
+    {
+        modelBuilder.Entity<RecommendationSnapshot>(entity =>
+        {
+            entity.HasKey(e => new { e.ProfileId, e.LibraryScope, e.ProviderId });
+            entity.Property(e => e.ProviderId).IsRequired().HasMaxLength(128);
+            entity.Property(e => e.Rows).IsRequired().HasColumnType("jsonb");
+
+            entity.HasOne<UserProfile>()
+                  .WithMany()
+                  .HasForeignKey(e => e.ProfileId)
                   .OnDelete(DeleteBehavior.Cascade);
         });
     }

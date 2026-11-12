@@ -99,6 +99,25 @@ public class ViewingHistoryClearTests
             ("watched", true, (decimal?)null, (DateTime?)null));
     }
 
+    // "Because you watched ..." would otherwise name what was just cleared until
+    // the rows were next rebuilt.
+    [Theory]
+    [InlineData(true, false)]
+    [InlineData(false, true)]
+    public async Task Clearing_either_drops_the_profiles_stored_for_you_rows(bool watchHistory, bool ratings)
+    {
+        _db.RecommendationSnapshots.AddRange(
+            new RecommendationSnapshot { ProfileId = _sam, LibraryScope = RecommendationSnapshot.AllLibraries, ProviderId = "local_recommendations", Rows = "[]", GeneratedAt = DateTime.UtcNow },
+            new RecommendationSnapshot { ProfileId = _sam, LibraryScope = Guid.NewGuid(), ProviderId = "openai_recommendations", Rows = "[]", GeneratedAt = DateTime.UtcNow },
+            new RecommendationSnapshot { ProfileId = _andy, LibraryScope = RecommendationSnapshot.AllLibraries, ProviderId = "local_recommendations", Rows = "[]", GeneratedAt = DateTime.UtcNow });
+        await _db.SaveChangesAsync(TestContext.Current.CancellationToken);
+
+        await Repository().ClearViewingHistoryAsync(_sam, watchHistory, ratings);
+
+        (await _db.RecommendationSnapshots.CountAsync(s => s.ProfileId == _sam, TestContext.Current.CancellationToken)).Should().Be(0);
+        (await _db.RecommendationSnapshots.CountAsync(s => s.ProfileId == _andy, TestContext.Current.CancellationToken)).Should().Be(1);
+    }
+
     [Fact]
     public async Task An_unknown_profile_is_not_found()
     {

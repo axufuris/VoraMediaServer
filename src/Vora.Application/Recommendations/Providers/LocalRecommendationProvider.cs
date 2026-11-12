@@ -32,6 +32,9 @@ public class LocalRecommendationProvider(IRecommendationRepository repository) :
     public string DeveloperName => "System";
     public bool IsSystemPlugin => true;
 
+    // Only Vora's own tables and stored embeddings: no outside call.
+    public bool MakesOutsideCalls => false;
+
     public IEnumerable<PluginSettingDefinitionDto> GetSettingDefinitions() =>
         new List<PluginSettingDefinitionDto>();
 

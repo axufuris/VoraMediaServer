@@ -1,6 +1,25 @@
 # For You
 
-The For You rows on Home and on each library's For You tab. `GET /api/recommendations/global` and `GET /api/libraries/{id}/recommendations` both call `RecommendationManager`, the second narrowed to one library. The clients ask once per provider (`?providerId=`), put the AI provider's rows first, and sort each provider's rows by `weight` **ascending**. So a row's weight is its place on the page, starting at 1, and `RecommendationManager` returns them in that order too. A provider that throws is logged as a warning and the other providers' rows still come. The tiles of every row of library titles are loaded in one query (`GetHydratedMediaItemsAsync` with all their ids); a row at a time made For You fifteen tile queries. A row named by TMDB ids (the AI provider's) is matched on its own, since a tile doesn't carry the id it matched by.
+The For You rows on Home and on each library's For You tab. `GET /api/recommendations/global` and `GET /api/libraries/{id}/recommendations` both call `RecommendationManager`, the second narrowed to one library. The clients ask once per provider (`?providerId=`), put the AI provider's rows first, and sort each provider's rows by `weight` **ascending**. So a row's weight is its place on the page, starting at 1, and `RecommendationManager` returns them in that order too. The page is a read of the rows each provider last built (Stored rows, below): no request waits on an AI call. A provider that throws is logged as a warning and the other providers' rows still come. The tiles of every row of library titles are loaded in one query (`GetHydratedMediaItemsAsync` with all their ids); a row at a time made For You fifteen tile queries. A row named by TMDB ids (the AI provider's) is matched on its own, since a tile doesn't carry the id it matched by.
+
+## Stored rows
+
+Each provider's rows are stored per profile, page and provider in `RecommendationSnapshots` (`docs/database.md`): the rows' titles, descriptions, weights and title ids, and when they were built. The tiles are loaded from those ids on every request, through the viewer's access filters and with their watch state as it is now, so a stored row never shows a title the viewer may not see.
+
+- **A request with rows stored** is three statements whatever the provider: whether the provider is on (`is_enabled`), its stored rows (with the profile's last play and last rating, for the local rows), and the tiles. Before, it asked every provider live: the local rows were 65 statements and about 0.9 s on a copy of QA, and the AI rows waited on a chat completion and an embeddings request after every restart, since they were only kept in memory.
+- **Out of date** rows are still shown, and a rebuild is queued behind them:
+  - a provider that makes outside calls (the AI provider, and any plugin that doesn't say otherwise): rows 12 hours old, as long as the memory cache kept them, so token spend is unchanged;
+  - the local provider: the profile played or rated anything since the rows were built (the latest `UserMediaStates.LastPlayedAt` or `UserMediaRatings.RatedAt`), or the rows are 24 hours old, for titles added or gone. Progress reports write `LastPlayedAt`, so watching anything counts.
+- **No rows yet:** the local provider's are built while the page waits, once, and stored, so a first visit isn't empty (empty rows are stored too: a profile that has watched nothing reads an empty list until it plays something). Any other provider's are queued, and the page gets none of its rows this time; they show on the next visit.
+- **Which kind a provider is:** `IRecommendationProvider.MakesOutsideCalls`, default `true`, so a third-party plugin is never built while a page waits. `LocalRecommendationProvider` says `false`.
+- **Rebuilds** run in `ForYouRebuildWorker`, two at a time, each in its own scope (`RecommendationManager.RebuildAsync`), from `IForYouRebuildQueue`:
+  - A rebuild already queued or running isn't queued again.
+  - One that fails (the AI's monthly token limit, a timeout) is logged as a warning and the rows already stored stay.
+  - An outside-call provider that finds nothing isn't kept, so the next look tries again rather than showing no AI rows for twelve hours. Its old rows go too, as they did when the cache's twelve hours ran out: an empty answer is also what a profile whose account turned AI recommendations off gets.
+  - Either of those waits 10 minutes (`ForYouRebuildQueue.Cooldown`, in memory) before a page view may queue it again, so a failing or empty provider isn't asked on every view.
+  - A rebuild's rows are dated when it started, and a build that started earlier never replaces one that started later.
+- **Clearing a profile's viewing history** (watch history or ratings) deletes its stored rows, which were built from it ("Because you watched …"); they are built again from what is left.
+- The stored rows aren't backed up: they are built again on the profile's next visit.
 
 ## What has been seen
 
@@ -37,6 +56,6 @@ The model is told:
 
 It invents 5 categories. Each one is embedded and searched among the current model's vectors (`VectorSearchUnwatchedMediaAsync`, under `Untouched`).
 
-- **Caching:** rows are kept for 12 hours per profile and library, unless none were found, in which case the next look asks again.
+- **Kept:** stored for 12 hours per profile and library, and only ever built in the background (Stored rows, above). Rows that found nothing aren't kept, and the next look asks again, at most every 10 minutes.
 - **Who gets them:** the profile's account needs **Enable AI recommendations** (Users & Access → Requests & AI), an admin's included; it is off for a new account.
 - **Requirements:** the AI connection and an embedding model (`docs/ai-connection.md`).

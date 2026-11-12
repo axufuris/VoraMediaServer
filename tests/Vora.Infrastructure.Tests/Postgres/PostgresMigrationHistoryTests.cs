@@ -691,6 +691,52 @@ public class PostgresMigrationHistoryTests(PostgresDatabase database) : IClassFi
     }
 
     [Fact]
+    public async Task A_database_on_the_search_index_migration_gains_the_for_you_rows_table_empty_and_keeps_its_profiles()
+    {
+        Assert.SkipUnless(PostgresDatabase.IsConfigured, PostgresDatabase.SkipReason);
+        var cancellationToken = TestContext.Current.CancellationToken;
+        await using var legacy = new LegacyDatabase();
+        var userId = Guid.NewGuid();
+        var profileId = Guid.NewGuid();
+        var movieId = Guid.NewGuid();
+        var playedAt = new DateTime(2026, 11, 10, 21, 0, 0, DateTimeKind.Utc);
+        await legacy.BuildSearchIndexStateAsync(async db =>
+        {
+            var library = new MediaLibrary { Name = "Movies", Type = LibraryType.Movie, FolderPaths = new List<string> { "/movies" } };
+            db.Add(library);
+            db.Add(new Movie { Id = movieId, Title = "Sicario", LibraryId = library.Id });
+            db.Add(new User { Id = userId, Email = "viewer@example.com", DisplayName = "Viewer" });
+            db.Add(new UserProfile { Id = profileId, Name = "Viewer", UserId = userId });
+            db.Add(new UserMediaState { ProfileId = profileId, MediaItemId = movieId, IsPlayed = true, LastPlayedAt = playedAt });
+            await db.SaveChangesAsync(cancellationToken);
+        }, cancellationToken);
+
+        await using (var before = legacy.NewContext())
+        {
+            (await before.Database.GetPendingMigrationsAsync(cancellationToken)).Should().Equal(MigrationHistoryTests.ChangesSinceInitial);
+            (await TablesAsync(before, cancellationToken)).Should().NotContain("RecommendationSnapshots");
+        }
+
+        await legacy.MigrateAsync(cancellationToken);
+
+        await using (var after = legacy.NewContext())
+        {
+            (await after.Database.GetPendingMigrationsAsync(cancellationToken)).Should().BeEmpty();
+            (await after.RecommendationSnapshots.CountAsync(cancellationToken)).Should().Be(0);
+            (await after.UserProfiles.AsNoTracking().SingleAsync(p => p.Id == profileId, cancellationToken)).Name.Should().Be("Viewer");
+            (await after.UserMediaStates.AsNoTracking().SingleAsync(s => s.ProfileId == profileId, cancellationToken)).LastPlayedAt.Should().Be(playedAt);
+
+            after.RecommendationSnapshots.Add(new RecommendationSnapshot { ProfileId = profileId, LibraryScope = RecommendationSnapshot.AllLibraries, ProviderId = "local_recommendations", Rows = "[]", GeneratedAt = DateTime.UtcNow });
+            await after.SaveChangesAsync(cancellationToken);
+            await after.UserProfiles.Where(p => p.Id == profileId).ExecuteDeleteAsync(cancellationToken);
+        }
+
+        // The table's foreign key came with it: a profile's rows go with the profile.
+        await using var deleted = legacy.NewContext();
+        (await deleted.RecommendationSnapshots.CountAsync(cancellationToken)).Should().Be(0);
+    }
+
+    [Fact]
     public async Task A_database_on_the_home_row_index_migration_gains_the_search_indexes_and_keeps_its_titles()
     {
         Assert.SkipUnless(PostgresDatabase.IsConfigured, PostgresDatabase.SkipReason);
