@@ -4,20 +4,29 @@ using System.Diagnostics;
 
 namespace Vora.Application.Iptv;
 
+public enum LiveSessionKind
+{
+    Timeshift = 0,
+    Remux = 1
+}
+
 public interface ITimeshiftCoordinator
 {
-    bool TryRegister(Guid profileId, Process process, string sessionPath);
+    bool TryRegister(Guid profileId, Process process, string sessionPath, LiveSessionKind kind = LiveSessionKind.Timeshift);
     bool IsActive(Guid profileId);
+    LiveSessionKind? KindOf(Guid profileId);
     void Heartbeat(Guid profileId);
     Task StopAsync(Guid profileId);
     Task<IAsyncDisposable> LockProfileAsync(Guid profileId);
-    Task<IReadOnlyList<Guid>> EvictStaleSessionsAsync(TimeSpan maxIdleDuration, TimeSpan maxSessionLifetime);
+    Task<IReadOnlyList<Guid>> EvictStaleSessionsAsync(TimeSpan maxIdleDuration, TimeSpan maxSessionLifetime, TimeSpan? remuxMaxIdle = null);
     Task ReapOrphanedDirectoriesAsync(string timeshiftRoot, TimeSpan maxIdleAge);
 }
 
 public class TimeshiftCoordinator : ITimeshiftCoordinator
 {
     public const string TimeshiftSubdirectory = "timeshift";
+
+    public static readonly TimeSpan LiveRemuxMaxIdle = TimeSpan.FromSeconds(60);
 
     private const int ProcessQuitTimeoutMs = 2000;
     private const int DirectoryDeleteRetries = 3;
@@ -32,10 +41,10 @@ public class TimeshiftCoordinator : ITimeshiftCoordinator
         _logger = logger;
     }
 
-    public bool TryRegister(Guid profileId, Process process, string sessionPath)
+    public bool TryRegister(Guid profileId, Process process, string sessionPath, LiveSessionKind kind = LiveSessionKind.Timeshift)
     {
         var now = DateTime.UtcNow;
-        return _activeTimeshifts.TryAdd(profileId, new ActiveSession(process, sessionPath)
+        return _activeTimeshifts.TryAdd(profileId, new ActiveSession(process, sessionPath, kind)
         {
             StartedAtUtc = now,
             LastHeartbeatUtc = now
@@ -43,6 +52,9 @@ public class TimeshiftCoordinator : ITimeshiftCoordinator
     }
 
     public bool IsActive(Guid profileId) => _activeTimeshifts.ContainsKey(profileId);
+
+    public LiveSessionKind? KindOf(Guid profileId) =>
+        _activeTimeshifts.TryGetValue(profileId, out var session) ? session.Kind : null;
 
     public void Heartbeat(Guid profileId)
     {
@@ -86,14 +98,15 @@ public class TimeshiftCoordinator : ITimeshiftCoordinator
         }
     }
 
-    public Task<IReadOnlyList<Guid>> EvictStaleSessionsAsync(TimeSpan maxIdleDuration, TimeSpan maxSessionLifetime)
+    public Task<IReadOnlyList<Guid>> EvictStaleSessionsAsync(TimeSpan maxIdleDuration, TimeSpan maxSessionLifetime, TimeSpan? remuxMaxIdle = null)
     {
         var now = DateTime.UtcNow;
         var evicted = new List<Guid>();
         foreach (var kvp in _activeTimeshifts)
         {
             var profileId = kvp.Key;
-            var isIdle = now - kvp.Value.LastHeartbeatUtc > maxIdleDuration;
+            var idleLimit = kvp.Value.Kind == LiveSessionKind.Remux ? remuxMaxIdle ?? LiveRemuxMaxIdle : maxIdleDuration;
+            var isIdle = now - kvp.Value.LastHeartbeatUtc > idleLimit;
             var exceededLifetime = now - kvp.Value.StartedAtUtc > maxSessionLifetime;
             if (!isIdle && !exceededLifetime) continue;
 
@@ -103,8 +116,8 @@ public class TimeshiftCoordinator : ITimeshiftCoordinator
                 TryDeleteSessionDirectory(session.SessionPath, profileId);
                 evicted.Add(profileId);
                 _logger.LogInformation(
-                    "Evicted timeshift session for profile {ProfileId} (idle: {Idle}, exceededLifetime: {ExceededLifetime}).",
-                    profileId, isIdle, exceededLifetime);
+                    "Evicted {Kind} session for profile {ProfileId} (idle: {Idle}, exceededLifetime: {ExceededLifetime}).",
+                    session.Kind, profileId, isIdle, exceededLifetime);
             }
         }
         return Task.FromResult<IReadOnlyList<Guid>>(evicted);
@@ -256,7 +269,7 @@ public class TimeshiftCoordinator : ITimeshiftCoordinator
         }
     }
 
-    private sealed record ActiveSession(Process Process, string SessionPath)
+    private sealed record ActiveSession(Process Process, string SessionPath, LiveSessionKind Kind)
     {
         public required DateTime StartedAtUtc { get; init; }
         public required DateTime LastHeartbeatUtc { get; set; }

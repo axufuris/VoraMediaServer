@@ -565,6 +565,10 @@ namespace Vora.Infrastructure.Migrations
                     b.Property<Guid>("PlaylistId")
                         .HasColumnType("uuid");
 
+                    b.Property<string>("Referer")
+                        .HasMaxLength(1024)
+                        .HasColumnType("character varying(1024)");
+
                     b.Property<string>("Resolution")
                         .HasMaxLength(16)
                         .HasColumnType("character varying(16)");
@@ -573,6 +577,10 @@ namespace Vora.Infrastructure.Migrations
                         .IsRequired()
                         .HasMaxLength(1024)
                         .HasColumnType("character varying(1024)");
+
+                    b.Property<string>("UserAgent")
+                        .HasMaxLength(512)
+                        .HasColumnType("character varying(512)");
 
                     b.Property<string>("VideoCodec")
                         .HasMaxLength(32)
@@ -649,6 +657,19 @@ namespace Vora.Infrastructure.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uuid");
 
+                    b.Property<DateTime?>("AccountCheckedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime?>("AccountExpiresAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int?>("AccountMaxConnections")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("AccountStatus")
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)");
+
                     b.Property<DateTime>("AddedAt")
                         .HasColumnType("timestamp with time zone");
 
@@ -680,8 +701,33 @@ namespace Vora.Infrastructure.Migrations
                         .HasMaxLength(128)
                         .HasColumnType("character varying(128)");
 
+                    b.Property<string>("PasswordCiphertext")
+                        .HasColumnType("text");
+
+                    b.Property<string>("Referer")
+                        .HasMaxLength(1024)
+                        .HasColumnType("character varying(1024)");
+
+                    b.Property<string>("ServerUrl")
+                        .HasMaxLength(1024)
+                        .HasColumnType("character varying(1024)");
+
+                    b.Property<int>("SourceType")
+                        .HasColumnType("integer");
+
                     b.Property<bool>("SupportsWebPlayback")
                         .HasColumnType("boolean");
+
+                    b.Property<bool>("UseProviderGuide")
+                        .HasColumnType("boolean");
+
+                    b.Property<string>("UserAgent")
+                        .HasMaxLength(512)
+                        .HasColumnType("character varying(512)");
+
+                    b.Property<string>("Username")
+                        .HasMaxLength(256)
+                        .HasColumnType("character varying(256)");
 
                     b.HasKey("Id");
 

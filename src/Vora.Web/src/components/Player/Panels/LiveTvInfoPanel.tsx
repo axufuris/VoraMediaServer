@@ -2,7 +2,7 @@ import type { IptvProgramDto } from '../../../api/Iptv/iptvClientService';
 
 interface LiveTvInfoPanelProps {
     activeProgram: IptvProgramDto | undefined;
-    streamUrl?: string;
+    providerName?: string;
     formatTime: (dateStr: string) => string;
 }
 
@@ -15,7 +15,7 @@ function Row({ label, value }: { label: string, value: React.ReactNode }) {
     );
 }
 
-export default function LiveTvInfoPanel({ activeProgram, streamUrl, formatTime }: LiveTvInfoPanelProps) {
+export default function LiveTvInfoPanel({ activeProgram, providerName, formatTime }: LiveTvInfoPanelProps) {
     return (
         <div
             className="pointer-events-auto absolute right-8 top-24 z-40 w-full max-w-sm rounded-2xl p-5 text-left backdrop-blur-md"
@@ -32,7 +32,7 @@ export default function LiveTvInfoPanel({ activeProgram, streamUrl, formatTime }
                 {activeProgram && (
                     <Row label="Time" value={`${formatTime(activeProgram.startTime)} – ${formatTime(activeProgram.endTime)}`} />
                 )}
-                {streamUrl && <Row label="Source" value={<span className="font-mono">{streamUrl}</span>} />}
+                {providerName && <Row label="Provider" value={providerName} />}
                 <Row label="Stream type" value="Timeshifted HLS" />
             </div>
         </div>

@@ -82,7 +82,7 @@ public class IptvRepository : IIptvRepository
         var playlists = await _context.IptvPlaylists
             .AsNoTracking()
             .Where(p => p.IsActive)
-            .Select(p => new { p.Id, p.DefaultChannelKind, p.M3uUrl })
+            .Select(p => new { p.Id, p.DefaultChannelKind, p.M3uUrl, p.SourceType, p.ServerUrl })
             .ToListAsync(cancellationToken);
 
         if (playlists.Count == 0) return (false, false);
@@ -93,7 +93,8 @@ public class IptvRepository : IIptvRepository
             await _context.IptvChannels
                 .AsNoTracking()
                 .AnyAsync(c => playlistIds.Contains(c.PlaylistId) && c.Kind == kind && !c.IsHiddenByAdmin, cancellationToken)
-            || playlists.Any(p => p.DefaultChannelKind == kind && !string.IsNullOrWhiteSpace(p.M3uUrl));
+            || playlists.Any(p => p.DefaultChannelKind == kind
+                && (p.SourceType == IptvSourceType.Xtream ? !string.IsNullOrWhiteSpace(p.ServerUrl) : !string.IsNullOrWhiteSpace(p.M3uUrl)));
 
         return (await HasSourceAsync(IptvChannelKind.Tv), await HasSourceAsync(IptvChannelKind.Radio));
     }
@@ -163,6 +164,8 @@ public class IptvRepository : IIptvRepository
                 existing.LogoUrl = newChan.LogoUrl;
                 existing.GroupTitle = newChan.GroupTitle;
                 existing.StreamUrl = newChan.StreamUrl;
+                existing.UserAgent = newChan.UserAgent;
+                existing.Referer = newChan.Referer;
                 existing.Resolution = newChan.Resolution;
                 existing.CountryCode = newChan.CountryCode;
 
@@ -185,15 +188,6 @@ public class IptvRepository : IIptvRepository
         }
 
         await _context.SaveChangesAsync();
-    }
-
-    public async Task<List<(Guid Id, string StreamUrl)>> GetChannelStreamsForPlaylistAsync(Guid playlistId)
-    {
-        return await _context.IptvChannels
-            .AsNoTracking()
-            .Where(c => c.PlaylistId == playlistId)
-            .Select(c => new ValueTuple<Guid, string>(c.Id, c.StreamUrl))
-            .ToListAsync();
     }
 
     public async Task UpdateChannelHealthAsync(IReadOnlyDictionary<Guid, bool> results, DateTime checkedAt)
@@ -463,6 +457,26 @@ public class IptvRepository : IIptvRepository
     public async Task<IptvChannel?> GetChannelByIdAsync(Guid id)
     {
         return await _context.IptvChannels.FindAsync(id);
+    }
+
+    public async Task<IptvChannel?> GetChannelWithPlaylistAsync(Guid id)
+    {
+        return await _context.IptvChannels
+            .AsNoTracking()
+            .Include(c => c.Playlist)
+                .ThenInclude(p => p.TunerProfile)
+            .FirstOrDefaultAsync(c => c.Id == id);
+    }
+
+    public async Task<int> GetConnectionLimitAsync(Guid playlistId)
+    {
+        var limits = await _context.IptvPlaylists
+            .AsNoTracking()
+            .Where(p => p.Id == playlistId)
+            .Select(p => new { MaxConcurrentStreams = p.TunerProfile == null ? (int?)null : p.TunerProfile.MaxConcurrentStreams, p.AccountMaxConnections })
+            .FirstOrDefaultAsync();
+
+        return limits is null ? 0 : IptvConnectionLimit.Of(limits.MaxConcurrentStreams, limits.AccountMaxConnections);
     }
 
     public async Task<ServerSetting> GetServerSettingsAsync()

@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Mvc;
 using Vora.Application.Iptv;
+using Vora.Application.Iptv.Dtos;
 using Vora.Domain.Enums;
 using Vora.Application.Iptv.ViewModels;
 
@@ -13,7 +14,14 @@ public class SetChannelKindDto
 public class CreateIptvPlaylistDto
 {
     public required string Name { get; set; }
-    public required string M3uUrl { get; set; }
+    public IptvSourceType? SourceType { get; set; }
+    public string? M3uUrl { get; set; }
+    public string? ServerUrl { get; set; }
+    public string? Username { get; set; }
+    public string? NewPassword { get; set; }
+    public string? UserAgent { get; set; }
+    public string? Referer { get; set; }
+    public bool? UseProviderGuide { get; set; }
     public bool SupportsWebPlayback { get; set; }
     public int MaxConcurrentStreams { get; set; }
     public string DefaultChannelKind { get; set; } = "Tv";
@@ -21,16 +29,15 @@ public class CreateIptvPlaylistDto
     public bool EnableHealthCheck { get; set; }
 }
 
-public class UpdateIptvPlaylistDto
+public class UpdateIptvPlaylistDto : CreateIptvPlaylistDto
 {
-    public required string Name { get; set; }
-    public required string M3uUrl { get; set; }
-    public bool SupportsWebPlayback { get; set; }
-    public int MaxConcurrentStreams { get; set; }
     public bool IsActive { get; set; }
-    public string DefaultChannelKind { get; set; } = "Tv";
-    public string? CountryFilter { get; set; }
-    public bool EnableHealthCheck { get; set; }
+    public bool ClearPassword { get; set; }
+}
+
+public class TestIptvPlaylistConnectionDto : UpdateIptvPlaylistDto
+{
+    public Guid? PlaylistId { get; set; }
 }
 
 public class CreateIptvEpgSourceDto
@@ -58,6 +65,9 @@ public static class IptvAdminEndpoints
             .Produces<IEnumerable<IptvPlaylistVM>>(StatusCodes.Status200OK);
         group.MapPost("/playlists", AddPlaylistAsync)
             .Produces<IptvPlaylistVM>(StatusCodes.Status200OK);
+        group.MapPost("/playlists/test-connection", TestPlaylistConnectionAsync)
+            .WithName("TestIptvPlaylistConnection")
+            .Produces<IptvConnectionTestVM>(StatusCodes.Status200OK);
         group.MapPut("/playlists/{id:guid}", UpdatePlaylistAsync)
             .Produces<IptvPlaylistVM>(StatusCodes.Status200OK);
         group.MapPost("/playlists/{id:guid}/refresh", RefreshPlaylistAsync);
@@ -92,15 +102,19 @@ public static class IptvAdminEndpoints
         {
             return Results.BadRequest($"Unknown default channel kind: {request.DefaultChannelKind}");
         }
-        var playlist = await manager.AddPlaylistAsync(
-            request.Name,
-            request.M3uUrl,
-            request.SupportsWebPlayback,
-            request.MaxConcurrentStreams,
-            defaultKind,
-            request.CountryFilter,
-            request.EnableHealthCheck);
+        var playlist = await manager.AddPlaylistAsync(Settings(request, request.Name, defaultKind, isActive: true, clearPassword: false));
         return Results.Ok(playlist);
+    }
+
+    private static async Task<IResult> TestPlaylistConnectionAsync([FromBody] TestIptvPlaylistConnectionDto request, IIptvManager manager, CancellationToken cancellationToken)
+    {
+        if (!Enum.TryParse<IptvChannelKind>(request.DefaultChannelKind, ignoreCase: true, out var defaultKind))
+        {
+            return Results.BadRequest($"Unknown default channel kind: {request.DefaultChannelKind}");
+        }
+        var name = string.IsNullOrWhiteSpace(request.Name) ? "Connection test" : request.Name;
+        var result = await manager.TestConnectionAsync(Settings(request, name, defaultKind, isActive: true, request.ClearPassword), request.PlaylistId, cancellationToken);
+        return Results.Ok(result);
     }
 
     private static async Task<IResult> UpdatePlaylistAsync(Guid id, [FromBody] UpdateIptvPlaylistDto request, IIptvManager manager)
@@ -109,18 +123,29 @@ public static class IptvAdminEndpoints
         {
             return Results.BadRequest($"Unknown default channel kind: {request.DefaultChannelKind}");
         }
-        var playlist = await manager.UpdatePlaylistAsync(
-            id,
-            request.Name,
-            request.M3uUrl,
-            request.SupportsWebPlayback,
-            request.MaxConcurrentStreams,
-            request.IsActive,
-            defaultKind,
-            request.CountryFilter,
-            request.EnableHealthCheck);
+        var playlist = await manager.UpdatePlaylistAsync(id, Settings(request, request.Name, defaultKind, request.IsActive, request.ClearPassword));
         return Results.Ok(playlist);
     }
+
+    private static IptvPlaylistSettingsDto Settings(CreateIptvPlaylistDto request, string name, IptvChannelKind defaultKind, bool isActive, bool clearPassword) => new()
+    {
+        Name = name,
+        SourceType = request.SourceType,
+        M3uUrl = request.M3uUrl,
+        ServerUrl = request.ServerUrl,
+        Username = request.Username,
+        NewPassword = request.NewPassword,
+        ClearPassword = clearPassword,
+        UserAgent = request.UserAgent,
+        Referer = request.Referer,
+        UseProviderGuide = request.UseProviderGuide,
+        SupportsWebPlayback = request.SupportsWebPlayback,
+        MaxConcurrentStreams = request.MaxConcurrentStreams,
+        IsActive = isActive,
+        DefaultChannelKind = defaultKind,
+        CountryFilter = request.CountryFilter,
+        EnableHealthCheck = request.EnableHealthCheck
+    };
 
     private static async Task<IResult> RefreshPlaylistAsync(Guid id, IIptvManager manager)
     {

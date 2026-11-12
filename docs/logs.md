@@ -42,6 +42,6 @@ The **Log Levels** drawer (slide-over at `z-[200]`) shows the default level, the
 
 ## Things to be careful about
 
-- **Secrets in log messages.** The viewer page renders raw messages verbatim. Don't log API keys or passwords — and the plugin-settings env seeder explicitly redacts values so they never reach this pipeline (see `docs/plugins.md`).
+- **Secrets in log messages.** The viewer page renders raw messages verbatim. Don't log API keys or passwords — and the plugin-settings env seeder explicitly redacts values so they never reach this pipeline (see `docs/plugins.md`). IPTV provider addresses carry logins (Xtream puts the password in the path), so every IPTV log line, `LastError` and ffmpeg output that can hold one goes through `IptvUrlRedactor`, and the IPTV `HttpClient` logs through `IptvHttpClientLogger` instead of the framework's logger, which writes the full path (`docs/iptv-and-dvr.md`, Providers that need an account).
 - **Bumping levels to Trace can be expensive.** The override provider gates each entry, but very chatty categories at Trace will still hit the ring buffer + file sink. Use overrides for short-lived debugging, not as a default.
 - **Ring buffer is process-local.** Restart the container and the buffer empties. The file sink is the persistent record.

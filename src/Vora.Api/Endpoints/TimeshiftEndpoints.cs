@@ -47,7 +47,15 @@ public static class TimeshiftEndpoints
         }
 
         var limits = new LiveVideoLimits(request.VideoCodecs, request.MaxH264Level, request.H264Profiles);
-        var url = await manager.StartTimeshiftSessionAsync(request.ChannelId, accountId.Value, profileId.Value, limits);
+        string? url;
+        try
+        {
+            url = await manager.StartTimeshiftSessionAsync(request.ChannelId, accountId.Value, profileId.Value, limits);
+        }
+        catch (UnauthorizedAccessException)
+        {
+            return Results.Forbid();
+        }
         if (url == null)
         {
             return Results.StatusCode(StatusCodes.Status409Conflict);

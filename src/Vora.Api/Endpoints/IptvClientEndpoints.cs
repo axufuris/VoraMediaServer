@@ -35,7 +35,9 @@ public static class IptvClientEndpoints
 
     private static async Task<IResult> GetClientPlaylistsAsync(Guid userId, [FromQuery] Guid? profileId, ClaimsPrincipal user, IIptvManager manager, ISystemSettingsRepository settingsRepo)
     {
-        var playlists = await manager.GetClientPlaylistsAsync(userId, profileId);
+        if (Viewer(user, userId, profileId) is not { } viewer) return Results.Unauthorized();
+
+        var playlists = await manager.GetClientPlaylistsAsync(viewer.AccountId, viewer.ProfileId);
 
         if (!user.IsAdmin())
         {
@@ -57,9 +59,17 @@ public static class IptvClientEndpoints
         return Results.Ok(playlists);
     }
 
-    private static async Task<IResult> GetGuideAsync([FromBody] GuideRequestDto request, IIptvManager manager)
+    private static async Task<IResult> GetGuideAsync([FromBody] GuideRequestDto request, ClaimsPrincipal user, IIptvManager manager)
     {
-        var guide = await manager.GetFilteredGuideAsync(request.UserId, request.ProfileId, request.ChannelIds, request.StartTime, request.EndTime);
+        if (Viewer(user, request.UserId, request.ProfileId) is not { } viewer) return Results.Unauthorized();
+
+        var guide = await manager.GetFilteredGuideAsync(viewer.AccountId, viewer.ProfileId ?? Guid.Empty, request.ChannelIds, request.StartTime, request.EndTime);
         return Results.Ok(guide);
+    }
+
+    private static (Guid AccountId, Guid? ProfileId)? Viewer(ClaimsPrincipal user, Guid requestedAccountId, Guid? requestedProfileId)
+    {
+        if (user.GetAccountId() is not { } accountId) return null;
+        return user.IsAdmin() ? (requestedAccountId, requestedProfileId) : (accountId, user.GetProfileId());
     }
 }

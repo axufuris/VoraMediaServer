@@ -16,6 +16,8 @@ public class StartPassthroughRequestDto
 
 public static class IptvPassthroughEndpoints
 {
+    private static readonly TimeSpan AudioKeepAliveInterval = TimeSpan.FromSeconds(30);
+
     public static IEndpointRouteBuilder MapIptvPassthroughEndpoints(this IEndpointRouteBuilder routes)
     {
         var group = routes.MapGroup("/api/iptv/passthrough").WithTags("IPTV Passthrough");
@@ -39,8 +41,8 @@ public static class IptvPassthroughEndpoints
 
         try
         {
-            var result = await service.StartPassthroughAsync(request.ChannelId, accountId.Value);
-            return Results.Ok(new PassthroughStartVM { Url = result.Url, StreamType = result.StreamType });
+            var result = await service.StartPassthroughAsync(request.ChannelId, accountId.Value, user.GetProfileId());
+            return Results.Ok(new PassthroughStartVM { Url = result.Url, StreamType = result.StreamType, AudioFormat = result.AudioFormat });
         }
         catch (UnauthorizedAccessException)
         {
@@ -49,6 +51,10 @@ public static class IptvPassthroughEndpoints
         catch (TunerLimitReachedException)
         {
             return Results.Conflict(new { error = "All available tuners for this playlist are in use." });
+        }
+        catch (IptvSourceException)
+        {
+            return Results.StatusCode(StatusCodes.Status502BadGateway);
         }
         catch (InvalidOperationException)
         {
@@ -85,7 +91,7 @@ public static class IptvPassthroughEndpoints
         }
         catch (HttpRequestException ex)
         {
-            logger.LogWarning(ex, "Segment fetch failed against upstream.");
+            logger.LogWarning("Segment fetch failed against upstream: {Error}", IptvUrlRedactor.Redact(ex.Message));
             return Results.StatusCode(StatusCodes.Status502BadGateway);
         }
 
@@ -103,7 +109,7 @@ public static class IptvPassthroughEndpoints
     {
         var logger = loggerFactory.CreateLogger("IptvPassthroughEndpoints.Audio");
 
-        HttpResponseMessage? upstream;
+        PassthroughAudioStream? upstream;
         try
         {
             upstream = await service.FetchAudioStreamAsync(t, context.RequestAborted);
@@ -113,9 +119,13 @@ public static class IptvPassthroughEndpoints
             logger.LogDebug("Audio fetch cancelled by client before upstream response.");
             return Results.Empty;
         }
+        catch (TunerLimitReachedException)
+        {
+            return Results.Conflict(new { error = "All available tuners for this playlist are in use." });
+        }
         catch (HttpRequestException ex)
         {
-            logger.LogWarning(ex, "Audio fetch failed against upstream.");
+            logger.LogWarning("Audio fetch failed against upstream: {Error}", IptvUrlRedactor.Redact(ex.Message));
             return Results.StatusCode(StatusCodes.Status502BadGateway);
         }
 
@@ -154,7 +164,7 @@ public static class IptvPassthroughEndpoints
         }
         catch (Exception ex)
         {
-            logger.LogWarning(ex, "Segment passthrough failed unexpectedly.");
+            logger.LogWarning("Segment passthrough failed unexpectedly: {Error}", IptvUrlRedactor.Redact(ex.Message));
         }
         finally
         {
@@ -162,9 +172,11 @@ public static class IptvPassthroughEndpoints
         }
     }
 
-    private static async Task PipeAudioStreamAsync(HttpResponseMessage upstream, HttpContext context, ILogger logger)
+    private static async Task PipeAudioStreamAsync(PassthroughAudioStream audio, HttpContext context, ILogger logger)
     {
+        var upstream = audio.Response;
         var stopwatch = Stopwatch.StartNew();
+        var lastKeepAlive = stopwatch.Elapsed;
         long bytesPiped = 0;
         var buffer = ArrayPool<byte>.Shared.Rent(8192);
         try
@@ -186,6 +198,11 @@ public static class IptvPassthroughEndpoints
                 await context.Response.Body.WriteAsync(buffer.AsMemory(0, read), context.RequestAborted);
                 await context.Response.Body.FlushAsync(context.RequestAborted);
                 bytesPiped += read;
+                if (stopwatch.Elapsed - lastKeepAlive >= AudioKeepAliveInterval)
+                {
+                    audio.KeepAlive();
+                    lastKeepAlive = stopwatch.Elapsed;
+                }
             }
 
             logger.LogInformation("Audio passthrough finished cleanly after {Elapsed}ms, {Bytes} bytes piped.", stopwatch.ElapsedMilliseconds, bytesPiped);
@@ -196,12 +213,12 @@ public static class IptvPassthroughEndpoints
         }
         catch (Exception ex)
         {
-            logger.LogWarning(ex, "Audio passthrough failed after {Elapsed}ms, {Bytes} bytes piped.", stopwatch.ElapsedMilliseconds, bytesPiped);
+            logger.LogWarning("Audio passthrough failed after {Elapsed}ms, {Bytes} bytes piped: {Error}", stopwatch.ElapsedMilliseconds, bytesPiped, IptvUrlRedactor.Redact(ex.Message));
         }
         finally
         {
             ArrayPool<byte>.Shared.Return(buffer);
-            upstream.Dispose();
+            audio.Dispose();
         }
     }
 }

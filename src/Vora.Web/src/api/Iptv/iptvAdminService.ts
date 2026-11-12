@@ -2,6 +2,8 @@ import { apiClient } from '../client';
 
 export type IptvChannelKind = 'Tv' | 'Radio';
 
+export type IptvSourceType = 'M3u' | 'Xtream';
+
 export interface IptvChannelVM {
     id: string;
     playlistId: string;
@@ -22,16 +24,56 @@ export interface IptvChannelVM {
 export interface IptvPlaylistVM {
     id: string;
     name: string;
+    sourceType?: IptvSourceType;
     m3uUrl?: string;
+    serverUrl?: string | null;
+    username?: string | null;
+    passwordIsSet?: boolean;
+    userAgent?: string | null;
+    referer?: string | null;
+    useProviderGuide?: boolean;
+    accountStatus?: string | null;
+    accountExpiresAt?: string | null;
+    accountMaxConnections?: number | null;
+    accountCheckedAt?: string | null;
     isActive: boolean;
     supportsWebPlayback: boolean;
     maxConcurrentStreams: number;
+    connectionLimit?: number;
     lastError?: string;
     lastSyncedAt?: string;
     defaultChannelKind: IptvChannelKind;
     countryFilter?: string | null;
     enableHealthCheck?: boolean;
     channels?: IptvChannelVM[];
+}
+
+export interface IptvPlaylistRequest {
+    name: string;
+    sourceType: IptvSourceType;
+    m3uUrl?: string | null;
+    serverUrl?: string | null;
+    username?: string | null;
+    newPassword?: string | null;
+    clearPassword?: boolean;
+    userAgent?: string | null;
+    referer?: string | null;
+    useProviderGuide?: boolean;
+    supportsWebPlayback: boolean;
+    maxConcurrentStreams: number;
+    isActive?: boolean;
+    defaultChannelKind: IptvChannelKind;
+    countryFilter?: string | null;
+    enableHealthCheck: boolean;
+}
+
+export interface IptvConnectionTestVM {
+    succeeded: boolean;
+    error?: string | null;
+    accountStatus?: string | null;
+    accountExpiresAt?: string | null;
+    accountMaxConnections?: number | null;
+    channelCount: number;
 }
 
 export const iptvAdminService = {
@@ -43,41 +85,18 @@ export const iptvAdminService = {
         return response.data;
     },
 
-    addPlaylist: async (
-        name: string,
-        m3uUrl: string,
-        supportsWebPlayback: boolean,
-        maxConcurrentStreams: number,
-        defaultChannelKind: IptvChannelKind,
-        countryFilter?: string | null,
-        enableHealthCheck?: boolean,
-        serverId?: string
-    ): Promise<IptvPlaylistVM> => {
-        const response = await apiClient.post<IptvPlaylistVM>(
-            '/iptv/admin/playlists',
-            { name, m3uUrl, supportsWebPlayback, maxConcurrentStreams, defaultChannelKind, countryFilter, enableHealthCheck },
-            { serverId }
-        );
+    addPlaylist: async (request: IptvPlaylistRequest, serverId?: string): Promise<IptvPlaylistVM> => {
+        const response = await apiClient.post<IptvPlaylistVM>('/iptv/admin/playlists', request, { serverId });
         return response.data;
     },
 
-    updatePlaylist: async (
-        id: string,
-        name: string,
-        m3uUrl: string,
-        supportsWebPlayback: boolean,
-        maxConcurrentStreams: number,
-        isActive: boolean,
-        defaultChannelKind: IptvChannelKind,
-        countryFilter?: string | null,
-        enableHealthCheck?: boolean,
-        serverId?: string
-    ): Promise<IptvPlaylistVM> => {
-        const response = await apiClient.put<IptvPlaylistVM>(
-            `/iptv/admin/playlists/${id}`,
-            { name, m3uUrl, supportsWebPlayback, maxConcurrentStreams, isActive, defaultChannelKind, countryFilter, enableHealthCheck },
-            { serverId }
-        );
+    updatePlaylist: async (id: string, request: IptvPlaylistRequest, serverId?: string): Promise<IptvPlaylistVM> => {
+        const response = await apiClient.put<IptvPlaylistVM>(`/iptv/admin/playlists/${id}`, request, { serverId });
+        return response.data;
+    },
+
+    testConnection: async (request: IptvPlaylistRequest, playlistId?: string, serverId?: string): Promise<IptvConnectionTestVM> => {
+        const response = await apiClient.post<IptvConnectionTestVM>('/iptv/admin/playlists/test-connection', { ...request, playlistId }, { serverId });
         return response.data;
     },
 

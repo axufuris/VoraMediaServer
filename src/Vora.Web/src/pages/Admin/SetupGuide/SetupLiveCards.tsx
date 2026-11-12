@@ -1,5 +1,5 @@
 import { useState, type ReactNode } from 'react';
-import { iptvAdminService, type IptvChannelKind, type IptvPlaylistVM } from '../../../api/Iptv/iptvAdminService';
+import { iptvAdminService, type IptvChannelKind, type IptvPlaylistRequest, type IptvPlaylistVM } from '../../../api/Iptv/iptvAdminService';
 import { iptvEpgAdminService, type IptvEpgSourceVM } from '../../../api/Iptv/iptvEpgAdminService';
 import { podcastService, type CatalogPodcastVM, type DiscoveredPodcastVM } from '../../../api/Podcasts/podcastService';
 import HealthBadge from '../../../components/Admin/Primitives/HealthBadge';
@@ -7,6 +7,9 @@ import { COUNTRY_OPTIONS } from '../../../utils/countries';
 import { FREE_EPG_SOURCES, FREE_PLAYLISTS } from '../../../utils/iptvPresets';
 import { CardHeading, CheckRow, FieldLabel, Hint, SetupCard, StatusMessage } from './SetupParts';
 import { secureImageUrl } from '../../../utils/secureImageUrl';
+import { errorDetail } from '../../../utils/apiError';
+import IptvSourceFields from '../../../components/Admin/Iptv/IptvSourceFields';
+import { describeSource, emptySourceDraft, missingSourceField, sourceRequestFields, type IptvSourceDraft } from '../../../components/Admin/Iptv/iptvSourceDraft';
 
 const looksLikeUrl = (value: string) => /^(https?|feed):/i.test(value.trim());
 
@@ -35,7 +38,8 @@ export function SetupPlaylistCard({ kind, playlists, serverId, onChanged }: { ki
     const presets = FREE_PLAYLISTS.filter(p => p.defaultKind === kind);
     const [preset, setPreset] = useState('');
     const [name, setName] = useState('');
-    const [url, setUrl] = useState('');
+    const [source, setSource] = useState<IptvSourceDraft>(emptySourceDraft);
+    const [sourceKey, setSourceKey] = useState(0);
     const [supportsWeb, setSupportsWeb] = useState(true);
     const [maxStreams, setMaxStreams] = useState(0);
     const [country, setCountry] = useState('');
@@ -49,25 +53,39 @@ export function SetupPlaylistCard({ kind, playlists, serverId, onChanged }: { ki
         const found = presets.find(p => p.name === value);
         if (found) {
             setName(found.name);
-            setUrl(found.m3u);
+            setSource({ ...emptySourceDraft(), m3uUrl: found.m3u });
+            setSourceKey(k => k + 1);
             setSupportsWeb(found.supportsWeb);
             setMaxStreams(found.maxConnections);
         }
     };
 
+    const request = (): IptvPlaylistRequest => ({
+        name: name.trim(),
+        ...sourceRequestFields(source),
+        supportsWebPlayback: supportsWeb,
+        maxConcurrentStreams: maxStreams,
+        defaultChannelKind: kind,
+        countryFilter: isTv ? null : (country || null),
+        enableHealthCheck: false,
+    });
+
     const add = async () => {
-        if (!name.trim() || !url.trim()) {
-            setError('Give it a name and an M3U URL first.');
+        const missing = missingSourceField(source, false);
+        if (!name.trim() || missing) {
+            setError(missing ?? 'Give it a name first.');
             return;
         }
         setBusy(true);
         setError(null);
         try {
-            await iptvAdminService.addPlaylist(name.trim(), url.trim(), supportsWeb, maxStreams, kind, isTv ? null : (country || null), false, serverId);
-            setPreset(''); setName(''); setUrl(''); setCountry('');
+            await iptvAdminService.addPlaylist(request(), serverId);
+            setPreset(''); setName(''); setCountry('');
+            setSource(emptySourceDraft());
+            setSourceKey(k => k + 1);
             onChanged();
-        } catch {
-            setError(`Couldn't add that playlist. Check the URL and try again.`);
+        } catch (err) {
+            setError(errorDetail(err, `Couldn't add that playlist`));
         } finally {
             setBusy(false);
         }
@@ -84,7 +102,7 @@ export function SetupPlaylistCard({ kind, playlists, serverId, onChanged }: { ki
 
     return (
         <SetupCard>
-            <CardHeading title={isTv ? 'Add a channel playlist' : 'Add a station list'} subtitle={`An M3U playlist supplies the ${unit}. Adding one reads it straight away.`} />
+            <CardHeading title={isTv ? 'Add a channel playlist' : 'Add a station list'} subtitle={`An M3U playlist or an Xtream Codes account supplies the ${unit}. Adding one reads it straight away.`} />
             <div>
                 <FieldLabel htmlFor={`${prefix}-preset`}>Start from a free list</FieldLabel>
                 <select id={`${prefix}-preset`} className="vora-input cursor-pointer" value={preset} onChange={e => choosePreset(e.target.value)}>
@@ -92,16 +110,18 @@ export function SetupPlaylistCard({ kind, playlists, serverId, onChanged }: { ki
                     {presets.map(p => <option key={p.name} value={p.name}>{p.name}</option>)}
                 </select>
             </div>
-            <div className="flex flex-wrap gap-3">
-                <div className="min-w-[200px] flex-1">
-                    <FieldLabel htmlFor={`${prefix}-name`}>Name</FieldLabel>
-                    <input id={`${prefix}-name`} className="vora-input" value={name} onChange={e => setName(e.target.value)} placeholder={isTv ? 'e.g. US — IPTV Org' : 'e.g. Top 100 Radio'} autoComplete="off" />
-                </div>
-                <div className="min-w-[260px] flex-[2]">
-                    <FieldLabel htmlFor={`${prefix}-url`}>M3U URL</FieldLabel>
-                    <input id={`${prefix}-url`} className="vora-input font-mono text-sm" value={url} onChange={e => setUrl(e.target.value)} placeholder="https://…" autoComplete="off" />
-                </div>
+            <div className="max-w-md">
+                <FieldLabel htmlFor={`${prefix}-name`}>Name</FieldLabel>
+                <input id={`${prefix}-name`} className="vora-input" value={name} onChange={e => setName(e.target.value)} placeholder={isTv ? 'e.g. US — IPTV Org' : 'e.g. Top 100 Radio'} autoComplete="off" />
             </div>
+            <IptvSourceFields
+                key={sourceKey}
+                idPrefix={prefix}
+                kind={kind}
+                draft={source}
+                onChange={patch => setSource(current => ({ ...current, ...patch }))}
+                onTest={() => iptvAdminService.testConnection(request(), undefined, serverId)}
+            />
             {isTv ? (
                 <div className="flex flex-wrap items-end gap-4">
                     <div className="min-w-[240px] flex-1">
@@ -111,7 +131,7 @@ export function SetupPlaylistCard({ kind, playlists, serverId, onChanged }: { ki
                         <FieldLabel htmlFor={`${prefix}-max`}>Max streams</FieldLabel>
                         <input id={`${prefix}-max`} type="number" min={0} className="vora-input" value={maxStreams} onChange={e => setMaxStreams(parseInt(e.target.value, 10) || 0)} />
                     </div>
-                    <Hint>Max streams: 0 means no limit. Set it to your provider's connection limit to avoid being banned.</Hint>
+                    <Hint>Max streams: 0 means no limit, or the account's own limit for an Xtream Codes account. Set it to your provider's connection limit to avoid being banned.</Hint>
                 </div>
             ) : (
                 <div>
@@ -130,7 +150,7 @@ export function SetupPlaylistCard({ kind, playlists, serverId, onChanged }: { ki
                 items={playlists.map(p => ({
                     id: p.id,
                     name: p.name,
-                    detail: p.m3uUrl ?? '',
+                    detail: describeSource(p),
                     badge: p.lastError
                         ? <HealthBadge tone="error">Couldn't read</HealthBadge>
                         : <HealthBadge tone="ok" showDot={false}>{(p.channels?.length ?? 0).toLocaleString()} {unit}</HealthBadge>,

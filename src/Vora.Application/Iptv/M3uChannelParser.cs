@@ -1,5 +1,6 @@
 ﻿using System.Security.Cryptography;
 using System.Text;
+using System.Text.Json;
 using System.Text.RegularExpressions;
 using Vora.Domain.Entities.Iptv;
 using Vora.Domain.Enums;
@@ -9,6 +10,10 @@ namespace Vora.Application.Iptv;
 internal static class M3uChannelParser
 {
     private const string ExtInfMarker = "#EXTINF";
+    private const string VlcOptionMarker = "#EXTVLCOPT:";
+    private const string HttpHeadersMarker = "#EXTHTTP:";
+    private const string KodiPropertyMarker = "#KODIPROP:";
+    private const string KodiStreamHeadersProperty = "inputstream.adaptive.stream_headers";
     private const string DefaultChannelName = "Unknown Channel";
 
     private static readonly Regex TvgIdRegex = new(@"tvg-id=""([^""]*)""", RegexOptions.IgnoreCase | RegexOptions.Compiled);
@@ -45,13 +50,16 @@ internal static class M3uChannelParser
 
     private static IptvChannel? ParseChannelLine(string line, string[] lines, int currentIndex, Guid playlistId, IptvChannelKind defaultKind)
     {
-        var streamUrl = FindStreamUrl(lines, currentIndex);
+        var entry = FindStream(lines, currentIndex);
+        if (string.IsNullOrWhiteSpace(entry.RawUrl)) return null;
+
+        var (streamUrl, suffixHeaders) = SplitHeaderSuffix(entry.RawUrl);
         if (string.IsNullOrWhiteSpace(streamUrl)) return null;
 
         var extId = ResolveExternalId(line);
         if (string.IsNullOrWhiteSpace(extId))
         {
-            extId = DeriveFallbackExternalId(streamUrl);
+            extId = DeriveFallbackExternalId(entry.RawUrl);
         }
 
         var rawName = ExtractRawName(line);
@@ -69,6 +77,8 @@ internal static class M3uChannelParser
             LogoUrl = TruncateOrNull(logoMatch.Success ? logoMatch.Groups[1].Value : null, 1024),
             GroupTitle = TruncateOrNull(groupTitle, 128),
             StreamUrl = streamUrl,
+            UserAgent = IptvRequestPolicy.CleanHeaderValue(suffixHeaders.UserAgent ?? entry.Headers.UserAgent, IptvRequestPolicy.MaxUserAgentLength),
+            Referer = IptvRequestPolicy.CleanHeaderValue(suffixHeaders.Referer ?? entry.Headers.Referer, IptvRequestPolicy.MaxRefererLength),
             Resolution = TruncateOrNull(resolution, 16),
             CountryCode = TruncateOrNull(countryCode, 8),
             Kind = defaultKind
@@ -107,7 +117,7 @@ internal static class M3uChannelParser
             : DefaultChannelName;
     }
 
-    private static (string? Resolution, string? CountryCode, string CleanedName) ExtractMetadata(string extId, string rawName, string rawLine)
+    internal static (string? Resolution, string? CountryCode, string CleanedName) ExtractMetadata(string extId, string rawName, string rawLine)
     {
         string? resolution = null;
         string? countryCode = null;
@@ -149,15 +159,138 @@ internal static class M3uChannelParser
         return (resolution, countryCode, cleanedName);
     }
 
-    private static string FindStreamUrl(string[] lines, int currentIndex)
+    private sealed record StreamHeaders(string? UserAgent, string? Referer)
     {
+        public static readonly StreamHeaders None = new(null, null);
+
+        public StreamHeaders Merge(StreamHeaders other) => new(other.UserAgent ?? UserAgent, other.Referer ?? Referer);
+    }
+
+    private sealed record StreamEntry(string RawUrl, StreamHeaders Headers);
+
+    private static StreamEntry FindStream(string[] lines, int currentIndex)
+    {
+        var headers = StreamHeaders.None;
         for (var j = currentIndex + 1; j < lines.Length; j++)
         {
-            if (!string.IsNullOrWhiteSpace(lines[j]) && !lines[j].StartsWith("#"))
+            if (string.IsNullOrWhiteSpace(lines[j])) continue;
+
+            var line = lines[j].Trim();
+            if (!line.StartsWith('#'))
             {
-                return lines[j].Trim();
+                return new StreamEntry(line, headers);
+            }
+
+            headers = headers.Merge(ReadOptionLine(line));
+        }
+        return new StreamEntry(string.Empty, StreamHeaders.None);
+    }
+
+    private static StreamHeaders ReadOptionLine(string line)
+    {
+        if (line.StartsWith(VlcOptionMarker, StringComparison.OrdinalIgnoreCase))
+        {
+            var option = line[VlcOptionMarker.Length..].Trim();
+            var eq = option.IndexOf('=');
+            if (eq <= 0) return StreamHeaders.None;
+
+            var name = option[..eq].Trim();
+            var value = option[(eq + 1)..].Trim().Trim('"');
+            if (string.Equals(name, "http-user-agent", StringComparison.OrdinalIgnoreCase)) return new StreamHeaders(value, null);
+            if (string.Equals(name, "http-referrer", StringComparison.OrdinalIgnoreCase)
+                || string.Equals(name, "http-referer", StringComparison.OrdinalIgnoreCase))
+            {
+                return new StreamHeaders(null, value);
+            }
+            return StreamHeaders.None;
+        }
+
+        if (line.StartsWith(HttpHeadersMarker, StringComparison.OrdinalIgnoreCase))
+        {
+            return ReadJsonHeaders(line[HttpHeadersMarker.Length..]);
+        }
+
+        if (line.StartsWith(KodiPropertyMarker, StringComparison.OrdinalIgnoreCase))
+        {
+            var property = line[KodiPropertyMarker.Length..].Trim();
+            var eq = property.IndexOf('=');
+            if (eq > 0 && string.Equals(property[..eq].Trim(), KodiStreamHeadersProperty, StringComparison.OrdinalIgnoreCase))
+            {
+                return ReadHeaderPairs(property[(eq + 1)..]);
             }
         }
-        return string.Empty;
+
+        return StreamHeaders.None;
     }
+
+    private static StreamHeaders ReadJsonHeaders(string json)
+    {
+        try
+        {
+            using var document = JsonDocument.Parse(json);
+            if (document.RootElement.ValueKind != JsonValueKind.Object) return StreamHeaders.None;
+
+            string? userAgent = null;
+            string? referer = null;
+            foreach (var property in document.RootElement.EnumerateObject())
+            {
+                if (property.Value.ValueKind != JsonValueKind.String) continue;
+                if (IsUserAgentName(property.Name)) userAgent = property.Value.GetString();
+                else if (IsRefererName(property.Name)) referer = property.Value.GetString();
+            }
+            return new StreamHeaders(userAgent, referer);
+        }
+        catch (JsonException)
+        {
+            return StreamHeaders.None;
+        }
+    }
+
+    private static (string Url, StreamHeaders Headers) SplitHeaderSuffix(string rawUrl)
+    {
+        var pipe = rawUrl.IndexOf('|');
+        if (pipe < 0) return (rawUrl, StreamHeaders.None);
+
+        var suffix = rawUrl[(pipe + 1)..];
+        if (!suffix.Contains('=')) return (rawUrl, StreamHeaders.None);
+
+        return (rawUrl[..pipe].Trim(), ReadHeaderPairs(suffix));
+    }
+
+    private static StreamHeaders ReadHeaderPairs(string pairs)
+    {
+        string? userAgent = null;
+        string? referer = null;
+        foreach (var pair in pairs.Split('&', StringSplitOptions.RemoveEmptyEntries))
+        {
+            var eq = pair.IndexOf('=');
+            if (eq <= 0) continue;
+
+            var name = pair[..eq].Trim();
+            var value = Unescape(pair[(eq + 1)..].Trim());
+            if (IsUserAgentName(name)) userAgent = value;
+            else if (IsRefererName(name)) referer = value;
+        }
+        return new StreamHeaders(userAgent, referer);
+    }
+
+    private static string Unescape(string value)
+    {
+        try
+        {
+            return Uri.UnescapeDataString(value);
+        }
+        catch (UriFormatException)
+        {
+            return value;
+        }
+    }
+
+    private static bool IsUserAgentName(string name) =>
+        string.Equals(name, "User-Agent", StringComparison.OrdinalIgnoreCase)
+        || string.Equals(name, "user_agent", StringComparison.OrdinalIgnoreCase);
+
+    private static bool IsRefererName(string name) =>
+        string.Equals(name, "Referer", StringComparison.OrdinalIgnoreCase)
+        || string.Equals(name, "Referrer", StringComparison.OrdinalIgnoreCase);
 }

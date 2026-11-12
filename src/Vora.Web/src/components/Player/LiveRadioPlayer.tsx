@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState, useRef, useMemo } from 'react';
+import { useCallback, useEffect, useState, useRef } from 'react';
 import type Hls from 'hls.js';
 import { loadHls } from '../../utils/loadHls';
 import { usePlayer, usePlayerTime } from '../../contexts/usePlayer';
@@ -8,11 +8,12 @@ import { timeshiftService } from '../../api/Iptv/timeshiftService';
 import { passthroughService } from '../../api/Iptv/passthroughService';
 import { podcastService } from '../../api/Podcasts/podcastService';
 import { serverVault } from '../../utils/serverVault';
-import { StorageKeys, decodeJwtPayload, getProfileIdFromToken } from '../../utils/storageKeys';
+import { StorageKeys, getProfileIdFromToken } from '../../utils/storageKeys';
 import { PlayPauseButton, SkipButton, VolumeControl, MaximizeButton, CloseButton } from './Controls/PlayerButtons';
 import RadioNowPlaying from './RadioNowPlaying';
 import PodcastNowPlaying from './PodcastNowPlaying';
 import { secureImageUrl } from '../../utils/secureImageUrl';
+import { useLivePermissions } from './useLivePermissions';
 
 export default function LiveRadioPlayer() {
     const { currentMedia, isPlaying, isMinimized, volume, togglePlayPause, setMinimized, closePlayer, setVolume, videoRef, playMedia, skipForward, skipBackward, seek, nextTrack, previousTrack, hasNext, hasPrevious, setFullscreen, isFullscreen } = usePlayer();
@@ -29,16 +30,7 @@ export default function LiveRadioPlayer() {
     const isLiveRadio = currentMedia?.playbackContextType === 'LiveRadio';
     const minimizePlayer = useCallback(() => setMinimized(true), [setMinimized]);
 
-    const canTimeshift = useMemo(() => {
-        const token = localStorage.getItem(StorageKeys.profileToken);
-        if (!token) return false;
-        try {
-            const payload = decodeJwtPayload(token);
-            return payload?.canTimeshiftIptv === 'True';
-        } catch {
-            return false;
-        }
-    }, []);
+    const { canTimeshift } = useLivePermissions(isLiveRadio);
 
     useEffect(() => {
         if (currentMedia?.playbackContextType !== 'LiveRadio') {

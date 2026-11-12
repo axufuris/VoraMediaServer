@@ -198,6 +198,40 @@ public sealed class LegacyDatabase : IAsyncDisposable
 
     private const string TablesSinceSearchIndexes = """
         DROP TABLE IF EXISTS "RecommendationSnapshots";
+        """ + ColumnsSinceForYouRows;
+
+    public const string ForYouRowsMigration = "20261112020121_ChangesSinceInitial";
+
+    private const string IptvProviderColumns = """
+        ALTER TABLE "IptvPlaylists" ADD COLUMN IF NOT EXISTS "SourceType" integer NOT NULL DEFAULT 0;
+        ALTER TABLE "IptvPlaylists" ADD COLUMN IF NOT EXISTS "ServerUrl" character varying(1024);
+        ALTER TABLE "IptvPlaylists" ADD COLUMN IF NOT EXISTS "Username" character varying(256);
+        ALTER TABLE "IptvPlaylists" ADD COLUMN IF NOT EXISTS "PasswordCiphertext" text;
+        ALTER TABLE "IptvPlaylists" ADD COLUMN IF NOT EXISTS "UserAgent" character varying(512);
+        ALTER TABLE "IptvPlaylists" ADD COLUMN IF NOT EXISTS "Referer" character varying(1024);
+        ALTER TABLE "IptvPlaylists" ADD COLUMN IF NOT EXISTS "UseProviderGuide" boolean NOT NULL DEFAULT TRUE;
+        ALTER TABLE "IptvPlaylists" ADD COLUMN IF NOT EXISTS "AccountStatus" character varying(32);
+        ALTER TABLE "IptvPlaylists" ADD COLUMN IF NOT EXISTS "AccountExpiresAt" timestamp with time zone;
+        ALTER TABLE "IptvPlaylists" ADD COLUMN IF NOT EXISTS "AccountMaxConnections" integer;
+        ALTER TABLE "IptvPlaylists" ADD COLUMN IF NOT EXISTS "AccountCheckedAt" timestamp with time zone;
+        ALTER TABLE "IptvChannels" ADD COLUMN IF NOT EXISTS "UserAgent" character varying(512);
+        ALTER TABLE "IptvChannels" ADD COLUMN IF NOT EXISTS "Referer" character varying(1024);
+        """;
+
+    private const string ColumnsSinceForYouRows = """
+        ALTER TABLE "IptvPlaylists" DROP COLUMN IF EXISTS "SourceType";
+        ALTER TABLE "IptvPlaylists" DROP COLUMN IF EXISTS "ServerUrl";
+        ALTER TABLE "IptvPlaylists" DROP COLUMN IF EXISTS "Username";
+        ALTER TABLE "IptvPlaylists" DROP COLUMN IF EXISTS "PasswordCiphertext";
+        ALTER TABLE "IptvPlaylists" DROP COLUMN IF EXISTS "UserAgent";
+        ALTER TABLE "IptvPlaylists" DROP COLUMN IF EXISTS "Referer";
+        ALTER TABLE "IptvPlaylists" DROP COLUMN IF EXISTS "UseProviderGuide";
+        ALTER TABLE "IptvPlaylists" DROP COLUMN IF EXISTS "AccountStatus";
+        ALTER TABLE "IptvPlaylists" DROP COLUMN IF EXISTS "AccountExpiresAt";
+        ALTER TABLE "IptvPlaylists" DROP COLUMN IF EXISTS "AccountMaxConnections";
+        ALTER TABLE "IptvPlaylists" DROP COLUMN IF EXISTS "AccountCheckedAt";
+        ALTER TABLE "IptvChannels" DROP COLUMN IF EXISTS "UserAgent";
+        ALTER TABLE "IptvChannels" DROP COLUMN IF EXISTS "Referer";
         """;
 
     private const string ColumnsSinceChannelVideoFormat = """
@@ -343,7 +377,7 @@ public sealed class LegacyDatabase : IAsyncDisposable
     public async Task SeedAsync(Func<VoraDbContext, Task> seed, CancellationToken cancellationToken)
     {
         await using var db = NewContext();
-        await db.Database.ExecuteSqlRawAsync(RememberedChoicesProfileColumns + LibrarySortProfileColumns + KeepHdrSettingColumns + AutoPlayProfileColumns + UpNextProfileColumns + ImageSubtitleDeviceColumns + LiveVideoChannelColumns + ThemeCollectionColumns + PlaySourceColumns, cancellationToken);
+        await db.Database.ExecuteSqlRawAsync(RememberedChoicesProfileColumns + LibrarySortProfileColumns + KeepHdrSettingColumns + AutoPlayProfileColumns + UpNextProfileColumns + ImageSubtitleDeviceColumns + LiveVideoChannelColumns + ThemeCollectionColumns + PlaySourceColumns + IptvProviderColumns, cancellationToken);
         await seed(db);
         await db.Database.ExecuteSqlRawAsync(ColumnsSinceRememberedChoices + ColumnsSinceVideoDimensions, cancellationToken);
     }
@@ -481,6 +515,15 @@ public sealed class LegacyDatabase : IAsyncDisposable
         await seed(db);
         await db.Database.ExecuteSqlRawAsync(TablesSinceSearchIndexes, cancellationToken);
         await ReplaceCombinedMigrationAsync(db, SearchIndexMigration, "10.0.9", cancellationToken);
+    }
+
+    public async Task BuildForYouRowsStateAsync(Func<VoraDbContext, Task> seed, CancellationToken cancellationToken)
+    {
+        await using var db = NewContext();
+        await db.Database.MigrateAsync(cancellationToken);
+        await seed(db);
+        await db.Database.ExecuteSqlRawAsync(ColumnsSinceForYouRows, cancellationToken);
+        await ReplaceCombinedMigrationAsync(db, ForYouRowsMigration, "10.0.9", cancellationToken);
     }
 
     private static async Task ReplaceCombinedMigrationAsync(VoraDbContext db, string migrationId, string productVersion, CancellationToken cancellationToken)

@@ -78,6 +78,7 @@ public static class DvrPlaybackEndpoints
         string fileName,
         ISystemSettingsRepository settingsRepo,
         IStreamingTokenSigner signer,
+        ITimeshiftCoordinator coordinator,
         HttpContext context)
     {
         if (!signer.TryVerify(token, TimeshiftTokenScope, out var payload) || payload != $"{profileId}:{sessionId}")
@@ -93,6 +94,8 @@ public static class DvrPlaybackEndpoints
         {
             return Results.NotFound();
         }
+
+        coordinator.Heartbeat(profileId);
 
         var contentType = fileName.EndsWith(".m3u8") ? "application/vnd.apple.mpegurl" : "video/MP2T";
 
