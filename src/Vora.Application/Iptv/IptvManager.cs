@@ -34,6 +34,8 @@ public interface IIptvManager
     Task<string?> StartTimeshiftSessionAsync(Guid channelId, Guid userId, Guid profileId, LiveVideoLimits? limits);
     Task StopTimeshiftSessionAsync(Guid profileId);
     void PingTimeshiftSession(Guid profileId);
+    Task<string> StartLiveRemuxAsync(IptvChannel channel, IptvUpstream upstream, Guid viewerKey, int connectionLimit);
+    Task StopLiveRemuxAsync(Guid viewerKey);
 }
 
 public class IptvManager : IIptvManager
@@ -48,6 +50,7 @@ public class IptvManager : IIptvManager
     private const string SecondSegmentFileName = "seg_001.ts";
     private const string TimeshiftTokenScope = "timeshift";
     private const string ProviderGuideSuffix = " (provider guide)";
+    public const int LiveRemuxWindowSegments = 6;
     private const int InitializationRetryDelayMs = 500;
     private static readonly TimeSpan InitializationTimeout = TimeSpan.FromSeconds(20);
     private static readonly TimeSpan TimeshiftTokenTtl = TimeSpan.FromHours(4);
@@ -394,6 +397,7 @@ public class IptvManager : IIptvManager
         var maxConcurrent = playlist is null ? 0 : IptvConnectionLimit.Of(playlist);
 
         _tunerRegistry.Release(leaseKey);
+        _tunerRegistry.ReleaseStartingWith(IptvPassthroughService.ViewerLiveLeasePrefix(profileId, channel.PlaylistId));
         if (!_tunerRegistry.TryAcquire(channel.PlaylistId, maxConcurrent, leaseKey, TunerLeaseKind.Timeshift))
         {
             return null;
@@ -413,7 +417,7 @@ public class IptvManager : IIptvManager
                     channel.Name, video.Encoder, LiveVideoDecision.Mismatch(known, clientLimits));
             }
 
-            var run = await LaunchTimeshiftAsync(profileId, upstream, secret, video);
+            var run = await LaunchTimeshiftAsync(profileId, upstream, secret, video, LiveSessionKind.Timeshift);
             if (run is null)
             {
                 _tunerRegistry.Release(leaseKey);
@@ -430,7 +434,7 @@ public class IptvManager : IIptvManager
                     if (video.Encodes)
                     {
                         _logger.LogInformation("Timeshift of {Channel} restarts to encode with {Encoder}: {Reason}.", channel.Name, video.Encoder, reason);
-                        run = await LaunchTimeshiftAsync(profileId, upstream, secret, video);
+                        run = await LaunchTimeshiftAsync(profileId, upstream, secret, video, LiveSessionKind.Timeshift);
                         if (run is null)
                         {
                             _tunerRegistry.Release(leaseKey);
@@ -446,7 +450,7 @@ public class IptvManager : IIptvManager
             {
                 _logger.LogWarning("Timeshift of {Channel} failed to encode with {Encoder}; retrying on the CPU.", channel.Name, video.Encoder);
                 video = await _timeshiftVideo.EncodeArgumentsAsync(encode, onCpu: true);
-                run = await LaunchTimeshiftAsync(profileId, upstream, secret, video);
+                run = await LaunchTimeshiftAsync(profileId, upstream, secret, video, LiveSessionKind.Timeshift);
                 if (run is null)
                 {
                     _tunerRegistry.Release(leaseKey);
@@ -489,6 +493,53 @@ public class IptvManager : IIptvManager
     public void PingTimeshiftSession(Guid profileId) =>
         _timeshiftCoordinator.Heartbeat(profileId);
 
+    public async Task<string> StartLiveRemuxAsync(IptvChannel channel, IptvUpstream upstream, Guid viewerKey, int connectionLimit)
+    {
+        IptvPlaylist? playlist = channel.Playlist;
+        var secret = playlist is null ? null : _upstreamResolver.PasswordFor(playlist);
+
+        await using var viewerLock = await _timeshiftCoordinator.LockProfileAsync(viewerKey);
+
+        var leaseKey = TimeshiftLeaseKey(viewerKey);
+        _tunerRegistry.Release(leaseKey);
+        if (!_tunerRegistry.TryAcquire(channel.PlaylistId, connectionLimit, leaseKey, TunerLeaseKind.Timeshift))
+        {
+            throw new TunerLimitReachedException();
+        }
+
+        try
+        {
+            var run = await LaunchTimeshiftAsync(viewerKey, upstream, secret, TimeshiftVideoArguments.Copy, LiveSessionKind.Remux)
+                ?? throw new InvalidOperationException("Another stream for this viewer is starting.");
+
+            await WaitForFileAsync(viewerKey, run, SecondSegmentFileName);
+            if (!_timeshiftCoordinator.IsActive(viewerKey) || !File.Exists(run.PlaylistPath))
+            {
+                await _timeshiftCoordinator.StopAsync(viewerKey);
+                throw new IptvSourceException("The channel's stream could not be read.");
+            }
+
+            _logger.LogInformation("Passthrough of {Channel} is remuxed to HLS because its stream isn't HLS.", channel.Name);
+            var sessionId = Path.GetFileName(run.SessionPath);
+            var token = _tokenSigner.Sign(TimeshiftTokenScope, $"{viewerKey}:{sessionId}", TimeshiftTokenTtl);
+            return $"/api/streaming/hls/timeshift/{token}/{viewerKey}/{sessionId}/{PlaylistFileName}";
+        }
+        catch
+        {
+            _tunerRegistry.Release(leaseKey);
+            throw;
+        }
+    }
+
+    public async Task StopLiveRemuxAsync(Guid viewerKey)
+    {
+        await using var viewerLock = await _timeshiftCoordinator.LockProfileAsync(viewerKey);
+        if (_timeshiftCoordinator.KindOf(viewerKey) != LiveSessionKind.Remux) return;
+
+        _tunerRegistry.Release(TimeshiftLeaseKey(viewerKey));
+        await _timeshiftCoordinator.StopAsync(viewerKey);
+    }
+
     internal static LiveVideoFormat? StoredVideoFormat(IptvChannel channel) =>
         channel.VideoCodec is { } codec
             ? new LiveVideoFormat(codec, channel.VideoProfile, channel.VideoLevel, channel.VideoHeight, channel.VideoFrameRate, channel.VideoInterlaced ?? false)
@@ -496,16 +547,16 @@ public class IptvManager : IIptvManager
 
     private sealed record TimeshiftRun(Process Process, string SessionPath, string PlaylistPath, DateTime ReadyBy);
 
-    private async Task<TimeshiftRun?> LaunchTimeshiftAsync(Guid profileId, IptvUpstream upstream, string? secret, TimeshiftVideoArguments video)
+    private async Task<TimeshiftRun?> LaunchTimeshiftAsync(Guid profileId, IptvUpstream upstream, string? secret, TimeshiftVideoArguments video, LiveSessionKind kind)
     {
         var sessionPath = await PrepareTimeshiftDirectoryAsync(profileId);
         var outputPath = Path.Combine(sessionPath, PlaylistFileName).Replace("\\", "/");
         var segmentPath = Path.Combine(sessionPath, SegmentFilePattern).Replace("\\", "/");
 
-        var process = BuildTimeshiftProcess(upstream.Url, upstream.Policy, outputPath, segmentPath, video);
+        var process = BuildTimeshiftProcess(upstream.Url, upstream.Policy, outputPath, segmentPath, video, kind == LiveSessionKind.Remux);
 
         await _timeshiftCoordinator.StopAsync(profileId);
-        if (!_timeshiftCoordinator.TryRegister(profileId, process, sessionPath))
+        if (!_timeshiftCoordinator.TryRegister(profileId, process, sessionPath, kind))
         {
             process.Dispose();
             TryDeleteDirectory(sessionPath);
@@ -618,7 +669,7 @@ public class IptvManager : IIptvManager
         }
     }
 
-    internal static Process BuildTimeshiftProcess(string streamUrl, IptvRequestPolicy policy, string outputPath, string segmentPath, TimeshiftVideoArguments video)
+    internal static Process BuildTimeshiftProcess(string streamUrl, IptvRequestPolicy policy, string outputPath, string segmentPath, TimeshiftVideoArguments video, bool rollingWindow = false)
     {
         var process = new Process
         {
@@ -652,8 +703,16 @@ public class IptvManager : IIptvManager
         args.Add("-b:a"); args.Add("128k");
         args.Add("-f"); args.Add("hls");
         args.Add("-hls_time"); args.Add("4");
-        args.Add("-hls_list_size"); args.Add("0");
-        args.Add("-hls_flags"); args.Add("append_list+temp_file");
+        if (rollingWindow)
+        {
+            args.Add("-hls_list_size"); args.Add(LiveRemuxWindowSegments.ToString(System.Globalization.CultureInfo.InvariantCulture));
+            args.Add("-hls_flags"); args.Add("delete_segments+temp_file");
+        }
+        else
+        {
+            args.Add("-hls_list_size"); args.Add("0");
+            args.Add("-hls_flags"); args.Add("append_list+temp_file");
+        }
         args.Add("-hls_segment_filename"); args.Add(segmentPath);
         args.Add(outputPath);
 

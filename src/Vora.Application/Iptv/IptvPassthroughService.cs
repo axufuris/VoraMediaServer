@@ -2,6 +2,7 @@ using System.Text;
 using Microsoft.Extensions.Logging;
 using Vora.Application.Users;
 using Vora.Domain.Entities.Iptv;
+using Vora.Domain.Enums;
 
 namespace Vora.Application.Iptv;
 
@@ -72,6 +73,7 @@ public class IptvPassthroughService : IIptvPassthroughService
     private readonly ITunerRegistry _tunerRegistry;
     private readonly IIptvUpstreamResolver _resolver;
     private readonly IIptvPassthroughTokenProtector _tokens;
+    private readonly IIptvManager _iptvManager;
     private readonly ILogger<IptvPassthroughService> _logger;
 
     public IptvPassthroughService(
@@ -81,6 +83,7 @@ public class IptvPassthroughService : IIptvPassthroughService
         ITunerRegistry tunerRegistry,
         IIptvUpstreamResolver resolver,
         IIptvPassthroughTokenProtector tokens,
+        IIptvManager iptvManager,
         ILogger<IptvPassthroughService> logger)
     {
         _repository = repository;
@@ -89,10 +92,18 @@ public class IptvPassthroughService : IIptvPassthroughService
         _tunerRegistry = tunerRegistry;
         _resolver = resolver;
         _tokens = tokens;
+        _iptvManager = iptvManager;
         _logger = logger;
     }
 
     public static string LiveLeaseKey(string leaseId) => $"live:{leaseId}";
+
+    private static string ViewerLeasePrefix(Guid viewerKey, Guid playlistId) => $"{viewerKey:N}.{playlistId:N}.";
+
+    public static string ViewerLiveLeasePrefix(Guid viewerKey, Guid playlistId) => LiveLeaseKey(ViewerLeasePrefix(viewerKey, playlistId));
+
+    public static bool NeedsRemux(IptvChannelKind channelKind, string streamType) =>
+        channelKind == IptvChannelKind.Tv && streamType != StreamTypeHls;
 
     private sealed record PassthroughTicket(string Tag, Guid PlaylistId, Guid ChannelId, string LeaseId, string Url);
 
@@ -114,7 +125,26 @@ public class IptvPassthroughService : IIptvPassthroughService
 
         var (resolvedUrl, streamType) = await ResolveStreamAsync(upstream.Url, upstream.Policy, channel.Name, depth: 0);
 
-        var leaseId = Guid.NewGuid().ToString("N");
+        var viewerKey = profileId ?? userId;
+        var viewerLeases = ViewerLeasePrefix(viewerKey, channel.PlaylistId);
+        _tunerRegistry.ReleaseStartingWith(ViewerLiveLeasePrefix(viewerKey, channel.PlaylistId));
+
+        if (NeedsRemux(channel.Kind, streamType))
+        {
+            var remuxUrl = await _iptvManager.StartLiveRemuxAsync(channel, upstream with { Url = resolvedUrl }, viewerKey, limit);
+            return new PassthroughStartResult
+            {
+                Url = remuxUrl,
+                StreamType = StreamTypeHls
+            };
+        }
+
+        if (channel.Kind == IptvChannelKind.Tv)
+        {
+            await _iptvManager.StopLiveRemuxAsync(viewerKey);
+        }
+
+        var leaseId = viewerLeases + Guid.NewGuid().ToString("N");
         if (streamType == StreamTypeAudio)
         {
             var audioLease = limit > 0 ? leaseId : string.Empty;
@@ -157,6 +187,10 @@ public class IptvPassthroughService : IIptvPassthroughService
         if (queryIdx >= 0) lowerPath = lowerPath[..queryIdx];
 
         if (lowerPath.EndsWith(".m3u8")) return (upstreamUrl, StreamTypeHls);
+        if (lowerPath.EndsWith(".ts") || lowerPath.EndsWith(".mpegts") || lowerPath.EndsWith(".mp4") || lowerPath.EndsWith(".mkv"))
+        {
+            return (upstreamUrl, StreamTypeAudio);
+        }
         if (lowerPath.EndsWith(".mp3") || lowerPath.EndsWith(".aac")
             || lowerPath.EndsWith(".ogg") || lowerPath.EndsWith(".opus")
             || lowerPath.EndsWith(".flac") || lowerPath.EndsWith(".wav"))

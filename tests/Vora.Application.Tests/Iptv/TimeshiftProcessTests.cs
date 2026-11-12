@@ -9,10 +9,35 @@ public class TimeshiftProcessTests
     private const string Playlist = "/transcode/timeshift/p/s/index.m3u8";
     private const string Segments = "/transcode/timeshift/p/s/seg_%03d.ts";
 
-    private static List<string> Arguments(TimeshiftVideoArguments video, IptvRequestPolicy? policy = null, string streamUrl = StreamUrl)
+    private static List<string> Arguments(TimeshiftVideoArguments video, IptvRequestPolicy? policy = null, string streamUrl = StreamUrl, bool rollingWindow = false)
     {
-        using var process = IptvManager.BuildTimeshiftProcess(streamUrl, policy ?? IptvRequestPolicy.None, Playlist, Segments, video);
+        using var process = IptvManager.BuildTimeshiftProcess(streamUrl, policy ?? IptvRequestPolicy.None, Playlist, Segments, video, rollingWindow);
         return [.. process.StartInfo.ArgumentList];
+    }
+
+    [Fact]
+    public void A_live_remux_copies_the_video_into_a_short_rolling_window_with_the_provider_s_headers()
+    {
+        var policy = new IptvRequestPolicy("IPTVSmartersPro", "https://portal.example.com/", null);
+
+        Arguments(TimeshiftVideoArguments.Copy, policy, rollingWindow: true).Should().Equal(
+            "-hide_banner", "-nostats", "-loglevel", "warning",
+            "-reconnect", "1",
+            "-reconnect_streamed", "1",
+            "-reconnect_delay_max", "5",
+            "-user_agent", "IPTVSmartersPro",
+            "-headers", "Referer: https://portal.example.com/\r\n",
+            "-i", StreamUrl,
+            "-c:v", "copy",
+            "-c:a", "aac",
+            "-ac", "2",
+            "-b:a", "128k",
+            "-f", "hls",
+            "-hls_time", "4",
+            "-hls_list_size", "6",
+            "-hls_flags", "delete_segments+temp_file",
+            "-hls_segment_filename", Segments,
+            Playlist);
     }
 
     [Fact]

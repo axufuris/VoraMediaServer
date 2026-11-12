@@ -6,6 +6,7 @@ using Vora.Application.Tasks;
 using Vora.Application.Users;
 using Vora.Application.Users.ViewModels;
 using Vora.Domain.Entities.Iptv;
+using Vora.Domain.Entities.Settings;
 using Vora.Domain.Enums;
 
 namespace Vora.Application.Tests.Iptv;
@@ -18,12 +19,13 @@ public class IptvProviderManagerTests
     private readonly ITimeshiftCoordinator _timeshift = Substitute.For<ITimeshiftCoordinator>();
     private readonly PlainSecretProtector _protector = new();
     private readonly StubUpstream _upstream = new();
+    private readonly TunerRegistry _tuners = new();
     private readonly IptvManager _manager;
 
     public IptvProviderManagerTests()
     {
         var resolver = new IptvUpstreamResolver(_protector);
-        _manager = new IptvManager(_repo, Substitute.For<IIptvEpgService>(), _users, _tasks, _timeshift, new TunerRegistry(),
+        _manager = new IptvManager(_repo, Substitute.For<IIptvEpgService>(), _users, _tasks, _timeshift, _tuners,
             Substitute.For<IStreamingTokenSigner>(), Substitute.For<ITimeshiftVideo>(), new IptvChannelLoader(_upstream, resolver), resolver, _protector,
             NullLogger<IptvManager>.Instance);
     }
@@ -257,6 +259,74 @@ public class IptvProviderManagerTests
 
         await act.Should().ThrowAsync<UnauthorizedAccessException>();
         await _timeshift.DidNotReceiveWithAnyArgs().LockProfileAsync(default);
+    }
+
+    [Fact]
+    public async Task A_live_remux_waits_for_a_free_connection_like_any_other_stream()
+    {
+        var playlistId = Guid.NewGuid();
+        var channel = new IptvChannel { ExternalChannelId = "a", Name = "A", StreamUrl = "https://iptv.example.com/a.ts", PlaylistId = playlistId };
+        _tuners.TryAcquire(playlistId, 1, IptvManager.TimeshiftLeaseKey(Guid.NewGuid()), TunerLeaseKind.Timeshift).Should().BeTrue();
+
+        var act = async () => await _manager.StartLiveRemuxAsync(channel, new IptvUpstream(channel.StreamUrl, IptvRequestPolicy.None), Guid.NewGuid(), connectionLimit: 1);
+
+        await act.Should().ThrowAsync<TunerLimitReachedException>();
+        _tuners.ActiveCount(playlistId).Should().Be(1);
+    }
+
+    [Fact]
+    public async Task Timeshift_takes_over_the_viewer_s_passthrough_connection_on_that_playlist()
+    {
+        var playlistId = Guid.NewGuid();
+        var accountId = Guid.NewGuid();
+        var profileId = Guid.NewGuid();
+        var channel = new IptvChannel { ExternalChannelId = "a", Name = "A", StreamUrl = "https://iptv.example.com/a.ts", PlaylistId = playlistId };
+        _repo.GetChannelWithPlaylistAsync(channel.Id).Returns(channel);
+        _users.GetUserAccountAsync(accountId).Returns(new UserVM { Id = accountId, HasAllIptvAccess = true, Profiles = new List<UserProfileVM> { new() { Id = profileId, HasAllIptvAccess = true } } });
+        _tuners.TryAcquire(playlistId, 1, IptvPassthroughService.LiveLeaseKey($"{profileId:N}.{playlistId:N}.{Guid.NewGuid():N}"), TunerLeaseKind.Live);
+        _tuners.TryAcquire(playlistId, 0, IptvPassthroughService.LiveLeaseKey($"{Guid.NewGuid():N}.{playlistId:N}.{Guid.NewGuid():N}"), TunerLeaseKind.Live);
+        _timeshift.TryRegister(default, default!, default!, default).ReturnsForAnyArgs(false);
+        var root = Path.Combine(Path.GetTempPath(), "vora-takeover-" + Guid.NewGuid().ToString("N"));
+        _repo.GetServerSettingsAsync().Returns(new ServerSetting { TranscoderTempDirectory = root });
+
+        try
+        {
+            await _manager.StartTimeshiftSessionAsync(channel.Id, accountId, profileId, null);
+        }
+        finally
+        {
+            if (Directory.Exists(root)) Directory.Delete(root, recursive: true);
+        }
+
+        _tuners.ActiveCount(playlistId).Should().Be(1);
+    }
+
+    [Fact]
+    public async Task Stopping_a_viewer_s_remux_leaves_a_timeshift_alone()
+    {
+        var viewer = Guid.NewGuid();
+        var playlistId = Guid.NewGuid();
+        _tuners.TryAcquire(playlistId, 0, IptvManager.TimeshiftLeaseKey(viewer), TunerLeaseKind.Timeshift);
+        _timeshift.KindOf(viewer).Returns(LiveSessionKind.Timeshift);
+
+        await _manager.StopLiveRemuxAsync(viewer);
+
+        await _timeshift.DidNotReceive().StopAsync(viewer);
+        _tuners.ActiveCount(playlistId).Should().Be(1);
+    }
+
+    [Fact]
+    public async Task Stopping_a_viewer_s_remux_ends_it_and_frees_its_connection()
+    {
+        var viewer = Guid.NewGuid();
+        var playlistId = Guid.NewGuid();
+        _tuners.TryAcquire(playlistId, 0, IptvManager.TimeshiftLeaseKey(viewer), TunerLeaseKind.Timeshift);
+        _timeshift.KindOf(viewer).Returns(LiveSessionKind.Remux);
+
+        await _manager.StopLiveRemuxAsync(viewer);
+
+        await _timeshift.Received(1).StopAsync(viewer);
+        _tuners.ActiveCount(playlistId).Should().Be(0);
     }
 
     [Fact]

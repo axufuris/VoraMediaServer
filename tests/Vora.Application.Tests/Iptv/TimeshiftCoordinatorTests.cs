@@ -22,6 +22,38 @@ public class TimeshiftCoordinatorTests : IDisposable
     }
 
     [Fact]
+    public async Task An_idle_live_remux_is_stopped_and_its_files_deleted_while_a_timeshift_keeps_its_longer_allowance()
+    {
+        var remuxViewer = Guid.NewGuid();
+        var timeshiftViewer = Guid.NewGuid();
+        var remuxDir = CreateProfileSessionDirectory(remuxViewer);
+        var timeshiftDir = CreateProfileSessionDirectory(timeshiftViewer);
+        _coordinator.TryRegister(remuxViewer, new Process(), remuxDir, LiveSessionKind.Remux).Should().BeTrue();
+        _coordinator.TryRegister(timeshiftViewer, new Process(), timeshiftDir).Should().BeTrue();
+
+        var evicted = await _coordinator.EvictStaleSessionsAsync(TimeSpan.FromHours(1), TimeSpan.FromHours(6), remuxMaxIdle: TimeSpan.Zero);
+
+        evicted.Should().Equal(remuxViewer);
+        Directory.Exists(remuxDir).Should().BeFalse();
+        _coordinator.IsActive(timeshiftViewer).Should().BeTrue();
+        _coordinator.KindOf(timeshiftViewer).Should().Be(LiveSessionKind.Timeshift);
+        _coordinator.KindOf(remuxViewer).Should().BeNull();
+    }
+
+    [Fact]
+    public async Task A_live_remux_that_is_fetched_from_stays_alive()
+    {
+        var viewer = Guid.NewGuid();
+        _coordinator.TryRegister(viewer, new Process(), CreateProfileSessionDirectory(viewer), LiveSessionKind.Remux);
+        _coordinator.Heartbeat(viewer);
+
+        var evicted = await _coordinator.EvictStaleSessionsAsync(TimeSpan.FromHours(1), TimeSpan.FromHours(6), remuxMaxIdle: TimeSpan.FromMinutes(1));
+
+        evicted.Should().BeEmpty();
+        _coordinator.KindOf(viewer).Should().Be(LiveSessionKind.Remux);
+    }
+
+    [Fact]
     public async Task ReapOrphanedDirectoriesAsync_deletes_directories_older_than_threshold()
     {
         var orphanProfileId = Guid.NewGuid();

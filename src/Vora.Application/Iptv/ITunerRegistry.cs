@@ -14,6 +14,7 @@ public interface ITunerRegistry
     bool TryAcquire(Guid playlistId, int maxConcurrent, string leaseKey, TunerLeaseKind kind);
     void Heartbeat(string leaseKey);
     void Release(string leaseKey);
+    void ReleaseStartingWith(string leaseKeyPrefix);
     int ActiveCount(Guid playlistId);
     IReadOnlyList<string> EvictIdle(TunerLeaseKind kind, TimeSpan maxIdle);
 }
@@ -79,6 +80,17 @@ public class TunerRegistry : ITunerRegistry
     public void Release(string leaseKey)
     {
         _leases.TryRemove(leaseKey, out _);
+    }
+
+    public void ReleaseStartingWith(string leaseKeyPrefix)
+    {
+        foreach (var key in _leases.Keys)
+        {
+            if (key.StartsWith(leaseKeyPrefix, StringComparison.Ordinal))
+            {
+                _leases.TryRemove(key, out _);
+            }
+        }
     }
 
     public int ActiveCount(Guid playlistId)

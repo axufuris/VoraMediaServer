@@ -20,12 +20,22 @@ public class IptvPassthroughTests
     private readonly IUserManager _users = Substitute.For<IUserManager>();
     private readonly TunerRegistry _tuners = new();
     private readonly Upstream _upstream = new();
+    private readonly IIptvManager _manager = Substitute.For<IIptvManager>();
     private readonly Guid _accountId = Guid.NewGuid();
     private readonly Guid _profileId = Guid.NewGuid();
+    private readonly Guid _otherAccountId = Guid.NewGuid();
+    private readonly Guid _otherProfileId = Guid.NewGuid();
 
     public IptvPassthroughTests()
     {
         AllowEverything();
+        _users.GetUserAccountAsync(_otherAccountId).Returns(new UserVM
+        {
+            Id = _otherAccountId,
+            HasAllIptvAccess = true,
+            Profiles = new List<UserProfileVM> { new() { Id = _otherProfileId, HasAllIptvAccess = true } }
+        });
+        _manager.StartLiveRemuxAsync(default!, default!, default, default).ReturnsForAnyArgs("/api/streaming/hls/timeshift/token/viewer/session/index.m3u8");
     }
 
     private void AllowEverything(bool profileAllowed = true, Guid? playlistId = null) =>
@@ -44,7 +54,7 @@ public class IptvPassthroughTests
     private IptvPassthroughService Service()
     {
         var secrets = new DataProtectionIptvSecretProtector(_dataProtection);
-        return new IptvPassthroughService(_repository, _users, _upstream, _tuners, new IptvUpstreamResolver(secrets), Tokens(), NullLogger<IptvPassthroughService>.Instance);
+        return new IptvPassthroughService(_repository, _users, _upstream, _tuners, new IptvUpstreamResolver(secrets), Tokens(), _manager, NullLogger<IptvPassthroughService>.Instance);
     }
 
     private IptvChannel XtreamChannel(int maxConnections = 0, string extension = "m3u8", string? userAgent = "IPTVSmartersPro")
@@ -188,6 +198,7 @@ public class IptvPassthroughTests
     public async Task Radio_on_a_provider_with_a_user_agent_sends_that_one()
     {
         var channel = XtreamChannel(extension: "mp3");
+        channel.Kind = IptvChannelKind.Radio;
         _upstream.Respond(_ => true, "mp3-bytes", "audio/mpeg");
         var service = Service();
 
@@ -208,7 +219,7 @@ public class IptvPassthroughTests
         var start = await service.StartPassthroughAsync(channel.Id, _accountId, _profileId);
         _tuners.ActiveCount(channel.PlaylistId).Should().Be(1);
 
-        var second = async () => await service.StartPassthroughAsync(channel.Id, _accountId, _profileId);
+        var second = async () => await service.StartPassthroughAsync(channel.Id, _otherAccountId, _otherProfileId);
         await second.Should().ThrowAsync<TunerLimitReachedException>();
 
         var audio = await service.FetchAudioStreamAsync(Token(start.Url), TestContext.Current.CancellationToken);
@@ -236,9 +247,92 @@ public class IptvPassthroughTests
         var service = Service();
 
         await service.StartPassthroughAsync(channel.Id, _accountId, _profileId);
-        var second = async () => await service.StartPassthroughAsync(channel.Id, _accountId, _profileId);
+        var second = async () => await service.StartPassthroughAsync(channel.Id, _otherAccountId, _otherProfileId);
 
         await second.Should().ThrowAsync<TunerLimitReachedException>();
+    }
+
+    [Fact]
+    public async Task Changing_channel_hands_the_viewer_s_tuner_to_the_new_channel()
+    {
+        var first = XtreamChannel(maxConnections: 1);
+        var second = new IptvChannel { ExternalChannelId = "bbc2.uk", Name = "BBC Two", StreamUrl = "xtream:1005.m3u8", PlaylistId = first.PlaylistId, Playlist = first.Playlist };
+        _repository.GetChannelWithPlaylistAsync(second.Id).Returns(second);
+        var service = Service();
+
+        await service.StartPassthroughAsync(first.Id, _accountId, _profileId);
+        var start = await service.StartPassthroughAsync(second.Id, _accountId, _profileId);
+
+        start.StreamType.Should().Be(IptvPassthroughService.StreamTypeHls);
+        _tuners.ActiveCount(first.PlaylistId).Should().Be(1);
+    }
+
+    [Fact]
+    public async Task A_tv_channel_that_is_not_hls_is_remuxed_instead_of_sent_as_audio()
+    {
+        var channel = XtreamChannel(maxConnections: 2, extension: "ts");
+        var service = Service();
+
+        var start = await service.StartPassthroughAsync(channel.Id, _accountId, _profileId);
+
+        start.StreamType.Should().Be(IptvPassthroughService.StreamTypeHls);
+        start.Url.Should().Be("/api/streaming/hls/timeshift/token/viewer/session/index.m3u8");
+        await _manager.Received(1).StartLiveRemuxAsync(
+            channel,
+            Arg.Is<IptvUpstream>(u => u.Url == "http://provider.example.com:8080/live/viewer/example-password/1001.ts" && u.Policy.UserAgent == "IPTVSmartersPro"),
+            _profileId,
+            2);
+        _upstream.Requests.Should().BeEmpty();
+        _tuners.ActiveCount(channel.PlaylistId).Should().Be(0);
+    }
+
+    [Fact]
+    public async Task A_tv_channel_sniffed_as_a_raw_stream_is_remuxed_too()
+    {
+        var channel = FreeRadioChannel();
+        channel.Kind = IptvChannelKind.Tv;
+        channel.StreamUrl = "https://radio.example.com/live/news";
+        _upstream.Respond(_ => true, "ts-bytes", "video/mp2t");
+
+        var start = await Service().StartPassthroughAsync(channel.Id, _accountId, _profileId);
+
+        start.StreamType.Should().Be(IptvPassthroughService.StreamTypeHls);
+        await _manager.Received(1).StartLiveRemuxAsync(channel, Arg.Any<IptvUpstream>(), _profileId, 0);
+    }
+
+    [Fact]
+    public async Task A_radio_channel_keeps_the_audio_passthrough()
+    {
+        var channel = FreeRadioChannel();
+        channel.StreamUrl = "https://radio.example.com/live/jazz.ts";
+
+        var start = await Service().StartPassthroughAsync(channel.Id, _accountId, _profileId);
+
+        start.StreamType.Should().Be(IptvPassthroughService.StreamTypeAudio);
+        await _manager.DidNotReceiveWithAnyArgs().StartLiveRemuxAsync(default!, default!, default, default);
+        await _manager.DidNotReceiveWithAnyArgs().StopLiveRemuxAsync(default);
+    }
+
+    [Fact]
+    public async Task An_hls_tv_channel_is_proxied_and_ends_the_viewer_s_remux()
+    {
+        var channel = XtreamChannel();
+
+        var start = await Service().StartPassthroughAsync(channel.Id, _accountId, _profileId);
+
+        start.Url.Should().StartWith("/api/iptv/passthrough/playlist.m3u8?t=");
+        await _manager.DidNotReceiveWithAnyArgs().StartLiveRemuxAsync(default!, default!, default, default);
+        await _manager.Received(1).StopLiveRemuxAsync(_profileId);
+    }
+
+    [Theory]
+    [InlineData(IptvChannelKind.Tv, "hls", false)]
+    [InlineData(IptvChannelKind.Tv, "audio", true)]
+    [InlineData(IptvChannelKind.Radio, "audio", false)]
+    [InlineData(IptvChannelKind.Radio, "hls", false)]
+    public void Only_tv_channels_that_are_not_hls_need_a_remux(IptvChannelKind kind, string streamType, bool expected)
+    {
+        IptvPassthroughService.NeedsRemux(kind, streamType).Should().Be(expected);
     }
 
     [Fact]
