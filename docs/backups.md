@@ -35,7 +35,7 @@ Implementations live in `Vora.Infrastructure/Backups/Sections/`. `EntityTableBac
 | `library.collections` | admin-made `Collections` (`SystemGenerated = false`), their `CollectionItems` and the images uploaded for them (`CollectionArtwork` with `IsUserUploaded`; the image files are not in the zip) |
 | `library.smart-lists` | `SmartLists` (home rows) |
 | `library.dedupe-rules` | `MediaDedupeSettings`, `MediaDedupeIgnoredGroups` |
-| `iptv.playlists`, `iptv.epg-sources`, `iptv.tuner-profiles`, `iptv.recording-schedules` | the IPTV/DVR configuration tables |
+| `iptv.playlists`, `iptv.epg-sources`, `iptv.tuner-profiles`, `iptv.recording-schedules` | the IPTV/DVR configuration tables. A playlist's provider login travels as it is stored: the username, the headers and the password **ciphertext**, which only opens with the DataProtection keys it was sealed with (see below) |
 | `iptv.channel-settings` | the admin's per-channel choices: hidden channels (`IsHiddenByAdmin`) and TV/radio overrides (`Kind` + `KindOverriddenByAdmin`), keyed by playlist id + external channel id and applied onto the channels the playlist has loaded |
 | `iptv.recordings` | finished DVR recordings (`IptvRecordingSessions` with `Status = Completed`): restored only when the schedule is here and the file is still on disk, and added beside the recordings already here rather than replacing them |
 | `discovery.rows`, `discovery.request-servers` | `DiscoveryRowConfigs`, `RequestServers` |
@@ -90,6 +90,7 @@ Limits worth knowing:
 
 A record is found on this server **by file first** — the item's own file for movies, episodes and tracks; an episode's file for seasons and shows; a track's file for albums and artists — because a fixed match's provider ids are exactly what a fresh scan got wrong. Without a matching file it falls back to the usual identities. Locks are added to the ones already there, never removed, and edits on titles not in the backup are left alone.
 - **IPTV recording schedules and channel settings** need the playlist's channels, which arrive on the playlist's first refresh. Restore them again after it, then **DVR Recordings** (which need their schedule, and their file on disk).
+- **IPTV provider passwords** (Xtream Codes accounts and M3U logins) are sealed with the server's DataProtection keys, like the SMTP password. Onto the same server, or with the **DataProtection keys** section restored too, they keep working. Without the keys the playlist restores but its next load fails with "Enter the password again"; nothing else needs redoing.
 - **Podcast progress** maps by the show's feed URL and the episode's feed GUID (then enclosure URL). When the episode isn't fetched yet, a placeholder `PodcastEpisode` is written from the backed-up details; the next feed refresh fills it in by GUID.
 - **Library access lists** (`AllowedLibraryIds` on accounts and profiles) are remapped by library name; an id that can't be matched is kept as-is, so a restricted profile stays restricted rather than opening up.
 - **Title-only matches** are a last resort for items without provider ids; smart-playlist and smart-list rule JSON is restored as written (ids inside rules are not remapped).
