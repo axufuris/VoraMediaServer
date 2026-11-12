@@ -203,19 +203,14 @@ public class IptvEpgService : IIptvEpgService
         var userManager = scope.ServiceProvider.GetRequiredService<IUserManager>();
 
         var user = await userManager.GetUserAccountAsync(userId);
-        var profile = user?.Profiles.FirstOrDefault(p => p.Id == profileId);
+        if (user is null) return new Dictionary<string, List<IptvProgramDto>>();
+
+        var profile = user.Profiles.FirstOrDefault(p => p.Id == profileId);
         var allChannels = await repository.GetActiveChannelsAsync(CancellationToken.None);
 
-        var validChannels = allChannels.Where(c => !c.IsHiddenByAdmin).ToList();
-        if (user != null && !user.IsAdmin && !user.HasAllIptvAccess)
-        {
-            validChannels = validChannels.Where(c => user.AllowedIptvPlaylistIds.Contains(c.PlaylistId)).ToList();
-        }
-
-        if (profile != null && !profile.IsAdmin && !profile.HasAllIptvAccess)
-        {
-            validChannels = validChannels.Where(c => profile.AllowedIptvPlaylistIds.Contains(c.PlaylistId)).ToList();
-        }
+        var validChannels = allChannels
+            .Where(c => !c.IsHiddenByAdmin && IptvPlaylistAccess.Allows(user, profile, c.PlaylistId))
+            .ToList();
 
         var validChannelIds = validChannels.Select(c => c.ExternalChannelId).ToHashSet(StringComparer.OrdinalIgnoreCase);
 
