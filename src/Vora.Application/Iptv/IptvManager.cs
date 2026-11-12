@@ -386,6 +386,7 @@ public class IptvManager : IIptvManager
 
         IptvPlaylist? playlist = channel.Playlist;
         var upstream = _upstreamResolver.Resolve(playlist, channel);
+        var secret = playlist is null ? null : _upstreamResolver.PasswordFor(playlist);
 
         await using var profileLock = await _timeshiftCoordinator.LockProfileAsync(profileId);
 
@@ -412,7 +413,7 @@ public class IptvManager : IIptvManager
                     channel.Name, video.Encoder, LiveVideoDecision.Mismatch(known, clientLimits));
             }
 
-            var run = await LaunchTimeshiftAsync(profileId, upstream, video);
+            var run = await LaunchTimeshiftAsync(profileId, upstream, secret, video);
             if (run is null)
             {
                 _tunerRegistry.Release(leaseKey);
@@ -429,7 +430,7 @@ public class IptvManager : IIptvManager
                     if (video.Encodes)
                     {
                         _logger.LogInformation("Timeshift of {Channel} restarts to encode with {Encoder}: {Reason}.", channel.Name, video.Encoder, reason);
-                        run = await LaunchTimeshiftAsync(profileId, upstream, video);
+                        run = await LaunchTimeshiftAsync(profileId, upstream, secret, video);
                         if (run is null)
                         {
                             _tunerRegistry.Release(leaseKey);
@@ -445,7 +446,7 @@ public class IptvManager : IIptvManager
             {
                 _logger.LogWarning("Timeshift of {Channel} failed to encode with {Encoder}; retrying on the CPU.", channel.Name, video.Encoder);
                 video = await _timeshiftVideo.EncodeArgumentsAsync(encode, onCpu: true);
-                run = await LaunchTimeshiftAsync(profileId, upstream, video);
+                run = await LaunchTimeshiftAsync(profileId, upstream, secret, video);
                 if (run is null)
                 {
                     _tunerRegistry.Release(leaseKey);
@@ -495,7 +496,7 @@ public class IptvManager : IIptvManager
 
     private sealed record TimeshiftRun(Process Process, string SessionPath, string PlaylistPath, DateTime ReadyBy);
 
-    private async Task<TimeshiftRun?> LaunchTimeshiftAsync(Guid profileId, IptvUpstream upstream, TimeshiftVideoArguments video)
+    private async Task<TimeshiftRun?> LaunchTimeshiftAsync(Guid profileId, IptvUpstream upstream, string? secret, TimeshiftVideoArguments video)
     {
         var sessionPath = await PrepareTimeshiftDirectoryAsync(profileId);
         var outputPath = Path.Combine(sessionPath, PlaylistFileName).Replace("\\", "/");
@@ -510,7 +511,15 @@ public class IptvManager : IIptvManager
             TryDeleteDirectory(sessionPath);
             return null;
         }
+        process.ErrorDataReceived += (_, line) =>
+        {
+            if (!string.IsNullOrWhiteSpace(line.Data))
+            {
+                _logger.LogDebug("Timeshift ffmpeg for profile {ProfileId}: {Output}", profileId, IptvUrlRedactor.Redact(line.Data, secret));
+            }
+        };
         process.Start();
+        process.BeginErrorReadLine();
         return new TimeshiftRun(process, sessionPath, outputPath, DateTime.UtcNow + InitializationTimeout);
     }
 
@@ -617,12 +626,16 @@ public class IptvManager : IIptvManager
             {
                 FileName = "ffmpeg",
                 RedirectStandardInput = true,
+                RedirectStandardError = true,
                 UseShellExecute = false,
                 CreateNoWindow = true
             }
         };
 
         var args = process.StartInfo.ArgumentList;
+        args.Add("-hide_banner");
+        args.Add("-nostats");
+        args.Add("-loglevel"); args.Add("warning");
         foreach (var argument in video.BeforeInput) args.Add(argument);
         args.Add("-reconnect"); args.Add("1");
         args.Add("-reconnect_streamed"); args.Add("1");

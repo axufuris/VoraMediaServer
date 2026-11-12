@@ -577,10 +577,13 @@ public static class ServiceRegistrationExtensions
             client.Timeout = TimeSpan.FromSeconds(5);
         });
         services.AddSingleton<Vora.Application.Devices.IClientLocationResolver, Vora.Application.Devices.ClientLocationResolver>();
+        services.AddSingleton<IptvHttpClientLogger>();
         services.AddHttpClient(IptvManager.HttpClientName, client =>
         {
             client.DefaultRequestHeaders.Add("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36");
-        });
+        })
+            .RemoveAllLoggers()
+            .AddLogger<IptvHttpClientLogger>();
         services.AddHttpClient(PodcastManager.HttpClientName, client =>
         {
             client.Timeout = TimeSpan.FromSeconds(30);

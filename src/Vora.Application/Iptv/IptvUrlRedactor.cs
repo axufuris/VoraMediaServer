@@ -23,8 +23,12 @@ public static class IptvUrlRedactor
         @"(?<kind>/(?:live|movie|series|timeshift)/)[^/\s?#'""<>]+/[^/\s?#'""<>]+/",
         RegexOptions.IgnoreCase | RegexOptions.Compiled);
 
+    private static readonly Regex XtreamTokenPathSegments = new(
+        @"(?<kind>/hlsr/)[^/\s?#'""<>]+/[^/\s?#'""<>]+/[^/\s?#'""<>]+/",
+        RegexOptions.IgnoreCase | RegexOptions.Compiled);
+
     private static readonly Regex XtreamStreamPath = new(
-        @"/(?:live|movie|series)/[^/]+/[^/]+/\d+(?:\.[a-z0-9]+)?$|/timeshift/[^/]+/[^/]+/\d+/",
+        @"/(?:live|movie|series)/[^/]+/[^/]+/\d+(?:\.[a-z0-9]+)?$|/timeshift/[^/]+/[^/]+/\d+/|/hlsr/[^/]+/[^/]+/[^/]+/",
         RegexOptions.IgnoreCase | RegexOptions.Compiled);
 
     private static readonly Regex QueryCredential = new(
@@ -38,6 +42,7 @@ public static class IptvUrlRedactor
         var redacted = UserInfo.Replace(text, m => m.Groups["scheme"].Value + Mask + "@");
         redacted = CredentialQuery.Replace(redacted, m => m.Groups["name"].Value + Mask);
         redacted = XtreamPathSegments.Replace(redacted, m => m.Groups["kind"].Value + Mask + "/" + Mask + "/");
+        redacted = XtreamTokenPathSegments.Replace(redacted, m => m.Groups["kind"].Value + Mask + "/" + Mask + "/" + Mask + "/");
 
         foreach (var secret in secrets)
         {

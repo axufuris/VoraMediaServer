@@ -11,6 +11,7 @@ public class IptvUrlRedactorTests
     [InlineData("http://provider.example.com/movie/viewer/example-password/77.mkv", "http://provider.example.com/movie/***/***/77.mkv")]
     [InlineData("https://cdn.example.com/hls/stream.m3u8?token=abc123&expires=1700000000", "https://cdn.example.com/hls/stream.m3u8?token=***&expires=1700000000")]
     [InlineData("https://cdn.example.com/a.m3u8?API_KEY=abc&x=1", "https://cdn.example.com/a.m3u8?API_KEY=***&x=1")]
+    [InlineData("http://provider.example.com/hlsr/t0k3n/viewer/example-password/1001/7/12.ts", "http://provider.example.com/hlsr/***/***/***/1001/7/12.ts")]
     public void Credentials_in_an_address_are_masked(string url, string expected)
     {
         IptvUrlRedactor.Redact(url).Should().Be(expected);

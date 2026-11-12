@@ -21,6 +21,7 @@ public class TimeshiftProcessTests
         var policy = new IptvRequestPolicy("IPTVSmartersPro", "https://portal.example.com/", null);
 
         Arguments(TimeshiftVideoArguments.Copy, policy).Should().Equal(
+            "-hide_banner", "-nostats", "-loglevel", "warning",
             "-reconnect", "1",
             "-reconnect_streamed", "1",
             "-reconnect_delay_max", "5",
@@ -54,6 +55,7 @@ public class TimeshiftProcessTests
     public void A_copy_copies_the_video_and_encodes_stereo_aac()
     {
         Arguments(TimeshiftVideoArguments.Copy).Should().Equal(
+            "-hide_banner", "-nostats", "-loglevel", "warning",
             "-reconnect", "1",
             "-reconnect_streamed", "1",
             "-reconnect_delay_max", "5",
@@ -80,6 +82,7 @@ public class TimeshiftProcessTests
             OnGpu: true);
 
         Arguments(video).Should().Equal(
+            "-hide_banner", "-nostats", "-loglevel", "warning",
             "-init_hw_device", "vaapi=va:/dev/dri/renderD128", "-filter_hw_device", "va",
             "-reconnect", "1",
             "-reconnect_streamed", "1",
@@ -95,6 +98,15 @@ public class TimeshiftProcessTests
             "-hls_flags", "append_list+temp_file",
             "-hls_segment_filename", Segments,
             Playlist);
+    }
+
+    [Fact]
+    public void Ffmpeg_output_is_read_by_the_server_rather_than_written_to_the_console()
+    {
+        using var process = IptvManager.BuildTimeshiftProcess(StreamUrl, IptvRequestPolicy.None, Playlist, Segments, TimeshiftVideoArguments.Copy);
+
+        process.StartInfo.RedirectStandardError.Should().BeTrue();
+        process.StartInfo.RedirectStandardInput.Should().BeTrue();
     }
 
     [Fact]

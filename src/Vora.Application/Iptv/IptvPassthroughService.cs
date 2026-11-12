@@ -509,13 +509,16 @@ public class IptvPassthroughService : IIptvPassthroughService
         return string.Concat(line.AsSpan(0, start), rewritten, line.AsSpan(end));
     }
 
-    private static string ResolveUri(string maybeRelative, Uri baseUri)
+    internal static string ResolveUri(string reference, Uri baseUri)
     {
-        if (Uri.TryCreate(maybeRelative, UriKind.Absolute, out var absolute))
+        if (reference.Contains("://", StringComparison.Ordinal) && Uri.TryCreate(reference, UriKind.Absolute, out var absolute))
         {
             return absolute.ToString();
         }
-        return new Uri(baseUri, maybeRelative).ToString();
+
+        return Uri.TryCreate(reference, UriKind.Relative, out var relative) && Uri.TryCreate(baseUri, relative, out var resolved)
+            ? resolved.ToString()
+            : reference;
     }
 
     private static bool IsHttpUrl(string url)
