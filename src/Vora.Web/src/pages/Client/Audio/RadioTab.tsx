@@ -7,6 +7,9 @@ import { profileDeviceSettingsService } from '../../../api/Users/profileDeviceSe
 import { usePlayer } from '../../../contexts/usePlayer';
 import { useSignalREvent } from '../../../hooks/useSignalREvent';
 import EmptyState from '../../../components/Client/Primitives/EmptyState';
+import MediaCard from '../../../components/Client/Primitives/MediaCard';
+import MediaGrid from '../../../components/Client/Primitives/MediaGrid';
+import { renderNavIcon } from '../../../layouts/parts/navIcons';
 import { secureImageUrl } from '../../../utils/secureImageUrl';
 
 interface RadioPrefs {
@@ -24,6 +27,25 @@ const DEFAULT_RADIO_PREFS: RadioPrefs = {
 const FAVORITES_GROUP = '★ Favorites';
 
 const radioPrefsCacheKey = (profileId: string, deviceId: string) => `radio_prefs_${profileId}_${deviceId}`;
+
+const stationCaption = (channel: IptvChannelVM): string[] =>
+    channel.countryCode && channel.countryCode !== 'Unknown' ? [channel.countryCode] : [];
+
+function FavoriteBadge() {
+    return (
+        <span
+            role="img"
+            aria-label="Favorite"
+            title="Favorite"
+            className="flex h-5 w-5 items-center justify-center rounded-full max-md:h-4 max-md:w-4"
+            style={{ background: 'var(--vora-accent-500)', color: 'var(--vora-accent-contrast)', boxShadow: 'var(--vora-shadow-md)' }}
+        >
+            <svg className="h-[0.6875rem] w-[0.6875rem] max-md:h-[0.5625rem] max-md:w-[0.5625rem]" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                <path d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z" />
+            </svg>
+        </span>
+    );
+}
 
 export default function RadioTab() {
     const { serverId } = useParams<{ serverId?: string }>();
@@ -267,8 +289,8 @@ export default function RadioTab() {
             {contextMenu && (
                 <div
                     style={{
-                        top: contextMenu.y,
-                        left: contextMenu.x,
+                        top: `min(${contextMenu.y}px, calc(100dvh - 6rem))`,
+                        left: `min(${contextMenu.x}px, calc(100vw - 13.5rem))`,
                         background: 'var(--vora-bg-raised)',
                         border: '1px solid var(--vora-border-strong)',
                         boxShadow: 'var(--vora-shadow-lg)',
@@ -355,9 +377,15 @@ export default function RadioTab() {
                     {[1, 2, 3].map(i => (
                         <div key={i}>
                             <div className="vora-skeleton mb-4 h-4 w-32" />
-                            <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6">
-                                {Array.from({ length: 6 }).map((_, j) => <div key={j} className="vora-skeleton h-40" />)}
-                            </div>
+                            <MediaGrid size="xs">
+                                {Array.from({ length: 8 }).map((_, j) => (
+                                    <div key={j}>
+                                        <div className="vora-skeleton aspect-square w-full" />
+                                        <div className="vora-skeleton mt-2.5 h-3 w-3/4" />
+                                        <div className="vora-skeleton mt-1.5 h-2.5 w-1/4" />
+                                    </div>
+                                ))}
+                            </MediaGrid>
                         </div>
                     ))}
                 </div>
@@ -387,63 +415,26 @@ export default function RadioTab() {
                         >
                             {group}
                         </h2>
-                        <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6">
-                            {groupedRadio[group].map(c => {
-                                const isFavorite = prefs.favoriteIds.includes(c.id);
-                                const isHidden = prefs.hiddenIds.includes(c.id);
-                                return (
-                                    <button
-                                        key={c.id}
-                                        type="button"
-                                        onClick={() => handlePlay(c)}
-                                        onContextMenu={(e) => {
-                                            e.preventDefault();
-                                            setContextMenu({ x: e.pageX, y: e.pageY, channelId: c.id });
-                                        }}
-                                        className="vora-card vora-card-interactive group relative flex cursor-pointer flex-col items-center p-4 text-left"
-                                        style={{ opacity: isHidden ? 0.45 : 1 }}
-                                    >
-                                        {isFavorite && (
-                                            <span
-                                                className="absolute left-2 top-2 flex h-5 w-5 items-center justify-center rounded-full"
-                                                style={{ background: 'var(--vora-accent-500)', color: 'var(--vora-accent-contrast)' }}
-                                                title="Favorite"
-                                            >
-                                                <svg width="11" height="11" viewBox="0 0 24 24" fill="currentColor">
-                                                    <path d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z" />
-                                                </svg>
-                                            </span>
-                                        )}
-
-                                        <div
-                                            className="mb-3 flex h-24 w-24 items-center justify-center overflow-hidden rounded-full transition-transform group-hover:scale-105"
-                                            style={{ background: 'var(--vora-bg-sunken)', border: '1px solid var(--vora-border-subtle)' }}
-                                        >
-                                            {c.logoUrl ? (
-                                                <img src={secureImageUrl(c.logoUrl)} alt={c.name} className="max-h-[80%] max-w-[80%] object-contain" />
-                                            ) : (
-                                                <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" style={{ color: 'var(--vora-text-disabled)' }}>
-                                                    <path d="M3.5 12a8.5 8.5 0 0117 0" />
-                                                    <path d="M7 12a5 5 0 0110 0" />
-                                                    <circle cx="12" cy="12" r="1" />
-                                                </svg>
-                                            )}
-                                        </div>
-                                        <span
-                                            className="line-clamp-2 w-full text-center text-sm font-medium"
-                                            style={{ color: 'var(--vora-text-primary)' }}
-                                        >
-                                            {c.name}
-                                        </span>
-                                        {c.countryCode && c.countryCode !== 'Unknown' && (
-                                            <span className="mt-1 text-[10px] font-semibold uppercase tracking-wider" style={{ color: 'var(--vora-text-muted)' }}>
-                                                {c.countryCode}
-                                            </span>
-                                        )}
-                                    </button>
-                                );
-                            })}
-                        </div>
+                        <MediaGrid size="xs">
+                            {groupedRadio[group].map(c => (
+                                <MediaCard
+                                    key={c.id}
+                                    title={c.name}
+                                    captionLines={stationCaption(c)}
+                                    imageUrl={c.logoUrl}
+                                    imageFit="contain"
+                                    uncachedImage
+                                    shape="square"
+                                    size="xs"
+                                    fill
+                                    placeholderIcon={renderNavIcon('radio', 'h-full w-full')}
+                                    topLeftBadge={prefs.favoriteIds.includes(c.id) ? <FavoriteBadge /> : undefined}
+                                    onClick={() => handlePlay(c)}
+                                    onMenu={at => setContextMenu({ ...at, channelId: c.id })}
+                                    className={prefs.hiddenIds.includes(c.id) ? 'opacity-45' : undefined}
+                                />
+                            ))}
+                        </MediaGrid>
                     </section>
                 ))
             )}

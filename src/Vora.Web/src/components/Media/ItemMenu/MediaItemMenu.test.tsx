@@ -13,7 +13,7 @@ import MediaItemMenuProvider from './MediaItemMenuProvider';
 import MediaMenuArea from './MediaMenuArea';
 import { mediaMenuTarget, type MediaMenuTarget } from './mediaItemMenu';
 import { useMediaItemActions } from './useMediaItemActions';
-import { LONG_PRESS_MS } from './useMediaMenuTrigger';
+import { LONG_PRESS_MS } from '../../../hooks/useMenuTrigger';
 
 type WatchlistDetails = { type: string; title: string; posterUrl?: string };
 
