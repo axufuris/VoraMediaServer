@@ -94,10 +94,11 @@ public class OpenAiRecommendationProvider : IRecommendationProvider, IPluginConn
             {
                 lists.Add(new RecommendationListDto
                 {
-                    Title = $"AI: {categories[i].Title}",
+                    Title = categories[i].Title,
                     Description = categories[i].Description,
                     // The row's place: the clients sort ascending.
                     Weight = lists.Count + 1,
+                    IsAi = true,
                     LocalItemIds = localMediaIds
                 });
             }

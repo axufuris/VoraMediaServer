@@ -24,6 +24,9 @@ nothing to group or aggregate on top of it. Each library page keeps its own
 **For You** tab, which is the same computation narrowed to that library. Both are
 gated on `FeatureGate.ForYou`, so the Home tab disappears with the feature rather
 than rendering a page whose calls 403.
+A row the AI made says so with `isAi: true` rather than in its title (which used
+to begin "AI: "). `RecommendationRow` draws a small muted sparkle after the title,
+named "Made by AI" for screen readers and never focusable; there is no "AI" text.
 
 A hosted page drops its own `PageHeader` — the tab bar already names it — and
 moves any page-level action into a right-aligned row above its content. Sub-tabs,

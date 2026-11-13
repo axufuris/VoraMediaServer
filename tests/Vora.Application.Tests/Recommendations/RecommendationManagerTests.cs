@@ -79,6 +79,9 @@ public class RecommendationManagerTests
     private static RecommendationListDto Row(string title, int weight, params Guid[] ids) =>
         new() { Title = title, Weight = weight, LocalItemIds = ids.ToList() };
 
+    private static RecommendationListDto AiRow(string title, int weight, params Guid[] ids) =>
+        new() { Title = title, Weight = weight, IsAi = true, LocalItemIds = ids.ToList() };
+
     private Task AskedNothingAsync(IRecommendationProvider provider) =>
         provider.DidNotReceive().GetRecommendationsAsync(Arg.Any<Guid>(), Arg.Any<Guid?>(), Arg.Any<CancellationToken>());
 
@@ -86,22 +89,35 @@ public class RecommendationManagerTests
     public async Task Stored_rows_are_served_without_asking_the_provider()
     {
         Store(LocalId, TimeSpan.FromHours(1), Row("Because you watched Heat", 1, A, B));
-        Store(AiId, TimeSpan.FromHours(1), Row("AI: Gritty Heists", 1, C));
+        Store(AiId, TimeSpan.FromHours(1), AiRow("Gritty Heists", 1, C));
 
         var rows = await RowsAsync();
 
-        rows.Select(r => r.Title).Should().Equal("AI: Gritty Heists", "Because you watched Heat");
+        rows.Select(r => r.Title).Should().Equal("Gritty Heists", "Because you watched Heat");
         await AskedNothingAsync(_local);
         await AskedNothingAsync(_ai);
         _queue.DidNotReceiveWithAnyArgs().TryQueue(default);
         await _snapshots.DidNotReceiveWithAnyArgs().SaveAsync(default, default, default!, default!, default);
     }
 
+    // The AI rows' titles began "AI: ". They carry a flag instead, which the
+    // clients draw as a small mark beside the title.
+    [Fact]
+    public async Task A_row_says_whether_the_ai_made_it()
+    {
+        Store(LocalId, TimeSpan.FromHours(1), Row("Because you watched Heat", 1, A, B));
+        Store(AiId, TimeSpan.FromHours(1), AiRow("Gritty Heists", 1, C));
+
+        var rows = await RowsAsync();
+
+        rows.Select(r => (r.Title, r.IsAi)).Should().Equal(("Gritty Heists", true), ("Because you watched Heat", false));
+    }
+
     [Fact]
     public async Task Ai_rows_older_than_twelve_hours_are_still_served_and_a_rebuild_is_queued()
     {
         var library = Guid.NewGuid();
-        Store(AiId, TimeSpan.FromHours(12), Row("AI: Gritty Heists", 1, A));
+        Store(AiId, TimeSpan.FromHours(12), AiRow("Gritty Heists", 1, A));
 
         var rows = await RowsAsync(AiId, library);
 
@@ -113,7 +129,7 @@ public class RecommendationManagerTests
     [Fact]
     public async Task Ai_rows_younger_than_twelve_hours_are_left_alone_whatever_was_watched()
     {
-        Store(AiId, TimeSpan.FromHours(11.9), Row("AI: Gritty Heists", 1, A));
+        Store(AiId, TimeSpan.FromHours(11.9), AiRow("Gritty Heists", 1, A));
         _lastActivity = _clock.Now;
 
         await RowsAsync(AiId);
@@ -223,13 +239,13 @@ public class RecommendationManagerTests
     [Fact]
     public async Task A_local_build_that_fails_leaves_the_other_providers_rows()
     {
-        Store(AiId, TimeSpan.FromHours(1), Row("AI: Gritty Heists", 1, A));
+        Store(AiId, TimeSpan.FromHours(1), AiRow("Gritty Heists", 1, A));
         _local.GetRecommendationsAsync(_profile, null, Arg.Any<CancellationToken>())
             .Returns<Task<IEnumerable<RecommendationListDto>>>(_ => throw new InvalidOperationException("boom"));
 
         var rows = await RowsAsync();
 
-        rows.Select(r => r.Title).Should().Equal("AI: Gritty Heists");
+        rows.Select(r => r.Title).Should().Equal("Gritty Heists");
         await _snapshots.DidNotReceiveWithAnyArgs().SaveAsync(default, default, default!, default!, default);
     }
 
@@ -237,7 +253,7 @@ public class RecommendationManagerTests
     public async Task A_provider_switched_off_is_not_read()
     {
         _settings.GetPluginSettingAsync(AiId, "is_enabled").Returns("false");
-        Store(AiId, TimeSpan.FromHours(20), Row("AI: Gritty Heists", 1, A));
+        Store(AiId, TimeSpan.FromHours(20), AiRow("Gritty Heists", 1, A));
         Store(LocalId, TimeSpan.FromHours(1), Row("Because you watched Heat", 1, B));
 
         var rows = await RowsAsync();
@@ -250,7 +266,7 @@ public class RecommendationManagerTests
     [Fact]
     public async Task Every_row_of_library_titles_is_loaded_in_one_query_and_keeps_its_order()
     {
-        Store(AiId, TimeSpan.FromHours(1), Row("AI: Gritty Heists", 1, C));
+        Store(AiId, TimeSpan.FromHours(1), AiRow("Gritty Heists", 1, C));
         Store(LocalId, TimeSpan.FromHours(1),
             Row("Because you watched Heat", 1, A, B, D),
             Row("Because you like Crime", 2, C, A));
@@ -258,7 +274,7 @@ public class RecommendationManagerTests
         var rows = await RowsAsync();
 
         _asked.Should().ContainSingle().Which.Should().BeEquivalentTo(new[] { A, B, D, C });
-        rows.Select(r => r.Title).Should().Equal("AI: Gritty Heists", "Because you watched Heat", "Because you like Crime");
+        rows.Select(r => r.Title).Should().Equal("Gritty Heists", "Because you watched Heat", "Because you like Crime");
         rows[1].Items.Select(i => i.Id).Should().Equal(A, B);
         rows[2].Items.Select(i => i.Id).Should().Equal(C, A);
     }
@@ -289,12 +305,12 @@ public class RecommendationManagerTests
     public async Task A_rebuild_stores_what_the_provider_found_as_of_when_it_started()
     {
         var library = Guid.NewGuid();
-        _ai.GetRecommendationsAsync(_profile, library, Arg.Any<CancellationToken>()).Returns(new List<RecommendationListDto> { Row("AI: Gritty Heists", 1, A) });
+        _ai.GetRecommendationsAsync(_profile, library, Arg.Any<CancellationToken>()).Returns(new List<RecommendationListDto> { AiRow("Gritty Heists", 1, A) });
 
         var result = await Manager().RebuildAsync(new ForYouRebuild(_profile, library, AiId), TestContext.Current.CancellationToken);
 
         result.Should().Be(ForYouRebuildResult.Stored);
-        await _snapshots.Received(1).SaveAsync(_profile, library, AiId, Arg.Is<IReadOnlyList<RecommendationListDto>>(l => l.Single().Title == "AI: Gritty Heists"), _clock.Now);
+        await _snapshots.Received(1).SaveAsync(_profile, library, AiId, Arg.Is<IReadOnlyList<RecommendationListDto>>(l => l.Single().Title == "Gritty Heists"), _clock.Now);
     }
 
     // Keeping an empty answer for twelve hours meant one bad search hid the AI

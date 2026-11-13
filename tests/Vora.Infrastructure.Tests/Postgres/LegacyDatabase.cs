@@ -234,6 +234,8 @@ public sealed class LegacyDatabase : IAsyncDisposable
         ALTER TABLE "IptvChannels" DROP COLUMN IF EXISTS "Referer";
         """;
 
+    public const string IptvProvidersMigration = "20261112032459_ChangesSinceInitial";
+
     private const string ColumnsSinceChannelVideoFormat = """
         DROP TABLE IF EXISTS "CollectionThemeVerdicts";
         DROP TABLE IF EXISTS "CollectionThemes";
@@ -524,6 +526,14 @@ public sealed class LegacyDatabase : IAsyncDisposable
         await seed(db);
         await db.Database.ExecuteSqlRawAsync(ColumnsSinceForYouRows, cancellationToken);
         await ReplaceCombinedMigrationAsync(db, ForYouRowsMigration, "10.0.9", cancellationToken);
+    }
+
+    public async Task BuildIptvProvidersStateAsync(Func<VoraDbContext, Task> seed, CancellationToken cancellationToken)
+    {
+        await using var db = NewContext();
+        await db.Database.MigrateAsync(cancellationToken);
+        await seed(db);
+        await ReplaceCombinedMigrationAsync(db, IptvProvidersMigration, "10.0.9", cancellationToken);
     }
 
     private static async Task ReplaceCombinedMigrationAsync(VoraDbContext db, string migrationId, string productVersion, CancellationToken cancellationToken)

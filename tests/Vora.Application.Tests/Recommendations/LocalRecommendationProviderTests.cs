@@ -77,6 +77,7 @@ public class LocalRecommendationProviderTests
             "Top rated you haven't seen");
         rows.Select(r => r.Weight).Should().Equal(1, 2, 3, 4, 5, 6, 7);
         rows.Should().OnlyContain(r => r.LocalItemIds.Count == LocalRecommendationProvider.ItemsPerRow);
+        rows.Should().OnlyContain(r => !r.IsAi);
         await _repository.Received().GetWatchedTitlesAsync(_profile, _library);
     }
 

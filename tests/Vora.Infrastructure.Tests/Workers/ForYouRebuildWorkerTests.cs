@@ -101,7 +101,7 @@ public class ForYouRebuildWorkerTests
     [Fact]
     public async Task A_rebuild_runs_in_its_own_scope_and_stores_what_the_provider_found()
     {
-        _ai.GetRecommendationsAsync(_profile, null, Arg.Any<CancellationToken>()).Returns(Rows("AI: Gritty Heists"));
+        _ai.GetRecommendationsAsync(_profile, null, Arg.Any<CancellationToken>()).Returns(Rows("Gritty Heists"));
         var worker = await StartAsync();
 
         _queue.TryQueue(Rebuild(AiId)).Should().BeTrue();
@@ -109,7 +109,7 @@ public class ForYouRebuildWorkerTests
         await worker.StopAsync(TestContext.Current.CancellationToken);
 
         _scopes.Created.Should().Be(1);
-        await _snapshots.Received(1).SaveAsync(_profile, null, AiId, Arg.Is<IReadOnlyList<RecommendationListDto>>(l => l.Single().Title == "AI: Gritty Heists"), _clock.Now);
+        await _snapshots.Received(1).SaveAsync(_profile, null, AiId, Arg.Is<IReadOnlyList<RecommendationListDto>>(l => l.Single().Title == "Gritty Heists"), _clock.Now);
         _queue.Finishes.Should().Equal((Rebuild(AiId), false));
         _queue.TryQueue(Rebuild(AiId)).Should().BeTrue("a rebuild that stored its rows can be asked for again");
     }
@@ -130,7 +130,7 @@ public class ForYouRebuildWorkerTests
         (await running.WaitAsync(TimeSpan.FromSeconds(10), TestContext.Current.CancellationToken)).Should().BeTrue();
         _queue.TryQueue(Rebuild(AiId)).Should().BeFalse();
         _queue.TryQueue(Rebuild(AiId)).Should().BeFalse();
-        release.SetResult(Rows("AI: Gritty Heists"));
+        release.SetResult(Rows("Gritty Heists"));
         await FinishedAsync();
         await worker.StopAsync(TestContext.Current.CancellationToken);
 
@@ -145,7 +145,7 @@ public class ForYouRebuildWorkerTests
         var limitReached = true;
         _ai.GetRecommendationsAsync(_profile, null, Arg.Any<CancellationToken>()).Returns(_ => limitReached
             ? throw new InvalidOperationException("AI monthly token limit reached")
-            : Task.FromResult<IEnumerable<RecommendationListDto>>(Rows("AI: Gritty Heists")));
+            : Task.FromResult<IEnumerable<RecommendationListDto>>(Rows("Gritty Heists")));
         var worker = await StartAsync();
 
         _queue.TryQueue(Rebuild(AiId)).Should().BeTrue();
