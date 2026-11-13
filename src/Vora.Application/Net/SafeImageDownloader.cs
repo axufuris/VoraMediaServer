@@ -30,7 +30,10 @@ public class SafeImageDownloader : ISafeImageDownloader
         "image/gif",
         "image/webp",
         "image/avif",
-        "image/bmp"
+        "image/bmp",
+        // Station logos are often a site's favicon.
+        "image/x-icon",
+        "image/vnd.microsoft.icon"
     };
 
     private readonly IHttpClientFactory _httpClientFactory;
@@ -176,6 +179,9 @@ public class SafeImageDownloader : ISafeImageDownloader
         if (bytes[0] == 0x47 && bytes[1] == 0x49 && bytes[2] == 0x46) return true;
         // BMP
         if (bytes[0] == 0x42 && bytes[1] == 0x4D) return true;
+        // ICO and CUR: reserved 0, type 1 or 2, then at least one image.
+        if (bytes[0] == 0x00 && bytes[1] == 0x00 && (bytes[2] == 0x01 || bytes[2] == 0x02) && bytes[3] == 0x00
+            && (bytes[4] | bytes[5]) != 0) return true;
 
         var riff = bytes[0] == 0x52 && bytes[1] == 0x49 && bytes[2] == 0x46 && bytes[3] == 0x46;
         var webp = bytes[8] == 0x57 && bytes[9] == 0x45 && bytes[10] == 0x42 && bytes[11] == 0x50;
