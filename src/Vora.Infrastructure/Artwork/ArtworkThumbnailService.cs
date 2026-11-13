@@ -5,6 +5,7 @@ using System.Text.RegularExpressions;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using SixLabors.ImageSharp;
+using SixLabors.ImageSharp.Formats.Ico;
 using SixLabors.ImageSharp.Formats.Jpeg;
 using SixLabors.ImageSharp.PixelFormats;
 using SixLabors.ImageSharp.Processing;
@@ -135,7 +136,7 @@ public class ArtworkThumbnailService : IArtworkThumbnailService
 
         try
         {
-            using var image = Image.Load<Rgba32>(sourceBytes);
+            using var image = LargestFrame(Image.Load<Rgba32>(sourceBytes));
             if (image.Width > width)
             {
                 image.Mutate(x => x.Resize(new ResizeOptions
@@ -176,6 +177,45 @@ public class ArtworkThumbnailService : IArtworkThumbnailService
 
         return File.Exists(cacheFile) ? cacheFile : null;
     }
+
+    // A thumbnail is one still picture. A favicon (.ico) holds the same picture
+    // at several sizes, usually smallest first; ImageSharp decodes each into a
+    // frame the size of the largest, with a smaller icon in its top-left
+    // corner, so the frame to keep is the one whose icon was largest. Any other
+    // multi-frame image (an animated GIF) keeps its first frame. Saving every
+    // frame would write an animated PNG led by a 16 px icon in a corner.
+    internal static Image<Rgba32> LargestFrame(Image<Rgba32> image)
+    {
+        if (image.Frames.Count <= 1) return image;
+
+        var best = 0;
+        if (image.Metadata.DecodedImageFormat == IcoFormat.Instance)
+        {
+            var bestSide = -1;
+            for (var i = 0; i < image.Frames.Count; i++)
+            {
+                var icon = image.Frames[i].Metadata.GetFormatMetadata(IcoFormat.Instance);
+                var side = Math.Min(IconSide(icon.EncodingWidth), IconSide(icon.EncodingHeight));
+                if (side > bestSide)
+                {
+                    best = i;
+                    bestSide = side;
+                }
+            }
+        }
+
+        var still = image.Frames.CloneFrame(best);
+        image.Dispose();
+        return still;
+    }
+
+    // An icon entry's side: the format writes 256 px as 0; unknown counts as nothing.
+    private static int IconSide(byte? encoded) => encoded switch
+    {
+        null => 0,
+        0 => 256,
+        var side => side.Value
+    };
 
     // Removing one source costs 4 kind folders x 6 width buckets x 2 extensions
     // = 48 File.Exists calls, nearly all of them misses. Done per source while

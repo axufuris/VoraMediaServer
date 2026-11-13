@@ -41,14 +41,24 @@ public class RemoteImageRegistryTests
     }
 
     [Theory]
-    [InlineData("https://example.com/logo.png")]
     [InlineData("/api/artwork/custom/logo.png")]
     [InlineData("data:image/png;base64,AAAA")]
-    public void Only_http_addresses_are_kept(string url)
+    [InlineData("ftp://example.com/logo.png")]
+    public void Only_web_addresses_are_kept(string url)
     {
         _registry.Remember(url);
 
         _registry.IsKnown(url).Should().BeFalse();
+    }
+
+    // A Roku can't decode an .ico, so an https favicon logo goes through the
+    // image cache too.
+    [Fact]
+    public void An_https_logo_the_server_sent_out_is_known()
+    {
+        _registry.Remember("https://www.iheart.com/favicon.ico");
+
+        _registry.IsKnown("https://www.iheart.com/favicon.ico").Should().BeTrue();
     }
 
     [Fact]
