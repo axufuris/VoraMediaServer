@@ -7,5 +7,6 @@ public class RecommendationListVM
     public string Title { get; set; } = string.Empty;
     public string? Description { get; set; }
     public int Weight { get; set; }
+    public bool IsAi { get; set; }
     public List<LibraryItemVM> Items { get; set; } = new();
 }

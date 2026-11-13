@@ -84,9 +84,31 @@ public class PostgresRecommendationSnapshotTests(PostgresDatabase database) : IC
             Title = "Second",
             Description = "Because.",
             Weight = 1,
+            IsAi = false,
             LocalItemIds = new List<Guid> { seed.Movies[2] },
             ExternalTmdbIds = new List<string>()
         });
+    }
+
+    // The migration that took "AI: " off the stored AI titles writes the flag
+    // as isAi, so that is the name the rows must keep.
+    [Fact]
+    public async Task An_ai_row_keeps_its_flag_stored_as_isAi()
+    {
+        Assert.SkipUnless(PostgresDatabase.IsConfigured, PostgresDatabase.SkipReason);
+        var seed = await SeedAsync();
+        await using var db = database.NewContext();
+        var repository = new RecommendationSnapshotRepository(db);
+        var rows = new List<RecommendationListDto> { new() { Title = "Gritty Heists", Weight = 1, IsAi = true, LocalItemIds = [seed.Movies[0]] } };
+
+        await repository.SaveAsync(seed.ProfileId, null, Ai, rows, At(10));
+
+        var stored = await repository.GetAsync(seed.ProfileId, null, new[] { Ai }, withLastActivity: false);
+        stored.Providers.Single().Rows.Single().IsAi.Should().BeTrue();
+        var flag = await db.Database
+            .SqlQueryRaw<string>("SELECT (\"Rows\" -> 0 ->> 'isAi') AS \"Value\" FROM \"RecommendationSnapshots\" WHERE \"ProfileId\" = {0} AND \"ProviderId\" = {1}", seed.ProfileId, Ai)
+            .SingleAsync(TestContext.Current.CancellationToken);
+        flag.Should().Be("true");
     }
 
     // A page building the rows and the worker rebuilding them can finish in

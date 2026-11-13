@@ -7,6 +7,8 @@ public class RecommendationListDto
 
     public int Weight { get; set; }
 
+    public bool IsAi { get; set; }
+
     public List<Guid> LocalItemIds { get; set; } = new();
     public List<string> ExternalTmdbIds { get; set; } = new();
 }

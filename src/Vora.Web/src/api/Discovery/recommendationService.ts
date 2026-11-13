@@ -5,6 +5,7 @@ export interface RecommendationListVM {
     title: string;
     description?: string;
     weight: number;
+    isAi?: boolean;
     items: LibraryItem[];
 }
 

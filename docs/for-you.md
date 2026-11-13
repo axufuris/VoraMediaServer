@@ -4,7 +4,7 @@ The For You rows on Home and on each library's For You tab. `GET /api/recommenda
 
 ## Stored rows
 
-Each provider's rows are stored per profile, page and provider in `RecommendationSnapshots` (`docs/database.md`): the rows' titles, descriptions, weights and title ids, and when they were built. The tiles are loaded from those ids on every request, through the viewer's access filters and with their watch state as it is now, so a stored row never shows a title the viewer may not see.
+Each provider's rows are stored per profile, page and provider in `RecommendationSnapshots` (`docs/database.md`): the rows' titles, descriptions, weights, whether the AI made them, and title ids, and when they were built. The tiles are loaded from those ids on every request, through the viewer's access filters and with their watch state as it is now, so a stored row never shows a title the viewer may not see.
 
 - **A request with rows stored** is three statements whatever the provider: whether the provider is on (`is_enabled`), its stored rows (with the profile's last play and last rating, for the local rows), and the tiles. Before, it asked every provider live: the local rows were 65 statements and about 0.9 s on a copy of QA, and the AI rows waited on a chat completion and an embeddings request after every restart, since they were only kept in memory.
 - **Out of date** rows are still shown, and a rebuild is queued behind them:
@@ -59,3 +59,4 @@ It invents 5 categories. Each one is embedded and searched among the current mod
 - **Kept:** stored for 12 hours per profile and library, and only ever built in the background (Stored rows, above). Rows that found nothing aren't kept, and the next look asks again, at most every 10 minutes.
 - **Who gets them:** the profile's account needs **Enable AI recommendations** (Users & Access → Requests & AI), an admin's included; it is off for a new account.
 - **Requirements:** the AI connection and an embedding model (`docs/ai-connection.md`).
+- **Marked, not prefixed:** a row's title is the category the model invented, as it is. The row carries `isAi: true` (`RecommendationListDto.IsAi`, copied to `RecommendationListVM.IsAi`; the local rows say `false`), and the web draws a small muted sparkle after the title (`RecommendationRow`, named "Made by AI" for screen readers, not focusable). Titles used to begin "AI: "; `ChangesSinceInitial` took that off the rows already stored and flagged them (`docs/database.md`).

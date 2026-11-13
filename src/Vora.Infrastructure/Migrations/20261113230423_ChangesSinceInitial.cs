@@ -285,6 +285,29 @@ CREATE TABLE IF NOT EXISTS ""RecommendationSnapshots"" (
     CONSTRAINT ""FK_RecommendationSnapshots_UserProfiles_ProfileId"" FOREIGN KEY (""ProfileId"") REFERENCES ""UserProfiles"" (""Id"") ON DELETE CASCADE
 );");
 
+            // The AI rows' titles began "AI: ". They carry isAi instead, and
+            // the clients draw a small mark (docs/for-you.md). Stored AI rows
+            // lose the prefix and gain the flag. Rows already flagged are
+            // left alone, so running it again changes nothing.
+            migrationBuilder.Sql(@"
+UPDATE ""RecommendationSnapshots"" AS s
+SET ""Rows"" = (
+    SELECT COALESCE(jsonb_agg(
+        CASE WHEN jsonb_typeof(r.elem) = 'object' THEN
+            r.elem || jsonb_build_object('isAi', true)
+                || CASE WHEN left(r.elem ->> 'title', 4) = 'AI: '
+                        THEN jsonb_build_object('title', substr(r.elem ->> 'title', 5))
+                        ELSE '{}'::jsonb END
+        ELSE r.elem END
+        ORDER BY r.ord), '[]'::jsonb)
+    FROM jsonb_array_elements(s.""Rows"") WITH ORDINALITY AS r(elem, ord)
+)
+WHERE s.""ProviderId"" = 'openai_recommendations'
+  AND CASE WHEN jsonb_typeof(s.""Rows"") = 'array' THEN EXISTS (
+          SELECT 1 FROM jsonb_array_elements(s.""Rows"") AS e(elem)
+          WHERE jsonb_typeof(e.elem) = 'object' AND (e.elem -> 'isAi') IS DISTINCT FROM 'true'::jsonb)
+      ELSE false END;");
+
             // Providers that need an account (docs/iptv-and-dvr.md). Every
             // playlist stays the M3U playlist it was, with no credentials and
             // no headers. The provider's guide is on, which only an Xtream

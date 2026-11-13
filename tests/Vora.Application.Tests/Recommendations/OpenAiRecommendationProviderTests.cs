@@ -42,8 +42,9 @@ public class OpenAiRecommendationProviderTests
     {
         var lists = (await Provider().GetRecommendationsAsync(_profile, null, TestContext.Current.CancellationToken)).ToList();
 
-        lists.Select(l => l.Title).Should().Equal("AI: Gritty Heists", "AI: Cozy Sci-Fi");
+        lists.Select(l => l.Title).Should().Equal("Gritty Heists", "Cozy Sci-Fi");
         lists.Select(l => l.Weight).Should().Equal(1, 2);
+        lists.Should().OnlyContain(l => l.IsAi);
         lists[0].LocalItemIds.Should().Equal(_movie);
         await _openAi.Received(1).CompleteJsonAsync(
             Arg.Is(AiConnection.PluginId),

@@ -139,6 +139,7 @@ public class RecommendationManager : IRecommendationManager
                     Title = list.Title,
                     Description = list.Description,
                     Weight = list.Weight,
+                    IsAi = list.IsAi,
                     Items = matchedItems
                 });
             }

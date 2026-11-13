@@ -10,6 +10,7 @@ using Vora.Domain.Entities.Tasks;
 using Vora.Domain.Entities.Users;
 using Vora.Domain.Enums;
 using Vora.Infrastructure.Persistence;
+using Vora.Infrastructure.Persistence.Repositories;
 
 namespace Vora.Infrastructure.Tests.Postgres;
 
@@ -688,6 +689,81 @@ public class PostgresMigrationHistoryTests(PostgresDatabase database) : IClassFi
         play.Completed.Should().BeTrue();
         play.Source.Should().Be(MusicPlaySource.None);
         play.SourceId.Should().BeNull();
+    }
+
+    private static RecommendationSnapshot StoredRows(Guid profileId, Guid scope, string providerId, string rows) =>
+        new() { ProfileId = profileId, LibraryScope = scope, ProviderId = providerId, Rows = rows, GeneratedAt = new DateTime(2026, 11, 12, 20, 0, 0, DateTimeKind.Utc) };
+
+    private static async Task<string> StoredRowsJsonAsync(VoraDbContext db, Guid scope, string providerId, CancellationToken cancellationToken) =>
+        (await db.RecommendationSnapshots.AsNoTracking().SingleAsync(s => s.LibraryScope == scope && s.ProviderId == providerId, cancellationToken)).Rows;
+
+    [Fact]
+    public async Task A_database_on_the_iptv_providers_migration_has_its_stored_ai_rows_lose_the_ai_prefix_and_gain_the_flag()
+    {
+        Assert.SkipUnless(PostgresDatabase.IsConfigured, PostgresDatabase.SkipReason);
+        var cancellationToken = TestContext.Current.CancellationToken;
+        await using var legacy = new LegacyDatabase();
+        var userId = Guid.NewGuid();
+        var profileId = Guid.NewGuid();
+        var library = Guid.NewGuid();
+        var heist = Guid.NewGuid();
+        var cozy = Guid.NewGuid();
+        await legacy.BuildIptvProvidersStateAsync(async db =>
+        {
+            db.Add(new User { Id = userId, Email = "viewer@example.com", DisplayName = "Viewer" });
+            db.Add(new UserProfile { Id = profileId, Name = "Viewer", UserId = userId });
+            db.AddRange(
+                StoredRows(profileId, RecommendationSnapshot.AllLibraries, "openai_recommendations",
+                    $$"""[{"title":"AI: Gritty Heists","description":"Crews and scores.","weight":1,"localItemIds":["{{heist}}"],"externalTmdbIds":[]},{"title":"Cozy Sci-Fi","description":null,"weight":2,"localItemIds":["{{cozy}}"],"externalTmdbIds":[]}]"""),
+                StoredRows(profileId, library, "openai_recommendations",
+                    """[{"title":"AI: Rogue Machines","description":null,"weight":1,"isAi":true,"localItemIds":[],"externalTmdbIds":[]}]"""),
+                StoredRows(profileId, RecommendationSnapshot.AllLibraries, "local_recommendations",
+                    $$"""[{"title":"Because you watched Heat","description":"Picked from Heat.","weight":1,"localItemIds":["{{heist}}"],"externalTmdbIds":[]}]"""));
+            await db.SaveChangesAsync(cancellationToken);
+        }, cancellationToken);
+
+        string localBefore, flaggedBefore;
+        await using (var before = legacy.NewContext())
+        {
+            (await before.Database.GetPendingMigrationsAsync(cancellationToken)).Should().Equal(MigrationHistoryTests.ChangesSinceInitial);
+            localBefore = await StoredRowsJsonAsync(before, RecommendationSnapshot.AllLibraries, "local_recommendations", cancellationToken);
+            flaggedBefore = await StoredRowsJsonAsync(before, library, "openai_recommendations", cancellationToken);
+        }
+
+        await legacy.MigrateAsync(cancellationToken);
+
+        string homeAfter;
+        await using (var after = legacy.NewContext())
+        {
+            (await after.Database.GetPendingMigrationsAsync(cancellationToken)).Should().BeEmpty();
+            var stored = await new RecommendationSnapshotRepository(after).GetAsync(profileId, null, new[] { "openai_recommendations", "local_recommendations" }, withLastActivity: false);
+
+            var ai = stored.Providers.Single(p => p.ProviderId == "openai_recommendations").Rows;
+            ai.Select(r => r.Title).Should().Equal("Gritty Heists", "Cozy Sci-Fi");
+            ai.Should().OnlyContain(r => r.IsAi);
+            ai.Select(r => r.Weight).Should().Equal(1, 2);
+            ai[0].Description.Should().Be("Crews and scores.");
+            ai[0].LocalItemIds.Should().Equal(heist);
+            ai[1].LocalItemIds.Should().Equal(cozy);
+
+            var local = stored.Providers.Single(p => p.ProviderId == "local_recommendations").Rows.Should().ContainSingle().Subject;
+            local.Title.Should().Be("Because you watched Heat");
+            local.IsAi.Should().BeFalse();
+
+            (await StoredRowsJsonAsync(after, RecommendationSnapshot.AllLibraries, "local_recommendations", cancellationToken)).Should().Be(localBefore);
+            (await StoredRowsJsonAsync(after, library, "openai_recommendations", cancellationToken)).Should().Be(flaggedBefore);
+            homeAfter = await StoredRowsJsonAsync(after, RecommendationSnapshot.AllLibraries, "openai_recommendations", cancellationToken);
+
+            // The next fold-in re-issues the migration, so every database runs it again.
+            await after.Database.ExecuteSqlAsync($"DELETE FROM \"__EFMigrationsHistory\" WHERE \"MigrationId\" = {MigrationHistoryTests.ChangesSinceInitial}", cancellationToken);
+        }
+
+        await legacy.MigrateAsync(cancellationToken);
+
+        await using var again = legacy.NewContext();
+        (await StoredRowsJsonAsync(again, RecommendationSnapshot.AllLibraries, "openai_recommendations", cancellationToken)).Should().Be(homeAfter);
+        (await StoredRowsJsonAsync(again, library, "openai_recommendations", cancellationToken)).Should().Be(flaggedBefore);
+        (await StoredRowsJsonAsync(again, RecommendationSnapshot.AllLibraries, "local_recommendations", cancellationToken)).Should().Be(localBefore);
     }
 
     [Fact]
