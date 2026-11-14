@@ -1,3 +1,4 @@
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Vora.Application.FileSystem;
 using Vora.Application.Net;
@@ -15,20 +16,25 @@ public interface ICollectionArtworkService
     Task<string> AddUrlAsync(Guid collectionId, string url, ArtworkKind kind);
     Task DeleteAsync(Guid artworkId);
     Task RefreshProviderArtworkAsync(Guid collectionId, string providerId);
+    Task<IReadOnlyList<CollectionArtworkVM>> FindProviderArtworkAsync(string providerId, string title, CancellationToken cancellationToken);
 }
 
 public class CollectionArtworkService : ICollectionArtworkService
 {
     private readonly ICollectionRepository _repository;
     private readonly IEnumerable<IArtworkProvider> _artworkProviders;
+    private readonly IEnumerable<IMetadataProvider> _metadataProviders;
     private readonly ISafeImageDownloader _imageDownloader;
+    private readonly ILogger<CollectionArtworkService> _logger;
     private readonly string _basePath;
 
-    public CollectionArtworkService(ICollectionRepository repository, IOptions<StoragePathsOptions> storagePaths, IEnumerable<IArtworkProvider> artworkProviders, ISafeImageDownloader imageDownloader)
+    public CollectionArtworkService(ICollectionRepository repository, IOptions<StoragePathsOptions> storagePaths, IEnumerable<IArtworkProvider> artworkProviders, IEnumerable<IMetadataProvider> metadataProviders, ISafeImageDownloader imageDownloader, ILogger<CollectionArtworkService> logger)
     {
         _repository = repository;
         _artworkProviders = artworkProviders;
+        _metadataProviders = metadataProviders;
         _imageDownloader = imageDownloader;
+        _logger = logger;
 
         _basePath = StorageRoots.CustomArtwork(storagePaths.Value);
 
@@ -38,18 +44,20 @@ public class CollectionArtworkService : ICollectionArtworkService
     public async Task<IEnumerable<CollectionArtworkVM>> GetArtworkAsync(Guid collectionId)
     {
         var artwork = await _repository.GetCollectionArtworkAsync(collectionId);
-        return artwork.Select(a => new CollectionArtworkVM
-        {
-            Id = a.Id.ToString(),
-            IsUserUploaded = a.IsUserUploaded,
-            Url = a.Url,
-            Type = a.Kind.ToString(),
-            Language = a.Language,
-            Width = a.Width,
-            Height = a.Height,
-            VoteAverage = a.VoteAverage
-        });
+        return artwork.Select(ToViewModel);
     }
+
+    private static CollectionArtworkVM ToViewModel(CollectionArtwork artwork) => new()
+    {
+        Id = artwork.Id.ToString(),
+        IsUserUploaded = artwork.IsUserUploaded,
+        Url = artwork.Url,
+        Type = artwork.Kind.ToString(),
+        Language = artwork.Language,
+        Width = artwork.Width,
+        Height = artwork.Height,
+        VoteAverage = artwork.VoteAverage
+    };
 
     public async Task<string> UploadAsync(Guid collectionId, UploadedFile file, ArtworkKind kind)
     {
@@ -123,9 +131,25 @@ public class CollectionArtworkService : ICollectionArtworkService
         var provider = _artworkProviders.FirstOrDefault(p => p.Id == providerId);
         if (provider == null) return;
 
-        var results = await provider.GetArtworkAsync(collection.TmdbId.ToString(), null, null, "Collection", null, collection.Title);
+        var newArtwork = await LookUpAsync(provider, collectionId, collection.TmdbId, collection.Title, CancellationToken.None);
+        await _repository.ReplaceProviderArtworkAsync(collectionId, newArtwork);
+    }
 
-        var newArtwork = results.Select(r => new CollectionArtwork
+    public async Task<IReadOnlyList<CollectionArtworkVM>> FindProviderArtworkAsync(string providerId, string title, CancellationToken cancellationToken)
+    {
+        var provider = _artworkProviders.FirstOrDefault(p => p.Id == providerId);
+        if (provider == null || string.IsNullOrWhiteSpace(title)) return [];
+
+        var found = await LookUpAsync(provider, Guid.Empty, null, title.Trim(), cancellationToken);
+        return found.Select(ToViewModel).ToList();
+    }
+
+    private async Task<List<CollectionArtwork>> LookUpAsync(IArtworkProvider provider, Guid collectionId, int? tmdbId, string title, CancellationToken cancellationToken)
+    {
+        var tmdbCollectionId = tmdbId ?? await FindTmdbCollectionIdAsync(title, cancellationToken);
+        var results = await provider.GetArtworkAsync(tmdbCollectionId?.ToString(), null, null, "Collection", null, title, cancellationToken);
+
+        return results.Select(r => new CollectionArtwork
         {
             CollectionId = collectionId,
             Kind = (Vora.Domain.Enums.ArtworkKind)r.Kind,
@@ -134,7 +158,23 @@ public class CollectionArtworkService : ICollectionArtworkService
             ProviderId = provider.Id,
             IsUserUploaded = false
         }).ToList();
+    }
 
-        await _repository.ReplaceProviderArtworkAsync(collectionId, newArtwork);
+    private async Task<int?> FindTmdbCollectionIdAsync(string title, CancellationToken cancellationToken)
+    {
+        foreach (var provider in _metadataProviders)
+        {
+            try
+            {
+                var id = await provider.FindCollectionIdAsync(title, cancellationToken);
+                if (id != null) return id;
+            }
+            catch (OperationCanceledException) { throw; }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Looking up the TMDB collection named {Title} with {Provider} failed.", title, provider.Id);
+            }
+        }
+        return null;
     }
 }

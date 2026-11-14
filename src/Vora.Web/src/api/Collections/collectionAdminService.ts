@@ -1,5 +1,5 @@
 import { apiClient } from '../client';
-import { postArtworkUpload, postArtworkUrl, type ArtworkKind, type ArtworkResult } from '../Media/artworkService';
+import { artworkKindQuery, postArtworkUpload, postArtworkUrl, type ArtworkKind, type ArtworkResult } from '../Media/artworkService';
 import type { CollectionSortOrder } from './collectionService';
 import type { PlaylistMediaType } from '../Music/smartPlaylistService';
 
@@ -47,6 +47,7 @@ export interface CreateCollectionRequest {
     mirrorList?: boolean;
     rulesJson?: string;
     smartMediaType?: PlaylistMediaType;
+    lockedFields?: string[];
 }
 
 export const collectionAdminService = {
@@ -92,11 +93,24 @@ export const collectionAdminService = {
         await apiClient.post(`/collections/${collectionId}/artwork/fetch?providerId=${providerId}`, null, { serverId });
     },
 
-    uploadArtwork: (collectionId: string, kind: ArtworkKind, file: File, serverId?: string): Promise<void> =>
+    findProviderArtwork: async (providerId: string, title: string, serverId?: string): Promise<ArtworkResult[]> => {
+        const query = new URLSearchParams({ providerId, title }).toString();
+        const response = await apiClient.get<ArtworkResult[]>(`/collections/artwork/search?${query}`, { serverId });
+        return response.data;
+    },
+
+    uploadArtwork: (collectionId: string, kind: ArtworkKind, file: File, serverId?: string): Promise<string> =>
         postArtworkUpload(`/collections/${collectionId}`, kind, file, serverId),
 
-    addArtworkUrl: (collectionId: string, kind: ArtworkKind, url: string, serverId?: string): Promise<void> =>
+    addArtworkUrl: (collectionId: string, kind: ArtworkKind, url: string, serverId?: string): Promise<string> =>
         postArtworkUrl(`/collections/${collectionId}`, kind, url, serverId),
+
+    selectArtwork: async (collectionId: string, kind: ArtworkKind, url: string, serverId?: string): Promise<void> => {
+        await apiClient.put(`/collections/${collectionId}/artwork/selected?${artworkKindQuery(kind)}`, JSON.stringify(url), {
+            headers: { 'Content-Type': 'application/json' },
+            serverId,
+        });
+    },
 
     deleteArtwork: async (artworkId: string, serverId?: string): Promise<void> => {
         await apiClient.delete(`/collections/artwork/${artworkId}`, { serverId });

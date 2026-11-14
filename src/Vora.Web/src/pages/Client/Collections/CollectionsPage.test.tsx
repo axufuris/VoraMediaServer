@@ -28,7 +28,7 @@ vi.mock('../../../api/Collections/collectionAdminService', () => ({
 }));
 
 vi.mock('../../../api/System/pluginAdminService', () => ({
-    pluginAdminService: { getChronologyProviders: () => Promise.resolve([]), getCollectionSyncProviders: () => Promise.resolve([]) },
+    pluginAdminService: { getChronologyProviders: () => Promise.resolve([]), getCollectionSyncProviders: () => Promise.resolve([]), getArtworkProviders: () => Promise.resolve([]) },
 }));
 
 const library = (id: string, name: string, type: string): LibrarySummary => ({ id, name, type, isBeingWatched: false });

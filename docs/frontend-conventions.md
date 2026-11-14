@@ -163,7 +163,7 @@ Use this anywhere you'd otherwise reach for `window.alert/confirm/prompt`. **Nev
 
 **Token-only colors.** Modal contents use `var(--vora-bg-raised)`, `var(--vora-text-primary)`, `var(--vora-accent-500)`, etc. — never raw Tailwind palette classes. The `Modal` primitive itself accepts `surface="light"` for the admin-aware variant; client modals use the default surface.
 
-`ArtworkPicker` from `components/Common/ArtworkPicker.tsx` is the shared poster/backdrop picker used by `EditMetadataModal` and `EditCollectionModal`. It handles upload, add-by-URL, delete, sort-current-selection-first, and provider-fetch via slot props.
+`ArtworkPicker` from `components/Common/ArtworkPicker.tsx` is the shared poster/backdrop picker used by `EditMetadataModal` and, through `components/Collections/CollectionArtworkPanel.tsx` (Your artwork / Vora posters pills, provider fetch, selection lock), by both `CreateCollectionModal` and `EditCollectionModal`. It handles upload, add-by-URL, delete, sort-current-selection-first, and provider-fetch via slot props. See `docs/vora-posters.md` for how Create stages artwork until the collection exists.
 
 The media tile system (`MediaCard`, `MediaRow`, `MediaGrid`, `DetailHero`, captions, sizing tokens) and the player shared primitives are in [`docs/frontend-client-ui.md`](frontend-client-ui.md).
 

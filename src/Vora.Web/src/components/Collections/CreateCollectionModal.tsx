@@ -2,16 +2,17 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { collectionAdminService } from '../../api/Collections/collectionAdminService';
 import type { CollectionSortOrder } from '../../api/Collections/collectionService';
+import type { ArtworkResult } from '../../api/Media/artworkService';
 import { pluginAdminService, type PluginOptionVM } from '../../api/System/pluginAdminService';
 import { emptyDefinition, type SmartPlaylistDefinition } from '../../api/Music/smartPlaylistService';
 import { useDialog } from '../../dialogs';
 import { Modal, ModalHeader, ModalBody, ModalFooter } from '../Common/Modal';
 import RuleTreeEditor from '../Common/RuleTreeEditor';
-import { safeMediaUrl } from '../../utils/safeUrl';
 import SeasonalVisibilityFields from './SeasonalVisibilityFields';
 import ContentProviderHelp from './ContentProviderHelp';
 import { seasonalWindowFrom, seasonalWindowRequest, type SeasonalWindow } from './seasonalWindow';
-import VoraPosterPicker from './VoraPosterPicker';
+import CollectionArtworkPanel, { type CollectionArtworkKind, type PosterSource } from './CollectionArtworkPanel';
+import { saveStagedArtwork, stagedArtworkOption, stagedArtworkProblems, useStagedArtwork, webImageAddress } from './stagedArtwork';
 import { useVoraPosters } from './useVoraPosters';
 import { isVoraPosterUrl, suggestVoraPoster } from '../../utils/voraPosters';
 
@@ -54,14 +55,74 @@ export default function CreateCollectionModal({
     const [isCreating, setIsCreating] = useState(false);
     const [activeSection, setActiveSection] = useState<'general' | 'poster' | 'backdrop'>('general');
 
+    const [lockedFields, setLockedFields] = useState<string[]>([]);
+    const [posterSource, setPosterSource] = useState<PosterSource | null>(null);
+    const [artworkProviders, setArtworkProviders] = useState<PluginOptionVM[]>([]);
+    const [selectedProviderId, setSelectedProviderId] = useState('tmdb_artwork');
+    const [fetchedArtwork, setFetchedArtwork] = useState<ArtworkResult[]>([]);
+    const [fetchingArtwork, setFetchingArtwork] = useState(false);
+    const { staged, addFile: stageFile, addUrl: stageUrl, remove: unstage, clear: clearStaged } = useStagedArtwork();
+
     const voraPosters = useVoraPosters(serverId, isOpen);
     const theme = contentSyncProviderId && contentSyncProviderId !== SMART_CONTENT ? contentSyncExternalId : undefined;
     const suggestedPoster = voraPosters.catalog ? suggestVoraPoster(voraPosters.catalog.posters, [title, theme]) : undefined;
     const chosenPosterUrl = posterChosen ? posterUrl : (suggestedPoster?.url ?? '');
-    const pastedPosterUrl = isVoraPosterUrl(chosenPosterUrl) ? '' : chosenPosterUrl;
+    const posterView: PosterSource = posterSource ?? (isVoraPosterUrl(chosenPosterUrl) ? 'vora' : 'artwork');
+    const artworkOptions = [...staged.map(stagedArtworkOption), ...fetchedArtwork];
+    const artworkKind: CollectionArtworkKind | null = activeSection === 'poster' ? 'Poster' : activeSection === 'backdrop' ? 'Backdrop' : null;
+
+    const toggleLock = (field: string) => {
+        setLockedFields(prev => prev.includes(field) ? prev.filter(f => f !== field) : [...prev, field]);
+    };
+
     const choosePoster = (url: string) => {
         setPosterUrl(url);
         setPosterChosen(true);
+    };
+
+    const selectArtwork = (kind: CollectionArtworkKind, url: string) => {
+        const field = kind === 'Poster' ? 'PosterUrl' : 'BackdropUrl';
+        if (kind === 'Poster') {
+            choosePoster(url);
+            setPosterSource(posterView);
+        } else {
+            setBackdropUrl(url);
+        }
+        if (!lockedFields.includes(field)) toggleLock(field);
+    };
+
+    const stageArtworkUrl = async (kind: CollectionArtworkKind, url: string) => {
+        const address = webImageAddress(url);
+        if (!address) {
+            await dialog.alert({ title: 'Not an image address', message: 'Enter an address that starts with http:// or https://.' });
+            return;
+        }
+        stageUrl(kind, address);
+    };
+
+    const unstageArtwork = (e: React.MouseEvent, artworkId: string) => {
+        e.stopPropagation();
+        const item = staged.find(entry => entry.id === artworkId);
+        if (!item) return;
+        unstage(item);
+        if (item.kind === 'Poster' && chosenPosterUrl === item.previewUrl) choosePoster('');
+        if (item.kind === 'Backdrop' && backdropUrl === item.previewUrl) setBackdropUrl('');
+    };
+
+    const fetchProviderArtwork = async () => {
+        if (!selectedProviderId) return;
+        if (!title.trim()) {
+            await dialog.alert({ title: 'Add a title first', message: 'Artwork providers find a new collection by its title. Enter it on the General tab, then fetch again.' });
+            return;
+        }
+        setFetchingArtwork(true);
+        try {
+            setFetchedArtwork(await collectionAdminService.findProviderArtwork(selectedProviderId, title.trim(), serverId));
+        } catch {
+            await dialog.alert('Failed to fetch artwork');
+        } finally {
+            setFetchingArtwork(false);
+        }
     };
 
     useEffect(() => {
@@ -78,6 +139,11 @@ export default function CreateCollectionModal({
             setIsCreating(false);
             setAutoSyncChronology(false);
             setActiveSection('general');
+            setLockedFields([]);
+            setPosterSource(null);
+            setFetchedArtwork([]);
+            setFetchingArtwork(false);
+            clearStaged();
 
             setSortTitle('');
             setSeason(seasonalWindowFrom());
@@ -95,8 +161,13 @@ export default function CreateCollectionModal({
             pluginAdminService.getCollectionSyncProviders(serverId)
                 .then(setSyncProviders)
                 .catch(console.error);
+
+            pluginAdminService.getArtworkProviders(serverId).then(providers => {
+                setArtworkProviders(providers);
+                if (providers.length > 0) setSelectedProviderId(providers[0].id);
+            }).catch(console.error);
         }
-    }, [isOpen, activeTab, serverId]);
+    }, [isOpen, activeTab, serverId, clearStaged]);
 
     const handleSubmit = async (e: React.SyntheticEvent) => {
         e.preventDefault();
@@ -106,12 +177,16 @@ export default function CreateCollectionModal({
         }
         setIsCreating(true);
 
+        const stagedPoster = staged.find(item => item.kind === 'Poster' && item.previewUrl === chosenPosterUrl);
+        const stagedBackdrop = staged.find(item => item.kind === 'Backdrop' && item.previewUrl === backdropUrl);
+
         try {
             const newCollectionId = await collectionAdminService.createCollection({
                 title: title.trim(),
                 description: description.trim() || undefined,
-                posterUrl: chosenPosterUrl.trim() || undefined,
-                backdropUrl: backdropUrl.trim() || undefined,
+                posterUrl: stagedPoster ? undefined : (chosenPosterUrl.trim() || undefined),
+                backdropUrl: stagedBackdrop ? undefined : (backdropUrl.trim() || undefined),
+                lockedFields,
                 defaultSort,
                 sortProviderId: sortProviderId || undefined,
                 externalListId: sortProviderId ? (externalListId.trim() || undefined) : undefined,
@@ -126,6 +201,11 @@ export default function CreateCollectionModal({
                 rulesJson: contentSyncProviderId === SMART_CONTENT ? JSON.stringify(smartDefinition) : undefined,
                 smartMediaType: contentSyncProviderId === SMART_CONTENT ? 'Movies' : undefined
             }, serverId);
+
+            const outcome = await saveStagedArtwork(newCollectionId, staged, { Poster: stagedPoster, Backdrop: stagedBackdrop }, serverId);
+            if (outcome.problems.length > 0) {
+                await dialog.alert({ title: 'Some artwork was not saved', message: stagedArtworkProblems(title.trim(), outcome), tone: 'danger' });
+            }
 
             onSaved();
             onClose();
@@ -397,46 +477,34 @@ export default function CreateCollectionModal({
                     </div>
                     )}
 
-                    {activeSection === 'poster' && (
-                        <div className="space-y-5">
-                            <section className="space-y-2">
-                                <h3 className="text-[var(--vora-text-secondary)] font-bold text-sm tracking-wide uppercase">Vora posters</h3>
-                                <p className="text-xs text-[var(--vora-text-muted)] leading-relaxed">
-                                    {suggestedPoster && !posterChosen
-                                        ? `The ${suggestedPoster.title} poster is picked from the title. Pick another, or click it again for no poster.`
-                                        : 'Posters that come with Vora. Click one to use it, and click it again for no poster.'}
-                                </p>
-                                <VoraPosterPicker
-                                    idPrefix="create-collection-vora"
-                                    catalog={voraPosters.catalog}
-                                    failed={voraPosters.failed}
-                                    selectedUrl={chosenPosterUrl}
-                                    suggestedUrl={suggestedPoster?.url}
-                                    onSelect={choosePoster}
-                                />
-                            </section>
-                            <section className="space-y-3 pt-4 border-t border-[var(--vora-border-subtle)]">
-                                <label htmlFor="create-collection-poster-url" className="block text-sm font-medium text-[var(--vora-text-muted)] mb-1">Or paste an image URL</label>
-                                <input id="create-collection-poster-url" type="url" value={pastedPosterUrl} onChange={e => choosePoster(e.target.value)} placeholder="https://…" className="w-full bg-[var(--vora-bg-raised)] border border-[var(--vora-border-subtle)] rounded-md p-2 text-[var(--vora-text-primary)] focus:border-[var(--vora-accent-500)] outline-none" />
-                                {safeMediaUrl(pastedPosterUrl)
-                                    ? <img src={safeMediaUrl(pastedPosterUrl)} alt="Poster preview" className="w-40 aspect-[2/3] object-cover rounded-md border border-[var(--vora-border-subtle)]" />
-                                    : <div className="w-40 aspect-[2/3] rounded-md border border-dashed border-[var(--vora-border-subtle)] flex items-center justify-center text-xs text-[var(--vora-text-muted)] text-center p-2">Poster preview</div>}
-                                <p className="text-xs text-[var(--vora-text-muted)] leading-relaxed">To upload a file or pick from an artwork provider, create the collection first, then edit it.</p>
-                            </section>
-                        </div>
-                    )}
-
-                    {activeSection === 'backdrop' && (
-                        <div className="space-y-3">
-                            <label className="block text-sm font-medium text-[var(--vora-text-muted)] mb-1">Backdrop URL</label>
-                            <input type="url" value={backdropUrl} onChange={e => setBackdropUrl(e.target.value)} placeholder="https://…" className="w-full bg-[var(--vora-bg-raised)] border border-[var(--vora-border-subtle)] rounded-md p-2 text-[var(--vora-text-primary)] focus:border-[var(--vora-accent-500)] outline-none" />
-                            {safeMediaUrl(backdropUrl)
-                                ? <img src={safeMediaUrl(backdropUrl)} alt="Backdrop preview" className="w-full max-w-md aspect-video object-cover rounded-md border border-[var(--vora-border-subtle)]" />
-                                : <div className="w-full max-w-md aspect-video rounded-md border border-dashed border-[var(--vora-border-subtle)] flex items-center justify-center text-xs text-[var(--vora-text-muted)]">Backdrop preview</div>}
-                            <p className="text-xs text-[var(--vora-text-muted)] leading-relaxed">Paste an image URL for the backdrop. To upload a file or pick from an artwork provider, create the collection first, then edit it.</p>
-                        </div>
-                    )}
                 </form>
+
+                {artworkKind && (
+                    <CollectionArtworkPanel
+                        kind={artworkKind}
+                        selectedUrl={artworkKind === 'Poster' ? chosenPosterUrl : backdropUrl}
+                        onSelect={url => selectArtwork(artworkKind, url)}
+                        locked={lockedFields.includes(artworkKind === 'Poster' ? 'PosterUrl' : 'BackdropUrl')}
+                        onToggleLock={() => toggleLock(artworkKind === 'Poster' ? 'PosterUrl' : 'BackdropUrl')}
+                        artwork={artworkOptions}
+                        loading={fetchingArtwork}
+                        onUpload={async file => stageFile(artworkKind, file)}
+                        onAddUrl={url => stageArtworkUrl(artworkKind, url)}
+                        onDeleteArtwork={unstageArtwork}
+                        fetcher={{ providers: artworkProviders, providerId: selectedProviderId, onProviderChange: setSelectedProviderId, onFetch: fetchProviderArtwork }}
+                        posterSource={posterView}
+                        onPosterSourceChange={setPosterSource}
+                        vora={{
+                            idPrefix: 'create-collection-vora',
+                            catalog: voraPosters.catalog,
+                            failed: voraPosters.failed,
+                            suggestedUrl: suggestedPoster?.url,
+                            note: suggestedPoster && !posterChosen
+                                ? `The ${suggestedPoster.title} poster is picked from the title. Pick another, or click it again for no poster.`
+                                : 'Posters that come with Vora. Click one to use it, and click it again for no poster.',
+                        }}
+                    />
+                )}
             </ModalBody>
 
             <ModalFooter className="flex justify-end gap-3">
