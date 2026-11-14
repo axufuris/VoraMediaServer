@@ -316,25 +316,7 @@ public class TvdbMetadataProvider : IMetadataProvider, IPluginConnectionTest
             }
         }
 
-        if (data.TryGetProperty("characters", out var chars) && chars.ValueKind == JsonValueKind.Array)
-        {
-            foreach (var character in chars.EnumerateArray())
-            {
-                result.Cast.Add(new CastMemberResult
-                {
-                    TmdbId = 0,
-                    TvdbId = character.TryGetProperty("peopleId", out var pid) && pid.ValueKind == JsonValueKind.Number ? pid.GetInt32() : 0,
-
-                    Name = character.TryGetProperty("personName", out var pn) && pn.ValueKind != JsonValueKind.Null ? pn.GetString() ?? "Unknown" : "Unknown",
-                    CharacterName = character.TryGetProperty("name", out var cn) && cn.ValueKind != JsonValueKind.Null ? cn.GetString() : null,
-
-                    ProfileImageUrl = character.TryGetProperty("personImgURL", out var pimg) && pimg.ValueKind != JsonValueKind.Null ? pimg.GetString() :
-                                      (character.TryGetProperty("image", out var cimg) && cimg.ValueKind != JsonValueKind.Null ? cimg.GetString() : null),
-
-                    Roles = MapPeopleTypeToRole(character.TryGetProperty("peopleType", out var pt) && pt.ValueKind != JsonValueKind.Null ? pt.GetString() : null)
-                });
-            }
-        }
+        result.Cast.AddRange(CastOf(data));
 
         result.GenreIds = GenreIds(data);
 
@@ -483,25 +465,7 @@ public class TvdbMetadataProvider : IMetadataProvider, IPluginConnectionTest
             result.ReleaseDate = d;
         }
 
-        if (data.TryGetProperty("characters", out var chars) && chars.ValueKind == JsonValueKind.Array)
-        {
-            foreach (var character in chars.EnumerateArray())
-            {
-                result.Cast.Add(new CastMemberResult
-                {
-                    TmdbId = 0,
-                    TvdbId = character.TryGetProperty("peopleId", out var pid) && pid.ValueKind == JsonValueKind.Number ? pid.GetInt32() : 0,
-
-                    Name = character.TryGetProperty("personName", out var pn) && pn.ValueKind != JsonValueKind.Null ? pn.GetString() ?? "Unknown" : "Unknown",
-                    CharacterName = character.TryGetProperty("name", out var cn) && cn.ValueKind != JsonValueKind.Null ? cn.GetString() : null,
-
-                    ProfileImageUrl = character.TryGetProperty("personImgURL", out var pimg) && pimg.ValueKind != JsonValueKind.Null ? pimg.GetString() :
-                                      (character.TryGetProperty("image", out var cimg) && cimg.ValueKind != JsonValueKind.Null ? cimg.GetString() : null),
-
-                    Roles = MapPeopleTypeToRole(character.TryGetProperty("peopleType", out var pt) && pt.ValueKind != JsonValueKind.Null ? pt.GetString() : null)
-                });
-            }
-        }
+        result.Cast.AddRange(CastOf(data));
 
         result.GenreIds = GenreIds(data);
 
@@ -784,14 +748,39 @@ public class TvdbMetadataProvider : IMetadataProvider, IPluginConnectionTest
                 .Select(g => g.ValueKind == JsonValueKind.Object && g.TryGetProperty("name", out var name) && name.ValueKind == JsonValueKind.String ? name.GetString() : null))
             : new List<int>();
 
-    private static CastRole MapPeopleTypeToRole(string? peopleType) => peopleType switch
+    internal static CastRole MapPeopleTypeToRole(string? peopleType) => peopleType switch
     {
         "Director" => CastRole.Director,
         "Writer" => CastRole.Writer,
-        "Producer" => CastRole.Producer,
+        "Producer" or "Executive Producer" or "Showrunner" => CastRole.Producer,
         "Creator" => CastRole.Creator,
+        "Crew" => CastRole.None,
         _ => CastRole.Actor
     };
+
+    internal static List<CastMemberResult> CastOf(JsonElement data)
+    {
+        var cast = new List<CastMemberResult>();
+        if (!data.TryGetProperty("characters", out var characters) || characters.ValueKind != JsonValueKind.Array) return cast;
+
+        foreach (var character in characters.EnumerateArray())
+        {
+            var roles = MapPeopleTypeToRole(character.TryGetProperty("peopleType", out var pt) && pt.ValueKind == JsonValueKind.String ? pt.GetString() : null);
+            if (roles == CastRole.None) continue;
+
+            cast.Add(new CastMemberResult
+            {
+                TmdbId = 0,
+                TvdbId = character.TryGetProperty("peopleId", out var pid) && pid.ValueKind == JsonValueKind.Number ? pid.GetInt32() : 0,
+                Name = character.TryGetProperty("personName", out var pn) && pn.ValueKind != JsonValueKind.Null ? pn.GetString() ?? "Unknown" : "Unknown",
+                CharacterName = character.TryGetProperty("name", out var cn) && cn.ValueKind != JsonValueKind.Null ? cn.GetString() : null,
+                ProfileImageUrl = character.TryGetProperty("personImgURL", out var pimg) && pimg.ValueKind != JsonValueKind.Null ? pimg.GetString() :
+                                  (character.TryGetProperty("image", out var cimg) && cimg.ValueKind != JsonValueKind.Null ? cimg.GetString() : null),
+                Roles = roles
+            });
+        }
+        return cast;
+    }
 
     public const int MaxSearchCandidates = 10;
 

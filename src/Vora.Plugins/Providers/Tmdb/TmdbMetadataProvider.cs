@@ -223,7 +223,7 @@ public class TmdbMetadataProvider : IMetadataProvider, IPluginConnectionTest
         return MapResult(doc.RootElement, isTv: true);
     }
 
-    private MetadataResult MapResult(JsonElement el, bool isTv)
+    internal static MetadataResult MapResult(JsonElement el, bool isTv)
     {
         var result = new MetadataResult
         {
@@ -421,77 +421,27 @@ public class TmdbMetadataProvider : IMetadataProvider, IPluginConnectionTest
             }
         }
 
-        var crewDict = new Dictionary<int, CastMemberResult>();
+        var people = new TmdbCredits();
 
         if (el.TryGetProperty("credits", out var credits))
         {
-            if (credits.TryGetProperty("cast", out var castArray))
+            if (credits.TryGetProperty("cast", out var castArray) && castArray.ValueKind == JsonValueKind.Array)
             {
-                foreach (var castMember in castArray.EnumerateArray().Take(50))
-                {
-                    var tmdbId = castMember.GetProperty("id").GetInt32();
-                    crewDict[tmdbId] = new CastMemberResult
-                    {
-                        TmdbId = tmdbId,
-                        Name = castMember.GetProperty("name").GetString() ?? "Unknown",
-                        CharacterName = castMember.TryGetProperty("character", out var c) ? c.GetString() : null,
-                        ProfileImageUrl = castMember.TryGetProperty("profile_path", out var pp) && pp.GetString() != null ? $"https://image.tmdb.org/t/p/w185{pp.GetString()}" : null,
-                        Roles = CastRole.Actor
-                    };
-                }
+                foreach (var castMember in castArray.EnumerateArray().Take(50)) people.AddActor(castMember);
             }
 
-            if (credits.TryGetProperty("crew", out var crewArray))
+            if (credits.TryGetProperty("crew", out var crewArray) && crewArray.ValueKind == JsonValueKind.Array)
             {
-                foreach (var crewMember in crewArray.EnumerateArray())
-                {
-                    var department = crewMember.TryGetProperty("department", out var dept) ? dept.GetString() : "";
-                    var crewRole = MapDepartmentToRole(department);
-                    if (crewRole == CastRole.None) continue;
-
-                    var tmdbId = crewMember.GetProperty("id").GetInt32();
-
-                    if (crewDict.TryGetValue(tmdbId, out var existing))
-                    {
-                        existing.Roles |= crewRole;
-                    }
-                    else
-                    {
-                        crewDict[tmdbId] = new CastMemberResult
-                        {
-                            TmdbId = tmdbId,
-                            Name = crewMember.GetProperty("name").GetString() ?? "Unknown",
-                            ProfileImageUrl = crewMember.TryGetProperty("profile_path", out var pp) && pp.GetString() != null ? $"https://image.tmdb.org/t/p/w185{pp.GetString()}" : null,
-                            Roles = crewRole
-                        };
-                    }
-                }
+                foreach (var crewMember in crewArray.EnumerateArray()) people.AddCrew(crewMember, TitleCrew);
             }
         }
 
         if (isTv && el.TryGetProperty("created_by", out var creators) && creators.ValueKind == JsonValueKind.Array)
         {
-            foreach (var creator in creators.EnumerateArray())
-            {
-                var tmdbId = creator.GetProperty("id").GetInt32();
-                if (crewDict.TryGetValue(tmdbId, out var existing))
-                {
-                    existing.Roles |= CastRole.Creator;
-                }
-                else
-                {
-                    crewDict[tmdbId] = new CastMemberResult
-                    {
-                        TmdbId = tmdbId,
-                        Name = creator.GetProperty("name").GetString() ?? "Unknown",
-                        ProfileImageUrl = creator.TryGetProperty("profile_path", out var pp) && pp.GetString() != null ? $"https://image.tmdb.org/t/p/w185{pp.GetString()}" : null,
-                        Roles = CastRole.Creator
-                    };
-                }
-            }
+            foreach (var creator in creators.EnumerateArray()) people.AddCreator(creator);
         }
 
-        result.Cast = crewDict.Values.ToList();
+        result.Cast = people.People();
 
         if (el.TryGetProperty("videos", out var vids) && vids.TryGetProperty("results", out var vidArray))
         {
@@ -581,70 +531,7 @@ public class TmdbMetadataProvider : IMetadataProvider, IPluginConnectionTest
                         var eNum = ep.TryGetProperty("episode_number", out var en) ? en.GetInt32() : -1;
                         if (eNum == -1) continue;
 
-                        var result = new MetadataResult
-                        {
-                            TmdbId = ep.TryGetProperty("id", out var idProp) ? idProp.GetInt32().ToString() : null,
-                            Title = ep.TryGetProperty("name", out var t) ? t.GetString() : null,
-                            Overview = ep.TryGetProperty("overview", out var ov) ? ov.GetString() : null,
-                            ReleaseDate = DateOnly.TryParse(ep.TryGetProperty("air_date", out var rd) ? rd.GetString() : "", out var d) ? d : null,
-                            Rating = ep.TryGetProperty("vote_average", out var va) && va.TryGetDecimal(out var rating) ? rating : null,
-                            RuntimeMinutes = ep.TryGetProperty("runtime", out var rt) ? rt.GetInt32() : null
-                        };
-
-                        if (ep.TryGetProperty("still_path", out var p) && p.GetString() != null)
-                        {
-                            var path = p.GetString();
-                            result.BackgroundUrl = $"https://image.tmdb.org/t/p/w1280{path}";
-                            result.PosterUrl = $"https://image.tmdb.org/t/p/w500{path}";
-                        }
-
-                        var crewDict = new Dictionary<int, CastMemberResult>();
-
-                        if (ep.TryGetProperty("guest_stars", out var guestArray) && guestArray.ValueKind == JsonValueKind.Array)
-                        {
-                            foreach (var castMember in guestArray.EnumerateArray())
-                            {
-                                var tmdbId = castMember.GetProperty("id").GetInt32();
-                                crewDict[tmdbId] = new CastMemberResult
-                                {
-                                    TmdbId = tmdbId,
-                                    Name = castMember.GetProperty("name").GetString() ?? "Unknown",
-                                    CharacterName = castMember.TryGetProperty("character", out var c) ? c.GetString() : null,
-                                    ProfileImageUrl = castMember.TryGetProperty("profile_path", out var pp) && pp.GetString() != null ? $"https://image.tmdb.org/t/p/w185{pp.GetString()}" : null,
-                                    Roles = CastRole.Actor
-                                };
-                            }
-                        }
-
-                        if (ep.TryGetProperty("crew", out var crewArray) && crewArray.ValueKind == JsonValueKind.Array)
-                        {
-                            foreach (var crewMember in crewArray.EnumerateArray())
-                            {
-                                var department = crewMember.TryGetProperty("department", out var dept) ? dept.GetString() : "";
-                                var crewRole = MapDepartmentToRole(department);
-                                if (crewRole == CastRole.None || crewRole == CastRole.Producer) continue;
-
-                                var tmdbId = crewMember.GetProperty("id").GetInt32();
-
-                                if (crewDict.TryGetValue(tmdbId, out var existing))
-                                {
-                                    existing.Roles |= crewRole;
-                                }
-                                else
-                                {
-                                    crewDict[tmdbId] = new CastMemberResult
-                                    {
-                                        TmdbId = tmdbId,
-                                        Name = crewMember.GetProperty("name").GetString() ?? "Unknown",
-                                        ProfileImageUrl = crewMember.TryGetProperty("profile_path", out var pp) && pp.GetString() != null ? $"https://image.tmdb.org/t/p/w185{pp.GetString()}" : null,
-                                        Roles = crewRole
-                                    };
-                                }
-                            }
-                        }
-
-                        result.Cast = crewDict.Values.ToList();
-                        seasonEpisodes[eNum] = result;
+                        seasonEpisodes[eNum] = MapEpisode(ep);
                     }
                 }
             }
@@ -683,13 +570,43 @@ public class TmdbMetadataProvider : IMetadataProvider, IPluginConnectionTest
         };
     }
 
-    private static CastRole MapDepartmentToRole(string? department) => department switch
+    private const CastRole TitleCrew = CastRole.Director | CastRole.Writer | CastRole.Producer | CastRole.Creator;
+    private const CastRole EpisodeCrew = CastRole.Director | CastRole.Writer;
+
+    internal static MetadataResult MapEpisode(JsonElement ep)
     {
-        "Directing" => CastRole.Director,
-        "Writing" => CastRole.Writer,
-        "Production" => CastRole.Producer,
-        _ => CastRole.None
-    };
+        var result = new MetadataResult
+        {
+            TmdbId = ep.TryGetProperty("id", out var idProp) ? idProp.GetInt32().ToString() : null,
+            Title = ep.TryGetProperty("name", out var t) ? t.GetString() : null,
+            Overview = ep.TryGetProperty("overview", out var ov) ? ov.GetString() : null,
+            ReleaseDate = DateOnly.TryParse(ep.TryGetProperty("air_date", out var rd) ? rd.GetString() : "", out var d) ? d : null,
+            Rating = ep.TryGetProperty("vote_average", out var va) && va.TryGetDecimal(out var rating) ? rating : null,
+            RuntimeMinutes = ep.TryGetProperty("runtime", out var rt) && rt.ValueKind == JsonValueKind.Number ? rt.GetInt32() : null
+        };
+
+        if (ep.TryGetProperty("still_path", out var p) && p.ValueKind == JsonValueKind.String)
+        {
+            var path = p.GetString();
+            result.BackgroundUrl = $"https://image.tmdb.org/t/p/w1280{path}";
+            result.PosterUrl = $"https://image.tmdb.org/t/p/w500{path}";
+        }
+
+        var people = new TmdbCredits();
+
+        if (ep.TryGetProperty("guest_stars", out var guestArray) && guestArray.ValueKind == JsonValueKind.Array)
+        {
+            foreach (var castMember in guestArray.EnumerateArray()) people.AddActor(castMember);
+        }
+
+        if (ep.TryGetProperty("crew", out var crewArray) && crewArray.ValueKind == JsonValueKind.Array)
+        {
+            foreach (var crewMember in crewArray.EnumerateArray()) people.AddCrew(crewMember, EpisodeCrew);
+        }
+
+        result.Cast = people.People();
+        return result;
+    }
 
     public const int MaxSearchCandidates = 10;
 
