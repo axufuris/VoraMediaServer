@@ -5,7 +5,7 @@ import PageHeader from '../../components/Client/Primitives/PageHeader';
 import EmptyState from '../../components/Client/Primitives/EmptyState';
 import MediaCard from '../../components/Client/Primitives/MediaCard';
 import MediaGrid from '../../components/Client/Primitives/MediaGrid';
-import { StorageKeys, getProfileIdFromToken } from '../../utils/storageKeys';
+import { profileIdForServer } from '../../api/client';
 import { discoveryTarget } from '../../utils/discoveryNavigation';
 
 interface WatchlistPageProps {
@@ -18,8 +18,7 @@ export default function WatchlistPage({ embedded = false }: WatchlistPageProps =
     const [items, setItems] = useState<WatchlistItem[]>([]);
     const [isLoading, setIsLoading] = useState(true);
 
-    const profileToken = localStorage.getItem(StorageKeys.profileToken);
-    const activeProfileId = getProfileIdFromToken(profileToken) ?? '';
+    const activeProfileId = profileIdForServer(serverId) ?? '';
 
     useEffect(() => {
         if (!activeProfileId) {

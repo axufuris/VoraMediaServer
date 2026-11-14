@@ -196,4 +196,4 @@ This is why removal is non-destructive to user data even though the row's GUID c
 
 `utils/serverVault.ts` stores an array of connected `VoraServer` records (id, name, url, token, profileId, profileName). The active server is tracked separately. `apiClient` calls accept `{ serverId }` to target a non-active server. `ServerManagerModal` is the UI for adding/switching/removing servers.
 
-Profile tokens are scoped to a server. When the user signs out of one server but stays on others, only that server's vault entry is removed.
+Profile tokens are scoped to a server, and so is the profile id a request names: take it from `profileIdForServer(serverId)` (`api/client.ts`, see `docs/frontend-conventions.md`), never from `profile_token`, which belongs to the primary server. When the user signs out of one server but stays on others, only that server's vault entry is removed.

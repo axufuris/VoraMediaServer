@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { fireEvent, render, screen } from '@testing-library/react';
 import PlexImportPanel from './PlexImportPanel';
 import { StorageKeys } from '../../utils/storageKeys';
+import { serverVault } from '../../utils/serverVault';
 import type { LibrarySyncTokenVM } from '../../api/LibraryMigration/libraryImportService';
 
 const mocks = vi.hoisted(() => ({
@@ -39,8 +40,8 @@ function signIn({ profileAdmin, serverAdmin = false }: { profileAdmin: boolean; 
     localStorage.setItem(StorageKeys.isServerAdmin, String(serverAdmin));
 }
 
-async function connect() {
-    render(<PlexImportPanel />);
+async function connect(serverId?: string) {
+    render(<PlexImportPanel serverId={serverId} />);
     fireEvent.click(await screen.findByRole('button', { name: 'Connect Plex' }));
     fireEvent.click(screen.getByRole('button', { name: 'Approve on plex.tv' }));
     await screen.findByText('Movies');
@@ -103,6 +104,21 @@ describe('PlexImportPanel', () => {
         expect(await screen.findByLabelText('Also set these as the server Admin Rating')).toBeInTheDocument();
         fireEvent.change(screen.getByLabelText('Import into'), { target: { value: 'p-kids' } });
         expect(screen.queryByLabelText('Also set these as the server Admin Rating')).not.toBeInTheDocument();
+    });
+
+    it("treats the second server's own profile as this profile", async () => {
+        signIn({ profileAdmin: true });
+        serverVault.addOrUpdateServer({ id: 'second', name: 'Second', url: 'http://second', token: tokenFor('p-second'), profileId: 'p-second', isAdmin: false });
+        mocks.getUserAccount.mockResolvedValue({ profiles: [{ id: 'p-second', name: 'Andy' }, { id: 'p-kids', name: 'Kids' }] });
+        await connect('second');
+
+        const target = await screen.findByLabelText('Import into');
+        expect(target).toHaveValue('p-second');
+        expect(screen.getByRole('option', { name: 'Andy (this profile)' })).toBeInTheDocument();
+        fireEvent.click(screen.getByRole('button', { name: 'Import' }));
+
+        await vi.waitFor(() => expect(mocks.runImport).toHaveBeenCalled());
+        expect(lastRequest()).toMatchObject({ profileId: null });
     });
 
     it("shows why an import failed, such as a wrong PIN", async () => {

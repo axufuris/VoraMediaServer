@@ -11,7 +11,8 @@ import {
 } from '../../api/LibraryMigration/libraryImportService';
 import { userService } from '../../api/Users/userService';
 import { useSignalREvent } from '../../hooks/useSignalREvent';
-import { StorageKeys, getProfileIdFromToken } from '../../utils/storageKeys';
+import { StorageKeys } from '../../utils/storageKeys';
+import { profileIdForServer } from '../../api/client';
 import { migrationSummary, sharedTitleNote } from '../../utils/migrationSummary';
 import { errorDetail } from '../../utils/apiError';
 
@@ -33,7 +34,7 @@ const accountLabel = (account: RemoteAccountVM) => account.isSignedIn ? `${accou
 export default function PlexImportPanel({ serverId }: PlexImportPanelProps) {
     const isAdmin = localStorage.getItem(StorageKeys.isServerAdmin) === 'true';
     const isProfileAdmin = localStorage.getItem(StorageKeys.isProfileAdmin) === 'true';
-    const activeProfileId = getProfileIdFromToken(localStorage.getItem(StorageKeys.profileToken)) ?? '';
+    const activeProfileId = profileIdForServer(serverId) ?? '';
 
     const [provider, setProvider] = useState<LibrarySyncProviderVM | null>(null);
     const [pinOpen, setPinOpen] = useState(false);

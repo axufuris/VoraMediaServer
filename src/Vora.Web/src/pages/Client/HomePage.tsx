@@ -7,7 +7,8 @@ import { useFeatureFlags } from '../../hooks/useFeatureFlags';
 import ClientHomeCustomizeModal, { type HomeLayoutItem } from '../../components/Home/HomeCustomizeModal';
 import SmartListRow from '../../components/Home/SmartListRow';
 import { profileDeviceSettingsService } from '../../api/Users/profileDeviceSettingsService';
-import { StorageKeys, getProfileIdFromToken } from '../../utils/storageKeys';
+import { StorageKeys } from '../../utils/storageKeys';
+import { profileIdForServer } from '../../api/client';
 import Tabs from '../../components/Client/Primitives/Tabs';
 import EmptyState from '../../components/Client/Primitives/EmptyState';
 import PlaylistsPage from './Playlists/PlaylistsPage';
@@ -119,8 +120,7 @@ export default function HomePage() {
         sessionStorage.setItem(HOME_TAB_STORAGE_KEY, tab);
     };
 
-    const profileToken = localStorage.getItem(StorageKeys.profileToken);
-    const activeProfileId = getProfileIdFromToken(profileToken) ?? '';
+    const activeProfileId = profileIdForServer(serverId) ?? '';
     const deviceId = localStorage.getItem(StorageKeys.deviceId) || 'unknown';
 
     useSignalREvent('SmartListsUpdated', useCallback(() => {

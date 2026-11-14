@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState, useCallback } from 'react';
 import { Outlet, useNavigate, useParams } from 'react-router-dom';
 import { libraryService } from '../api/Media/libraryService';
 import { authService } from '../api/Auth/authService';
+import { profileIdForServer } from '../api/client';
 import { useSignalREvent, disconnectSignalR } from '../hooks/useSignalREvent';
 import GlobalVideoPlayer from '../components/Player/GlobalVideoPlayer';
 import DesktopPlaybackHost from '../components/Player/DesktopPlaybackHost';
@@ -103,8 +104,7 @@ export default function MainLayout() {
     const isServerAdmin = localStorage.getItem('is_server_admin') === 'true';
     const profileName = localStorage.getItem('profile_name') || 'User';
     const currentUserId = localStorage.getItem('user_id');
-    const profileToken = localStorage.getItem('profile_token');
-    const activeProfileId = profileToken ? JSON.parse(atob(profileToken.split('.')[1])).sub : '';
+    const activeProfileId = profileIdForServer(serverId) ?? '';
 
     const [isBlockedBySchedule, setIsBlockedBySchedule] = useState<boolean>(getInitialBlockedState);
 

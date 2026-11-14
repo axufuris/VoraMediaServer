@@ -4,7 +4,8 @@ import { libraryService, type LibrarySummary } from '../../api/Media/libraryServ
 import { iptvClientService } from '../../api/Iptv/iptvClientService';
 import { type IptvPlaylistVM } from '../../api/Iptv/iptvAdminService';
 import { useDialog } from '../../dialogs';
-import { StorageKeys, getProfileIdFromToken } from '../../utils/storageKeys';
+import { StorageKeys } from '../../utils/storageKeys';
+import { profileIdForServer } from '../../api/client';
 
 import { profileService, type ProfileScheduleVM, type UserProfileVM } from '../../api/Users/profileService';
 import { userImageService } from '../../api/Users/userImageService';
@@ -32,8 +33,7 @@ export default function AccountSettingsPage() {
     const [loadError, setLoadError] = useState<string | null>(null); // Safely triggers re-fetches
 
     const isProfileAdmin = localStorage.getItem(StorageKeys.isProfileAdmin) === 'true';
-    const profileToken = localStorage.getItem(StorageKeys.profileToken);
-    const activeProfileId = getProfileIdFromToken(profileToken) ?? '';
+    const activeProfileId = profileIdForServer(serverId) ?? '';
 
     useEffect(() => {
         let isMounted = true;
@@ -369,10 +369,7 @@ function ProfileEditor({ profile, user, libraries, iptvPlaylists, serverId, onCl
     };
 
     const showParentalTabs = isProfileAdmin && !profile.isAdmin;
-    const currentProfileToken = localStorage.getItem(StorageKeys.profileToken);
-    const currentProfileId = currentProfileToken
-        ? (getProfileIdFromToken(currentProfileToken) ?? '')
-        : '';
+    const currentProfileId = profileIdForServer(serverId) ?? '';
     const isOwnProfile = profile.id !== 'NEW' && profile.id === currentProfileId;
     const tabs: { id: ProfileEditTab; label: string; show: boolean }[] = [
         { id: 'basics', label: 'Basics', show: true },

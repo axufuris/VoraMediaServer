@@ -11,7 +11,7 @@ import RatingBadge from '../../../components/Client/Primitives/RatingBadge';
 import TrailerOverlay from '../../../components/Client/Primitives/TrailerOverlay';
 import { BookmarkIcon } from '../../../components/Client/Primitives/ActionIcons';
 import { directorsFrom } from '../../../utils/credits';
-import { StorageKeys, getProfileIdFromToken } from '../../../utils/storageKeys';
+import { profileIdForServer } from '../../../api/client';
 import { formatRuntime } from '../../../utils/formatRuntime';
 import { formatDate } from '../../../utils/serverTime';
 
@@ -32,8 +32,7 @@ export default function DiscoveryDetailsPage() {
 
     const [playingTrailer, setPlayingTrailer] = useState<Trailer | null>(null);
 
-    const profileToken = localStorage.getItem(StorageKeys.profileToken);
-    const activeProfileId = getProfileIdFromToken(profileToken) ?? '';
+    const activeProfileId = profileIdForServer(serverId) ?? '';
     const [requestStatus, setRequestStatus] = useState<DiscoveryRequestStatus | null>(null);
 
     useEffect(() => {

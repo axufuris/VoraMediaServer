@@ -6,7 +6,7 @@ import { usePlayer } from '../../../contexts/usePlayer';
 import { useSignalREvent } from '../../../hooks/useSignalREvent';
 import DvrSessionCard from '../../../components/Dvr/DvrSessionCard';
 import { useDialog } from '../../../dialogs';
-import { StorageKeys, getProfileIdFromToken } from '../../../utils/storageKeys';
+import { profileIdForServer } from '../../../api/client';
 import PageHeader from '../../../components/Client/Primitives/PageHeader';
 import EmptyState from '../../../components/Client/Primitives/EmptyState';
 import Tabs from '../../../components/Client/Primitives/Tabs';
@@ -44,11 +44,8 @@ export default function DvrDashboard({ embedded = false }: DvrDashboardProps) {
     useEffect(() => {
         const loadSessions = async () => {
             try {
-                const activeServer = serverVault.getActiveServer();
-                if (!activeServer) return;
-
-                const profileToken = localStorage.getItem(StorageKeys.profileToken);
-                const activeProfileId = getProfileIdFromToken(profileToken) ?? activeServer.profileId;
+                const activeProfileId = profileIdForServer(serverId);
+                if (!serverVault.getActiveServer() || !activeProfileId) return;
 
                 const data = await dvrService.getRecordingSessions(activeProfileId, serverId);
                 setSessions(data.sort((a, b) => new Date(b.startTime).getTime() - new Date(a.startTime).getTime()));
@@ -68,10 +65,8 @@ export default function DvrDashboard({ embedded = false }: DvrDashboardProps) {
         const fetchFreshSessions = async () => {
             try {
                 const activeServer = serverVault.getActiveServer();
-                if (!activeServer) return;
-
-                const profileToken = localStorage.getItem(StorageKeys.profileToken);
-                const activeProfileId = getProfileIdFromToken(profileToken) ?? activeServer.profileId;
+                const activeProfileId = profileIdForServer(activeServer?.id);
+                if (!activeServer || !activeProfileId) return;
 
                 const freshData = await dvrService.getRecordingSessions(activeProfileId, activeServer.id);
                 setSessions(freshData.sort((a, b) => new Date(b.startTime).getTime() - new Date(a.startTime).getTime()));

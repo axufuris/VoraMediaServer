@@ -10,7 +10,8 @@ import EmptyState from '../../../components/Client/Primitives/EmptyState';
 import MediaRow, { MediaRowItem } from '../../../components/Client/Primitives/MediaRow';
 import MediaCard from '../../../components/Client/Primitives/MediaCard';
 import DiscoveryStatusBadge from '../../../components/Discovery/DiscoveryStatusBadge';
-import { StorageKeys, getProfileIdFromToken } from '../../../utils/storageKeys';
+import { StorageKeys } from '../../../utils/storageKeys';
+import { profileIdForServer } from '../../../api/client';
 import { discoveryTarget } from '../../../utils/discoveryNavigation';
 import { watchlistKey } from '../../../utils/watchlistKey';
 
@@ -26,8 +27,7 @@ export default function DiscoveryPage({ embedded = false }: DiscoveryPageProps =
     const [isLoading, setIsLoading] = useState(true);
     const [isCustomizeOpen, setIsCustomizeOpen] = useState(false);
 
-    const profileToken = localStorage.getItem(StorageKeys.profileToken);
-    const activeProfileId = getProfileIdFromToken(profileToken) ?? '';
+    const activeProfileId = profileIdForServer(serverId) ?? '';
     const deviceId = localStorage.getItem(StorageKeys.deviceId) || 'unknown';
 
     useEffect(() => {

@@ -5,7 +5,8 @@ import { type IptvProgramDto } from '../../../api/Iptv/iptvClientService';
 import { dvrService } from '../../../api/Iptv/dvrService';
 import { usePlayer } from '../../../contexts/usePlayer';
 import { serverVault } from '../../../utils/serverVault';
-import { StorageKeys, decodeJwtPayload, getProfileIdFromToken } from '../../../utils/storageKeys';
+import { StorageKeys, decodeJwtPayload } from '../../../utils/storageKeys';
+import { profileIdForServer } from '../../../api/client';
 import { useDialog } from '../../../dialogs';
 import GuideProgramModal from '../../../components/Iptv/GuideProgramModal';
 import { ROW_HEIGHT, PX_PER_MINUTE, HOURS_TO_SHOW, CHANNEL_COLUMN_WIDTH, PHONE_CHANNEL_COLUMN_WIDTH, parseDate } from './guideConstants';
@@ -320,8 +321,7 @@ export default function LiveTvGuide({ isEmbedded = false, currentPlayingChannelI
         try {
             const activeServer = serverVault.getActiveServer();
             if (!activeServer) return;
-            const profileToken = localStorage.getItem(StorageKeys.profileToken);
-            const activeProfileId = getProfileIdFromToken(profileToken) ?? activeServer.profileId;
+            const activeProfileId = profileIdForServer(serverId) ?? activeServer.profileId;
 
             await dvrService.scheduleRecording(
                 activeProfileId,

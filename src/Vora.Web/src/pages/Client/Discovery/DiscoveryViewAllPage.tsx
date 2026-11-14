@@ -7,7 +7,7 @@ import MediaCard from '../../../components/Client/Primitives/MediaCard';
 import MediaGrid from '../../../components/Client/Primitives/MediaGrid';
 import EmptyState from '../../../components/Client/Primitives/EmptyState';
 import DiscoveryStatusBadge from '../../../components/Discovery/DiscoveryStatusBadge';
-import { StorageKeys, getProfileIdFromToken } from '../../../utils/storageKeys';
+import { profileIdForServer } from '../../../api/client';
 import { discoveryTarget } from '../../../utils/discoveryNavigation';
 import { watchlistKey } from '../../../utils/watchlistKey';
 
@@ -25,8 +25,7 @@ export default function DiscoveryViewAllPage() {
 
     const observerTarget = useRef<HTMLDivElement>(null);
 
-    const profileToken = localStorage.getItem(StorageKeys.profileToken);
-    const activeProfileId = getProfileIdFromToken(profileToken) ?? '';
+    const activeProfileId = profileIdForServer(serverId) ?? '';
 
     useEffect(() => {
         const fetchInitialData = async () => {

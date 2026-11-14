@@ -1,6 +1,6 @@
 import axios, { type AxiosInstance, type InternalAxiosRequestConfig, type AxiosRequestConfig, isAxiosError } from 'axios';
 import { serverVault, type VoraServer } from '../utils/serverVault';
-import { StorageKeys, SessionKeys } from '../utils/storageKeys';
+import { StorageKeys, SessionKeys, getProfileIdFromToken } from '../utils/storageKeys';
 import { defaultApiBaseUrl } from '../utils/apiBase';
 import { getDesktopBridge } from '../desktop/desktopPlayback';
 
@@ -122,6 +122,20 @@ function resolveClient(serverId?: string): ClientResolution {
     return { cacheKey, baseUrl, server };
 }
 
+function requestToken(server: VoraServer | undefined): string | null {
+    const current = server ? serverVault.getServer(server.id) ?? server : undefined;
+    const token = current?.token
+        || sessionStorage.getItem(SessionKeys.pendingUserToken)
+        || localStorage.getItem(StorageKeys.profileToken)
+        || localStorage.getItem(StorageKeys.accountToken);
+    return token === 'undefined' || token === 'null' ? null : token;
+}
+
+export function profileIdForServer(serverId?: string): string | null {
+    const { server } = resolveClient(serverId);
+    return getProfileIdFromToken(requestToken(server)) ?? (server?.profileId || null);
+}
+
 const clientCache = new Map<string, AxiosInstance>();
 
 function buildAxiosInstance(baseUrl: string, server: VoraServer | undefined): AxiosInstance {
@@ -133,11 +147,7 @@ function buildAxiosInstance(baseUrl: string, server: VoraServer | undefined): Ax
     });
 
     instance.interceptors.request.use((config: InternalAxiosRequestConfig) => {
-        const pendingToken = sessionStorage.getItem(SessionKeys.pendingUserToken);
-        let token = server?.token || pendingToken || localStorage.getItem(StorageKeys.profileToken) || localStorage.getItem(StorageKeys.accountToken);
-        if (token === 'undefined' || token === 'null') {
-            token = null;
-        }
+        const token = requestToken(server);
         if (config.headers) {
             if (token) {
                 config.headers['Authorization'] = `Bearer ${token}`;

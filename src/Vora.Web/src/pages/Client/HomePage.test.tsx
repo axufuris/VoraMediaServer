@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { cleanup, render, screen, waitFor } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import HomePage from './HomePage';
 import type { SmartListEntry } from '../../api/Collections/smartListService';
@@ -7,12 +7,15 @@ import type { ContinueWatchingItem } from '../../api/Media/syncService';
 import type { NavItem } from '../../layouts/MainLayout';
 import { SidebarItemsContext, type SidebarItems } from '../../layouts/sidebarItems';
 import { StorageKeys } from '../../utils/storageKeys';
+import { serverVault } from '../../utils/serverVault';
+import { clearApiClientCache } from '../../api/client';
 
 const mocks = vi.hoisted(() => ({
     getActiveLists: vi.fn(),
     getListEntries: vi.fn(),
     getContinueWatching: vi.fn(),
     getHomeLayout: vi.fn(),
+    saveHomeLayout: vi.fn(),
 }));
 
 vi.mock('../../api/Collections/smartListService', () => ({
@@ -22,7 +25,7 @@ vi.mock('../../api/Media/syncService', () => ({
     syncService: { getContinueWatching: mocks.getContinueWatching, hideFromContinueWatching: vi.fn() },
 }));
 vi.mock('../../api/Users/profileDeviceSettingsService', () => ({
-    profileDeviceSettingsService: { getHomeLayout: mocks.getHomeLayout, saveHomeLayout: vi.fn() },
+    profileDeviceSettingsService: { getHomeLayout: mocks.getHomeLayout, saveHomeLayout: mocks.saveHomeLayout },
 }));
 vi.mock('../../hooks/useSignalREvent', () => ({ useSignalREvent: () => { } }));
 vi.mock('../../hooks/useFeatureFlags', () => ({ useFeatureFlags: () => ({ forYou: true }) }));
@@ -44,8 +47,8 @@ const library = (id: string, isPinned: boolean): NavItem =>
 
 const sidebar = (items: NavItem[], loaded = true): SidebarItems => ({ items, loaded });
 
-const page = (value: SidebarItems) => (
-    <MemoryRouter initialEntries={['/server/home']}>
+const page = (value: SidebarItems, path = '/server/home') => (
+    <MemoryRouter initialEntries={[path]}>
         <SidebarItemsContext.Provider value={value}>
             <Routes>
                 <Route path="/server/:serverId" element={<HomePage />} />
@@ -60,22 +63,26 @@ const movie = (id: string, title: string): SmartListEntry =>
 const resuming = (id: string, title: string): ContinueWatchingItem =>
     ({ id, title, type: 'Movie', resumePositionSeconds: 600, durationSeconds: 6000 });
 
+const tokenFor = (profileId: string) => `header.${btoa(JSON.stringify({ sub: profileId }))}.signature`;
+
 beforeEach(() => {
     localStorage.clear();
     sessionStorage.clear();
-    localStorage.setItem(StorageKeys.profileToken, `header.${btoa(JSON.stringify({ sub: 'profile-1' }))}.signature`);
+    localStorage.setItem(StorageKeys.profileToken, tokenFor('profile-1'));
     localStorage.setItem(StorageKeys.deviceId, 'device-1');
     vi.stubGlobal('ResizeObserver', NoopResizeObserver);
     mocks.getActiveLists.mockResolvedValue([{ id: 'list-1', title: 'Recently Added Movies & Shows', displayOrder: 0, source: 'Library' }]);
     mocks.getHomeLayout.mockResolvedValue(null);
     mocks.getListEntries.mockResolvedValue([movie('m1', 'Heat')]);
     mocks.getContinueWatching.mockResolvedValue([resuming('m2', 'Alien')]);
+    mocks.saveHomeLayout.mockResolvedValue(undefined);
 });
 
 afterEach(() => {
     cleanup();
     vi.clearAllMocks();
     localStorage.clear();
+    clearApiClientCache();
 });
 
 describe('HomePage and the libraries unpinned from the sidebar', () => {
@@ -130,5 +137,51 @@ describe('HomePage and the libraries unpinned from the sidebar', () => {
 
         expect(mocks.getListEntries).toHaveBeenCalledTimes(1);
         expect(mocks.getContinueWatching).toHaveBeenCalledTimes(1);
+    });
+});
+
+describe('HomePage on a second server', () => {
+    const hiddenRow = JSON.stringify([{ listId: 'list-1', isEnabled: false, orderIndex: 0 }]);
+    const shownRow = JSON.stringify([{ listId: 'list-1', isEnabled: true, orderIndex: 0 }]);
+
+    beforeEach(() => {
+        serverVault.addOrUpdateServer({ id: 'home', name: 'Home', url: 'http://home', token: tokenFor('profile-1'), profileId: 'profile-1', isAdmin: false });
+        serverVault.addOrUpdateServer({ id: 'second', name: 'Second', url: 'http://second', token: tokenFor('profile-2'), profileId: 'profile-2', isAdmin: false });
+        serverVault.setActiveServerId('home');
+        localStorage.setItem('client_home_layout_profile-1_device-1', hiddenRow);
+        localStorage.setItem('client_home_layout_profile-2_device-1', shownRow);
+    });
+
+    it("asks for Continue Watching and the home layout with that server's own profile", async () => {
+        render(page(sidebar([]), '/server/second'));
+
+        expect(await screen.findByText('Alien')).toBeTruthy();
+        expect(await screen.findByText('Recently Added Movies & Shows')).toBeTruthy();
+        expect(mocks.getContinueWatching).toHaveBeenCalledWith('profile-2', 'second');
+        expect(mocks.getContinueWatching).not.toHaveBeenCalledWith('profile-1', expect.anything());
+        expect(mocks.getHomeLayout).toHaveBeenCalledWith('profile-2', 'device-1', 'second');
+        expect(mocks.getHomeLayout).not.toHaveBeenCalledWith('profile-1', expect.anything(), expect.anything());
+    });
+
+    it("saves the home layout under that server's own profile, leaving the primary layout alone", async () => {
+        render(page(sidebar([]), '/server/second'));
+        expect(await screen.findByText('Alien')).toBeTruthy();
+
+        fireEvent.click(screen.getByRole('button', { name: 'Customize' }));
+        fireEvent.click(await screen.findByRole('button', { name: 'Save Layout' }));
+
+        await waitFor(() => expect(mocks.saveHomeLayout).toHaveBeenCalledTimes(1));
+        expect(mocks.saveHomeLayout).toHaveBeenCalledWith('profile-2', 'device-1', expect.any(String), 'second');
+        expect(localStorage.getItem('client_home_layout_profile-2_device-1')).toBe(mocks.saveHomeLayout.mock.calls[0][2]);
+        expect(localStorage.getItem('client_home_layout_profile-1_device-1')).toBe(hiddenRow);
+    });
+
+    it('keeps using the primary profile on the primary server', async () => {
+        render(page(sidebar([])));
+
+        expect(await screen.findByText('Alien')).toBeTruthy();
+        expect(mocks.getContinueWatching).toHaveBeenCalledWith('profile-1', 'home');
+        expect(mocks.getHomeLayout).toHaveBeenCalledWith('profile-1', 'device-1', 'home');
+        expect(screen.queryByText('Recently Added Movies & Shows')).toBeNull();
     });
 });
