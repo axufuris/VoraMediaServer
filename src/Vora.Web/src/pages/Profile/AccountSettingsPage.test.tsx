@@ -6,7 +6,7 @@ import { StorageKeys } from '../../utils/storageKeys';
 import { serverVault } from '../../utils/serverVault';
 import type { UserVM } from '../../api/Users/userService';
 
-const getUserAccount = vi.fn<() => Promise<UserVM>>();
+const getUserAccount = vi.fn<(userId: string, serverId?: string) => Promise<UserVM>>();
 
 const account = {
     id: 'acct-1',
@@ -18,7 +18,7 @@ const account = {
 } as unknown as UserVM;
 
 vi.mock('../../api/Users/userService', () => ({
-    userService: { getUserAccount: () => getUserAccount(), updateAccount: () => Promise.resolve() },
+    userService: { getUserAccount: (userId: string, serverId?: string) => getUserAccount(userId, serverId), updateAccount: () => Promise.resolve() },
 }));
 vi.mock('../../api/Media/libraryService', () => ({
     libraryService: { getLibraries: () => Promise.resolve([]) },
@@ -115,14 +115,14 @@ describe('AccountSettingsPage', () => {
 });
 
 describe('AccountSettingsPage on a second server', () => {
-    const tokenFor = (profileId: string) => `header.${btoa(JSON.stringify({ sub: profileId }))}.signature`;
+    const tokenFor = (profileId: string, accountId: string) => `header.${btoa(JSON.stringify({ sub: profileId, accountId }))}.signature`;
 
     beforeEach(() => {
         localStorage.clear();
         localStorage.setItem(StorageKeys.userId, 'acct-1');
         localStorage.setItem(StorageKeys.isProfileAdmin, 'false');
-        localStorage.setItem(StorageKeys.profileToken, tokenFor('profile-1'));
-        serverVault.addOrUpdateServer({ id: 'second', name: 'Second', url: 'http://second', token: tokenFor('profile-2'), profileId: 'profile-2', isAdmin: false });
+        localStorage.setItem(StorageKeys.profileToken, tokenFor('profile-1', 'acct-1'));
+        serverVault.addOrUpdateServer({ id: 'second', name: 'Second', url: 'http://second', token: tokenFor('profile-2', 'acct-2'), profileId: 'profile-2', isAdmin: false });
         getUserAccount.mockReset();
         getUserAccount.mockResolvedValue({
             ...account,
@@ -141,5 +141,7 @@ describe('AccountSettingsPage on a second server', () => {
 
         expect(await screen.findByDisplayValue('Andy on Second')).toBeInTheDocument();
         expect(screen.getByRole('button', { name: 'Connections' })).toBeInTheDocument();
+        expect(getUserAccount).toHaveBeenCalledWith('acct-2', 'second');
+        expect(getUserAccount).not.toHaveBeenCalledWith('acct-1', expect.anything());
     });
 });

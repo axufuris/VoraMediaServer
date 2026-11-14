@@ -2,13 +2,13 @@ import { useEffect, useState, useCallback, useRef, useMemo } from 'react';
 import { useParams } from 'react-router-dom';
 import { podcastService, type ServerPodcastSubscription, type PodcastEpisodeVM, type DiscoveredPodcastVM, type ServerPodcastFeedEpisode, type AggregatedCatalogPodcastVM, type CatalogServerAvailability } from '../../../api/Podcasts/podcastService';
 import { serverVault } from '../../../utils/serverVault';
-import { StorageKeys, decodeJwtPayload } from '../../../utils/storageKeys';
 import { usePlayer } from '../../../contexts/usePlayer';
 import { useDialog } from '../../../dialogs';
 import { useSignalREvent } from '../../../hooks/useSignalREvent';
 import { calendarDaysBetween, parseServerDate } from '../../../utils/serverTime';
 import { secureImageUrl } from '../../../utils/secureImageUrl';
 import { podcastPlayable } from '../../../utils/playables';
+import { tokenClaimsForServer } from '../../../api/client';
 
 const SELECTED_SUB_STORAGE_KEY = 'podcast_selected_sub';
 const VIEW_MODE_STORAGE_KEY = 'podcast_view_mode';
@@ -53,16 +53,7 @@ export default function PodcastsTab() {
     const [isLoadingEpisodes, setIsLoadingEpisodes] = useState(false);
     const [isRefreshing, setIsRefreshing] = useState(false);
 
-    const canAddCustomFeeds = useMemo(() => {
-        const token = localStorage.getItem(StorageKeys.profileToken);
-        if (!token) return false;
-        try {
-            const payload = decodeJwtPayload(token);
-            return payload?.canAddCustomPodcastFeeds === 'True';
-        } catch {
-            return false;
-        }
-    }, []);
+    const canAddCustomFeeds = useMemo(() => tokenClaimsForServer(serverId)?.canAddCustomPodcastFeeds === 'True', [serverId]);
 
     const [viewMode, setViewMode] = useState<PodcastViewMode>(() => {
         const stored = sessionStorage.getItem(VIEW_MODE_STORAGE_KEY);

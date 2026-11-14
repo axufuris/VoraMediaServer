@@ -5,8 +5,7 @@ import { type IptvProgramDto } from '../../../api/Iptv/iptvClientService';
 import { dvrService } from '../../../api/Iptv/dvrService';
 import { usePlayer } from '../../../contexts/usePlayer';
 import { serverVault } from '../../../utils/serverVault';
-import { StorageKeys, decodeJwtPayload } from '../../../utils/storageKeys';
-import { profileIdForServer } from '../../../api/client';
+import { profileIdForServer, tokenClaimsForServer } from '../../../api/client';
 import { useDialog } from '../../../dialogs';
 import GuideProgramModal from '../../../components/Iptv/GuideProgramModal';
 import { ROW_HEIGHT, PX_PER_MINUTE, HOURS_TO_SHOW, CHANNEL_COLUMN_WIDTH, PHONE_CHANNEL_COLUMN_WIDTH, parseDate } from './guideConstants';
@@ -29,16 +28,7 @@ export default function LiveTvGuide({ isEmbedded = false, currentPlayingChannelI
     const { serverId } = useParams<{ serverId?: string }>();
     const { playMedia } = usePlayer();
 
-    const canRecord = useMemo(() => {
-        const token = localStorage.getItem(StorageKeys.profileToken);
-        if (!token) return false;
-        try {
-            const payload = decodeJwtPayload(token);
-            return payload?.canRecordLiveTv === 'True';
-        } catch {
-            return false;
-        }
-    }, []);
+    const canRecord = useMemo(() => tokenClaimsForServer(serverId)?.canRecordLiveTv === 'True', [serverId]);
 
     const [containerWidth, setContainerWidth] = useState(0);
     const channelColumnWidth = useIsPhone() ? PHONE_CHANNEL_COLUMN_WIDTH : CHANNEL_COLUMN_WIDTH;

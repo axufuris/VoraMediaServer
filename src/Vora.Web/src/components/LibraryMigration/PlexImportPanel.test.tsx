@@ -108,11 +108,13 @@ describe('PlexImportPanel', () => {
 
     it("treats the second server's own profile as this profile", async () => {
         signIn({ profileAdmin: true });
-        serverVault.addOrUpdateServer({ id: 'second', name: 'Second', url: 'http://second', token: tokenFor('p-second'), profileId: 'p-second', isAdmin: false });
+        const secondToken = `x.${btoa(JSON.stringify({ sub: 'p-second', accountId: 'account-second' }))}.y`;
+        serverVault.addOrUpdateServer({ id: 'second', name: 'Second', url: 'http://second', token: secondToken, profileId: 'p-second', isAdmin: false });
         mocks.getUserAccount.mockResolvedValue({ profiles: [{ id: 'p-second', name: 'Andy' }, { id: 'p-kids', name: 'Kids' }] });
         await connect('second');
 
         const target = await screen.findByLabelText('Import into');
+        expect(mocks.getUserAccount).toHaveBeenCalledWith('account-second', 'second');
         expect(target).toHaveValue('p-second');
         expect(screen.getByRole('option', { name: 'Andy (this profile)' })).toBeInTheDocument();
         fireEvent.click(screen.getByRole('button', { name: 'Import' }));

@@ -29,7 +29,7 @@ export const SessionKeys = {
     newBuildReloadAt: 'new_build_reload_at',
 } as const;
 
-interface JwtPayload {
+export interface JwtPayload {
     sub?: string;
     [key: string]: unknown;
 }
@@ -50,4 +50,9 @@ export function decodeJwtPayload(token: string | null | undefined): JwtPayload |
 export function getProfileIdFromToken(token: string | null | undefined): string | null {
     const payload = decodeJwtPayload(token);
     return typeof payload?.sub === 'string' ? payload.sub : null;
+}
+
+export function getAccountIdFromToken(token: string | null | undefined): string | null {
+    const payload = decodeJwtPayload(token);
+    return typeof payload?.accountId === 'string' && payload.accountId.length > 0 ? payload.accountId : null;
 }

@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { streamingService } from './streamingService';
 import { apiClient } from '../client';
+import { scanDeviceCapabilities } from '../../utils/hardwareScanner';
 import { forgetConnectionSpeeds, measureConnection } from '../../utils/connectionSpeed';
 
 const capabilities = { detectedAudioChannels: 2, pickedAudioChannels: 6, playsAnyAudioLayout: true, canSwitchAudioTracks: false };
@@ -30,6 +31,7 @@ describe('asking the server for its playback decision', () => {
             { mediaId: 'movie', deviceId: 'device', startPosition: 0, capabilities: sent },
             { serverId: 'server' });
         expect(decision.audioTrackId).toBe('audio');
+        expect(scanDeviceCapabilities).toHaveBeenLastCalledWith('server');
     });
 
     it('names the version and subtitle the viewer is looking at', async () => {

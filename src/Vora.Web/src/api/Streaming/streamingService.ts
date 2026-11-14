@@ -148,7 +148,7 @@ const subtitleObjectUrls = new Map<string, string>();
 const subtitleCacheKey = (sessionId: string, subtitleTrackId: string) => `${sessionId}|${subtitleTrackId}`;
 
 async function capabilitiesFor(serverId?: string): Promise<DeviceCapabilities> {
-    return { ...await playbackCapabilities(), measuredBandwidthKbps: knownConnectionKbps(serverId) };
+    return { ...await playbackCapabilities(serverId), measuredBandwidthKbps: knownConnectionKbps(serverId) };
 }
 
 export const streamingService = {

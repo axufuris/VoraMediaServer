@@ -19,6 +19,7 @@ interface UsePlayerKeyboardOptions {
     // arrow seeks or changes the volume there.
     plainArrows?: boolean;
     indicatorMs?: number;
+    serverId?: string;
 }
 
 const modalIsOpen = () => document.querySelector('[aria-modal="true"]') !== null;
@@ -34,7 +35,7 @@ const modalIsOpen = () => document.querySelector('[aria-modal="true"]') !== null
 // up while it is still showing, so three Rights read +30s, not +10s three
 // times.
 export function usePlayerKeyboard({
-    enabled, canSeek, volume, isPlaying, onPlayPause, onSkipForward, onSkipBackward, onVolume, plainArrows = true, indicatorMs = 900,
+    enabled, canSeek, volume, isPlaying, onPlayPause, onSkipForward, onSkipBackward, onVolume, plainArrows = true, indicatorMs = 900, serverId,
 }: UsePlayerKeyboardOptions): PlayerKeyIndicatorState | null {
     const [indicator, setIndicator] = useState<PlayerKeyIndicatorState | null>(null);
     const volumeRef = useRef(volume);
@@ -62,7 +63,7 @@ export function usePlayerKeyboard({
 
         const onKeyDown = (event: KeyboardEvent) => {
             if (event.defaultPrevented || modalIsOpen()) return;
-            const action = playerKeyAction(event, currentPlayerKeySteps(), canSeek, plainArrows);
+            const action = playerKeyAction(event, currentPlayerKeySteps(serverId), canSeek, plainArrows);
             if (!action) return;
 
             if (action.kind === 'playPause') {
@@ -99,7 +100,7 @@ export function usePlayerKeyboard({
 
         window.addEventListener('keydown', onKeyDown);
         return () => window.removeEventListener('keydown', onKeyDown);
-    }, [enabled, canSeek, plainArrows, onPlayPause, onSkipForward, onSkipBackward, onVolume, indicatorMs]);
+    }, [enabled, canSeek, plainArrows, onPlayPause, onSkipForward, onSkipBackward, onVolume, indicatorMs, serverId]);
 
     return indicator;
 }

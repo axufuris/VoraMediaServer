@@ -9,7 +9,7 @@ import { timeshiftService } from '../../api/Iptv/timeshiftService';
 import { passthroughService } from '../../api/Iptv/passthroughService';
 import { serverVault } from '../../utils/serverVault';
 import { StorageKeys } from '../../utils/storageKeys';
-import { profileIdForServer } from '../../api/client';
+import { profileIdForServer, userIdForServer } from '../../api/client';
 import LiveTvGuide from '../../pages/Client/LiveTv/LiveTvGuide';
 import { parseGuidePrefs } from '../../pages/Client/LiveTv/hooks/useGuideData';
 import { setChannelFavorite } from '../../pages/Client/LiveTv/hooks/channelFavorites';
@@ -65,7 +65,7 @@ export default function LiveTvPlayer() {
                 if (!activeServer) return;
 
                 const activeProfileId = profileIdForServer(activeServer.id) ?? activeServer.profileId;
-                const userId = localStorage.getItem(StorageKeys.userId) || activeProfileId;
+                const userId = userIdForServer(activeServer.id) || activeProfileId;
                 const deviceId = localStorage.getItem(StorageKeys.deviceId) || 'unknown';
 
                 const allProviders = await iptvClientService.getPlaylists(userId, activeProfileId, activeServer.id);
@@ -344,6 +344,7 @@ export default function LiveTvPlayer() {
         onSkipForward: skipForward,
         onSkipBackward: skipBackward,
         onVolume: setVolume,
+        serverId: currentMedia?.serverId,
     });
 
     const toggleCc = () => {

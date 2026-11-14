@@ -8,8 +8,7 @@ import { timeshiftService } from '../../api/Iptv/timeshiftService';
 import { passthroughService } from '../../api/Iptv/passthroughService';
 import { podcastService } from '../../api/Podcasts/podcastService';
 import { serverVault } from '../../utils/serverVault';
-import { StorageKeys } from '../../utils/storageKeys';
-import { profileIdForServer } from '../../api/client';
+import { profileIdForServer, userIdForServer } from '../../api/client';
 import { PlayPauseButton, SkipButton, VolumeControl, MaximizeButton, CloseButton } from './Controls/PlayerButtons';
 import RadioNowPlaying from './RadioNowPlaying';
 import PodcastNowPlaying from './PodcastNowPlaying';
@@ -46,7 +45,7 @@ export default function LiveRadioPlayer() {
                 if (!activeServer) return;
 
                 const activeProfileId = profileIdForServer(activeServer.id) ?? activeServer.profileId;
-                const userId = localStorage.getItem(StorageKeys.userId) || activeProfileId;
+                const userId = userIdForServer(activeServer.id) || activeProfileId;
 
                 const allProviders = await iptvClientService.getPlaylists(userId, activeProfileId, activeServer.id);
                 if (cancelled) return;

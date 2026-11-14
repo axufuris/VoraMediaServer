@@ -109,3 +109,39 @@ describe('the capabilities a play request sends', () => {
         expect((await playbackCapabilities()).canSwitchAudioTracks).toBe(false);
     });
 });
+
+describe('the capabilities a play request to a second server sends', () => {
+    const tokenFor = (profileId: string) => `header.${btoa(JSON.stringify({ sub: profileId }))}.signature`;
+
+    beforeEach(() => {
+        localStorage.setItem('device_id', 'device-1');
+        localStorage.setItem('profile_token', tokenFor('profile-1'));
+        localStorage.setItem('Vora_servers_vault', JSON.stringify([
+            { id: 'home', name: 'Home', url: 'http://home', token: tokenFor('profile-1'), profileId: 'profile-1', isAdmin: false },
+            { id: 'second', name: 'Second', url: 'http://second', token: tokenFor('profile-2'), profileId: 'profile-2', isAdmin: false },
+        ]));
+        localStorage.setItem('Vora_active_server_id', 'home');
+        localStorage.setItem('playback_prefs_profile-1_device-1', JSON.stringify({ bitrate: 8, maxResolution: 720 }));
+        localStorage.setItem('playback_prefs_profile-2_device-1', JSON.stringify({ bitrate: 20, maxResolution: 1080 }));
+    });
+
+    it("carry that server's limits from the desktop app", async () => {
+        useBridge();
+        const { playbackCapabilities } = await freshModules();
+
+        const second = await playbackCapabilities('second');
+        const primary = await playbackCapabilities();
+
+        expect([second.requestedClientBitrateKbps, second.requestedMaxResolution]).toEqual([20000, 1080]);
+        expect([primary.requestedClientBitrateKbps, primary.requestedMaxResolution]).toEqual([8000, 720]);
+    });
+
+    it("carry that server's limits from the browser", async () => {
+        const { playbackCapabilities, scanner } = await freshModules();
+        const scan = vi.spyOn(scanner, 'scanDeviceCapabilities');
+
+        await playbackCapabilities('second');
+
+        expect(scan).toHaveBeenCalledWith('second');
+    });
+});

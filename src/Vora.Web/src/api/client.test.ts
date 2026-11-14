@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { createServerClient, clearApiClientCache, getResponseStatus, profileIdForServer } from './client';
+import { createServerClient, clearApiClientCache, getResponseStatus, profileIdForServer, tokenClaimsForServer, userIdForServer } from './client';
 import { serverVault, type VoraServer } from '../utils/serverVault';
-import { getProfileIdFromToken } from '../utils/storageKeys';
+import { getAccountIdFromToken, getProfileIdFromToken } from '../utils/storageKeys';
 
 describe('getResponseStatus', () => {
     it('returns the response status for axios errors', () => {
@@ -318,5 +318,80 @@ describe('profileIdForServer', () => {
 
         expect(profileIdForServer()).toBe('new-profile');
         expect(getProfileIdFromToken(sentToken())).toBe('new-profile');
+    });
+});
+
+describe('userIdForServer and tokenClaimsForServer', () => {
+    const tokenFor = (claims: Record<string, string>) => `header.${btoa(JSON.stringify(claims))}.signature`;
+    const primaryToken = tokenFor({ sub: 'primary-profile', accountId: 'primary-account', canRecordLiveTv: 'False' });
+    const secondToken = tokenFor({ sub: 'second-profile', accountId: 'second-account', canRecordLiveTv: 'True' });
+
+    const vaultServer = (id: string, token: string, profileId: string): VoraServer =>
+        ({ id, name: id, url: `http://${id}`, token, profileId, isAdmin: false });
+
+    const sentToken = (serverId?: string): string | undefined => {
+        const config = { headers: {} as Record<string, string>, url: '/x', method: 'get' };
+        // @ts-expect-error - private structure used for whitebox test
+        const requestHandlers = createServerClient(serverId).interceptors.request.handlers as { fulfilled: (c: typeof config) => typeof config }[];
+        return requestHandlers[0].fulfilled(config).headers['Authorization']?.replace('Bearer ', '');
+    };
+
+    beforeEach(() => {
+        clearApiClientCache();
+        localStorage.clear();
+        sessionStorage.clear();
+        localStorage.setItem('profile_token', primaryToken);
+        localStorage.setItem('user_id', 'primary-account');
+        serverVault.addOrUpdateServer(vaultServer('home', primaryToken, 'primary-profile'));
+        serverVault.addOrUpdateServer(vaultServer('second', secondToken, 'second-profile'));
+        serverVault.setActiveServerId('home');
+    });
+
+    afterEach(() => {
+        clearApiClientCache();
+    });
+
+    it('names the account in the token sent to a second server, not the stored primary user id', () => {
+        expect(userIdForServer('second')).toBe('second-account');
+        expect(getAccountIdFromToken(sentToken('second'))).toBe('second-account');
+    });
+
+    it('names the primary account on the primary server, as before', () => {
+        expect(userIdForServer()).toBe('primary-account');
+        expect(userIdForServer('home')).toBe('primary-account');
+    });
+
+    it('names the active server account when no server is given', () => {
+        serverVault.setActiveServerId('second');
+
+        expect(userIdForServer()).toBe('second-account');
+        expect(getAccountIdFromToken(sentToken())).toBe('second-account');
+    });
+
+    it('takes the account from an account token, which names it in accountId and sub alike', () => {
+        localStorage.removeItem('profile_token');
+        localStorage.removeItem('user_id');
+        serverVault.clearVault();
+        localStorage.setItem('account_token', tokenFor({ sub: 'account-only', accountId: 'account-only', type: 'account_level' }));
+
+        expect(userIdForServer()).toBe('account-only');
+    });
+
+    it('falls back to the stored user id when the token names no account', () => {
+        serverVault.addOrUpdateServer(vaultServer('second', 'opaque-token', 'second-profile'));
+
+        expect(userIdForServer('second')).toBe('primary-account');
+    });
+
+    it("reads the permission claims from that server's token", () => {
+        expect(tokenClaimsForServer('second')?.canRecordLiveTv).toBe('True');
+        expect(tokenClaimsForServer()?.canRecordLiveTv).toBe('False');
+    });
+
+    it('has no claims when no token is stored', () => {
+        localStorage.removeItem('profile_token');
+        serverVault.clearVault();
+
+        expect(tokenClaimsForServer()).toBeNull();
     });
 });

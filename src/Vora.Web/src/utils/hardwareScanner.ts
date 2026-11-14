@@ -1,4 +1,5 @@
-import { StorageKeys, getProfileIdFromToken } from './storageKeys';
+import { StorageKeys } from './storageKeys';
+import { profileIdForServer } from '../api/client';
 
 export interface DeviceCapabilities {
     videoCodecs: string[];
@@ -132,10 +133,10 @@ const probeHdrFormats = async (): Promise<string[]> => {
 // request, not a device capability). The Max Resolution / Max Audio
 // Channels caps are applied separately via applyUserCaps so the raw
 // auto-detected device values stay intact.
-export function readRequestedBitrateKbps(): number {
+export function readRequestedBitrateKbps(ids?: ProfileDeviceIds): number {
     let requestedClientBitrateKbps = 0;
     try {
-        const { profileId, deviceId } = getCurrentProfileDeviceIds();
+        const { profileId, deviceId } = ids ?? getCurrentProfileDeviceIds();
         const savedPref = localStorage.getItem(`playback_prefs_${profileId}_${deviceId}`);
 
         if (savedPref) {
@@ -166,12 +167,12 @@ export function readClientBandwidthKbps(): number {
     return clientBandwidthKbps;
 }
 
-export const scanDeviceCapabilitiesSync = (): DeviceCapabilities => {
+export const scanDeviceCapabilitiesSync = (ids?: ProfileDeviceIds): DeviceCapabilities => {
     const videoCodecs: string[] = [];
     const audioCodecs: string[] = [];
     const containers: string[] = [];
     const maxAudioChannels = detectAudioOutputChannels();
-    const requestedClientBitrateKbps = readRequestedBitrateKbps();
+    const requestedClientBitrateKbps = readRequestedBitrateKbps(ids);
     const clientBandwidthKbps = readClientBandwidthKbps();
     const requestedMaxResolution = 0;
     const requestedMaxWidth = 0;
@@ -263,11 +264,15 @@ export interface PlaybackPrefs {
     maxAudioChannels: number;
 }
 
-export function getCurrentProfileDeviceIds(): { profileId: string; deviceId: string } {
+export interface ProfileDeviceIds {
+    profileId: string;
+    deviceId: string;
+}
+
+export function getCurrentProfileDeviceIds(serverId?: string): ProfileDeviceIds {
     let profileId = 'unknown';
     try {
-        const token = localStorage.getItem(StorageKeys.profileToken);
-        if (token) profileId = getProfileIdFromToken(token) || 'unknown';
+        profileId = profileIdForServer(serverId) || 'unknown';
     } catch (error: unknown) {
         console.warn("Could not resolve profile id from token.", error);
     }
@@ -316,18 +321,18 @@ export function applyUserCaps(device: DeviceCapabilities, prefs: PlaybackPrefs):
 // user's caps applied. Use this anywhere the client pre-picks tracks or shows
 // a direct-play/transcode badge.
 export function getEffectiveCapabilities(profileId: string, deviceId: string): DeviceCapabilities {
-    return applyUserCaps(scanDeviceCapabilitiesSync(), readPlaybackPrefs(profileId, deviceId));
+    return applyUserCaps(scanDeviceCapabilitiesSync({ profileId, deviceId }), readPlaybackPrefs(profileId, deviceId));
 }
 
 // Full capability scan for the paths that REPORT capabilities to the server
 // (stream start, device-capabilities update). Replaces the HDR gate estimate
 // with the precise MediaCapabilities.decodingInfo probe and applies the user's
 // caps so the server sees the effective values.
-export const scanDeviceCapabilities = async (): Promise<DeviceCapabilities> => {
-    const base = scanDeviceCapabilitiesSync();
+export const scanDeviceCapabilities = async (serverId?: string): Promise<DeviceCapabilities> => {
+    const ids = getCurrentProfileDeviceIds(serverId);
+    const base = scanDeviceCapabilitiesSync(ids);
     const supportedHdrFormats = await probeHdrFormats();
-    const { profileId, deviceId } = getCurrentProfileDeviceIds();
-    return applyUserCaps({ ...base, supportedHdrFormats }, readPlaybackPrefs(profileId, deviceId));
+    return applyUserCaps({ ...base, supportedHdrFormats }, readPlaybackPrefs(ids.profileId, ids.deviceId));
 };
 
 export function detectAudioOutputChannels(): number {

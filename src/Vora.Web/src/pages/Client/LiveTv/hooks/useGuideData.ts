@@ -5,7 +5,7 @@ import { dvrService, type IptvRecordingSessionVM } from '../../../../api/Iptv/dv
 import { profileDeviceSettingsService } from '../../../../api/Users/profileDeviceSettingsService';
 import { serverVault } from '../../../../utils/serverVault';
 import { StorageKeys } from '../../../../utils/storageKeys';
-import { profileIdForServer } from '../../../../api/client';
+import { profileIdForServer, userIdForServer } from '../../../../api/client';
 import { useSignalREvent } from '../../../../hooks/useSignalREvent';
 
 export interface GuidePrefs {
@@ -112,7 +112,7 @@ export function useGuideData(serverId: string | undefined, timelineStart: Date, 
                 if (!activeServer) return;
 
                 const activeProfileId = profileIdFor(serverId, activeServer);
-                const userId = localStorage.getItem(StorageKeys.userId) || activeProfileId;
+                const userId = userIdForServer(serverId) || activeProfileId;
                 const deviceId = readDeviceId();
                 const cacheKey = StorageKeys.iptvPrefs(activeProfileId, deviceId);
 

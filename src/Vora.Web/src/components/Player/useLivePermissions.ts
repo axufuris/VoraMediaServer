@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react';
 import { userService } from '../../api/Users/userService';
+import { tokenClaimsForServer, userIdForServer } from '../../api/client';
 import { serverVault } from '../../utils/serverVault';
-import { StorageKeys, decodeJwtPayload } from '../../utils/storageKeys';
+import { StorageKeys } from '../../utils/storageKeys';
 
 export interface LivePermissions {
     canTimeshift: boolean;
@@ -10,19 +11,18 @@ export interface LivePermissions {
 
 const truthy = (value: unknown) => value === true || value === 'True' || value === 'true' || value === '1' || value === 1;
 
+const activeServerId = (): string | undefined => serverVault.getActiveServerId() || undefined;
+
 export function readLivePermissions(): LivePermissions {
-    const isServerAdmin = localStorage.getItem(StorageKeys.isServerAdmin) === 'true';
-    const token = localStorage.getItem(StorageKeys.profileToken);
-    if (!token) return { canTimeshift: isServerAdmin, canRecord: isServerAdmin };
-    try {
-        const payload = decodeJwtPayload(token) ?? {};
-        return {
-            canTimeshift: isServerAdmin || truthy(payload.canTimeshiftIptv),
-            canRecord: isServerAdmin || truthy(payload.canRecordLiveTv),
-        };
-    } catch {
-        return { canTimeshift: isServerAdmin, canRecord: isServerAdmin };
-    }
+    const claims = tokenClaimsForServer(activeServerId());
+    const isServerAdmin = claims && 'isAdmin' in claims
+        ? truthy(claims.isAdmin)
+        : localStorage.getItem(StorageKeys.isServerAdmin) === 'true';
+    if (!claims) return { canTimeshift: isServerAdmin, canRecord: isServerAdmin };
+    return {
+        canTimeshift: isServerAdmin || truthy(claims.canTimeshiftIptv),
+        canRecord: isServerAdmin || truthy(claims.canRecordLiveTv),
+    };
 }
 
 export function useLivePermissions(refresh = true): LivePermissions {
@@ -30,10 +30,11 @@ export function useLivePermissions(refresh = true): LivePermissions {
 
     useEffect(() => {
         if (!refresh) return;
-        const userId = localStorage.getItem(StorageKeys.userId);
+        const serverId = activeServerId();
+        const userId = userIdForServer(serverId);
         if (!userId) return;
         let cancelled = false;
-        userService.getUserAccount(userId, serverVault.getActiveServerId() || undefined)
+        userService.getUserAccount(userId, serverId)
             .then(u => {
                 if (cancelled) return;
                 setPermissions({

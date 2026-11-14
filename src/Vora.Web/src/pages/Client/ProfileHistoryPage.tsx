@@ -2,7 +2,7 @@ import { useState, useEffect, Fragment } from 'react';
 import { useParams } from 'react-router-dom';
 import { type UserProfileHistoryDto, type UserVM, userService } from '../../api/Users/userService';
 import { StorageKeys } from '../../utils/storageKeys';
-import { profileIdForServer } from '../../api/client';
+import { profileIdForServer, userIdForServer } from '../../api/client';
 import { formatTime, parseServerDate } from '../../utils/serverTime';
 export default function ProfileHistoryPage() {
     const { serverId } = useParams<{ serverId?: string }>();
@@ -11,7 +11,7 @@ export default function ProfileHistoryPage() {
     const [totalItems, setTotalItems] = useState(0);
     const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set());
 
-    const userId = localStorage.getItem(StorageKeys.userId);
+    const userId = userIdForServer(serverId);
     const activeProfileId = profileIdForServer(serverId);
     const isServerAdmin = localStorage.getItem(StorageKeys.isServerAdmin) === 'true';
 

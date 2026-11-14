@@ -11,6 +11,7 @@ const mocks = vi.hoisted(() => ({
     getNavPrefs: vi.fn(),
     saveNavPrefs: vi.fn(),
     getPlaybackPrefs: vi.fn(),
+    playbackCapabilities: vi.fn(),
 }));
 
 vi.mock('../api/Users/profileDeviceSettingsService', () => ({
@@ -20,7 +21,7 @@ vi.mock('../api/Media/libraryService', () => ({ libraryService: { getLibraries: 
 vi.mock('../api/Auth/authService', () => ({ authService: { logout: vi.fn() } }));
 vi.mock('../api/Streaming/streamingService', () => ({ streamingService: { measureConnection: () => Promise.resolve() } }));
 vi.mock('../api/Users/deviceService', () => ({ deviceService: { updateCapabilities: () => Promise.resolve() } }));
-vi.mock('../utils/desktopCapabilities', () => ({ playbackCapabilities: () => Promise.resolve({}) }));
+vi.mock('../utils/desktopCapabilities', () => ({ playbackCapabilities: mocks.playbackCapabilities }));
 vi.mock('../hooks/useSignalREvent', () => ({ useSignalREvent: () => { }, disconnectSignalR: () => { } }));
 vi.mock('../hooks/useScrollRestoration', () => ({ useScrollRestoration: () => () => { } }));
 vi.mock('../hooks/useFeatureFlags', () => ({
@@ -72,6 +73,7 @@ beforeEach(() => {
     mocks.getNavPrefs.mockResolvedValue(null);
     mocks.saveNavPrefs.mockResolvedValue(undefined);
     mocks.getPlaybackPrefs.mockResolvedValue('{"bitrate":8}');
+    mocks.playbackCapabilities.mockResolvedValue({});
 });
 
 afterEach(() => {
@@ -106,5 +108,36 @@ describe('MainLayout on a second server', () => {
         fireEvent.click(await screen.findByRole('button', { name: 'Music' }));
 
         expect(mocks.saveNavPrefs).toHaveBeenCalledWith('profile-1', 'device-1', expect.any(String), undefined);
+    });
+});
+
+describe('MainLayout identity on a second server', () => {
+    const scheduledToken = (profileId: string) => {
+        const today = new Date().getDay();
+        const schedules = JSON.stringify([{ dayOfWeek: (today + 1) % 7, startTime: '00:00', endTime: '23:59' }]);
+        return `header.${btoa(JSON.stringify({ sub: profileId, accountId: 'account-2', accessSchedules: schedules }))}.signature`;
+    };
+
+    it("blocks a second server's pages by that server's profile schedule", async () => {
+        serverVault.addOrUpdateServer({ id: 'second', name: 'Second', url: 'http://second', token: scheduledToken('profile-2'), profileId: 'profile-2', isAdmin: false });
+
+        renderAt('/server/second');
+
+        expect(await screen.findByText('Outside Allowed Timeframe')).toBeInTheDocument();
+    });
+
+    it('leaves the primary server open when only the second profile has a schedule', async () => {
+        serverVault.addOrUpdateServer({ id: 'second', name: 'Second', url: 'http://second', token: scheduledToken('profile-2'), profileId: 'profile-2', isAdmin: false });
+
+        renderAt('/');
+
+        expect(await screen.findByRole('button', { name: 'Music' })).toBeInTheDocument();
+        expect(screen.queryByText('Outside Allowed Timeframe')).toBeNull();
+    });
+
+    it("reports this device's capabilities to a second server with that server's playback prefs", async () => {
+        renderAt('/server/second');
+
+        await waitFor(() => expect(mocks.playbackCapabilities).toHaveBeenCalledWith('second'));
     });
 });

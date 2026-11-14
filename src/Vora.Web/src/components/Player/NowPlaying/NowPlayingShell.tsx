@@ -15,6 +15,7 @@ export interface NowPlayingKeys {
     onSkipForward?: (seconds: number) => void;
     onSkipBackward?: (seconds: number) => void;
     enabled?: boolean;
+    serverId?: string;
 }
 
 const doNothing = () => { };
@@ -65,6 +66,7 @@ export function NowPlayingShell({
         onSkipBackward: playerKeys?.onSkipBackward ?? doNothing,
         onVolume: playerKeys?.onVolume ?? doNothing,
         plainArrows: false,
+        serverId: playerKeys?.serverId,
     });
 
     // A D-pad can only move focus that already exists, and a remote cannot

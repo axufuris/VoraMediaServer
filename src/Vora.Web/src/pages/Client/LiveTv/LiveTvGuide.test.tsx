@@ -1,10 +1,12 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { act, fireEvent, render, screen } from '@testing-library/react';
-import { MemoryRouter } from 'react-router-dom';
+import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import LiveTvGuide from './LiveTvGuide';
 import type { IptvChannelVM } from '../../../api/Iptv/iptvAdminService';
 import type { IptvProgramDto } from '../../../api/Iptv/iptvClientService';
 import type { UseGuideDataResult } from './hooks/useGuideData';
+import { serverVault } from '../../../utils/serverVault';
+import { StorageKeys } from '../../../utils/storageKeys';
 
 const START = new Date('2026-09-24T20:00:00Z').getTime();
 
@@ -75,5 +77,49 @@ describe('LiveTvGuide channel order', () => {
 
         fireEvent.change(screen.getByPlaceholderText('Search channels...'), { target: { value: 'a' } });
         expect(channelOrder()).toEqual(['Bravo', 'Charlie', 'Alpha News']);
+    });
+});
+
+describe('LiveTvGuide recording on a second server', () => {
+    const tokenFor = (claims: Record<string, string>) => `header.${btoa(JSON.stringify(claims))}.signature`;
+
+    beforeEach(() => {
+        vi.useFakeTimers();
+        vi.setSystemTime(START);
+        vi.stubGlobal('ResizeObserver', NoopResizeObserver);
+        localStorage.clear();
+        localStorage.setItem(StorageKeys.profileToken, tokenFor({ sub: 'profile-1', canRecordLiveTv: 'False' }));
+        serverVault.addOrUpdateServer({ id: 'second', name: 'Second', url: 'http://second', token: tokenFor({ sub: 'profile-2', canRecordLiveTv: 'True' }), profileId: 'profile-2', isAdmin: false });
+    });
+
+    afterEach(() => {
+        vi.useRealTimers();
+        vi.unstubAllGlobals();
+        localStorage.clear();
+    });
+
+    const openProgram = (path: string) => {
+        render(
+            <MemoryRouter initialEntries={[path]}>
+                <Routes>
+                    <Route path="/livetv" element={<LiveTvGuide />} />
+                    <Route path="/server/:serverId/livetv" element={<LiveTvGuide />} />
+                </Routes>
+            </MemoryRouter>,
+        );
+        fireEvent.contextMenu(screen.getByText('bravo show'));
+    };
+
+    it("offers recording when that server's profile may record", () => {
+        openProgram('/server/second/livetv');
+
+        expect(screen.getByRole('button', { name: /Record this episode/ })).toBeInTheDocument();
+    });
+
+    it('keeps the primary profile rights on the primary server', () => {
+        openProgram('/livetv');
+
+        expect(screen.getByRole('button', { name: /Play channel/ })).toBeInTheDocument();
+        expect(screen.queryByRole('button', { name: /Record this episode/ })).toBeNull();
     });
 });
