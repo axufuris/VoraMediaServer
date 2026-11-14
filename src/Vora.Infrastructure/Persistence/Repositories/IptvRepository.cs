@@ -118,11 +118,13 @@ public class IptvRepository : IIptvRepository
     public async Task DeletePlaylistAsync(Guid id)
     {
         var playlist = await _context.IptvPlaylists.FindAsync(id);
-        if (playlist != null)
-        {
-            _context.IptvPlaylists.Remove(playlist);
-            await _context.SaveChangesAsync();
-        }
+        if (playlist == null) return;
+
+        await using var transaction = await _context.Database.BeginTransactionAsync();
+        await AccessLists.RemoveIptvPlaylistAsync(_context, id);
+        _context.IptvPlaylists.Remove(playlist);
+        await _context.SaveChangesAsync();
+        await transaction.CommitAsync();
     }
 
     public async Task UpdateChannelsAsync(Guid playlistId, List<IptvChannel> newChannels)

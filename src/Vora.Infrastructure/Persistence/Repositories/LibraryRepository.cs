@@ -237,6 +237,8 @@ public class LibraryRepository : ILibraryRepository
             .Select(m => m.Id)
             .ToListAsync(cancellationToken);
 
+        await using var transaction = await _context.Database.BeginTransactionAsync(cancellationToken);
+
         if (showIds.Any())
         {
             await _context.Set<Season>()
@@ -248,8 +250,11 @@ public class LibraryRepository : ILibraryRepository
             .Where(m => m.LibraryId == id)
             .ExecuteDeleteAsync(cancellationToken);
 
+        await AccessLists.RemoveLibraryAsync(_context, id, cancellationToken);
+
         _context.MediaLibraries.Remove(library);
         await _context.SaveChangesAsync(cancellationToken);
+        await transaction.CommitAsync(cancellationToken);
     }
 
 }

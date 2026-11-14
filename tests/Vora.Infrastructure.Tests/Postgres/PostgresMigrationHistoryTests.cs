@@ -1,3 +1,4 @@
+using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
 using Vora.Application.SmartLists;
 using Vora.Domain.Entities.Iptv;
@@ -689,6 +690,109 @@ public class PostgresMigrationHistoryTests(PostgresDatabase database) : IClassFi
         play.Completed.Should().BeTrue();
         play.Source.Should().Be(MusicPlaySource.None);
         play.SourceId.Should().BeNull();
+    }
+
+    private sealed class StoredAccessLists
+    {
+        public string AllowedLibraryIds { get; init; } = string.Empty;
+        public string AllowedIptvPlaylistIds { get; init; } = string.Empty;
+    }
+
+    private static Task<StoredAccessLists> StoredAccountListsAsync(VoraDbContext db, Guid userId, CancellationToken cancellationToken) =>
+        db.Database.SqlQuery<StoredAccessLists>($"SELECT \"AllowedLibraryIds\", \"AllowedIptvPlaylistIds\" FROM \"Users\" WHERE \"Id\" = {userId}").SingleAsync(cancellationToken);
+
+    private static Task<StoredAccessLists> StoredProfileListsAsync(VoraDbContext db, Guid profileId, CancellationToken cancellationToken) =>
+        db.Database.SqlQuery<StoredAccessLists>($"SELECT \"AllowedLibraryIds\", \"AllowedIptvPlaylistIds\" FROM \"UserProfiles\" WHERE \"Id\" = {profileId}").SingleAsync(cancellationToken);
+
+    [Fact]
+    public async Task A_database_on_the_ai_row_flag_migration_forgets_access_to_libraries_and_playlists_that_no_longer_exist()
+    {
+        Assert.SkipUnless(PostgresDatabase.IsConfigured, PostgresDatabase.SkipReason);
+        var cancellationToken = TestContext.Current.CancellationToken;
+        await using var legacy = new LegacyDatabase();
+        var movies = new MediaLibrary { Name = "Movies", Type = LibraryType.Movie, FolderPaths = new List<string> { "/media/movies" } };
+        var shows = new MediaLibrary { Name = "Shows", Type = LibraryType.TvShow, FolderPaths = new List<string> { "/media/shows" } };
+        var freeview = new IptvPlaylist { Name = "Freeview" };
+        var deletedLibrary = Guid.Parse("1d9fa095-beb2-4393-aed4-6b1546cf90e8");
+        var otherDeletedLibrary = Guid.Parse("a8f484bc-38df-420d-ac1e-5479e1a1ef7f");
+        var deletedPlaylist = Guid.NewGuid();
+        var account = new User
+        {
+            Email = "restricted@example.com",
+            DisplayName = "Restricted",
+            HasAllLibraryAccess = false,
+            AllowedLibraryIds = new List<Guid> { deletedLibrary, movies.Id, otherDeletedLibrary, shows.Id },
+            HasAllIptvAccess = false,
+            AllowedIptvPlaylistIds = new List<Guid> { deletedPlaylist, freeview.Id }
+        };
+        var onlyDeleted = new UserProfile
+        {
+            Name = "Kid",
+            UserId = account.Id,
+            HasAllLibraryAccess = false,
+            AllowedLibraryIds = new List<Guid> { otherDeletedLibrary },
+            HasAllIptvAccess = false,
+            AllowedIptvPlaylistIds = new List<Guid> { deletedPlaylist }
+        };
+        var untouched = new UserProfile
+        {
+            Name = "Teen",
+            UserId = account.Id,
+            HasAllLibraryAccess = false,
+            AllowedLibraryIds = new List<Guid> { shows.Id, movies.Id },
+            HasAllIptvAccess = false,
+            AllowedIptvPlaylistIds = new List<Guid> { freeview.Id }
+        };
+        var everything = new User { Email = "admin@example.com", DisplayName = "Admin" };
+        await legacy.BuildAiRowFlagStateAsync(async db =>
+        {
+            db.AddRange(movies, shows, freeview, account, onlyDeleted, untouched, everything);
+            await db.SaveChangesAsync(cancellationToken);
+        }, cancellationToken);
+
+        StoredAccessLists untouchedBefore, everythingBefore;
+        await using (var before = legacy.NewContext())
+        {
+            (await before.Database.GetPendingMigrationsAsync(cancellationToken)).Should().Equal(MigrationHistoryTests.ChangesSinceInitial);
+            untouchedBefore = await StoredProfileListsAsync(before, untouched.Id, cancellationToken);
+            everythingBefore = await StoredAccountListsAsync(before, everything.Id, cancellationToken);
+        }
+
+        await legacy.MigrateAsync(cancellationToken);
+
+        StoredAccessLists accountAfter, onlyDeletedAfter;
+        await using (var after = legacy.NewContext())
+        {
+            (await after.Database.GetPendingMigrationsAsync(cancellationToken)).Should().BeEmpty();
+
+            var storedAccount = await after.Users.AsNoTracking().SingleAsync(u => u.Id == account.Id, cancellationToken);
+            storedAccount.HasAllLibraryAccess.Should().BeFalse();
+            storedAccount.AllowedLibraryIds.Should().Equal(movies.Id, shows.Id);
+            storedAccount.AllowedIptvPlaylistIds.Should().Equal(freeview.Id);
+
+            var storedProfile = await after.UserProfiles.AsNoTracking().SingleAsync(p => p.Id == onlyDeleted.Id, cancellationToken);
+            storedProfile.HasAllLibraryAccess.Should().BeFalse();
+            storedProfile.AllowedLibraryIds.Should().BeEmpty();
+            storedProfile.HasAllIptvAccess.Should().BeFalse();
+            storedProfile.AllowedIptvPlaylistIds.Should().BeEmpty();
+
+            accountAfter = await StoredAccountListsAsync(after, account.Id, cancellationToken);
+            accountAfter.AllowedLibraryIds.Should().Be(JsonSerializer.Serialize(new List<Guid> { movies.Id, shows.Id }));
+            onlyDeletedAfter = await StoredProfileListsAsync(after, onlyDeleted.Id, cancellationToken);
+            onlyDeletedAfter.AllowedLibraryIds.Should().Be("[]");
+            onlyDeletedAfter.AllowedIptvPlaylistIds.Should().Be("[]");
+            (await StoredProfileListsAsync(after, untouched.Id, cancellationToken)).Should().BeEquivalentTo(untouchedBefore);
+            (await StoredAccountListsAsync(after, everything.Id, cancellationToken)).Should().BeEquivalentTo(everythingBefore);
+
+            await after.Database.ExecuteSqlAsync($"DELETE FROM \"__EFMigrationsHistory\" WHERE \"MigrationId\" = {MigrationHistoryTests.ChangesSinceInitial}", cancellationToken);
+        }
+
+        await legacy.MigrateAsync(cancellationToken);
+
+        await using var again = legacy.NewContext();
+        (await StoredAccountListsAsync(again, account.Id, cancellationToken)).Should().BeEquivalentTo(accountAfter);
+        (await StoredProfileListsAsync(again, onlyDeleted.Id, cancellationToken)).Should().BeEquivalentTo(onlyDeletedAfter);
+        (await StoredProfileListsAsync(again, untouched.Id, cancellationToken)).Should().BeEquivalentTo(untouchedBefore);
     }
 
     private static RecommendationSnapshot StoredRows(Guid profileId, Guid scope, string providerId, string rows) =>
