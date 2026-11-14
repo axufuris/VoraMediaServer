@@ -56,7 +56,7 @@ All under `/api/auth/*`, anonymous unless noted. See `Vora.Api/Endpoints/AuthEnd
 | --- | --- |
 | `GET /setup-status` | Returns `{ isClaimed, registrationMode, serverName, emailEnabled }`. The frontend uses `emailEnabled` to decide whether to render Forgot Password / Email Invitations UI. |
 | `POST /setup` | First-run server claim. |
-| `POST /login` | Email + password, returns `account_token`. |
+| `POST /login` | Email + password, returns `account_token`. A failure is a bare 401; the server log says why (warning: no account with that email, wrong password with its length, or locked out after 5 failures in 15 min for 5 min), never the password itself. |
 | `POST /register` | Body: `{ email, password, displayName, secretCode?, inviteToken? }`. If `inviteToken` is present, validates it via `InvitationManager`, forces the email to match the ticket, and bypasses `RegistrationMode.Disabled`. Otherwise enforces `RegistrationMode` (Simple / SecretWord / Disabled). |
 | `POST /exchange-profile-token` | Returns the narrower `profile_token`. |
 | `POST /forgot-password` | Body: `{ email }`. Always returns 204 (no enumeration leak). Throttled 3/hour/email via `IMemoryCache`. Silently no-ops if email is disabled. |

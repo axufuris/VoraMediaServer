@@ -261,14 +261,26 @@ public class AuthManager(
     public async Task<AuthResponseDto?> LoginAsync(string email, string password)
     {
         var key = email.Trim().ToLowerInvariant();
+        // A failed sign-in says why in the server log (never the password),
+        // so an admin can tell a mistyped email from a wrong password: the
+        // client only ever gets a bare 401.
         if (memoryCache.TryGetValue(LoginLockPrefix + key, out _))
         {
+            logger.LogWarning("Sign-in refused for '{Email}': locked out after {MaxFailures} failed attempts", email, MaxLoginFailures);
             return null;
         }
 
         var user = await repository.GetUserWithProfilesByEmailAsync(email);
         if (user == null || !VerifyPassword(password, user.PasswordHash))
         {
+            if (user == null)
+            {
+                logger.LogWarning("Sign-in failed for '{Email}': no account has that email", email);
+            }
+            else
+            {
+                logger.LogWarning("Sign-in failed for '{Email}': wrong password ({PasswordLength} characters)", email, password.Length);
+            }
             RegisterFailedLogin(key);
             return null;
         }
