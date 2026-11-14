@@ -9,6 +9,8 @@ public interface IMetadataProvider : IVoraPlugin
     Task<MetadataResult?> FetchMovieMetadataByIdAsync(string id, string source, CancellationToken cancellationToken = default);
     Task<MetadataResult?> FetchTvShowMetadataByIdAsync(string id, string source, CancellationToken cancellationToken = default);
     Task<MetadataResult?> FetchEpisodeMetadataAsync(string showTmdbId, int seasonNumber, int episodeNumber, CancellationToken cancellationToken = default);
+    Task<IReadOnlyDictionary<int, MetadataResult>?> FetchSeasonEpisodesAsync(string showId, int seasonNumber, CancellationToken cancellationToken = default)
+        => Task.FromResult<IReadOnlyDictionary<int, MetadataResult>?>(null);
     Task<MetadataResult?> FetchSeasonMetadataAsync(string showId, string source, int seasonNumber, CancellationToken cancellationToken = default)
         => Task.FromResult<MetadataResult?>(null);
     Task<ActorMetadataResult?> FetchActorMetadataAsync(int personId, CancellationToken cancellationToken = default);

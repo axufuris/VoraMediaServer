@@ -344,10 +344,7 @@ public class LibraryManager : ILibraryManager
             return itemId;
         }
 
-        var metadata = sp.GetRequiredService<IMetadataManager>();
-        await metadata.TriggerMediaItemMetadataRefreshAsync(itemId.Value, forceOverride, cancellationToken);
-        await metadata.TriggerMediaItemArtworkRefreshAsync(itemId.Value, forceOverride, cancellationToken);
-        await metadata.TriggerMediaItemRatingsRefreshAsync(itemId.Value, forceOverride, cancellationToken);
+        await sp.GetRequiredService<IMetadataManager>().RefreshTitleAsync(itemId.Value, forceOverride, cancellationToken);
         if (forceOverride) await media.MarkFullyRefreshedAsync(itemId.Value);
         return itemId;
     }

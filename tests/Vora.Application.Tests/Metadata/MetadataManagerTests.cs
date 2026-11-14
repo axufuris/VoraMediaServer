@@ -229,13 +229,13 @@ public class MetadataManagerTests
         var idB = Guid.NewGuid();
         // Non-force ratings refresh targets only items still missing a rating.
         _media.GetMediaIdsMissingRatingsAsync(libId).Returns(new[] { idA, idB });
-        // GetForMetadataSyncAsync returns null for both → RefreshRatingsAsync no-ops
-        _media.GetForMetadataSyncAsync(Arg.Any<Guid>()).Returns((Vora.Domain.Entities.Media.MediaItem?)null);
+        // GetForRatingsRefreshAsync returns null for both → RefreshRatingsAsync no-ops
+        _media.GetForRatingsRefreshAsync(Arg.Any<Guid>()).Returns((Vora.Domain.Entities.Media.MediaItem?)null);
 
         await _manager.TriggerLibraryRatingsRefreshAsync(libId, cancellationToken: TestContext.Current.CancellationToken);
 
-        await _media.Received(1).GetForMetadataSyncAsync(idA);
-        await _media.Received(1).GetForMetadataSyncAsync(idB);
+        await _media.Received(1).GetForRatingsRefreshAsync(idA);
+        await _media.Received(1).GetForRatingsRefreshAsync(idB);
         await _notifier.Received().NotifyLibraryUpdatedAsync(libId);
     }
 

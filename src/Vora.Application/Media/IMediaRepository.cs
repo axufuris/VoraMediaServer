@@ -72,6 +72,8 @@ public interface IMediaRepository
     Task<IEnumerable<Guid>> GetEnrichableMediaIdsAsync(Guid libraryId, DateTime? fullyRefreshedBefore = null, DateTime? ratingsCheckedBefore = null);
     Task MarkFullyRefreshedAsync(Guid mediaItemId);
     Task<IEnumerable<Guid>> GetMediaIdsMissingRatingsAsync(Guid libraryId);
+    Task<IReadOnlyList<(Guid ShowId, Guid EpisodeId)>> GetEpisodeIdsToRateAsync(Guid libraryId, bool missingOnly, DateTime? checkedBefore = null);
+    Task<MediaItem?> GetForRatingsRefreshAsync(Guid id);
     Task<List<Guid>> GetMediaIdsMissingTvdbIdAsync();
     Task<MediaItem?> GetForBasicUpdateAsync(Guid id);
     Task SyncMediaTracksAsync(Guid mediaPartId, List<MediaVideoTrack> incomingVideo, List<MediaAudioTrack> incomingAudio, List<MediaSubtitleTrack> incomingSubtitles);

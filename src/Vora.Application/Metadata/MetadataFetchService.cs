@@ -16,6 +16,8 @@ public interface IMetadataFetchService
     Task<((decimal? Rating1, string? Name1, decimal? Rating2, string? Name2) Ratings, List<MediaArtwork> Artwork)> GetSecondaryDataAsync(MediaItem item, bool forceOverride, CancellationToken cancellationToken = default);
     Task<List<MediaArtwork>> GetArtworkAsync(MediaItem item);
     Task<(decimal? Rating1, string? Name1, decimal? Rating2, string? Name2)> GetRatingsAsync(MediaItem item, CancellationToken cancellationToken = default);
+    (decimal? Rating1, string? Name1, decimal? Rating2, string? Name2) GetRatingsInMetadata(MediaItem item, MetadataResult? metadata, string metadataProviderId);
+    bool CanAskRatingsProviders(MediaLibrary library);
 }
 
 public class MetadataFetchService : IMetadataFetchService
@@ -30,6 +32,7 @@ public class MetadataFetchService : IMetadataFetchService
     private readonly ILocalMediaReader _localMedia;
     private readonly IVideoFrameArtworkService _frames;
     private readonly Dictionary<Guid, bool> _trustedShowDocuments = new();
+    private readonly Dictionary<(string Provider, string Show, int Season), IReadOnlyDictionary<int, MetadataResult>?> _seasonEpisodes = new();
 
     public MetadataFetchService(
         IEnumerable<IMetadataProvider> providers,
@@ -275,48 +278,100 @@ public class MetadataFetchService : IMetadataFetchService
         {
             if (provider.Id == "tvdb_metadata" && !string.IsNullOrEmpty(episode.Season?.TvShow?.TvdbId))
             {
-                return await provider.FetchEpisodeMetadataAsync(episode.Season.TvShow.TvdbId, episode.Season.SeasonNumber, episode.EpisodeNumber);
+                return await FetchEpisodeFromItsSeasonAsync(provider, episode.Season.TvShow.TvdbId, episode.Season.SeasonNumber, episode.EpisodeNumber);
             }
 
             if (!string.IsNullOrEmpty(episode.Season?.TvShow?.TmdbId))
             {
-                return await provider.FetchEpisodeMetadataAsync(episode.Season.TvShow.TmdbId, episode.Season.SeasonNumber, episode.EpisodeNumber);
+                return await FetchEpisodeFromItsSeasonAsync(provider, episode.Season.TvShow.TmdbId, episode.Season.SeasonNumber, episode.EpisodeNumber);
             }
         }
 
         return null;
     }
 
+    private async Task<MetadataResult?> FetchEpisodeFromItsSeasonAsync(IMetadataProvider provider, string showId, int seasonNumber, int episodeNumber)
+    {
+        var key = (provider.Id, showId, seasonNumber);
+        if (!_seasonEpisodes.TryGetValue(key, out var seasonEpisodes))
+        {
+            seasonEpisodes = await provider.FetchSeasonEpisodesAsync(showId, seasonNumber);
+            _seasonEpisodes[key] = seasonEpisodes;
+        }
+
+        if (seasonEpisodes != null && seasonEpisodes.TryGetValue(episodeNumber, out var episode)) return episode;
+
+        return await provider.FetchEpisodeMetadataAsync(showId, seasonNumber, episodeNumber);
+    }
+
+    public (decimal? Rating1, string? Name1, decimal? Rating2, string? Name2) GetRatingsInMetadata(MediaItem item, MetadataResult? metadata, string metadataProviderId)
+    {
+        if (item.Library == null || metadata == null || StaysLocal(item)) return (null, null, null, null);
+
+        var (provider1, provider2) = RatingsProvidersOf(item.Library);
+        var score = metadata.Rating is > 0 ? metadata.Rating : null;
+        var name1 = SourceCarriedBy(provider1, metadataProviderId);
+        var name2 = SourceCarriedBy(provider2, metadataProviderId);
+
+        return (name1 == null ? null : score, name1, name2 == null ? null : score, name2);
+    }
+
+    private static string? SourceCarriedBy(IRatingsProvider? provider, string metadataProviderId) =>
+        provider is { } carried && carried.ScoreComesWithMetadataFrom == metadataProviderId ? carried.RatingSourceName : null;
+
+    public bool CanAskRatingsProviders(MediaLibrary library)
+    {
+        var (provider1, provider2) = RatingsProvidersOf(library);
+        return provider1?.IsCurrentlyAvailable == true || provider2?.IsCurrentlyAvailable == true;
+    }
+
+    private (IRatingsProvider? Slot1, IRatingsProvider? Slot2) RatingsProvidersOf(MediaLibrary library) =>
+        (RatingsProvider(library.ThirdPartyRating1ProviderId), RatingsProvider(library.ThirdPartyRating2ProviderId));
+
+    private IRatingsProvider? RatingsProvider(string? providerId) =>
+        string.IsNullOrEmpty(providerId) ? null : _ratingsProviders.FirstOrDefault(p => p.Id == providerId);
+
     private async Task<(decimal? Rating1, string? Name1, decimal? Rating2, string? Name2)> FetchRatingsDataAsync(MediaItem item, CancellationToken cancellationToken = default)
     {
         if (item.Library == null || StaysLocal(item)) return (null, null, null, null);
 
-        var provider1 = !string.IsNullOrEmpty(item.Library.ThirdPartyRating1ProviderId)
-            ? _ratingsProviders.FirstOrDefault(p => p.Id == item.Library.ThirdPartyRating1ProviderId) : null;
+        var (provider1, provider2) = RatingsProvidersOf(item.Library);
+        var slot1 = FetchSlotAsync(item, provider1, item.ThirdPartyRating1, item.ThirdPartyRating1Name, cancellationToken);
+        var slot2 = FetchSlotAsync(item, provider2, item.ThirdPartyRating2, item.ThirdPartyRating2Name, cancellationToken);
 
-        var provider2 = !string.IsNullOrEmpty(item.Library.ThirdPartyRating2ProviderId)
-            ? _ratingsProviders.FirstOrDefault(p => p.Id == item.Library.ThirdPartyRating2ProviderId) : null;
+        await Task.WhenAll(slot1, slot2);
+
+        var (rating1, name1) = await slot1;
+        var (rating2, name2) = await slot2;
+        return (rating1, name1, rating2, name2);
+    }
+
+    private Task<(decimal? Rating, string? Name)> FetchSlotAsync(MediaItem item, IRatingsProvider? provider, decimal? stored, string? storedName, CancellationToken cancellationToken)
+    {
+        if (provider == null) return Task.FromResult<(decimal?, string?)>((null, null));
+
+        if (item is Episode && provider.ScoreComesWithMetadataFrom == MetadataProviderIdOf(item))
+        {
+            var kept = storedName == provider.RatingSourceName ? stored : null;
+            return Task.FromResult<(decimal?, string?)>((kept, provider.RatingSourceName));
+        }
 
         // A provider that's configured but temporarily unavailable (e.g. its
         // rate-limit circuit breaker is open) is treated as "not consulted": we
         // skip the fetch AND return a null slot name. ApplyRatingsAsync only
         // clears a slot when its name is non-null, so a null name leaves any
         // existing rating in place instead of wiping it during the outage.
-        var available1 = provider1 != null && provider1.IsCurrentlyAvailable;
-        var available2 = provider2 != null && provider2.IsCurrentlyAvailable;
+        if (!provider.IsCurrentlyAvailable) return Task.FromResult<(decimal?, string?)>((null, null));
 
-        Task<decimal?> task1 = available1
-            ? provider1!.FetchRatingAsync(item.ImdbId, item.TmdbId, item.TvdbId, item.GetType().Name, cancellationToken)
-            : Task.FromResult<decimal?>(null);
+        return AskAsync();
 
-        Task<decimal?> task2 = available2
-            ? provider2!.FetchRatingAsync(item.ImdbId, item.TmdbId, item.TvdbId, item.GetType().Name, cancellationToken)
-            : Task.FromResult<decimal?>(null);
-
-        await Task.WhenAll(task1, task2);
-
-        return (await task1, available1 ? provider1!.RatingSourceName : null, await task2, available2 ? provider2!.RatingSourceName : null);
+        async Task<(decimal?, string?)> AskAsync() =>
+            (await provider.FetchRatingAsync(item.ImdbId, item.TmdbId, item.TvdbId, item.GetType().Name, cancellationToken), provider.RatingSourceName);
     }
+
+    private static string MetadataProviderIdOf(MediaItem item) => item.Library?.MetadataProviderId ?? TmdbMetadataProviderId;
+
+    private static bool TakesItsPictureFromItsMetadata(MediaItem item) => item is Episode;
 
     private static bool UsesLocalArtworkProvider(MediaItem item) =>
         StaysLocal(item) || item.Library?.ArtworkProviderId == LocalArtworkProvider.ProviderId;
@@ -349,7 +404,7 @@ public class MetadataFetchService : IMetadataFetchService
     private async Task<List<MediaArtwork>> FetchProviderArtworkAsync(MediaItem item)
     {
         var artworkEntities = new List<MediaArtwork>();
-        if (item?.Library == null || UsesLocalArtworkProvider(item)) return artworkEntities;
+        if (item?.Library == null || UsesLocalArtworkProvider(item) || TakesItsPictureFromItsMetadata(item)) return artworkEntities;
 
         var providerIdToUse = item.Library.ArtworkProviderId ?? TmdbArtworkProviderId;
         var provider = _artworkProviders.FirstOrDefault(p => p.Id == providerIdToUse) ?? _artworkProviders.FirstOrDefault(p => p.Id == TmdbArtworkProviderId);

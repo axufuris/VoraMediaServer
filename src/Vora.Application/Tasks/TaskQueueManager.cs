@@ -270,9 +270,7 @@ public class TaskQueueManager : ITaskQueueManager
             await mediaManager.TriggerTargetedScanAsync(mediaItemId, ct);
             await analyzerManager.TriggerMediaItemFileAnalysisAsync(mediaItemId, mediaItemName, ct);
 
-            await metadataManager.TriggerMediaItemMetadataRefreshAsync(mediaItemId, forceOverride, ct);
-            await metadataManager.TriggerMediaItemArtworkRefreshAsync(mediaItemId, forceOverride, ct);
-            await metadataManager.TriggerMediaItemRatingsRefreshAsync(mediaItemId, forceOverride, ct);
+            await metadataManager.RefreshTitleAsync(mediaItemId, forceOverride, ct);
             await metadataManager.TriggerActorMetadataRefreshAsync(ct);
 
             await analyzerManager.TriggerMediaItemSilenceDetectionAsync(mediaItemId, mediaItemName, forceOverride: forceOverride, isAdditionTrigger: true, cancellationToken: ct);
@@ -318,9 +316,7 @@ public class TaskQueueManager : ITaskQueueManager
             // runs on its own throttled key and must not hold up the ingest.
             sp.GetRequiredService<ITaskQueueManager>().QueuePreExtractMediaItemSubtitles(itemId, libraryId: libraryId);
 
-            await metadataManager.TriggerMediaItemMetadataRefreshAsync(itemId, false, ct);
-            await metadataManager.TriggerMediaItemArtworkRefreshAsync(itemId, false, ct);
-            await metadataManager.TriggerMediaItemRatingsRefreshAsync(itemId, false, ct);
+            await metadataManager.RefreshTitleAsync(itemId, false, ct);
 
             // A brand-new season's poster/episode-count come from the parent
             // show's mapping — refresh the show ONCE, only when a new season was
@@ -366,9 +362,7 @@ public class TaskQueueManager : ITaskQueueManager
             var metadataManager = sp.GetRequiredService<IMetadataManager>();
             var overlayManager = sp.GetRequiredService<IPosterOverlayManager>();
 
-            await metadataManager.TriggerMediaItemMetadataRefreshAsync(mediaItemId, forceOverride, ct);
-            await metadataManager.TriggerMediaItemArtworkRefreshAsync(mediaItemId, forceOverride, ct);
-            await metadataManager.TriggerMediaItemRatingsRefreshAsync(mediaItemId, forceOverride, ct);
+            await metadataManager.RefreshTitleAsync(mediaItemId, forceOverride, ct);
             await metadataManager.TriggerActorMetadataRefreshAsync(ct);
 
             await overlayManager.GenerateOverlaysForMediaAsync(mediaItemId, ct);
@@ -386,9 +380,7 @@ public class TaskQueueManager : ITaskQueueManager
             var metadataManager = sp.GetRequiredService<IMetadataManager>();
             var overlayManager = sp.GetRequiredService<IPosterOverlayManager>();
 
-            await metadataManager.TriggerMediaItemMetadataRefreshAsync(mediaItemId, true, ct);
-            await metadataManager.TriggerMediaItemArtworkRefreshAsync(mediaItemId, true, ct);
-            await metadataManager.TriggerMediaItemRatingsRefreshAsync(mediaItemId, true, ct);
+            await metadataManager.RefreshTitleAsync(mediaItemId, true, ct);
             await overlayManager.GenerateOverlaysForMediaAsync(mediaItemId, ct);
 
             if (isTvShow)

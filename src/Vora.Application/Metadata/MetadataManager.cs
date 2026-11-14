@@ -20,8 +20,9 @@ public interface IMetadataManager
     Task TriggerLibraryRatingsRefreshAsync(Guid libraryId, string? name = null, bool forceOverride = false, DateTime? checkedBefore = null, CancellationToken cancellationToken = default);
     Task TriggerMediaItemArtworkRefreshAsync(Guid mediaItemId, bool forceOverride = false, CancellationToken cancellationToken = default);
     Task TriggerMediaItemMetadataRefreshAsync(Guid mediaItemId, bool forceOverride = false, CancellationToken cancellationToken = default);
+    Task RefreshTitleAsync(Guid mediaItemId, bool forceOverride = false, CancellationToken cancellationToken = default);
     Task TriggerLibraryArtworkRefreshAsync(Guid libraryId, bool forceOverride = false, CancellationToken cancellationToken = default);
-    Task TriggerMediaItemRatingsRefreshAsync(Guid mediaItemId, bool forceOverride = false, CancellationToken cancellationToken = default);
+    Task<bool> RefreshShowEpisodeRatingsAsync(Guid showId, IReadOnlyList<Guid> episodeIds, bool forceOverride = false, CancellationToken cancellationToken = default);
     Task RefreshMetadataAsync(Guid mediaItemId, bool forceOverride = false, bool notify = true);
     Task<IReadOnlyList<Guid>> TriggerLibraryLocalMetadataSyncAsync(Guid libraryId, DateTime? since = null, CancellationToken cancellationToken = default);
 }
@@ -178,8 +179,83 @@ public class MetadataManager : IMetadataManager
             ? await _repository.GetEnrichableMediaIdsAsync(libraryId, ratingsCheckedBefore: checkedBefore)
             : await _repository.GetMediaIdsMissingRatingsAsync(libraryId);
 
-        await ProcessLibraryItemsAsync(libraryId, ids, "ratings", id => RefreshRatingsAsync(id, forceOverride), cancellationToken);
+        var finished = await ProcessLibraryItemsUntilAsync(libraryId, ids, "ratings", id => RefreshRatingsAsync(id, forceOverride), cancellationToken);
+        if (!finished)
+        {
+            LogRatingsPassStopped(libraryId);
+            return;
+        }
+
+        await RefreshLibraryEpisodeRatingsAsync(libraryId, forceOverride, checkedBefore, cancellationToken);
     }
+
+    private async Task RefreshLibraryEpisodeRatingsAsync(Guid libraryId, bool forceOverride, DateTime? checkedBefore, CancellationToken cancellationToken)
+    {
+        var episodes = await _repository.GetEpisodeIdsToRateAsync(libraryId, missingOnly: !forceOverride, checkedBefore);
+        if (episodes.Count == 0) return;
+
+        var shows = episodes.GroupBy(episode => episode.ShowId).ToList();
+        var titles = await _repository.GetDisplayTitlesByIdsAsync(shows.Select(show => show.Key).ToList());
+        var done = 0;
+        var showsDone = 0;
+
+        foreach (var show in shows)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            var episodeIds = show.Select(episode => episode.EpisodeId).ToList();
+            done += episodeIds.Count;
+            var title = titles.TryGetValue(show.Key, out var t) && !string.IsNullOrWhiteSpace(t) ? t : "…";
+            _progress.Report($"{ProgressLabel("ratings")} — {title} episodes ({done}/{episodes.Count})");
+
+            var keepGoing = true;
+            try
+            {
+                using var scope = _scopeFactory.CreateScope();
+                var scopedManager = scope.ServiceProvider.GetRequiredService<IMetadataManager>();
+                keepGoing = await scopedManager.RefreshShowEpisodeRatingsAsync(show.Key, episodeIds, forceOverride, cancellationToken);
+            }
+            catch (OperationCanceledException) { throw; }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Library ratings refresh failed for the episodes of {TvShowId}.", show.Key);
+            }
+
+            if (++showsDone % NotificationBatchSize == 0) await _notifier.NotifyLibraryUpdatedAsync(libraryId);
+
+            if (!keepGoing)
+            {
+                LogRatingsPassStopped(libraryId);
+                break;
+            }
+        }
+
+        await _notifier.NotifyLibraryUpdatedAsync(libraryId);
+    }
+
+    public async Task<bool> RefreshShowEpisodeRatingsAsync(Guid showId, IReadOnlyList<Guid> episodeIds, bool forceOverride = false, CancellationToken cancellationToken = default)
+    {
+        var keepGoing = true;
+        foreach (var episodeId in episodeIds)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            try
+            {
+                keepGoing = await RefreshRatingsAsync(episodeId, forceOverride, notify: false);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Episode ratings refresh failed for {EpisodeId}.", episodeId);
+            }
+
+            if (!keepGoing) break;
+        }
+
+        if (episodeIds.Count > 0) await _notifier.NotifyMediaItemUpdatedAsync(showId);
+        return keepGoing;
+    }
+
+    private void LogRatingsPassStopped(Guid libraryId) =>
+        _logger.LogInformation("Ratings refresh for library {LibraryId} stopped: none of its ratings providers can be asked right now. The rest is picked up by the next ratings pass.", libraryId);
 
     public async Task TriggerLibraryArtworkRefreshAsync(Guid libraryId, bool forceOverride = false, CancellationToken cancellationToken = default)
     {
@@ -200,42 +276,41 @@ public class MetadataManager : IMetadataManager
         // set of work is identical to running those phases — same guard sets,
         // same leaf refresh calls — only the grouping (by item vs by operation)
         // differs.
-        HashSet<Guid> metaSet, artSet, ratSet;
-        List<Guid> ordered;
-
         if (forceOverride)
         {
-            ordered = (await _repository.GetEnrichableMediaIdsAsync(libraryId, fullyRefreshedBefore)).ToList();
-            metaSet = ordered.ToHashSet();
-            artSet = metaSet;
-            ratSet = metaSet;
+            var titles = await _repository.GetEnrichableMediaIdsAsync(libraryId, fullyRefreshedBefore);
+            await ProcessLibraryItemsAsync(libraryId, titles, "enrich", async id =>
+            {
+                using var scope = _scopeFactory.CreateScope();
+                await scope.ServiceProvider.GetRequiredService<IMetadataManager>().RefreshTitleAsync(id, forceOverride: true, cancellationToken);
+                await _repository.MarkFullyRefreshedAsync(id);
+            }, cancellationToken);
+            return;
         }
-        else
-        {
-            var metaIds = (await _repository.GetMediaIdsMissingMetadataAsync(libraryId)).ToList();
-            metaSet = metaIds.ToHashSet();
-            artSet = (await _repository.GetMediaIdsMissingArtworkAsync(libraryId)).ToHashSet();
-            ratSet = (await _repository.GetMediaIdsMissingRatingsAsync(libraryId)).ToHashSet();
 
-            ordered = new List<Guid>(metaIds);
-            var seen = new HashSet<Guid>(metaIds);
-            foreach (var id in artSet) if (seen.Add(id)) ordered.Add(id);
-            foreach (var id in ratSet) if (seen.Add(id)) ordered.Add(id);
-        }
+        var metaIds = (await _repository.GetMediaIdsMissingMetadataAsync(libraryId)).ToList();
+        var metaSet = metaIds.ToHashSet();
+        var artSet = (await _repository.GetMediaIdsMissingArtworkAsync(libraryId)).ToHashSet();
+        var ratSet = (await _repository.GetMediaIdsMissingRatingsAsync(libraryId)).ToHashSet();
+
+        var ordered = new List<Guid>(metaIds);
+        var seen = new HashSet<Guid>(metaIds);
+        foreach (var id in artSet) if (seen.Add(id)) ordered.Add(id);
+        foreach (var id in ratSet) if (seen.Add(id)) ordered.Add(id);
 
         await ProcessLibraryItemsAsync(libraryId, ordered, "enrich", async id =>
         {
-            if (forceOverride || metaSet.Contains(id))
+            if (metaSet.Contains(id))
             {
                 using var scope = _scopeFactory.CreateScope();
                 var scopedManager = scope.ServiceProvider.GetRequiredService<IMetadataManager>();
-                if (forceOverride) await scopedManager.TriggerMediaItemMetadataRefreshAsync(id, forceOverride, cancellationToken);
-                else await scopedManager.RefreshMetadataAsync(id, forceOverride);
+                await scopedManager.RefreshMetadataAsync(id);
             }
-            if (forceOverride || artSet.Contains(id)) await RefreshArtworkAsync(id, forceOverride);
-            if (forceOverride || ratSet.Contains(id)) await RefreshRatingsAsync(id, forceOverride);
-            if (forceOverride) await _repository.MarkFullyRefreshedAsync(id);
+            if (artSet.Contains(id)) await RefreshArtworkAsync(id);
+            if (ratSet.Contains(id)) await RefreshRatingsAsync(id);
         }, cancellationToken);
+
+        await RefreshLibraryEpisodeRatingsAsync(libraryId, forceOverride: false, checkedBefore: null, cancellationToken);
     }
 
     public async Task TriggerMediaItemMetadataRefreshAsync(Guid mediaItemId, bool forceOverride = false, CancellationToken cancellationToken = default)
@@ -245,51 +320,78 @@ public class MetadataManager : IMetadataManager
 
         if (itemType == nameof(Season))
         {
-            var season = await _repository.GetForBasicUpdateAsync(mediaItemId) as Season;
-            if (season != null) await TriggerMediaItemMetadataRefreshAsync(season.TvShowId, forceOverride, cancellationToken);
+            var showId = await ShowOfSeasonAsync(mediaItemId);
+            if (showId != null) await TriggerMediaItemMetadataRefreshAsync(showId.Value, forceOverride, cancellationToken);
             return;
         }
 
-        await RefreshMetadataAsync(mediaItemId, forceOverride);
+        await RefreshItemMetadataAsync(mediaItemId, forceOverride, notify: true, withRatingsAndArtwork: true);
 
-        if (itemType == nameof(TvShow))
+        if (itemType == nameof(TvShow)) await RefreshSeasonsAndEpisodesAsync(mediaItemId, forceOverride, cancellationToken);
+    }
+
+    public async Task RefreshTitleAsync(Guid mediaItemId, bool forceOverride = false, CancellationToken cancellationToken = default)
+    {
+        var itemType = await _repository.GetProjectedAsync(mediaItemId, m => m.GetType().Name);
+        if (itemType == null) return;
+
+        if (itemType == nameof(Season))
         {
-            var tvShow = await _repository.GetForMetadataSyncAsync(mediaItemId) as TvShow;
-            if (tvShow != null)
-            {
-                foreach (var season in tvShow.Seasons)
-                {
-                    cancellationToken.ThrowIfCancellationRequested();
-                    await RefreshArtworkAsync(season.Id, forceOverride);
-                    await RefreshRatingsAsync(season.Id, forceOverride);
-                }
-            }
-            var episodeIds = await _repository.GetEpisodeIdsForShowAsync(mediaItemId);
-            // Enrich episodes on THIS scope so they share the provider's per-show
-            // episode-list cache: the bulk episode list is fetched once and every
-            // episode reads from it. (Enriching each episode in its own scope threw
-            // that cache away and re-fetched the whole list per episode — a ~Nx
-            // request storm that saturated the provider and stalled the scan.) A
-            // failing episode is isolated so it can't abort the rest of the show.
-            foreach (var epId in episodeIds)
+            var showId = await ShowOfSeasonAsync(mediaItemId);
+            if (showId != null) await RefreshTitleAsync(showId.Value, forceOverride, cancellationToken);
+            return;
+        }
+
+        await RefreshItemMetadataAsync(mediaItemId, forceOverride, notify: true, withRatingsAndArtwork: false);
+
+        if (itemType == nameof(TvShow)) await RefreshSeasonsAndEpisodesAsync(mediaItemId, forceOverride, cancellationToken);
+
+        cancellationToken.ThrowIfCancellationRequested();
+        if (itemType != nameof(Episode)) await RefreshArtworkAsync(mediaItemId, forceOverride);
+        await RefreshRatingsAsync(mediaItemId, forceOverride);
+    }
+
+    private async Task<Guid?> ShowOfSeasonAsync(Guid seasonId) =>
+        (await _repository.GetForBasicUpdateAsync(seasonId) as Season)?.TvShowId;
+
+    private async Task RefreshSeasonsAndEpisodesAsync(Guid showId, bool forceOverride, CancellationToken cancellationToken)
+    {
+        if (await _repository.GetForMetadataSyncAsync(showId) is TvShow tvShow)
+        {
+            foreach (var season in tvShow.Seasons)
             {
                 cancellationToken.ThrowIfCancellationRequested();
-                try
-                {
-                    // Suppress the per-episode SignalR fan-out (episode + season +
-                    // show, ×N episodes re-notifies the same show/seasons over and
-                    // over). One notification for the show after the loop is enough
-                    // during a bulk scan; the episode counts refresh with it.
-                    await RefreshMetadataAsync(epId, forceOverride, notify: false);
-                }
-                catch (Exception ex)
-                {
-                    _logger.LogError(ex, "Episode metadata refresh failed for {EpisodeId}.", epId);
-                }
+                await RefreshArtworkAsync(season.Id, forceOverride);
+                await RefreshRatingsAsync(season.Id, forceOverride);
             }
-
-            if (episodeIds.Count > 0) await _notifier.NotifyMediaItemUpdatedAsync(mediaItemId);
         }
+
+        var episodeIds = await _repository.GetEpisodeIdsForShowAsync(showId);
+        // Enrich episodes on THIS scope so they share the fetch service's
+        // season cache: each season's episode list is fetched once and every
+        // episode of it reads its text, credits and still from that one answer.
+        // (Enriching each episode in its own scope threw that cache away and
+        // re-fetched the list per episode — a ~Nx request storm that saturated
+        // the provider and stalled the scan.) A failing episode is isolated so
+        // it can't abort the rest of the show.
+        foreach (var epId in episodeIds)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            try
+            {
+                // Suppress the per-episode SignalR fan-out (episode + season +
+                // show, ×N episodes re-notifies the same show/seasons over and
+                // over). One notification for the show after the loop is enough
+                // during a bulk scan; the episode counts refresh with it.
+                await RefreshItemMetadataAsync(epId, forceOverride, notify: false, withRatingsAndArtwork: false);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Episode metadata refresh failed for {EpisodeId}.", epId);
+            }
+        }
+
+        if (episodeIds.Count > 0) await _notifier.NotifyMediaItemUpdatedAsync(showId);
     }
 
     public async Task TriggerMediaItemArtworkRefreshAsync(Guid mediaItemId, bool forceOverride = false, CancellationToken cancellationToken = default)
@@ -305,20 +407,10 @@ public class MetadataManager : IMetadataManager
         }
     }
 
-    public async Task TriggerMediaItemRatingsRefreshAsync(Guid mediaItemId, bool forceOverride = false, CancellationToken cancellationToken = default)
-    {
-        var itemInfo = await _repository.GetProjectedAsync(mediaItemId, m => new { m.Id, Type = m.GetType().Name });
-        if (itemInfo == null) return;
+    public Task RefreshMetadataAsync(Guid mediaItemId, bool forceOverride = false, bool notify = true) =>
+        RefreshItemMetadataAsync(mediaItemId, forceOverride, notify, withRatingsAndArtwork: true);
 
-        await RefreshRatingsAsync(mediaItemId, forceOverride);
-
-        if (itemInfo.Type == nameof(TvShow))
-        {
-            await RefreshChildSeasonsAsync(mediaItemId, forceOverride, RefreshRatingsAsync, cancellationToken);
-        }
-    }
-
-    public async Task RefreshMetadataAsync(Guid mediaItemId, bool forceOverride = false, bool notify = true)
+    private async Task RefreshItemMetadataAsync(Guid mediaItemId, bool forceOverride, bool notify, bool withRatingsAndArtwork)
     {
         var item = await _repository.GetForMetadataSyncAsync(mediaItemId);
         if (item == null || !item.CanBeEnriched()) return;
@@ -343,9 +435,18 @@ public class MetadataManager : IMetadataManager
             await _repository.UpdateMediaItemAsync(season);
         }
 
-        var secondaryFetch = await _fetchService.GetSecondaryDataAsync(item, forceOverride);
-
-        var updatedSecondary = await _mappingService.ApplySecondaryDataAsync(item, secondaryFetch.Ratings, secondaryFetch.Artwork, forceOverride);
+        var updatedSecondary = false;
+        if (item is Episode)
+        {
+            var ratingsInMetadata = _fetchService.GetRatingsInMetadata(item, textFetch.Metadata, textFetch.ProviderId);
+            var artwork = await _fetchService.GetArtworkAsync(item);
+            updatedSecondary = await _mappingService.ApplySecondaryDataAsync(item, ratingsInMetadata, artwork, forceOverride);
+        }
+        else if (withRatingsAndArtwork)
+        {
+            var secondaryFetch = await _fetchService.GetSecondaryDataAsync(item, forceOverride);
+            updatedSecondary = await _mappingService.ApplySecondaryDataAsync(item, secondaryFetch.Ratings, secondaryFetch.Artwork, forceOverride);
+        }
 
         if (updatedSecondary)
         {
@@ -371,10 +472,10 @@ public class MetadataManager : IMetadataManager
         await NotifyItemAndParentsAsync(item);
     }
 
-    private async Task RefreshRatingsAsync(Guid mediaItemId, bool forceOverride = false)
+    private async Task<bool> RefreshRatingsAsync(Guid mediaItemId, bool forceOverride = false, bool notify = true)
     {
-        var item = await _repository.GetForMetadataSyncAsync(mediaItemId);
-        if (item == null || !item.CanBeEnriched()) return;
+        var item = await _repository.GetForRatingsRefreshAsync(mediaItemId);
+        if (item == null || !item.CanBeEnriched()) return true;
 
         var ratingsData = await _fetchService.GetRatingsAsync(item);
 
@@ -401,7 +502,9 @@ public class MetadataManager : IMetadataManager
             await _repository.UpdateMediaItemAsync(item);
         }
 
-        await NotifyItemAndParentsAsync(item);
+        if (notify) await NotifyItemAndParentsAsync(item);
+
+        return item.Library == null || _fetchService.CanAskRatingsProviders(item.Library);
     }
 
     private async Task RefreshChildSeasonsAsync(Guid showId, bool forceOverride, Func<Guid, bool, Task> refreshFn, CancellationToken cancellationToken = default)
@@ -512,7 +615,14 @@ public class MetadataManager : IMetadataManager
         _progress.Report(null);
     }
 
-    private async Task ProcessLibraryItemsAsync(Guid libraryId, IEnumerable<Guid> ids, string operation, Func<Guid, Task> refreshFn, CancellationToken cancellationToken = default)
+    private Task ProcessLibraryItemsAsync(Guid libraryId, IEnumerable<Guid> ids, string operation, Func<Guid, Task> refreshFn, CancellationToken cancellationToken = default) =>
+        ProcessLibraryItemsUntilAsync(libraryId, ids, operation, async id =>
+        {
+            await refreshFn(id);
+            return true;
+        }, cancellationToken);
+
+    private async Task<bool> ProcessLibraryItemsUntilAsync(Guid libraryId, IEnumerable<Guid> ids, string operation, Func<Guid, Task<bool>> refreshFn, CancellationToken cancellationToken = default)
     {
         var idList = ids as IReadOnlyList<Guid> ?? ids.ToList();
         var total = idList.Count;
@@ -520,6 +630,7 @@ public class MetadataManager : IMetadataManager
         var label = ProgressLabel(operation);
 
         var count = 0;
+        var keepGoing = true;
         foreach (var id in idList)
         {
             cancellationToken.ThrowIfCancellationRequested();
@@ -529,7 +640,7 @@ public class MetadataManager : IMetadataManager
 
             try
             {
-                await refreshFn(id);
+                keepGoing = await refreshFn(id);
             }
             catch (Exception ex)
             {
@@ -540,9 +651,12 @@ public class MetadataManager : IMetadataManager
             {
                 await _notifier.NotifyLibraryUpdatedAsync(libraryId);
             }
+
+            if (!keepGoing) break;
         }
 
         await _notifier.NotifyLibraryUpdatedAsync(libraryId);
+        return keepGoing;
     }
 
     private static string ProgressLabel(string operation) => operation switch

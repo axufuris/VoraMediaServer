@@ -507,44 +507,46 @@ public class TmdbMetadataProvider : IMetadataProvider, IPluginConnectionTest
 
     public async Task<MetadataResult?> FetchEpisodeMetadataAsync(string showTmdbId, int seasonNumber, int episodeNumber, CancellationToken cancellationToken = default)
     {
-        await Task.Delay(250);
+        var seasonEpisodes = await SeasonEpisodesAsync(showTmdbId, seasonNumber, cancellationToken);
+        return seasonEpisodes.TryGetValue(episodeNumber, out var episode) ? episode : null;
+    }
+
+    public async Task<IReadOnlyDictionary<int, MetadataResult>?> FetchSeasonEpisodesAsync(string showId, int seasonNumber, CancellationToken cancellationToken = default) =>
+        await SeasonEpisodesAsync(showId, seasonNumber, cancellationToken);
+
+    private async Task<Dictionary<int, MetadataResult>> SeasonEpisodesAsync(string showTmdbId, int seasonNumber, CancellationToken cancellationToken)
+    {
         var cacheKey = $"{showTmdbId}_{seasonNumber}";
+        if (_tmdbSeasonCache.TryGetValue(cacheKey, out var cached)) return cached;
 
-        if (!_tmdbSeasonCache.TryGetValue(cacheKey, out var seasonEpisodes))
+        await Task.Delay(250, cancellationToken);
+
+        var seasonEpisodes = new Dictionary<int, MetadataResult>();
+        var apiKey = await GetApiKeyAsync();
+        var lang = await GetLanguageAsync();
+        var url = $"tv/{showTmdbId}/season/{seasonNumber}?api_key={apiKey}&language={lang}&append_to_response=credits,videos";
+
+        var response = await _httpClient.GetAsync(url, cancellationToken);
+        if (response.IsSuccessStatusCode)
         {
-            seasonEpisodes = new Dictionary<int, MetadataResult>();
-            var apiKey = await GetApiKeyAsync();
-            var lang = await GetLanguageAsync();
-            var url = $"tv/{showTmdbId}/season/{seasonNumber}?api_key={apiKey}&language={lang}&append_to_response=credits,videos";
-
-            var response = await _httpClient.GetAsync(url);
-            if (response.IsSuccessStatusCode)
-            {
-                using var stream = await response.Content.ReadAsStreamAsync();
-                using var doc = await JsonDocument.ParseAsync(stream);
-                var el = doc.RootElement;
-
-                if (el.TryGetProperty("episodes", out var episodes) && episodes.ValueKind == JsonValueKind.Array)
-                {
-                    foreach (var ep in episodes.EnumerateArray())
-                    {
-                        var eNum = ep.TryGetProperty("episode_number", out var en) ? en.GetInt32() : -1;
-                        if (eNum == -1) continue;
-
-                        seasonEpisodes[eNum] = MapEpisode(ep);
-                    }
-                }
-            }
-
-            _tmdbSeasonCache[cacheKey] = seasonEpisodes;
+            using var stream = await response.Content.ReadAsStreamAsync(cancellationToken);
+            using var doc = await JsonDocument.ParseAsync(stream, cancellationToken: cancellationToken);
+            foreach (var (number, episode) in MapSeasonEpisodes(doc.RootElement)) seasonEpisodes[number] = episode;
         }
 
-        if (seasonEpisodes.TryGetValue(episodeNumber, out var epResult))
-        {
-            return epResult;
-        }
+        _tmdbSeasonCache[cacheKey] = seasonEpisodes;
+        return seasonEpisodes;
+    }
 
-        return null;
+    internal static IEnumerable<(int Number, MetadataResult Episode)> MapSeasonEpisodes(JsonElement season)
+    {
+        if (!season.TryGetProperty("episodes", out var episodes) || episodes.ValueKind != JsonValueKind.Array) yield break;
+
+        foreach (var ep in episodes.EnumerateArray())
+        {
+            if (!ep.TryGetProperty("episode_number", out var number) || number.ValueKind != JsonValueKind.Number) continue;
+            yield return (number.GetInt32(), MapEpisode(ep));
+        }
     }
 
     public async Task<ActorMetadataResult?> FetchActorMetadataAsync(int personId, CancellationToken cancellationToken = default)
