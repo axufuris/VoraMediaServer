@@ -95,7 +95,7 @@ A record is found on this server **by file first** — the item's own file for m
 - **Library access lists** (`AllowedLibraryIds` on accounts and profiles) are remapped by library name; an id that can't be matched is kept as-is, so a restricted profile stays restricted rather than opening up.
 - **Title-only matches** are a last resort for items without provider ids; smart-playlist and smart-list rule JSON is restored as written (ids inside rules are not remapped).
 
-Rows are written by `BackupTableSync.ReplaceAsync`: rows not in the backup are deleted, rows in both are updated in place, new rows are added. Updating in place matters because deletes cascade — the old delete-everything-then-insert wiped every profile's history whenever **User Accounts & Profiles** was restored on its own. Before removing a profile or request server, the section clears the `NO ACTION` references to it (`StreamSessions.UserProfileId`, `MediaRequests.AssignedServerId`).
+Rows are written by `BackupTableSync.ReplaceAsync`: rows not in the backup are deleted, rows in both are updated in place, new rows are added. Updating in place matters because deletes cascade — the old delete-everything-then-insert wiped every profile's history whenever **User Accounts & Profiles** was restored on its own. Before removing a profile or request server, the section clears the `NO ACTION` references to it (`StreamSessions.UserProfileId`, `MediaRequests.AssignedServerId`). Before removing an IPTV playlist, it takes the playlist out of every account's and profile's `AllowedIptvPlaylistIds`, which is JSON text that nothing cascades to (`AccessLists`, `docs/database.md`).
 
 ## Manager
 

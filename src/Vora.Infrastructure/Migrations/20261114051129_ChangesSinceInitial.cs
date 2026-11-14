@@ -326,6 +326,51 @@ ALTER TABLE ""IptvPlaylists"" ADD COLUMN IF NOT EXISTS ""AccountMaxConnections""
 ALTER TABLE ""IptvPlaylists"" ADD COLUMN IF NOT EXISTS ""AccountCheckedAt"" timestamp with time zone;
 ALTER TABLE ""IptvChannels"" ADD COLUMN IF NOT EXISTS ""UserAgent"" character varying(512);
 ALTER TABLE ""IptvChannels"" ADD COLUMN IF NOT EXISTS ""Referer"" character varying(1024);");
+
+            // Deleting a library or an IPTV playlist left its id in every
+            // account's and profile's access list (docs/database.md). Ids of
+            // libraries and playlists that no longer exist are taken out; the
+            // rest keep their order. Running it again changes nothing.
+            migrationBuilder.Sql(@"
+UPDATE ""Users"" AS t
+SET ""AllowedLibraryIds"" = (
+    SELECT COALESCE('[' || string_agg(to_jsonb(e.id)::text, ',' ORDER BY e.ord) || ']', '[]')
+    FROM jsonb_array_elements_text(t.""AllowedLibraryIds""::jsonb) WITH ORDINALITY AS e(id, ord)
+    WHERE EXISTS (SELECT 1 FROM ""MediaLibraries"" l WHERE l.""Id""::text = lower(e.id)))
+WHERE CASE WHEN left(btrim(t.""AllowedLibraryIds""), 1) = '[' THEN EXISTS (
+          SELECT 1 FROM jsonb_array_elements_text(t.""AllowedLibraryIds""::jsonb) AS e(id)
+          WHERE NOT EXISTS (SELECT 1 FROM ""MediaLibraries"" l WHERE l.""Id""::text = lower(e.id)))
+      ELSE false END;
+
+UPDATE ""UserProfiles"" AS t
+SET ""AllowedLibraryIds"" = (
+    SELECT COALESCE('[' || string_agg(to_jsonb(e.id)::text, ',' ORDER BY e.ord) || ']', '[]')
+    FROM jsonb_array_elements_text(t.""AllowedLibraryIds""::jsonb) WITH ORDINALITY AS e(id, ord)
+    WHERE EXISTS (SELECT 1 FROM ""MediaLibraries"" l WHERE l.""Id""::text = lower(e.id)))
+WHERE CASE WHEN left(btrim(t.""AllowedLibraryIds""), 1) = '[' THEN EXISTS (
+          SELECT 1 FROM jsonb_array_elements_text(t.""AllowedLibraryIds""::jsonb) AS e(id)
+          WHERE NOT EXISTS (SELECT 1 FROM ""MediaLibraries"" l WHERE l.""Id""::text = lower(e.id)))
+      ELSE false END;
+
+UPDATE ""Users"" AS t
+SET ""AllowedIptvPlaylistIds"" = (
+    SELECT COALESCE('[' || string_agg(to_jsonb(e.id)::text, ',' ORDER BY e.ord) || ']', '[]')
+    FROM jsonb_array_elements_text(t.""AllowedIptvPlaylistIds""::jsonb) WITH ORDINALITY AS e(id, ord)
+    WHERE EXISTS (SELECT 1 FROM ""IptvPlaylists"" p WHERE p.""Id""::text = lower(e.id)))
+WHERE CASE WHEN left(btrim(t.""AllowedIptvPlaylistIds""), 1) = '[' THEN EXISTS (
+          SELECT 1 FROM jsonb_array_elements_text(t.""AllowedIptvPlaylistIds""::jsonb) AS e(id)
+          WHERE NOT EXISTS (SELECT 1 FROM ""IptvPlaylists"" p WHERE p.""Id""::text = lower(e.id)))
+      ELSE false END;
+
+UPDATE ""UserProfiles"" AS t
+SET ""AllowedIptvPlaylistIds"" = (
+    SELECT COALESCE('[' || string_agg(to_jsonb(e.id)::text, ',' ORDER BY e.ord) || ']', '[]')
+    FROM jsonb_array_elements_text(t.""AllowedIptvPlaylistIds""::jsonb) WITH ORDINALITY AS e(id, ord)
+    WHERE EXISTS (SELECT 1 FROM ""IptvPlaylists"" p WHERE p.""Id""::text = lower(e.id)))
+WHERE CASE WHEN left(btrim(t.""AllowedIptvPlaylistIds""), 1) = '[' THEN EXISTS (
+          SELECT 1 FROM jsonb_array_elements_text(t.""AllowedIptvPlaylistIds""::jsonb) AS e(id)
+          WHERE NOT EXISTS (SELECT 1 FROM ""IptvPlaylists"" p WHERE p.""Id""::text = lower(e.id)))
+      ELSE false END;");
         }
 
         /// <inheritdoc />

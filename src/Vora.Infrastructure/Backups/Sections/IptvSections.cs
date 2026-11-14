@@ -3,6 +3,7 @@ using Vora.Application.Backups;
 using Vora.Domain.Entities.Iptv;
 using Vora.Domain.Enums;
 using Vora.Infrastructure.Persistence;
+using Vora.Infrastructure.Persistence.Repositories;
 
 namespace Vora.Infrastructure.Backups.Sections;
 
@@ -13,6 +14,14 @@ public sealed class IptvPlaylistsBackupSection : EntityTableBackupSection<IptvPl
     public override string DisplayName => "IPTV Playlists";
     public override BackupSectionGroup Group => BackupSectionGroup.Iptv;
     protected override DbSet<IptvPlaylist> Set(VoraDbContext db) => db.IptvPlaylists;
+
+    protected override async Task ReleaseReferencesAsync(List<IptvPlaylist> removed, CancellationToken ct)
+    {
+        foreach (var playlist in removed)
+        {
+            await AccessLists.RemoveIptvPlaylistAsync(Db, playlist.Id, ct);
+        }
+    }
 }
 
 public sealed record IptvChannelSetting(Guid PlaylistId, string ExternalChannelId, bool IsHiddenByAdmin, IptvChannelKind Kind, bool KindOverriddenByAdmin);

@@ -236,6 +236,8 @@ public sealed class LegacyDatabase : IAsyncDisposable
 
     public const string IptvProvidersMigration = "20261112032459_ChangesSinceInitial";
 
+    public const string AiRowFlagMigration = "20261113230423_ChangesSinceInitial";
+
     private const string ColumnsSinceChannelVideoFormat = """
         DROP TABLE IF EXISTS "CollectionThemeVerdicts";
         DROP TABLE IF EXISTS "CollectionThemes";
@@ -534,6 +536,14 @@ public sealed class LegacyDatabase : IAsyncDisposable
         await db.Database.MigrateAsync(cancellationToken);
         await seed(db);
         await ReplaceCombinedMigrationAsync(db, IptvProvidersMigration, "10.0.9", cancellationToken);
+    }
+
+    public async Task BuildAiRowFlagStateAsync(Func<VoraDbContext, Task> seed, CancellationToken cancellationToken)
+    {
+        await using var db = NewContext();
+        await db.Database.MigrateAsync(cancellationToken);
+        await seed(db);
+        await ReplaceCombinedMigrationAsync(db, AiRowFlagMigration, "10.0.9", cancellationToken);
     }
 
     private static async Task ReplaceCombinedMigrationAsync(VoraDbContext db, string migrationId, string productVersion, CancellationToken cancellationToken)
