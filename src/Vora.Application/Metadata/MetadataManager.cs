@@ -196,9 +196,10 @@ public class MetadataManager : IMetadataManager
     {
         // Enrich each item fully (metadata → artwork → ratings) before moving to
         // the next, so posters fill in progressively during a first scan instead
-        // of after three separate whole-library phases. The set of work is
-        // identical to running those phases — same guard sets, same leaf refresh
-        // calls — only the grouping (by item vs by operation) differs.
+        // of after three separate whole-library phases. For a non-forced pass the
+        // set of work is identical to running those phases — same guard sets,
+        // same leaf refresh calls — only the grouping (by item vs by operation)
+        // differs.
         HashSet<Guid> metaSet, artSet, ratSet;
         List<Guid> ordered;
 
@@ -228,7 +229,8 @@ public class MetadataManager : IMetadataManager
             {
                 using var scope = _scopeFactory.CreateScope();
                 var scopedManager = scope.ServiceProvider.GetRequiredService<IMetadataManager>();
-                await scopedManager.RefreshMetadataAsync(id, forceOverride);
+                if (forceOverride) await scopedManager.TriggerMediaItemMetadataRefreshAsync(id, forceOverride, cancellationToken);
+                else await scopedManager.RefreshMetadataAsync(id, forceOverride);
             }
             if (forceOverride || artSet.Contains(id)) await RefreshArtworkAsync(id, forceOverride);
             if (forceOverride || ratSet.Contains(id)) await RefreshRatingsAsync(id, forceOverride);
@@ -238,10 +240,10 @@ public class MetadataManager : IMetadataManager
 
     public async Task TriggerMediaItemMetadataRefreshAsync(Guid mediaItemId, bool forceOverride = false, CancellationToken cancellationToken = default)
     {
-        var itemInfo = await _repository.GetProjectedAsync(mediaItemId, m => new { m.Id, Type = m.GetType().Name });
-        if (itemInfo == null) return;
+        var itemType = await _repository.GetProjectedAsync(mediaItemId, m => m.GetType().Name);
+        if (itemType == null) return;
 
-        if (itemInfo.Type == nameof(Season))
+        if (itemType == nameof(Season))
         {
             var season = await _repository.GetForBasicUpdateAsync(mediaItemId) as Season;
             if (season != null) await TriggerMediaItemMetadataRefreshAsync(season.TvShowId, forceOverride, cancellationToken);
@@ -250,7 +252,7 @@ public class MetadataManager : IMetadataManager
 
         await RefreshMetadataAsync(mediaItemId, forceOverride);
 
-        if (itemInfo.Type == nameof(TvShow))
+        if (itemType == nameof(TvShow))
         {
             var tvShow = await _repository.GetForMetadataSyncAsync(mediaItemId) as TvShow;
             if (tvShow != null)

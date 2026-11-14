@@ -446,7 +446,7 @@ export default function ManageLibrary() {
                                     title: 'Replace all metadata?',
                                     message: isMusic
                                         ? 'This re-fetches artwork for every artist and album in this library, replacing anything that is not locked.'
-                                        : 'This re-fetches details, artwork and ratings for every item in this library, replacing anything that is not locked. On a large library it can take hours.',
+                                        : `This re-fetches details, artwork and ratings for every ${isTvShow ? 'show, season and episode' : 'item'} in this library, replacing what is there, even fields you locked. On a large library it can take hours.`,
                                     confirmText: 'Replace all',
                                 });
                                 if (!ok) return;
