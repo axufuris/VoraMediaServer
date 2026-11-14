@@ -126,6 +126,17 @@ describe('ManageLibrary metadata buttons', () => {
             message: expect.stringMatching(/every show, season and episode.*even fields you locked/),
         })));
     });
+
+    it('on a TV library, does not promise episode ratings from replacing, and points to Refresh ratings', async () => {
+        mocks.confirm.mockResolvedValue(false);
+        await renderManage('TvShow');
+
+        fireEvent.click(screen.getByRole('button', { name: 'Replace all metadata' }));
+
+        await waitFor(() => expect(mocks.confirm).toHaveBeenCalledWith(expect.objectContaining({
+            message: expect.stringMatching(/ratings for the shows and seasons.*Episodes are rated by Refresh ratings/),
+        })));
+    });
 });
 
 describe('ManageLibrary local files', () => {

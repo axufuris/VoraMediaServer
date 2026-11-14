@@ -12,7 +12,7 @@ public class TvdbMetadataProvider : IMetadataProvider, IPluginConnectionTest
 {
     private readonly HttpClient _httpClient;
     private readonly IServiceScopeFactory _scopeFactory;
-    private readonly Dictionary<string, Dictionary<string, MetadataResult>> _tvdbEpisodeCache = new();
+    private readonly Dictionary<string, Dictionary<(int Season, int Episode), MetadataResult>> _tvdbEpisodeCache = new();
     private readonly Dictionary<string, SeasonPosterInfo> _seasonPosterCache = new();
     private string? _cachedLanguage;
 
@@ -576,14 +576,28 @@ public class TvdbMetadataProvider : IMetadataProvider, IPluginConnectionTest
 
     public async Task<MetadataResult?> FetchEpisodeMetadataAsync(string showTmdbId, int seasonNumber, int episodeNumber, CancellationToken cancellationToken = default)
     {
-        if (!_tvdbEpisodeCache.TryGetValue(showTmdbId, out var showEpisodes))
+        var showEpisodes = await ShowEpisodesAsync(showTmdbId);
+        return showEpisodes.TryGetValue((seasonNumber, episodeNumber), out var result) ? result : null;
+    }
+
+    public async Task<IReadOnlyDictionary<int, MetadataResult>?> FetchSeasonEpisodesAsync(string showId, int seasonNumber, CancellationToken cancellationToken = default)
+    {
+        var showEpisodes = await ShowEpisodesAsync(showId);
+        return showEpisodes
+            .Where(entry => entry.Key.Season == seasonNumber)
+            .ToDictionary(entry => entry.Key.Episode, entry => entry.Value);
+    }
+
+    private async Task<Dictionary<(int Season, int Episode), MetadataResult>> ShowEpisodesAsync(string showTvdbId)
+    {
+        if (!_tvdbEpisodeCache.TryGetValue(showTvdbId, out var showEpisodes))
         {
             // Only pace the actual network fetch — every episode of a show hits
             // this method, but the list is fetched once and the rest are cache
             // hits, so delaying on a hit needlessly slowed episode enrichment.
             await Task.Delay(250);
 
-            showEpisodes = new Dictionary<string, MetadataResult>();
+            showEpisodes = new Dictionary<(int Season, int Episode), MetadataResult>();
             var token = await GetValidTokenAsync();
             var lang = await GetLanguageAsync();
 
@@ -591,7 +605,7 @@ public class TvdbMetadataProvider : IMetadataProvider, IPluginConnectionTest
             {
                 for (int page = 0; page < 5; page++)
                 {
-                    var url = $"series/{showTmdbId}/episodes/default/{lang}?page={page}";
+                    var url = $"series/{showTvdbId}/episodes/default/{lang}?page={page}";
                     var response = await TvdbSession.SendAsync(_httpClient, _scopeFactory, url, token);
                     if (!response.IsSuccessStatusCode) break;
 
@@ -608,7 +622,7 @@ public class TvdbMetadataProvider : IMetadataProvider, IPluginConnectionTest
 
                             if (sNum != -1 && eNum != -1)
                             {
-                                showEpisodes[$"{sNum}_{eNum}"] = new MetadataResult
+                                showEpisodes[(sNum, eNum)] = new MetadataResult
                                 {
                                     TvdbId = ep.TryGetProperty("id", out var idProp) && idProp.ValueKind == JsonValueKind.Number ? idProp.GetInt32().ToString() : null,
                                     Title = ep.TryGetProperty("name", out var t) && t.ValueKind != JsonValueKind.Null ? t.GetString() : null,
@@ -631,15 +645,10 @@ public class TvdbMetadataProvider : IMetadataProvider, IPluginConnectionTest
                 }
             }
 
-            _tvdbEpisodeCache[showTmdbId] = showEpisodes;
+            _tvdbEpisodeCache[showTvdbId] = showEpisodes;
         }
 
-        if (showEpisodes.TryGetValue($"{seasonNumber}_{episodeNumber}", out var result))
-        {
-            return result;
-        }
-
-        return null;
+        return showEpisodes;
     }
 
     public async Task<ActorMetadataResult?> FetchActorMetadataAsync(int personId, CancellationToken cancellationToken = default)

@@ -10,5 +10,7 @@ public interface IRatingsProvider : IVoraPlugin
     // temporary outage never wipes ratings fetched on an earlier run.
     bool IsCurrentlyAvailable => true;
 
+    string? ScoreComesWithMetadataFrom => null;
+
     Task<decimal?> FetchRatingAsync(string? imdbId, string? tmdbId, string? tvdbId, string mediaType, CancellationToken cancellationToken = default);
 }

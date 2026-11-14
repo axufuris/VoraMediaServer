@@ -51,9 +51,11 @@ public class ReplaceAllMetadataTests
         }
 
         _media.GetProjectedAsync(show.Id, Arg.Any<Expression<Func<MediaItem, string>>>()).Returns(nameof(TvShow));
-        _media.GetForMetadataSyncAsync(show.Id).Returns(show);
-        _media.GetForMetadataSyncAsync(season.Id).Returns(season);
-        foreach (var episode in season.Episodes) _media.GetForMetadataSyncAsync(episode.Id).Returns(episode);
+        foreach (var item in new MediaItem[] { show, season }.Concat(season.Episodes))
+        {
+            _media.GetForMetadataSyncAsync(item.Id).Returns(item);
+            _media.GetForRatingsRefreshAsync(item.Id).Returns(item);
+        }
         _media.GetEpisodeIdsForShowAsync(show.Id).Returns(season.Episodes.Select(episode => episode.Id).ToList());
         return show;
     }
@@ -146,6 +148,7 @@ public class ReplaceAllMetadataTests
         var movie = new Movie { Title = "Heat", LibraryId = _library.Id, Library = _library };
         _media.GetProjectedAsync(movie.Id, Arg.Any<Expression<Func<MediaItem, string>>>()).Returns(nameof(Movie));
         _media.GetForMetadataSyncAsync(movie.Id).Returns(movie);
+        _media.GetForRatingsRefreshAsync(movie.Id).Returns(movie);
         ReplaceAllTakes(movie);
 
         await ReplaceAllAsync(TestContext.Current.CancellationToken);

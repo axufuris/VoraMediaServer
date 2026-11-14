@@ -416,7 +416,9 @@ export default function ManageLibrary() {
                                     showAlert('Error', isMusic ? 'Failed to start the popularity refresh.' : 'Failed to trigger ratings refresh.');
                                 }
                             }}
-                            title={isMusic ? 'Fetch Last.fm listeners, plays, tags and biographies for every artist now, without waiting for the monthly refresh' : undefined}
+                            title={isMusic
+                                ? 'Fetch Last.fm listeners, plays, tags and biographies for every artist now, without waiting for the monthly refresh'
+                                : `Re-fetch ratings for every ${isTvShow ? 'show, then for episodes' : 'item'}; if a provider runs out of daily requests, the rest waits for a later pass`}
                             className="vora-button-secondary text-xs"
                         >
                             {isMusic ? 'Refresh popularity' : 'Refresh ratings'}
@@ -446,7 +448,9 @@ export default function ManageLibrary() {
                                     title: 'Replace all metadata?',
                                     message: isMusic
                                         ? 'This re-fetches artwork for every artist and album in this library, replacing anything that is not locked.'
-                                        : `This re-fetches details, artwork and ratings for every ${isTvShow ? 'show, season and episode' : 'item'} in this library, replacing what is there, even fields you locked. On a large library it can take hours.`,
+                                        : isTvShow
+                                            ? 'This re-fetches details and artwork for every show, season and episode in this library, and ratings for the shows and seasons, replacing what is there, even fields you locked. Episodes are rated by Refresh ratings. On a large library it can take hours.'
+                                            : 'This re-fetches details, artwork and ratings for every item in this library, replacing what is there, even fields you locked. On a large library it can take hours.',
                                     confirmText: 'Replace all',
                                 });
                                 if (!ok) return;

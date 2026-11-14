@@ -22,6 +22,8 @@ public class TmdbRatingsProvider : IRatingsProvider
 
     public string RatingSourceName => "TMDB";
 
+    public string? ScoreComesWithMetadataFrom => "tmdb_metadata";
+
     public TmdbRatingsProvider(HttpClient httpClient, IServiceScopeFactory scopeFactory)
     {
         _httpClient = httpClient;
@@ -40,8 +42,9 @@ public class TmdbRatingsProvider : IRatingsProvider
         if (string.IsNullOrEmpty(apiKey)) return null;
 
         var isTv = mediaType is "TvShow" or "Season" or "Episode";
+        var isEpisode = mediaType == "Episode";
 
-        if (!string.IsNullOrEmpty(tmdbId))
+        if (!string.IsNullOrEmpty(tmdbId) && !isEpisode)
         {
             var endpoint = isTv ? $"tv/{tmdbId}" : $"movie/{tmdbId}";
             var rating = await FetchVoteAverageAsync($"{endpoint}?api_key={apiKey}", cancellationToken);
@@ -55,7 +58,7 @@ public class TmdbRatingsProvider : IRatingsProvider
 
         if (externalSource != null && !string.IsNullOrEmpty(externalId))
         {
-            var arrayName = isTv ? "tv_results" : "movie_results";
+            var arrayName = isEpisode ? "tv_episode_results" : isTv ? "tv_results" : "movie_results";
             return await FetchVoteAverageFromFindAsync($"find/{externalId}?api_key={apiKey}&external_source={externalSource}", arrayName, cancellationToken);
         }
 

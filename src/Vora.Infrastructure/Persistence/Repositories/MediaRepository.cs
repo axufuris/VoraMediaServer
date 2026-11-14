@@ -1089,6 +1089,58 @@ public partial class MediaRepository : IMediaRepository
             .ToListAsync();
     }
 
+    private static readonly Expression<Func<Episode, bool>> FoundByAnIdOfItsOwn =
+        e => (e.ImdbId != null && e.ImdbId != "") || (e.TvdbId != null && e.TvdbId != "");
+
+    public async Task<IReadOnlyList<(Guid ShowId, Guid EpisodeId)>> GetEpisodeIdsToRateAsync(Guid libraryId, bool missingOnly, DateTime? checkedBefore = null)
+    {
+        var providers = await _context.MediaLibraries
+            .AsNoTracking()
+            .Where(l => l.Id == libraryId)
+            .Select(l => new { l.ThirdPartyRating1ProviderId, l.ThirdPartyRating2ProviderId })
+            .FirstOrDefaultAsync();
+        if (providers == null) return [];
+
+        var wantsRating1 = !string.IsNullOrWhiteSpace(providers.ThirdPartyRating1ProviderId);
+        var wantsRating2 = !string.IsNullOrWhiteSpace(providers.ThirdPartyRating2ProviderId);
+        if (!wantsRating1 && !wantsRating2) return [];
+
+        var episodes = _context.Set<Episode>()
+            .AsNoTracking()
+            .Where(e => e.LibraryId == libraryId && e.MissingSince == null)
+            .Where(FoundByAnIdOfItsOwn);
+
+        if (missingOnly)
+        {
+            var recheckCutoff = DateTime.UtcNow.AddDays(-RatingsRecheckDays);
+            episodes = episodes.Where(e => ((wantsRating1 && e.ThirdPartyRating1 == null) || (wantsRating2 && e.ThirdPartyRating2 == null))
+                && (e.RatingsCheckedAt == null || e.RatingsCheckedAt < recheckCutoff));
+        }
+
+        if (checkedBefore != null)
+        {
+            episodes = episodes.Where(e => e.RatingsCheckedAt == null || e.RatingsCheckedAt < checkedBefore);
+        }
+
+        var rows = await episodes
+            .OrderBy(e => e.Season.TvShow.SortTitle ?? e.Season.TvShow.Title)
+            .ThenBy(e => e.Season.TvShowId)
+            .ThenBy(e => e.Season.SeasonNumber)
+            .ThenBy(e => e.EpisodeNumber)
+            .Select(e => new { e.Season.TvShowId, e.Id })
+            .ToListAsync();
+
+        return rows.Select(row => (row.TvShowId, row.Id)).ToList();
+    }
+
+    public Task<MediaItem?> GetForRatingsRefreshAsync(Guid id) =>
+        _context.MediaItems
+            .Include(m => m.Library)
+            .Include(m => ((Episode)m).Season).ThenInclude(s => s.TvShow)
+            .Include(m => ((Season)m).TvShow)
+            .AsSplitQuery()
+            .FirstOrDefaultAsync(m => m.Id == id);
+
     public async Task<MediaItem?> GetForBasicUpdateAsync(Guid id)
     {
         return await _context.MediaItems.FirstOrDefaultAsync(m => m.Id == id);
