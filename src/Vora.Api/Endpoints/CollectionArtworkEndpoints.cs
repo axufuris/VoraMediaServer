@@ -21,9 +21,19 @@ public static class CollectionArtworkEndpoints
             .DisableAntiforgery()
             .Produces<UploadedImageResponse>(StatusCodes.Status200OK);
 
-        group.MapPost("/{id:guid}/artwork/url", AddArtworkUrlAsync).RequireAuthorization("AdminOnly");
+        group.MapPost("/{id:guid}/artwork/url", AddArtworkUrlAsync)
+            .RequireAuthorization("AdminOnly")
+            .Produces<UploadedImageResponse>(StatusCodes.Status200OK);
 
         group.MapPost("/{id:guid}/artwork/fetch", RefreshProviderArtworkAsync).RequireAuthorization("AdminOnly");
+
+        group.MapPut("/{id:guid}/artwork/selected", SelectArtworkAsync)
+            .RequireAuthorization("AdminOnly")
+            .Produces(StatusCodes.Status204NoContent);
+
+        group.MapGet("/artwork/search", FindProviderArtworkAsync)
+            .RequireAuthorization("AdminOnly")
+            .Produces<IReadOnlyList<CollectionArtworkVM>>(StatusCodes.Status200OK);
 
         group.MapDelete("/artwork/{artworkId:guid}", DeleteArtworkAsync).RequireAuthorization("AdminOnly");
 
@@ -45,14 +55,26 @@ public static class CollectionArtworkEndpoints
 
     private static async Task<IResult> AddArtworkUrlAsync(Guid id, [FromBody] string url, [FromQuery] ArtworkKind kind, ICollectionArtworkService service)
     {
-        await service.AddUrlAsync(id, url, kind);
-        return Results.Ok();
+        var savedUrl = await service.AddUrlAsync(id, url, kind);
+        return Results.Ok(new UploadedImageResponse { Url = savedUrl });
     }
 
     private static async Task<IResult> RefreshProviderArtworkAsync(Guid id, [FromQuery] string providerId, ICollectionArtworkService service)
     {
         await service.RefreshProviderArtworkAsync(id, providerId);
         return Results.Accepted();
+    }
+
+    private static async Task<IResult> SelectArtworkAsync(Guid id, [FromBody] string? url, [FromQuery] ArtworkKind kind, ICollectionManager manager)
+    {
+        await manager.SetArtworkAsync(id, kind, url);
+        return Results.NoContent();
+    }
+
+    private static async Task<IResult> FindProviderArtworkAsync([FromQuery] string providerId, [FromQuery] string title, ICollectionArtworkService service, CancellationToken ct)
+    {
+        var artwork = await service.FindProviderArtworkAsync(providerId, title, ct);
+        return Results.Ok(artwork);
     }
 
     private static async Task<IResult> DeleteArtworkAsync(Guid artworkId, ICollectionArtworkService service)

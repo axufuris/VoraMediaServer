@@ -39,7 +39,9 @@ public static partial class ArtworkEndpoints
         authGroup.MapPost("/media/{id:guid}/artwork/fetch", RefreshMediaArtworkAsync).RequireAuthorization("AdminOnly");
         authGroup.MapPost("/media/{id:guid}/artwork/upload", UploadMediaArtworkAsync).RequireAuthorization("AdminOnly").DisableAntiforgery()
             .Produces<UploadedImageResponse>(StatusCodes.Status200OK);
-        authGroup.MapPost("/media/{id:guid}/artwork/url", AddMediaArtworkUrlAsync).RequireAuthorization("AdminOnly");
+        authGroup.MapPost("/media/{id:guid}/artwork/url", AddMediaArtworkUrlAsync)
+            .RequireAuthorization("AdminOnly")
+            .Produces<UploadedImageResponse>(StatusCodes.Status200OK);
         authGroup.MapDelete("/media/artwork/{artworkId:guid}", DeleteMediaArtworkAsync).RequireAuthorization("AdminOnly");
 
         return group;
@@ -166,8 +168,8 @@ public static partial class ArtworkEndpoints
 
     private static async Task<IResult> AddMediaArtworkUrlAsync(Guid id, [FromBody] string url, [FromQuery] ArtworkKind kind, IArtworkService service)
     {
-        await service.AddUrlAsync(id, url, kind);
-        return Results.Ok();
+        var savedUrl = await service.AddUrlAsync(id, url, kind);
+        return Results.Ok(new UploadedImageResponse { Url = savedUrl });
     }
 
     private static async Task<IResult> DeleteMediaArtworkAsync(Guid artworkId, IArtworkService service)

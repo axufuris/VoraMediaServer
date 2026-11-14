@@ -21,20 +21,26 @@ export function artworkKindQuery(kind: ArtworkKind): string {
     return new URLSearchParams({ kind }).toString();
 }
 
-export async function postArtworkUpload(ownerPath: string, kind: ArtworkKind, file: File, serverId?: string): Promise<void> {
+interface SavedArtworkResponse {
+    url: string;
+}
+
+export async function postArtworkUpload(ownerPath: string, kind: ArtworkKind, file: File, serverId?: string): Promise<string> {
     const data = new FormData();
     data.append('file', file);
-    await apiClient.post(`${ownerPath}/artwork/upload?${artworkKindQuery(kind)}`, data, {
+    const response = await apiClient.post<SavedArtworkResponse>(`${ownerPath}/artwork/upload?${artworkKindQuery(kind)}`, data, {
         headers: { 'Content-Type': 'multipart/form-data' },
         serverId,
     });
+    return response.data.url;
 }
 
-export async function postArtworkUrl(ownerPath: string, kind: ArtworkKind, url: string, serverId?: string): Promise<void> {
-    await apiClient.post(`${ownerPath}/artwork/url?${artworkKindQuery(kind)}`, JSON.stringify(url), {
+export async function postArtworkUrl(ownerPath: string, kind: ArtworkKind, url: string, serverId?: string): Promise<string> {
+    const response = await apiClient.post<SavedArtworkResponse>(`${ownerPath}/artwork/url?${artworkKindQuery(kind)}`, JSON.stringify(url), {
         headers: { 'Content-Type': 'application/json' },
         serverId,
     });
+    return response.data.url;
 }
 
 export const artworkService = {
@@ -45,9 +51,9 @@ export const artworkService = {
     fetchProviderArtwork: async (mediaItemId: string, providerId: string, serverId?: string): Promise<void> => {
         await apiClient.post(`/media/${mediaItemId}/artwork/fetch?providerId=${encodeURIComponent(providerId)}`, null, { serverId });
     },
-    uploadArtwork: (mediaItemId: string, kind: ArtworkKind, file: File, serverId?: string): Promise<void> =>
+    uploadArtwork: (mediaItemId: string, kind: ArtworkKind, file: File, serverId?: string): Promise<string> =>
         postArtworkUpload(`/media/${mediaItemId}`, kind, file, serverId),
-    addArtworkUrl: (mediaItemId: string, kind: ArtworkKind, url: string, serverId?: string): Promise<void> =>
+    addArtworkUrl: (mediaItemId: string, kind: ArtworkKind, url: string, serverId?: string): Promise<string> =>
         postArtworkUrl(`/media/${mediaItemId}`, kind, url, serverId),
     deleteArtwork: async (artworkId: string, serverId?: string): Promise<void> => {
         await apiClient.delete(`/media/artwork/${artworkId}`, { serverId });

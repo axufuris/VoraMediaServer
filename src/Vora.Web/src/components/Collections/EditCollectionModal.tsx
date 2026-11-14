@@ -4,7 +4,6 @@ import { collectionAdminService } from '../../api/Collections/collectionAdminSer
 import { collectionService, type CollectionDetails, type CollectionSortOrder } from '../../api/Collections/collectionService';
 import type { ArtworkKind, ArtworkResult } from '../../api/Media/artworkService';
 import { Modal } from '../Common/Modal';
-import ArtworkPicker from '../Common/ArtworkPicker';
 import { pluginAdminService, type PluginOptionVM } from '../../api/System/pluginAdminService';
 import { emptyDefinition, type SmartPlaylistDefinition } from '../../api/Music/smartPlaylistService';
 import RuleTreeEditor from '../Common/RuleTreeEditor';
@@ -13,7 +12,8 @@ import { errorDetail } from '../../utils/apiError';
 import SeasonalVisibilityFields from './SeasonalVisibilityFields';
 import ContentProviderHelp from './ContentProviderHelp';
 import { seasonalWindowFrom, seasonalWindowRequest, type SeasonalWindow } from './seasonalWindow';
-import VoraPosterPicker from './VoraPosterPicker';
+import CollectionArtworkPanel, { type PosterSource } from './CollectionArtworkPanel';
+import LockButton from './LockButton';
 import { useVoraPosters } from './useVoraPosters';
 import { isVoraPosterUrl, suggestVoraPoster } from '../../utils/voraPosters';
 
@@ -84,7 +84,7 @@ export default function EditCollectionModal({
 
     const [lockedFields, setLockedFields] = useState<string[]>(collection.lockedFields || []);
     const [isSaving, setIsSaving] = useState(false);
-    const [posterSource, setPosterSource] = useState<'artwork' | 'vora'>(isVoraPosterUrl(collection.posterUrl) ? 'vora' : 'artwork');
+    const [posterSource, setPosterSource] = useState<PosterSource>(isVoraPosterUrl(collection.posterUrl) ? 'vora' : 'artwork');
 
     const voraPosters = useVoraPosters(serverId, isOpen && activeTab === 'poster' && posterSource === 'vora');
     const theme = contentSyncProviderId && contentSyncProviderId !== SMART_CONTENT ? contentSyncExternalId : undefined;
@@ -223,14 +223,9 @@ export default function EditCollectionModal({
         } catch { await dialog.alert("Failed to delete."); }
     };
 
-    const LockIcon = ({ field }: { field: string }) => {
-        const isLocked = lockedFields.includes(field);
-        return (
-            <button type="button" onClick={() => toggleLock(field)} className={`ml-2 focus:outline-none transition-colors cursor-pointer ${isLocked ? 'text-[var(--vora-accent-500)] hover:text-[var(--vora-accent-500)]' : 'text-[var(--vora-text-muted)] hover:text-[var(--vora-text-muted)]'}`}>
-                {isLocked ? <svg className="w-4 h-4 inline-block" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M5 9V7a5 5 0 0110 0v2a2 2 0 012 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 012-2zm8-2v2H7V7a3 3 0 016 0z" clipRule="evenodd" /></svg> : <svg className="w-4 h-4 inline-block" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M10 2a5 5 0 00-5 5v2a2 2 0 00-2 2v5a2 2 0 002 2h10a2 2 0 002-2v-5a2 2 0 00-2-2H7V7a3 3 0 015.905-.75 1 1 0 001.937-.5A5.002 5.002 0 0010 2z" clipRule="evenodd" /></svg>}
-            </button>
-        );
-    };
+    const LockIcon = ({ field }: { field: string }) => (
+        <LockButton locked={lockedFields.includes(field)} onToggle={() => toggleLock(field)} />
+    );
 
     return (
         <Modal
@@ -480,73 +475,23 @@ export default function EditCollectionModal({
                     {(activeTab === 'poster' || activeTab === 'backdrop') && (() => {
                         const isPoster = activeTab === 'poster';
                         const lockField = isPoster ? 'PosterUrl' : 'BackdropUrl';
-                        const sourceSwitch = isPoster && (
-                            <div className="flex flex-wrap items-center gap-2 mb-5" role="group" aria-label="Where the poster comes from">
-                                {([['artwork', 'Your artwork'], ['vora', 'Vora posters']] as const).map(([source, label]) => (
-                                    <button
-                                        key={source}
-                                        type="button"
-                                        data-active={posterSource === source}
-                                        aria-pressed={posterSource === source}
-                                        onClick={() => setPosterSource(source)}
-                                        className="vora-pill cursor-pointer rounded-full px-4 py-1.5 text-sm font-medium"
-                                    >
-                                        {label}
-                                    </button>
-                                ))}
-                            </div>
-                        );
-                        if (isPoster && posterSource === 'vora') {
-                            return (
-                                <>
-                                    {sourceSwitch}
-                                    <VoraPosterPicker
-                                        idPrefix="edit-collection-vora"
-                                        catalog={voraPosters.catalog}
-                                        failed={voraPosters.failed}
-                                        selectedUrl={posterUrl}
-                                        suggestedUrl={suggestedPoster?.url}
-                                        onSelect={url => handleSelectArt(url, 'PosterUrl')}
-                                    />
-                                </>
-                            );
-                        }
                         return (
-                            <>
-                            {sourceSwitch}
-                            <ArtworkPicker
-                                artType={isPoster ? 'Poster' : 'Backdrop'}
-                                artwork={artwork}
-                                loading={loadingArt}
+                            <CollectionArtworkPanel
+                                kind={isPoster ? 'Poster' : 'Backdrop'}
                                 selectedUrl={isPoster ? posterUrl : backdropUrl}
                                 onSelect={(url) => handleSelectArt(url, lockField)}
+                                locked={lockedFields.includes(lockField)}
+                                onToggleLock={() => toggleLock(lockField)}
+                                artwork={artwork}
+                                loading={loadingArt}
                                 onUpload={(file) => uploadArtwork(isPoster ? 'Poster' : 'Backdrop', file)}
                                 onAddUrl={(url) => addArtworkUrl(isPoster ? 'Poster' : 'Backdrop', url)}
                                 onDeleteArtwork={deleteArtwork}
-                                actionRowLeft={
-                                    <div className="flex items-center gap-2">
-                                        <select
-                                            value={selectedProviderId}
-                                            onChange={e => setSelectedProviderId(e.target.value)}
-                                            className="p-1.5 bg-[var(--vora-bg-raised)] border border-[var(--vora-border-subtle)] text-[var(--vora-text-primary)] text-xs rounded outline-none focus:border-[var(--vora-accent-500)]"
-                                        >
-                                            {artworkProviders.map(p => (
-                                                <option key={p.id} value={p.id}>{p.name}</option>
-                                            ))}
-                                        </select>
-                                        <button type="button" onClick={handleFetchProvider} className="px-3 py-1.5 bg-[var(--vora-info-500)] hover:bg-[color-mix(in_srgb,var(--vora-info-500)_85%,var(--vora-text-primary))] active:bg-[color-mix(in_srgb,var(--vora-info-500)_85%,var(--vora-bg-canvas))] text-[var(--vora-text-primary)] text-xs font-bold rounded cursor-pointer transition-colors">
-                                            Fetch Artwork
-                                        </button>
-                                    </div>
-                                }
-                                actionRowRight={
-                                    <div className="flex items-center text-sm text-[var(--vora-text-muted)]">
-                                        <span className="mr-2">Selected {activeTab}:</span>
-                                        <LockIcon field={lockField} />
-                                    </div>
-                                }
+                                fetcher={{ providers: artworkProviders, providerId: selectedProviderId, onProviderChange: setSelectedProviderId, onFetch: handleFetchProvider }}
+                                posterSource={posterSource}
+                                onPosterSourceChange={setPosterSource}
+                                vora={{ idPrefix: 'edit-collection-vora', catalog: voraPosters.catalog, failed: voraPosters.failed, suggestedUrl: suggestedPoster?.url }}
                             />
-                            </>
                         );
                     })()}
                 </div>

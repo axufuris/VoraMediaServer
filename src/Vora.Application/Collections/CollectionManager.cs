@@ -20,6 +20,7 @@ public interface ICollectionManager
     Task<IEnumerable<CollectionSummaryVM>> GetAllCollectionsAsync(bool hasAllAccess, List<Guid> allowedLibs);
     Task<IEnumerable<CollectionSummaryVM>> GetGlobalCollectionsAsync(bool hasAllAccess, List<Guid> allowedLibs, bool includeHidden = false);
     Task UpdateCollectionAsync(Guid id, UpdateCollectionRequest request);
+    Task SetArtworkAsync(Guid id, ArtworkKind kind, string? url);
     Task SetItemInUniverseYearAsync(Guid collectionId, Guid mediaItemId, double? year, bool locked);
     Task RemoveMediaFromCollectionAsync(Guid collectionId, Guid mediaItemId);
     Task ReorderCollectionItemsAsync(Guid collectionId, List<Guid> orderedMediaItemIds);
@@ -117,7 +118,8 @@ public class CollectionManager : ICollectionManager
             SyncIntervalDays = Math.Max(1, request.SyncIntervalDays),
             MirrorList = request.MirrorList,
             RulesJson = request.RulesJson,
-            SmartMediaType = request.SmartMediaType
+            SmartMediaType = request.SmartMediaType,
+            LockedFields = request.LockedFields
         };
 
         var id = await _repository.CreateCollectionAsync(collection);
@@ -176,6 +178,27 @@ public class CollectionManager : ICollectionManager
 
         TriggerCollectionSyncTasks(id, request.Title, request.ContentSyncProviderId, request.SortProviderId, request.RulesJson);
 
+        await _notifier.NotifyCollectionUpdatedAsync(id);
+    }
+
+    public async Task SetArtworkAsync(Guid id, ArtworkKind kind, string? url)
+    {
+        var collection = await _repository.GetForUpdateAsync(id) ?? throw new InvalidOperationException("Collection not found");
+        var address = string.IsNullOrWhiteSpace(url) ? null : url.Trim();
+
+        switch (kind)
+        {
+            case ArtworkKind.Poster:
+                collection.PosterUrl = address;
+                break;
+            case ArtworkKind.Backdrop:
+                collection.BackdropUrl = address;
+                break;
+            default:
+                throw new InvalidOperationException("A collection has a poster and a backdrop only.");
+        }
+
+        await _repository.UpdateCollectionAsync(collection);
         await _notifier.NotifyCollectionUpdatedAsync(id);
     }
 
