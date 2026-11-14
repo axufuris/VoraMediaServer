@@ -115,6 +115,17 @@ describe('ManageLibrary metadata buttons', () => {
             message: expect.stringContaining('every artist and album'),
         })));
     });
+
+    it('on a TV library, says replacing covers every season and episode, locked fields too', async () => {
+        mocks.confirm.mockResolvedValue(false);
+        await renderManage('TvShow');
+
+        fireEvent.click(screen.getByRole('button', { name: 'Replace all metadata' }));
+
+        await waitFor(() => expect(mocks.confirm).toHaveBeenCalledWith(expect.objectContaining({
+            message: expect.stringMatching(/every show, season and episode.*even fields you locked/),
+        })));
+    });
 });
 
 describe('ManageLibrary local files', () => {

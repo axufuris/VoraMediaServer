@@ -204,4 +204,20 @@ public class EnrichmentTargetTests
         (await repo.GetEnrichableMediaIdsAsync(libraryId, fullyRefreshedBefore: started)).Should().BeEquivalentTo(new[] { never.Id, earlier.Id });
         (await repo.GetEnrichableMediaIdsAsync(libraryId, ratingsCheckedBefore: started)).Should().BeEquivalentTo(new[] { never.Id, redone.Id });
     }
+
+    [Fact]
+    public async Task A_resumed_forced_refresh_of_a_tv_library_takes_each_show_not_finished_since_it_was_asked_for_and_never_an_episode_on_its_own()
+    {
+        using var db = NewContext();
+        var started = new DateTime(2026, 11, 14, 9, 0, 0, DateTimeKind.Utc);
+        var (libraryId, finished, season) = SeedShow(db);
+        finished.FullyRefreshedAt = started.AddMinutes(20);
+        var pending = new TvShow { Id = Guid.NewGuid(), Title = "Taskmaster", LibraryId = libraryId, FullyRefreshedAt = started.AddDays(-7) };
+        db.Set<TvShow>().Add(pending);
+        db.Set<Episode>().Add(new Episode { Id = Guid.NewGuid(), Title = "Pilot", LibraryId = libraryId, SeasonId = season.Id, EpisodeNumber = 1 });
+        db.SaveChanges();
+        var repo = new MediaRepository(NullLogger<MediaRepository>.Instance, db);
+
+        (await repo.GetEnrichableMediaIdsAsync(libraryId, fullyRefreshedBefore: started)).Should().Equal(pending.Id);
+    }
 }
