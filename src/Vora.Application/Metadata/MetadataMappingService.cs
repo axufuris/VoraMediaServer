@@ -183,7 +183,7 @@ public class MetadataMappingService : IMetadataMappingService
         return updated;
     }
 
-    public Task<bool> ApplyRatingsAsync(MediaItem item, (decimal? Rating1, string? Name1, decimal? Rating2, string? Name2) ratingsData, bool forceOverride)
+    public async Task<bool> ApplyRatingsAsync(MediaItem item, (decimal? Rating1, string? Name1, decimal? Rating2, string? Name2) ratingsData, bool forceOverride)
     {
         bool updated = false;
         var drawnOnOverlay = (item.ThirdPartyRating1, item.ThirdPartyRating1Name, item.ThirdPartyRating2, item.ThirdPartyRating2Name);
@@ -227,9 +227,14 @@ public class MetadataMappingService : IMetadataMappingService
         if (drawnOnOverlay != (item.ThirdPartyRating1, item.ThirdPartyRating1Name, item.ThirdPartyRating2, item.ThirdPartyRating2Name))
         {
             item.LastOverlayGeneratedAt = null;
+            // Its seasons draw the show's scores they have none of their own for.
+            if (item is TvShow)
+            {
+                await _repository.MarkSeasonOverlaysStaleAsync(item.Id);
+            }
         }
 
-        return Task.FromResult(updated);
+        return updated;
     }
 
     private void ApplyCoreMetadata(MediaItem item, MetadataResult metadata, bool forceOverride, string providerName)

@@ -1963,4 +1963,35 @@ public partial class MediaRepository : IMediaRepository
 
         return null;
     }
+
+    public async Task<Vora.Application.Posters.OverlayRatings?> GetOverlayRatingsAsync(Guid mediaItemId)
+    {
+        return await _context.MediaItems
+            .AsNoTracking()
+            .Where(m => m.Id == mediaItemId)
+            .Select(m => new Vora.Application.Posters.OverlayRatings(
+                m.ServerAdminRating,
+                m.ThirdPartyRating1Name,
+                m.ThirdPartyRating1,
+                m.ThirdPartyRating2Name,
+                m.ThirdPartyRating2))
+            .FirstOrDefaultAsync();
+    }
+
+    public async Task<List<Guid>> GetSeasonIdsOfShowAsync(Guid showId)
+    {
+        return await _context.Set<Season>()
+            .AsNoTracking()
+            .Where(s => s.TvShowId == showId)
+            .OrderBy(s => s.SeasonNumber)
+            .Select(s => s.Id)
+            .ToListAsync();
+    }
+
+    public async Task MarkSeasonOverlaysStaleAsync(Guid showId)
+    {
+        await _context.Set<Season>()
+            .Where(s => s.TvShowId == showId && s.LastOverlayGeneratedAt != null)
+            .ExecuteUpdateAsync(s => s.SetProperty(m => m.LastOverlayGeneratedAt, (DateTime?)null));
+    }
 }

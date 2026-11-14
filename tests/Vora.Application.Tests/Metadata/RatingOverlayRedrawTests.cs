@@ -15,8 +15,11 @@ public class RatingOverlayRedrawTests
 {
     private static readonly DateTime OverlayDrawn = new(2026, 9, 28, 8, 0, 0, DateTimeKind.Utc);
 
-    private readonly MetadataMappingService _service = new(
-        Substitute.For<IMediaRepository>(),
+    private readonly IMediaRepository _repository = Substitute.For<IMediaRepository>();
+    private readonly MetadataMappingService _service;
+
+    public RatingOverlayRedrawTests() => _service = new(
+        _repository,
         Substitute.For<IMediaArtworkRepository>(),
         Substitute.For<IActorRepository>(),
         Substitute.For<ICollectionRepository>(),
@@ -61,6 +64,35 @@ public class RatingOverlayRedrawTests
 
         movie.ThirdPartyRating2.Should().BeNull();
         movie.LastOverlayGeneratedAt.Should().BeNull();
+    }
+
+    [Fact]
+    public async Task A_shows_new_score_redraws_its_seasons_which_may_draw_it()
+    {
+        var show = new TvShow { Title = "Severance", ThirdPartyRating1 = 8.3m, ThirdPartyRating1Name = "TMDB", LastOverlayGeneratedAt = OverlayDrawn };
+
+        await _service.ApplyRatingsAsync(show, (8.3m, "TMDB", 96m, "Rotten Tomatoes"), forceOverride: false);
+
+        show.LastOverlayGeneratedAt.Should().BeNull();
+        await _repository.Received(1).MarkSeasonOverlaysStaleAsync(show.Id);
+    }
+
+    [Fact]
+    public async Task A_show_whose_scores_are_unchanged_leaves_its_seasons_alone()
+    {
+        var show = new TvShow { Title = "Severance", ThirdPartyRating1 = 8.3m, ThirdPartyRating1Name = "TMDB", LastOverlayGeneratedAt = OverlayDrawn };
+
+        await _service.ApplyRatingsAsync(show, (8.3m, "TMDB", null, null), forceOverride: false);
+
+        await _repository.DidNotReceive().MarkSeasonOverlaysStaleAsync(Arg.Any<Guid>());
+    }
+
+    [Fact]
+    public async Task A_movies_new_score_has_no_seasons_to_redraw()
+    {
+        await _service.ApplyRatingsAsync(Movie(), (7.4m, "TMDB", 88m, "Rotten Tomatoes"), forceOverride: false);
+
+        await _repository.DidNotReceive().MarkSeasonOverlaysStaleAsync(Arg.Any<Guid>());
     }
 
     [Fact]
