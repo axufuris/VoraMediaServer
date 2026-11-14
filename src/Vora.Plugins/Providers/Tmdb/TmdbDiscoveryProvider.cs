@@ -12,6 +12,13 @@ public class TmdbDiscoveryProvider : IDiscoveryProvider
     private const long CacheEntrySize = 1024;
     private const int MaxCredits = 20;
 
+    // Search hits sent back: TMDB's first page (it pages by 20). The clients
+    // hide the ones the server marks as in the library, so a search for a
+    // title the library mostly has (e.g. "marvel") still has titles to show;
+    // with only the top four, every one could be owned and the row came back
+    // empty.
+    internal const int SearchResultLimit = 20;
+
     private readonly HttpClient _httpClient;
     private readonly IServiceScopeFactory _scopeFactory;
     private readonly IMemoryCache _cache;
@@ -467,7 +474,7 @@ public class TmdbDiscoveryProvider : IDiscoveryProvider
                 });
             }
 
-            return results.Take(4);
+            return results.Take(SearchResultLimit).ToList();
         });
 
         return cachedSearch ?? new List<DiscoveryItemDto>();
