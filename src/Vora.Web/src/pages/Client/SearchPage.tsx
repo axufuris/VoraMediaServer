@@ -41,11 +41,10 @@ export default function SearchPage() {
                     console.error('Discovery search failed', discovery.reason);
                     setDiscoveryResults([]);
                 } else {
-                    const localTitles = new Set([
-                        ...(localData?.movies ?? []).map(m => m.title.toLowerCase()),
-                        ...(localData?.tvShows ?? []).map(s => s.title.toLowerCase())
-                    ]);
-                    setDiscoveryResults(discovery.value.filter(d => !localTitles.has(d.title.toLowerCase())));
+                    // The server marks what the library already has by its
+                    // TMDB id; matching titles also hid a remake or a namesake
+                    // the library doesn't have.
+                    setDiscoveryResults(discovery.value.filter(d => !d.inLibrary));
                 }
             } finally {
                 setIsLoading(false);
