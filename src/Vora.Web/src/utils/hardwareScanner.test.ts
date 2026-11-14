@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { applyUserCaps, detectAudioOutputChannels, detectHlsVideoCodecs, getEffectiveCapabilities, scanDeviceCapabilities, scanDeviceCapabilitiesSync, type DeviceCapabilities } from './hardwareScanner';
+import { applyUserCaps, detectAudioOutputChannels, detectHlsVideoCodecs, getCurrentProfileDeviceIds, getEffectiveCapabilities, scanDeviceCapabilities, scanDeviceCapabilitiesSync, type DeviceCapabilities } from './hardwareScanner';
+import { serverVault } from './serverVault';
 import { StorageKeys } from './storageKeys';
 
 const close = vi.fn().mockResolvedValue(undefined);
@@ -208,5 +209,45 @@ describe('browser resolution preference', () => {
         expect(result.requestedMaxWidth).toBe(0);
         expect(result.supportedHdrFormats).toContain('HDR10');
         expect(result.hlsVideoCodecs).toContain('hevc');
+    });
+});
+
+describe('playback prefs on more than one server', () => {
+    const tokenFor = (profileId: string) => `header.${btoa(JSON.stringify({ sub: profileId }))}.signature`;
+
+    beforeEach(() => {
+        localStorage.setItem(StorageKeys.deviceId, 'device-1');
+        localStorage.setItem(StorageKeys.profileToken, tokenFor('profile-1'));
+        serverVault.addOrUpdateServer({ id: 'home', name: 'Home', url: 'http://home', token: tokenFor('profile-1'), profileId: 'profile-1', isAdmin: false });
+        serverVault.addOrUpdateServer({ id: 'second', name: 'Second', url: 'http://second', token: tokenFor('profile-2'), profileId: 'profile-2', isAdmin: false });
+        serverVault.setActiveServerId('home');
+        localStorage.setItem(StorageKeys.playbackPrefs('profile-1', 'device-1'), JSON.stringify({ bitrate: 8, maxResolution: 720 }));
+        localStorage.setItem(StorageKeys.playbackPrefs('profile-2', 'device-1'), JSON.stringify({ bitrate: 20, maxResolution: 1080 }));
+    });
+
+    it("reads the prefs of the profile that server's token names", () => {
+        expect(getCurrentProfileDeviceIds('second')).toEqual({ profileId: 'profile-2', deviceId: 'device-1' });
+        expect(getCurrentProfileDeviceIds()).toEqual({ profileId: 'profile-1', deviceId: 'device-1' });
+    });
+
+    it("sends a second server that server's bitrate and resolution limits", async () => {
+        const second = await scanDeviceCapabilities('second');
+
+        expect(second.requestedClientBitrateKbps).toBe(20000);
+        expect(second.requestedMaxResolution).toBe(1080);
+    });
+
+    it('sends the primary server the primary limits, as before', async () => {
+        const primary = await scanDeviceCapabilities();
+
+        expect(primary.requestedClientBitrateKbps).toBe(8000);
+        expect(primary.requestedMaxResolution).toBe(720);
+    });
+
+    it("judges tracks with one profile's bitrate and resolution, not a mix of two", () => {
+        const second = getEffectiveCapabilities('profile-2', 'device-1');
+
+        expect(second.requestedClientBitrateKbps).toBe(20000);
+        expect(second.requestedMaxResolution).toBe(1080);
     });
 });

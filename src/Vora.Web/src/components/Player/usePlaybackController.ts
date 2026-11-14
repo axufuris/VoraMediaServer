@@ -109,7 +109,7 @@ export function usePlaybackController(engine: PlaybackEngine) {
 
     const sideloadSubtitleEvent = useEffectEvent((subtitleTrackId: string | null) => sideloadSubtitle(subtitleTrackId));
 
-    const caps = usePlaybackCapabilities();
+    const caps = usePlaybackCapabilities(currentMedia?.serverId);
 
     const [upNextData, setUpNextData] = useState<UpNextResultVM | null>(null);
 

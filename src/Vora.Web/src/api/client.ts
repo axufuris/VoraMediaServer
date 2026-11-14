@@ -1,6 +1,6 @@
 import axios, { type AxiosInstance, type InternalAxiosRequestConfig, type AxiosRequestConfig, isAxiosError } from 'axios';
 import { serverVault, type VoraServer } from '../utils/serverVault';
-import { StorageKeys, SessionKeys, getProfileIdFromToken } from '../utils/storageKeys';
+import { StorageKeys, SessionKeys, decodeJwtPayload, getAccountIdFromToken, getProfileIdFromToken, type JwtPayload } from '../utils/storageKeys';
 import { defaultApiBaseUrl } from '../utils/apiBase';
 import { getDesktopBridge } from '../desktop/desktopPlayback';
 
@@ -134,6 +134,16 @@ function requestToken(server: VoraServer | undefined): string | null {
 export function profileIdForServer(serverId?: string): string | null {
     const { server } = resolveClient(serverId);
     return getProfileIdFromToken(requestToken(server)) ?? (server?.profileId || null);
+}
+
+export function userIdForServer(serverId?: string): string | null {
+    const { server } = resolveClient(serverId);
+    return getAccountIdFromToken(requestToken(server)) ?? localStorage.getItem(StorageKeys.userId);
+}
+
+export function tokenClaimsForServer(serverId?: string): JwtPayload | null {
+    const { server } = resolveClient(serverId);
+    return decodeJwtPayload(requestToken(server));
 }
 
 const clientCache = new Map<string, AxiosInstance>();

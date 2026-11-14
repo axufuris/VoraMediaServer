@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState, useCallback } from 'react';
 import { Outlet, useNavigate, useParams } from 'react-router-dom';
 import { libraryService } from '../api/Media/libraryService';
 import { authService } from '../api/Auth/authService';
-import { profileIdForServer } from '../api/client';
+import { profileIdForServer, tokenClaimsForServer, userIdForServer } from '../api/client';
 import { useSignalREvent, disconnectSignalR } from '../hooks/useSignalREvent';
 import GlobalVideoPlayer from '../components/Player/GlobalVideoPlayer';
 import DesktopPlaybackHost from '../components/Player/DesktopPlaybackHost';
@@ -63,13 +63,12 @@ interface ParsedSchedule {
     endTime: string;
 }
 
-const getInitialBlockedState = (): boolean => {
-    const token = localStorage.getItem('profile_token');
-    if (!token) return false;
+const blockedBySchedule = (serverId?: string): boolean => {
+    const claims = tokenClaimsForServer(serverId);
+    if (!claims) return false;
 
     try {
-        const payload = JSON.parse(atob(token.split('.')[1]));
-        const schedules = JSON.parse(payload.accessSchedules || "[]");
+        const schedules = JSON.parse(typeof claims.accessSchedules === 'string' && claims.accessSchedules ? claims.accessSchedules : "[]");
 
         if (!schedules || schedules.length === 0) return false;
 
@@ -103,10 +102,14 @@ export default function MainLayout() {
     const [isProfileMenuOpen, setIsProfileMenuOpen] = useState(false);
     const isServerAdmin = localStorage.getItem('is_server_admin') === 'true';
     const profileName = localStorage.getItem('profile_name') || 'User';
-    const currentUserId = localStorage.getItem('user_id');
+    const currentUserId = userIdForServer(serverId);
     const activeProfileId = profileIdForServer(serverId) ?? '';
 
-    const [isBlockedBySchedule, setIsBlockedBySchedule] = useState<boolean>(getInitialBlockedState);
+    const [schedule, setSchedule] = useState(() => ({ serverId, blocked: blockedBySchedule(serverId) }));
+    if (schedule.serverId !== serverId) {
+        setSchedule({ serverId, blocked: blockedBySchedule(serverId) });
+    }
+    const isBlockedBySchedule = schedule.blocked;
 
     const { currentMedia, isMinimized } = usePlayer();
     const desktop = useDesktopPlayback();
@@ -304,10 +307,10 @@ export default function MainLayout() {
 
     useEffect(() => {
         const interval = setInterval(() => {
-            setIsBlockedBySchedule(getInitialBlockedState());
+            setSchedule({ serverId, blocked: blockedBySchedule(serverId) });
         }, 30000);
         return () => clearInterval(interval);
-    }, []);
+    }, [serverId]);
 
     useEffect(() => {
         const checkCapabilities = async () => {
@@ -319,7 +322,7 @@ export default function MainLayout() {
             sessionStorage.setItem(cacheKey, 'pending');
 
             try {
-                const capabilities = await playbackCapabilities();
+                const capabilities = await playbackCapabilities(serverId);
                 await deviceService.updateCapabilities(capabilities, serverId);
 
                 sessionStorage.setItem(cacheKey, 'true');

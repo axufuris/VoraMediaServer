@@ -115,6 +115,7 @@ export default function GlobalVideoPlayer() {
         onSkipForward: skipForward,
         onSkipBackward: skipBackward,
         onVolume: setVolume,
+        serverId: currentMedia?.serverId,
     });
 
     const picture = usePictureClick({ isPlaying, onPlayPause: togglePlayPause });

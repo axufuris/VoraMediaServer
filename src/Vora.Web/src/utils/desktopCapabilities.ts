@@ -8,13 +8,14 @@ import {
     readRequestedBitrateKbps,
     scanDeviceCapabilities,
     type DeviceCapabilities,
+    type ProfileDeviceIds,
 } from './hardwareScanner';
 
 export const DESKTOP_HDR_FORMATS = ['HDR10', 'HLG', 'HDR10+', 'DolbyVision'];
 
 export const DESKTOP_HLS_VIDEO_CODECS = ['h264', 'hevc', 'mpeg2video'];
 
-export function desktopProfile(desktop: DesktopCapabilities): DeviceCapabilities {
+export function desktopProfile(desktop: DesktopCapabilities, ids?: ProfileDeviceIds): DeviceCapabilities {
     return {
         videoCodecs: desktop.videoCodecs,
         audioCodecs: desktop.audioCodecs,
@@ -27,7 +28,7 @@ export function desktopProfile(desktop: DesktopCapabilities): DeviceCapabilities
         rendersImageSubtitles: true,
         hlsVideoCodecs: DESKTOP_HLS_VIDEO_CODECS,
         clientBandwidthKbps: readClientBandwidthKbps(),
-        requestedClientBitrateKbps: readRequestedBitrateKbps(),
+        requestedClientBitrateKbps: readRequestedBitrateKbps(ids),
         requestedMaxResolution: 0,
         requestedMaxWidth: 0,
         displayWidth: desktop.displayWidth,
@@ -39,13 +40,13 @@ export function desktopProfile(desktop: DesktopCapabilities): DeviceCapabilities
 }
 
 export function desktopDeviceCapabilities(desktop: DesktopCapabilities, profileId: string, deviceId: string): DeviceCapabilities {
-    return applyUserCaps(desktopProfile(desktop), readPlaybackPrefs(profileId, deviceId));
+    return applyUserCaps(desktopProfile(desktop, { profileId, deviceId }), readPlaybackPrefs(profileId, deviceId));
 }
 
-export async function playbackCapabilities(): Promise<DeviceCapabilities> {
+export async function playbackCapabilities(serverId?: string): Promise<DeviceCapabilities> {
     await loadDesktopPlayback();
     const desktop = desktopPlaybackCapabilities();
-    if (!desktop) return scanDeviceCapabilities();
-    const { profileId, deviceId } = getCurrentProfileDeviceIds();
+    if (!desktop) return scanDeviceCapabilities(serverId);
+    const { profileId, deviceId } = getCurrentProfileDeviceIds(serverId);
     return desktopDeviceCapabilities(desktop, profileId, deviceId);
 }

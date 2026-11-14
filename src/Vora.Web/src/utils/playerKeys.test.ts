@@ -1,5 +1,7 @@
 import { beforeEach, describe, expect, it } from 'vitest';
-import { DEFAULT_PLAYER_KEY_STEPS, isTypingTarget, nextVolume, playerKeyAction, readPlayerKeySteps, spaceBelongsToTarget } from './playerKeys';
+import { DEFAULT_PLAYER_KEY_STEPS, currentPlayerKeySteps, isTypingTarget, nextVolume, playerKeyAction, readPlayerKeySteps, spaceBelongsToTarget } from './playerKeys';
+import { serverVault } from './serverVault';
+import { StorageKeys } from './storageKeys';
 
 const key = (name: string, modifiers: Partial<{ altKey: boolean; ctrlKey: boolean; metaKey: boolean; shiftKey: boolean }> = {}) =>
     ({ key: name, altKey: false, ctrlKey: false, metaKey: false, shiftKey: false, ...modifiers });
@@ -168,5 +170,23 @@ describe('readPlayerKeySteps', () => {
 
         localStorage.setItem('playback_prefs_profile_device', '{not json');
         expect(readPlayerKeySteps('profile', 'device')).toEqual({ seekSeconds: 10, volumePercent: 5 });
+    });
+});
+
+describe('currentPlayerKeySteps on more than one server', () => {
+    const tokenFor = (profileId: string) => `header.${btoa(JSON.stringify({ sub: profileId }))}.signature`;
+
+    beforeEach(() => {
+        localStorage.clear();
+        localStorage.setItem(StorageKeys.deviceId, 'device-1');
+        localStorage.setItem(StorageKeys.profileToken, tokenFor('profile-1'));
+        serverVault.addOrUpdateServer({ id: 'second', name: 'Second', url: 'http://second', token: tokenFor('profile-2'), profileId: 'profile-2', isAdmin: false });
+        localStorage.setItem(StorageKeys.playbackPrefs('profile-1', 'device-1'), JSON.stringify({ seekStepSeconds: 15, volumeStepPercent: 2 }));
+        localStorage.setItem(StorageKeys.playbackPrefs('profile-2', 'device-1'), JSON.stringify({ seekStepSeconds: 30, volumeStepPercent: 10 }));
+    });
+
+    it('reads the steps saved for the profile of the server the media plays from', () => {
+        expect(currentPlayerKeySteps('second')).toEqual({ seekSeconds: 30, volumePercent: 10 });
+        expect(currentPlayerKeySteps()).toEqual({ seekSeconds: 15, volumePercent: 2 });
     });
 });

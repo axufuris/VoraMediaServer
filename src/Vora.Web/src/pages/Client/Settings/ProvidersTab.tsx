@@ -3,6 +3,7 @@ import { type IptvPlaylistVM, type IptvChannelVM } from '../../../api/Iptv/iptvA
 import { iptvClientService } from '../../../api/Iptv/iptvClientService';
 import { profileDeviceSettingsService } from '../../../api/Users/profileDeviceSettingsService';
 import { StorageKeys } from '../../../utils/storageKeys';
+import { userIdForServer } from '../../../api/client';
 import { parseGuidePrefs } from '../LiveTv/hooks/useGuideData';
 import { secureImageUrl } from '../../../utils/secureImageUrl';
 
@@ -20,7 +21,7 @@ export default function ProvidersTab({ activeProfileId, serverId, onSaved }: { a
     useEffect(() => {
         const load = async () => {
             try {
-                const userId = localStorage.getItem(StorageKeys.userId) || activeProfileId;
+                const userId = userIdForServer(serverId) || activeProfileId;
                 const provs = await iptvClientService.getPlaylists(userId, activeProfileId, serverId);
                 setProviders(provs);
                 const deviceId = localStorage.getItem(StorageKeys.deviceId) || 'unknown';

@@ -15,9 +15,10 @@ interface HarnessProps {
     onSkipForward?: (seconds: number) => void;
     onSkipBackward?: (seconds: number) => void;
     onVolume?: (volume: number) => void;
+    serverId?: string;
 }
 
-function Harness({ enabled = true, canSeek = true, plainArrows, startVolume = 0.5, startPlaying = true, onPlayPause, onSkipForward = vi.fn(), onSkipBackward = vi.fn(), onVolume }: HarnessProps) {
+function Harness({ enabled = true, canSeek = true, plainArrows, startVolume = 0.5, startPlaying = true, onPlayPause, onSkipForward = vi.fn(), onSkipBackward = vi.fn(), onVolume, serverId }: HarnessProps) {
     const [volume, setVolume] = useState(startVolume);
     const [playing, setPlaying] = useState(startPlaying);
     const indicator = usePlayerKeyboard({
@@ -30,6 +31,7 @@ function Harness({ enabled = true, canSeek = true, plainArrows, startVolume = 0.
         onSkipForward,
         onSkipBackward,
         onVolume: level => { setVolume(level); onVolume?.(level); },
+        serverId,
     });
     return (
         <div>
@@ -109,6 +111,21 @@ describe('usePlayerKeyboard', () => {
 
         expect(onSkipForward).toHaveBeenCalledWith(30);
         expect(onVolume).toHaveBeenCalledWith(0.6);
+    });
+
+    it('uses the steps saved for the server the media plays from', () => {
+        const tokenFor = (profileId: string) => `header.${btoa(JSON.stringify({ sub: profileId }))}.signature`;
+        localStorage.setItem(StorageKeys.deviceId, 'device');
+        localStorage.setItem(StorageKeys.profileToken, tokenFor('profile-1'));
+        localStorage.setItem('Vora_servers_vault', JSON.stringify([{ id: 'second', name: 'Second', url: 'http://second', token: tokenFor('profile-2'), profileId: 'profile-2', isAdmin: false }]));
+        localStorage.setItem(StorageKeys.playbackPrefs('profile-1', 'device'), JSON.stringify({ seekStepSeconds: 15 }));
+        localStorage.setItem(StorageKeys.playbackPrefs('profile-2', 'device'), JSON.stringify({ seekStepSeconds: 30 }));
+        const onSkipForward = vi.fn();
+        render(<Harness onSkipForward={onSkipForward} serverId="second" />);
+
+        press('ArrowRight');
+
+        expect(onSkipForward).toHaveBeenCalledWith(30);
     });
 
     it('does nothing while the player is minimised', () => {

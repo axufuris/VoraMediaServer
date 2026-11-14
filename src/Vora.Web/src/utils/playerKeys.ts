@@ -116,7 +116,7 @@ export function readPlayerKeySteps(profileId: string, deviceId: string): PlayerK
     }
 }
 
-export function currentPlayerKeySteps(): PlayerKeySteps {
-    const { profileId, deviceId } = getCurrentProfileDeviceIds();
+export function currentPlayerKeySteps(serverId?: string): PlayerKeySteps {
+    const { profileId, deviceId } = getCurrentProfileDeviceIds(serverId);
     return readPlayerKeySteps(profileId, deviceId);
 }

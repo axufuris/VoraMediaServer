@@ -24,7 +24,7 @@ vi.mock('../../../../api/Users/profileDeviceSettingsService', () => ({
 }));
 vi.mock('../../../../hooks/useSignalREvent', () => ({ useSignalREvent: () => { } }));
 
-const tokenFor = (profileId: string) => `header.${btoa(JSON.stringify({ sub: profileId }))}.signature`;
+const tokenFor = (profileId: string, accountId = 'user-1') => `header.${btoa(JSON.stringify({ sub: profileId, accountId }))}.signature`;
 const start = new Date('2026-11-14T18:00:00Z');
 const end = new Date('2026-11-14T22:00:00Z');
 
@@ -34,7 +34,7 @@ beforeEach(() => {
     localStorage.setItem(StorageKeys.userId, 'user-1');
     localStorage.setItem(StorageKeys.deviceId, 'device-1');
     serverVault.addOrUpdateServer({ id: 'home', name: 'Home', url: 'http://home', token: tokenFor('profile-1'), profileId: 'profile-1', isAdmin: false });
-    serverVault.addOrUpdateServer({ id: 'second', name: 'Second', url: 'http://second', token: tokenFor('profile-2'), profileId: 'profile-2', isAdmin: false });
+    serverVault.addOrUpdateServer({ id: 'second', name: 'Second', url: 'http://second', token: tokenFor('profile-2', 'account-2'), profileId: 'profile-2', isAdmin: false });
     serverVault.setActiveServerId('home');
     mocks.getPlaylists.mockResolvedValue([]);
     mocks.getGuide.mockResolvedValue({});
@@ -54,9 +54,9 @@ describe('useGuideData on a second server', () => {
         const { result } = renderHook(() => useGuideData('second', start, end));
         await waitFor(() => expect(result.current.isLoading).toBe(false));
 
-        expect(mocks.getPlaylists).toHaveBeenCalledWith('user-1', 'profile-2', 'second');
+        expect(mocks.getPlaylists).toHaveBeenCalledWith('account-2', 'profile-2', 'second');
         expect(mocks.getIptvPrefs).toHaveBeenCalledWith('profile-2', 'device-1', 'second');
-        expect(mocks.getGuide).toHaveBeenCalledWith('user-1', 'profile-2', [], start.toISOString(), end.toISOString(), 'second');
+        expect(mocks.getGuide).toHaveBeenCalledWith('account-2', 'profile-2', [], start.toISOString(), end.toISOString(), 'second');
         expect(mocks.getRecordingSessions).toHaveBeenCalledWith('profile-2', 'second');
     });
 
@@ -75,6 +75,7 @@ describe('useGuideData on a second server', () => {
         const { result } = renderHook(() => useGuideData(undefined, start, end));
         await waitFor(() => expect(result.current.isLoading).toBe(false));
 
+        expect(mocks.getPlaylists).toHaveBeenCalledWith('user-1', 'profile-1', undefined);
         expect(mocks.getIptvPrefs).toHaveBeenCalledWith('profile-1', 'device-1', undefined);
         expect(mocks.getRecordingSessions).toHaveBeenCalledWith('profile-1', undefined);
     });

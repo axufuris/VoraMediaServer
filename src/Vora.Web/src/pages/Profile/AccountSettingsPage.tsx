@@ -5,7 +5,7 @@ import { iptvClientService } from '../../api/Iptv/iptvClientService';
 import { type IptvPlaylistVM } from '../../api/Iptv/iptvAdminService';
 import { useDialog } from '../../dialogs';
 import { StorageKeys } from '../../utils/storageKeys';
-import { profileIdForServer } from '../../api/client';
+import { profileIdForServer, userIdForServer } from '../../api/client';
 
 import { profileService, type ProfileScheduleVM, type UserProfileVM } from '../../api/Users/profileService';
 import { userImageService } from '../../api/Users/userImageService';
@@ -39,7 +39,7 @@ export default function AccountSettingsPage() {
         let isMounted = true;
 
         const fetchData = async () => {
-            const userId = localStorage.getItem(StorageKeys.userId);
+            const userId = userIdForServer(serverId);
             if (!userId) {
                 if (isMounted) setLoadError('You are not signed in on this device.');
                 return;

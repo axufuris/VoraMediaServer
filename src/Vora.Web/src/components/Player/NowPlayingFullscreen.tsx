@@ -270,6 +270,7 @@ export default function NowPlayingFullscreen() {
                 onSkipForward: Number.isFinite(duration) && duration > 0 ? skipForward : undefined,
                 onSkipBackward: Number.isFinite(duration) && duration > 0 ? skipBackward : undefined,
                 enabled: !synthMenuOpen && !audioSettingsOpen && !addToPlaylistOpen && !stationDialogOpen,
+                serverId: currentMedia.serverId,
             }}
             headerActions={radioSeed && (
                 <NowPlayingPill

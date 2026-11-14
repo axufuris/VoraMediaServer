@@ -1,7 +1,7 @@
 import { useEffect, useState, useMemo, useRef, useCallback } from 'react';
 import { useParams } from 'react-router-dom';
 import { StorageKeys } from '../../../utils/storageKeys';
-import { profileIdForServer } from '../../../api/client';
+import { profileIdForServer, userIdForServer } from '../../../api/client';
 import { iptvClientService } from '../../../api/Iptv/iptvClientService';
 import { type IptvChannelVM } from '../../../api/Iptv/iptvAdminService';
 import { profileDeviceSettingsService } from '../../../api/Users/profileDeviceSettingsService';
@@ -66,7 +66,7 @@ export default function RadioTab() {
     useEffect(() => {
         const load = async () => {
             try {
-                const userId = localStorage.getItem(StorageKeys.userId) || profileId;
+                const userId = userIdForServer(serverId) || profileId;
                 if (!userId || !profileId) return;
 
                 const cacheKey = radioPrefsCacheKey(profileId, deviceId);

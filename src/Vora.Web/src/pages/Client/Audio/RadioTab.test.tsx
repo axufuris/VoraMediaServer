@@ -177,7 +177,7 @@ describe('RadioTab', () => {
 
 describe('RadioTab on a second server', () => {
     it("loads and saves the stations and favourites of that server's own profile", async () => {
-        const secondToken = `x.${btoa(JSON.stringify({ sub: 'profile-2' }))}.y`;
+        const secondToken = `x.${btoa(JSON.stringify({ sub: 'profile-2', accountId: 'account-2' }))}.y`;
         serverVault.addOrUpdateServer({ id: 'second', name: 'Second', url: 'http://second', token: secondToken, profileId: 'profile-2', isAdmin: false });
         localStorage.setItem('radio_prefs_profile-1_device-1', JSON.stringify({ favoriteIds: ['kexp'], hiddenIds: [], countryFilter: 'All' }));
 
@@ -188,7 +188,7 @@ describe('RadioTab on a second server', () => {
         );
         await screen.findByText('BBC Radio 4');
 
-        expect(mocks.getPlaylists).toHaveBeenCalledWith('user-1', 'profile-2', 'second');
+        expect(mocks.getPlaylists).toHaveBeenCalledWith('account-2', 'profile-2', 'second');
         expect(mocks.getRadioPrefs).toHaveBeenCalledWith('profile-2', 'device-1', 'second');
         await waitFor(() => expect(mocks.saveRadioPrefs).toHaveBeenCalledWith('profile-2', 'device-1', expect.any(String), 'second'), { timeout: 3000 });
         expect(mocks.saveRadioPrefs).not.toHaveBeenCalledWith('profile-1', expect.anything(), expect.anything(), expect.anything());

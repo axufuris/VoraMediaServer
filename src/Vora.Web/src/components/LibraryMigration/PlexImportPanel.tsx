@@ -12,7 +12,7 @@ import {
 import { userService } from '../../api/Users/userService';
 import { useSignalREvent } from '../../hooks/useSignalREvent';
 import { StorageKeys } from '../../utils/storageKeys';
-import { profileIdForServer } from '../../api/client';
+import { profileIdForServer, userIdForServer } from '../../api/client';
 import { migrationSummary, sharedTitleNote } from '../../utils/migrationSummary';
 import { errorDetail } from '../../utils/apiError';
 
@@ -71,7 +71,7 @@ export default function PlexImportPanel({ serverId }: PlexImportPanelProps) {
     }, [serverId]);
 
     useEffect(() => {
-        const userId = localStorage.getItem(StorageKeys.userId);
+        const userId = userIdForServer(serverId);
         if (!isProfileAdmin || !userId) return;
         let cancelled = false;
         userService.getUserAccount(userId, serverId)

@@ -1,4 +1,4 @@
-import { useEffect, useSyncExternalStore } from 'react';
+import { useCallback, useEffect, useSyncExternalStore } from 'react';
 import type { DesktopCapabilities } from '../desktop/desktopBridge';
 import { desktopPlaybackCapabilities, loadDesktopPlayback, subscribeDesktopPlayback } from '../desktop/desktopPlayback';
 import { desktopDeviceCapabilities } from '../utils/desktopCapabilities';
@@ -7,24 +7,24 @@ import { onPlaybackPrefsChanged } from '../utils/playbackPrefsEvents';
 import { StorageKeys } from '../utils/storageKeys';
 
 interface CapabilitiesSnapshot {
-    profileId: string;
-    deviceId: string;
     savedPrefs: string | null;
     desktop: DesktopCapabilities | null;
     capabilities: DeviceCapabilities;
 }
 
-let snapshot: CapabilitiesSnapshot | null = null;
+const snapshots = new Map<string, CapabilitiesSnapshot>();
 
-function currentCapabilities(): DeviceCapabilities {
-    const { profileId, deviceId } = getCurrentProfileDeviceIds();
+function currentCapabilities(serverId?: string): DeviceCapabilities {
+    const { profileId, deviceId } = getCurrentProfileDeviceIds(serverId);
+    const key = `${profileId}|${deviceId}`;
     const savedPrefs = localStorage.getItem(StorageKeys.playbackPrefs(profileId, deviceId));
     const desktop = desktopPlaybackCapabilities();
-    if (snapshot && snapshot.profileId === profileId && snapshot.deviceId === deviceId && snapshot.savedPrefs === savedPrefs && snapshot.desktop === desktop) {
+    const snapshot = snapshots.get(key);
+    if (snapshot && snapshot.savedPrefs === savedPrefs && snapshot.desktop === desktop) {
         return snapshot.capabilities;
     }
     const capabilities = desktop ? desktopDeviceCapabilities(desktop, profileId, deviceId) : getEffectiveCapabilities(profileId, deviceId);
-    snapshot = { profileId, deviceId, savedPrefs, desktop, capabilities };
+    snapshots.set(key, { savedPrefs, desktop, capabilities });
     return capabilities;
 }
 
@@ -37,7 +37,8 @@ function subscribe(onChange: () => void): () => void {
     };
 }
 
-export function usePlaybackCapabilities(): DeviceCapabilities {
+export function usePlaybackCapabilities(serverId?: string): DeviceCapabilities {
     useEffect(() => { void loadDesktopPlayback(); }, []);
-    return useSyncExternalStore(subscribe, currentCapabilities, currentCapabilities);
+    const read = useCallback(() => currentCapabilities(serverId), [serverId]);
+    return useSyncExternalStore(subscribe, read, read);
 }

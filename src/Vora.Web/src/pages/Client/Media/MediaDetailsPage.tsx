@@ -135,7 +135,7 @@ export default function MediaDetailsPage() {
     }
 
     const isAdmin = localStorage.getItem(StorageKeys.isServerAdmin) === 'true';
-    const caps = usePlaybackCapabilities();
+    const caps = usePlaybackCapabilities(serverId);
     const { playMedia, isPlaying } = usePlayer();
     const tracks = useTitleTrackChoices(qualityMedia, caps, serverId);
 

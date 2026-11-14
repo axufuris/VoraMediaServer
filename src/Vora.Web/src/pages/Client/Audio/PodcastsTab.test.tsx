@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
-import { MemoryRouter } from 'react-router-dom';
+import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import PodcastsTab from './PodcastsTab';
 import type { PodcastEpisodeVM, ServerPodcastFeedEpisode, ServerPodcastSubscription } from '../../../api/Podcasts/podcastService';
 import { serverVault, type VoraServer } from '../../../utils/serverVault';
@@ -147,5 +147,38 @@ describe('PodcastsTab new episodes', () => {
         fireEvent.click(screen.getByText('Mark as played'));
 
         await waitFor(() => expect(mocks.saveEpisodeState).toHaveBeenCalledWith('garden-27', 0, true, 'cabin'));
+    });
+});
+
+describe('PodcastsTab custom feeds on more than one server', () => {
+    const tokenFor = (canAdd: string) => `header.${btoa(JSON.stringify({ sub: 'profile', canAddCustomPodcastFeeds: canAdd }))}.signature`;
+
+    const renderAt = (path: string) => {
+        sessionStorage.setItem('podcast_view_mode', 'subscriptions');
+        return render(
+            <MemoryRouter initialEntries={[path]}>
+                <Routes><Route path="/server/:serverId/podcasts" element={<PodcastsTab />} /></Routes>
+            </MemoryRouter>,
+        );
+    };
+
+    beforeEach(() => {
+        serverVault.addOrUpdateServer({ ...server('home', 'Home'), token: tokenFor('False') });
+        serverVault.addOrUpdateServer({ ...server('cabin', 'Cabin'), token: tokenFor('True') });
+        localStorage.setItem('profile_token', tokenFor('False'));
+    });
+
+    it("offers a custom feed on a server whose profile may add one", async () => {
+        renderAt('/server/cabin/podcasts');
+
+        expect(await screen.findByPlaceholderText('Search by name or paste an RSS feed URL...')).toBeInTheDocument();
+    });
+
+    it("hides it on a server whose profile may not, whatever the primary profile allows", async () => {
+        localStorage.setItem('profile_token', tokenFor('True'));
+        renderAt('/server/home/podcasts');
+
+        expect(await screen.findByText('Gardening Hour')).toBeInTheDocument();
+        expect(screen.queryByPlaceholderText('Search by name or paste an RSS feed URL...')).toBeNull();
     });
 });
