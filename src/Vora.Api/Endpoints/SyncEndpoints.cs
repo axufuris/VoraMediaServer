@@ -1,4 +1,5 @@
-﻿using Vora.Application.Sync;
+﻿using Vora.Api.Extensions;
+using Vora.Application.Sync;
 using Vora.Application.Sync.ViewModels;
 
 namespace Vora.Api.Endpoints;
@@ -7,7 +8,8 @@ public static class SyncEndpoints
 {
     public static RouteGroupBuilder MapSyncEndpoints(this IEndpointRouteBuilder routes)
     {
-        var group = routes.MapGroup("/api/sync").WithTags("Sync & State").RequireAuthorization();
+        var group = routes.MapGroup("/api/sync").WithTags("Sync & State").RequireAuthorization()
+            .AddEndpointFilter<AccountOwnershipFilter>();
 
         group.MapGet("/profiles/{profileId:guid}/continue-watching", GetContinueWatchingAsync)
             .WithName("ListContinueWatching")
