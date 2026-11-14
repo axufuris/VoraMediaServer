@@ -142,7 +142,7 @@ public class LocalImageSharpOverlayProvider(ILogger<LocalImageSharpOverlayProvid
         image.Mutate(x => x.Crop(new Rectangle(cropX, cropY, cropWidth, cropHeight)));
     }
 
-    private const string CacheKeyVersion = "v11-ratings-keep-their-slots";
+    private const string CacheKeyVersion = "v12-seasons-borrow-show-ratings";
 
     // Derived from CacheKeyVersion's leading "vN" so a single bump (which authors
     // already do when the compositing output changes) both busts the cached files

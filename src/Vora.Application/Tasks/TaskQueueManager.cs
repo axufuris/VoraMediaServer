@@ -579,9 +579,15 @@ public class TaskQueueManager : ITaskQueueManager
         {
             var manager = sp.GetRequiredService<IPosterOverlayManager>();
             await manager.GenerateOverlaysForMediaAsync(mediaItemId, ct);
+            // A show's seasons may draw its ratings (a new Vora rating, edited details).
+            var seasonIds = await manager.GenerateOverlaysForShowSeasonsAsync(mediaItemId, ct);
 
             var notifier = sp.GetRequiredService<IClientNotifier>();
             await notifier.NotifyMediaItemUpdatedAsync(mediaItemId);
+            foreach (var seasonId in seasonIds)
+            {
+                await notifier.NotifyMediaItemUpdatedAsync(seasonId);
+            }
         }, MediaLabel(mediaItemId, "Generate Poster Overlays: {0}"), mediaItemId: mediaItemId, recipe: TaskRecipe.Of(nameof(QueueGeneratePosterOverlays), new { mediaItemId }));
     }
 

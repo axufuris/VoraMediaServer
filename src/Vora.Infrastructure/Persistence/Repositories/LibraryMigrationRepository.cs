@@ -148,15 +148,26 @@ public class LibraryMigrationRepository : ILibraryMigrationRepository
             .ToListAsync();
 
         var librariesChanged = new HashSet<Guid>();
+        var showsChanged = new List<Guid>();
         foreach (var item in items)
         {
             if (!byItem.TryGetValue(item.Id, out var rating) || item.ServerAdminRating == rating) continue;
             item.ServerAdminRating = rating;
             item.LastOverlayGeneratedAt = null;
             librariesChanged.Add(item.LibraryId);
+            if (item is TvShow) showsChanged.Add(item.Id);
         }
 
         await _context.SaveChangesAsync();
+
+        // A season without a server rating of its own draws its show's.
+        if (showsChanged.Count > 0)
+        {
+            await _context.Set<Season>()
+                .Where(s => showsChanged.Contains(s.TvShowId) && s.LastOverlayGeneratedAt != null)
+                .ExecuteUpdateAsync(s => s.SetProperty(m => m.LastOverlayGeneratedAt, (DateTime?)null));
+        }
+
         return librariesChanged;
     }
 

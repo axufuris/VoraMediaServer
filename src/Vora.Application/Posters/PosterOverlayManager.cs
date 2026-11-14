@@ -13,6 +13,7 @@ public interface IPosterOverlayManager
 {
     Task<bool> RunLibraryOverlaySyncAsync(Guid libraryId, CancellationToken cancellationToken = default);
     Task<bool> GenerateOverlaysForMediaAsync(Guid mediaItemId, CancellationToken cancellationToken = default);
+    Task<List<Guid>> GenerateOverlaysForShowSeasonsAsync(Guid showId, CancellationToken cancellationToken = default);
     Task<bool> HasPendingOverlayWorkAsync(Guid libraryId, CancellationToken cancellationToken = default);
     Task<bool> HasOverlaysFromAnOlderLayoutAsync();
     Task<int> SweepOrphanedOverlayFilesAsync(CancellationToken cancellationToken = default);
@@ -179,6 +180,22 @@ public class PosterOverlayManager : IPosterOverlayManager
         return true;
     }
 
+    // A season's overlay draws the show's ratings it has none of its own for
+    // (OverlayRatings.OrShows), so redrawing one show redraws its seasons after
+    // it. Returns the seasons, for the clients to reload; none for anything that
+    // isn't a show. The library pass doesn't use this: it reaches the seasons
+    // itself, and MarkSeasonOverlaysStaleAsync sends them to it.
+    public async Task<List<Guid>> GenerateOverlaysForShowSeasonsAsync(Guid showId, CancellationToken cancellationToken = default)
+    {
+        var seasonIds = await _mediaRepo.GetSeasonIdsOfShowAsync(showId);
+        foreach (var seasonId in seasonIds)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            await GenerateOverlaysForMediaAsync(seasonId, cancellationToken);
+        }
+        return seasonIds;
+    }
+
     public async Task<bool> GenerateOverlaysForMediaAsync(Guid mediaItemId, CancellationToken cancellationToken = default)
     {
         var item = await _mediaRepo.GetForPosterOverlayAsync(mediaItemId);
@@ -261,6 +278,12 @@ public class PosterOverlayManager : IPosterOverlayManager
 
         string? actualContentRating = item.ContentRating ?? await _mediaRepo.GetParentContentRatingAsync(item.Id);
 
+        var ratings = OverlayRatings.Of(item);
+        if (item is Season season && await _mediaRepo.GetOverlayRatingsAsync(season.TvShowId) is { } showRatings)
+        {
+            ratings = ratings.OrShows(showRatings);
+        }
+
         var dto = new OverlayMediaDto
         {
             Id = item.Id,
@@ -271,11 +294,11 @@ public class PosterOverlayManager : IPosterOverlayManager
             AudioCodec = bestAudioTrack?.Codec,
             HasStinger = item.HasMidCreditsStinger || item.HasPostCreditsStinger,
             Edition = item.Edition,
-            ServerAdminRating = item.ServerAdminRating,
-            ThirdPartyRating1Name = item.ThirdPartyRating1Name,
-            ThirdPartyRating1 = item.ThirdPartyRating1,
-            ThirdPartyRating2Name = item.ThirdPartyRating2Name,
-            ThirdPartyRating2 = item.ThirdPartyRating2,
+            ServerAdminRating = ratings.ServerAdminRating,
+            ThirdPartyRating1Name = ratings.Rating1Name,
+            ThirdPartyRating1 = ratings.Rating1,
+            ThirdPartyRating2Name = ratings.Rating2Name,
+            ThirdPartyRating2 = ratings.Rating2,
             PosterUrl = item.PosterUrl,
             OriginalPosterUrl = item.OriginalPosterUrl
         };

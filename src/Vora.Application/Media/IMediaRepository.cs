@@ -127,4 +127,16 @@ public interface IMediaRepository
     Task<bool> AnyOverlayFromAnotherLayoutAsync(int currentLayoutVersion);
     Task<HashSet<string>> GetReferencedOverlayFileNamesAsync();
     Task<string?> GetParentContentRatingAsync(Guid mediaItemId);
+
+    // The ratings an item's poster overlay draws; null for an unknown item. A
+    // season's overlay borrows the ones it lacks from its show's.
+    Task<Vora.Application.Posters.OverlayRatings?> GetOverlayRatingsAsync(Guid mediaItemId);
+
+    // A show's seasons, for redrawing their overlays after the show's ratings
+    // change. Empty for anything that isn't a show.
+    Task<List<Guid>> GetSeasonIdsOfShowAsync(Guid showId);
+
+    // Sends a show's already-overlaid seasons back to the overlay step, because
+    // the show's ratings they may be drawing changed.
+    Task MarkSeasonOverlaysStaleAsync(Guid showId);
 }
