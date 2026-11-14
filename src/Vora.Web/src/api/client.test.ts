@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { createServerClient, clearApiClientCache, getResponseStatus } from './client';
-import { serverVault } from '../utils/serverVault';
+import { createServerClient, clearApiClientCache, getResponseStatus, profileIdForServer } from './client';
+import { serverVault, type VoraServer } from '../utils/serverVault';
+import { getProfileIdFromToken } from '../utils/storageKeys';
 
 describe('getResponseStatus', () => {
     it('returns the response status for axios errors', () => {
@@ -225,5 +226,97 @@ describe('createServerClient response interceptor 401 handling', () => {
         await expect(rejected(fakeAxiosError)).rejects.toBe(fakeAxiosError);
 
         expect(localStorage.getItem('profile_token')).toBe('keep-me');
+    });
+});
+
+describe('profileIdForServer', () => {
+    const tokenFor = (profileId: string) => `header.${btoa(JSON.stringify({ sub: profileId }))}.signature`;
+
+    const vaultServer = (id: string, token: string, profileId: string): VoraServer =>
+        ({ id, name: id, url: `http://${id}`, token, profileId, isAdmin: false });
+
+    const sentToken = (serverId?: string): string | undefined => {
+        const config = { headers: {} as Record<string, string>, url: '/x', method: 'get' };
+        // @ts-expect-error - private structure used for whitebox test
+        const requestHandlers = createServerClient(serverId).interceptors.request.handlers as { fulfilled: (c: typeof config) => typeof config }[];
+        const authorization = requestHandlers[0].fulfilled(config).headers['Authorization'];
+        return authorization?.replace('Bearer ', '');
+    };
+
+    beforeEach(() => {
+        clearApiClientCache();
+        localStorage.clear();
+        sessionStorage.clear();
+        localStorage.setItem('profile_token', tokenFor('primary-profile'));
+    });
+
+    afterEach(() => {
+        clearApiClientCache();
+    });
+
+    it('names the profile in the vault token of the server the request goes to, not the primary one', () => {
+        serverVault.addOrUpdateServer(vaultServer('home', tokenFor('primary-profile'), 'primary-profile'));
+        serverVault.addOrUpdateServer(vaultServer('second', tokenFor('second-profile'), 'second-profile'));
+        serverVault.setActiveServerId('home');
+
+        expect(profileIdForServer('second')).toBe('second-profile');
+        expect(getProfileIdFromToken(sentToken('second'))).toBe('second-profile');
+        expect(profileIdForServer('home')).toBe('primary-profile');
+    });
+
+    it('names the active vault server profile when no server is given', () => {
+        serverVault.addOrUpdateServer(vaultServer('home', tokenFor('primary-profile'), 'primary-profile'));
+        serverVault.addOrUpdateServer(vaultServer('second', tokenFor('second-profile'), 'second-profile'));
+        serverVault.setActiveServerId('second');
+
+        expect(profileIdForServer()).toBe('second-profile');
+        expect(getProfileIdFromToken(sentToken())).toBe('second-profile');
+    });
+
+    it('names the primary profile when there is no vault at all, as today', () => {
+        expect(profileIdForServer()).toBe('primary-profile');
+        expect(profileIdForServer('unknown-server')).toBe('primary-profile');
+        expect(getProfileIdFromToken(sentToken('unknown-server'))).toBe('primary-profile');
+    });
+
+    it('names the pending token profile while signing in to a new server', () => {
+        serverVault.addOrUpdateServer(vaultServer('home', tokenFor('primary-profile'), 'primary-profile'));
+        serverVault.setActiveServerId('home');
+        sessionStorage.setItem('pending_server_url', 'http://new');
+        sessionStorage.setItem('pending_user_token', tokenFor('pending-profile'));
+
+        expect(profileIdForServer()).toBe('pending-profile');
+        expect(getProfileIdFromToken(sentToken())).toBe('pending-profile');
+    });
+
+    it('prefers the pending token to the stored profile token when no vault server matches', () => {
+        sessionStorage.setItem('pending_user_token', tokenFor('pending-profile'));
+
+        expect(profileIdForServer()).toBe('pending-profile');
+        expect(getProfileIdFromToken(sentToken())).toBe('pending-profile');
+    });
+
+    it('falls back to the vault profileId when the token carries no profile', () => {
+        serverVault.addOrUpdateServer(vaultServer('second', 'opaque-token', 'second-profile'));
+
+        expect(profileIdForServer('second')).toBe('second-profile');
+        expect(sentToken('second')).toBe('opaque-token');
+    });
+
+    it('is null when no token names a profile and the vault has none', () => {
+        localStorage.removeItem('profile_token');
+
+        expect(profileIdForServer()).toBeNull();
+    });
+
+    it('keeps naming the profile the request carries after the vault token changes', () => {
+        serverVault.addOrUpdateServer(vaultServer('home', tokenFor('old-profile'), 'old-profile'));
+        serverVault.setActiveServerId('home');
+        expect(getProfileIdFromToken(sentToken())).toBe('old-profile');
+
+        serverVault.addOrUpdateServer(vaultServer('home', tokenFor('new-profile'), 'new-profile'));
+
+        expect(profileIdForServer()).toBe('new-profile');
+        expect(getProfileIdFromToken(sentToken())).toBe('new-profile');
     });
 });

@@ -1,9 +1,11 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
-import { MemoryRouter } from 'react-router-dom';
+import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import RadioTab from './RadioTab';
 import type { IptvChannelVM } from '../../../api/Iptv/iptvAdminService';
 import { LONG_PRESS_MS } from '../../../hooks/useMenuTrigger';
+import { serverVault } from '../../../utils/serverVault';
+import { clearApiClientCache } from '../../../api/client';
 
 const mocks = vi.hoisted(() => ({
     getPlaylists: vi.fn(),
@@ -66,6 +68,7 @@ afterEach(() => {
     cleanup();
     vi.useRealTimers();
     vi.clearAllMocks();
+    clearApiClientCache();
 });
 
 describe('RadioTab', () => {
@@ -169,5 +172,27 @@ describe('RadioTab', () => {
 
         expect(screen.getByRole('button', { name: 'Add to favorites' })).toBeInTheDocument();
         expect(mocks.playMedia).not.toHaveBeenCalled();
+    });
+});
+
+describe('RadioTab on a second server', () => {
+    it("loads and saves the stations and favourites of that server's own profile", async () => {
+        const secondToken = `x.${btoa(JSON.stringify({ sub: 'profile-2' }))}.y`;
+        serverVault.addOrUpdateServer({ id: 'second', name: 'Second', url: 'http://second', token: secondToken, profileId: 'profile-2', isAdmin: false });
+        localStorage.setItem('radio_prefs_profile-1_device-1', JSON.stringify({ favoriteIds: ['kexp'], hiddenIds: [], countryFilter: 'All' }));
+
+        render(
+            <MemoryRouter initialEntries={['/server/second/radio']}>
+                <Routes><Route path="/server/:serverId/radio" element={<RadioTab />} /></Routes>
+            </MemoryRouter>,
+        );
+        await screen.findByText('BBC Radio 4');
+
+        expect(mocks.getPlaylists).toHaveBeenCalledWith('user-1', 'profile-2', 'second');
+        expect(mocks.getRadioPrefs).toHaveBeenCalledWith('profile-2', 'device-1', 'second');
+        await waitFor(() => expect(mocks.saveRadioPrefs).toHaveBeenCalledWith('profile-2', 'device-1', expect.any(String), 'second'), { timeout: 3000 });
+        expect(mocks.saveRadioPrefs).not.toHaveBeenCalledWith('profile-1', expect.anything(), expect.anything(), expect.anything());
+        expect(JSON.parse(localStorage.getItem('radio_prefs_profile-2_device-1') ?? '{}').favoriteIds).toEqual(['jazz']);
+        expect(JSON.parse(localStorage.getItem('radio_prefs_profile-1_device-1') ?? '{}').favoriteIds).toEqual(['kexp']);
     });
 });

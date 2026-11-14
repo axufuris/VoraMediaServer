@@ -51,7 +51,9 @@ api/System/               systemSettingsAdminService, emailAdminService,
 
 Frontend services align 1:1 with backend `Vora.Api/Endpoints/*Endpoints.cs` groupings. When adding/splitting a service, mirror the backend grouping.
 
-All HTTP calls go through `apiClient.get/post/put/delete` from `api/client.ts`. **Never** call axios directly from pages. `createServerClient` handles per-server vault/token routing automatically; pass `{ serverId }` in the config when targeting a non-active server.
+All HTTP calls go through `apiClient.get/post/put/delete` from `api/client.ts`. **Never** call axios directly from pages. `createServerClient` handles per-server vault/token routing automatically; pass `{ serverId }` in the config when targeting a non-active server. The request interceptor reads the vault entry's token when the request is sent, so a profile switch takes effect without a reload.
+
+**A profile id sent to a server comes from that server's token: `profileIdForServer(serverId)`** (`api/client.ts`). It picks the token exactly as the interceptor does (that server's vault entry, else the active server, else the pending, profile or account token; the same `requestToken`), reads its `sub`, and falls back to the vault entry's `profileId`. `getProfileIdFromToken(localStorage profile_token)` is the primary server's profile: paired with another server's `serverId`, the request carries that server's token but names a profile it doesn't own, which `AccountOwnershipFilter` answers with 403 (Continue Watching vanished from a second server's Home). Pass the page's `serverId`, or `activeServer.id` where the request goes to the active server (the live TV player, SignalR refreshes). Local keys built from the profile id (`client_home_layout_<profileId>_<deviceId>`, `iptv_prefs_…`, `radio_prefs_…`, `playback_prefs_…` cached by `MainLayout`) use the same id, so two servers' copies don't collide. Only code that means the primary profile takes the id from `profile_token`: sign-in and profile selection, `App.tsx`'s legacy vault migration, and local keys with no `serverId` behind them (the player's `playback_prefs`, the music nav, the library sort).
 
 ## `src/components/` — grouped by feature
 
@@ -193,6 +195,6 @@ Remote-control (D-pad) navigation and row hover are in [`docs/frontend-client-ui
 - **Strict TypeScript.** Never leave `any` or `unknown` in the code.
 - **No `alert/confirm/prompt`.** Use `useDialog`.
 - **`cursor-pointer` on every clickable element** (button, anchor, click handler on a div).
-- All API calls through `apiClient` (or a service that wraps it).
+- All API calls through `apiClient` (or a service that wraps it), and a profile id in a request from `profileIdForServer(serverId)`, never from `profile_token` (see `src/api/` above).
 - localStorage keys: see `docs/auth-and-devices.md`. Don't invent new ones in a vacuum. **`is_server_admin`** is the canonical admin flag — `is_admin` is dead.
 - Device headers (`X-Vora-Device-Id`, `X-Vora-Client`, `X-Vora-Device`, `X-Vora-Device-Type`, `X-Vora-OS`) are set automatically in the `client.ts` interceptor. Don't set them by hand.

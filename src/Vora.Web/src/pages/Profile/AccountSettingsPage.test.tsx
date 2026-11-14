@@ -1,8 +1,9 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, waitFor } from '@testing-library/react';
-import { MemoryRouter } from 'react-router-dom';
+import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import AccountSettingsPage from './AccountSettingsPage';
 import { StorageKeys } from '../../utils/storageKeys';
+import { serverVault } from '../../utils/serverVault';
 import type { UserVM } from '../../api/Users/userService';
 
 const getUserAccount = vi.fn<() => Promise<UserVM>>();
@@ -110,5 +111,35 @@ describe('AccountSettingsPage', () => {
 
         expect(await screen.findByRole('alert')).toHaveTextContent('not signed in');
         expect(getUserAccount).not.toHaveBeenCalled();
+    });
+});
+
+describe('AccountSettingsPage on a second server', () => {
+    const tokenFor = (profileId: string) => `header.${btoa(JSON.stringify({ sub: profileId }))}.signature`;
+
+    beforeEach(() => {
+        localStorage.clear();
+        localStorage.setItem(StorageKeys.userId, 'acct-1');
+        localStorage.setItem(StorageKeys.isProfileAdmin, 'false');
+        localStorage.setItem(StorageKeys.profileToken, tokenFor('profile-1'));
+        serverVault.addOrUpdateServer({ id: 'second', name: 'Second', url: 'http://second', token: tokenFor('profile-2'), profileId: 'profile-2', isAdmin: false });
+        getUserAccount.mockReset();
+        getUserAccount.mockResolvedValue({
+            ...account,
+            profiles: [{ id: 'profile-2', name: 'Andy on Second', isAdmin: false, hasPin: false, accessSchedules: [] }],
+        } as unknown as UserVM);
+    });
+
+    it("opens that server's own profile, with its connections, for a profile that is not the main one", async () => {
+        render(
+            <MemoryRouter initialEntries={['/server/second/account']}>
+                <div data-vora-client="">
+                    <Routes><Route path="/server/:serverId/account" element={<AccountSettingsPage />} /></Routes>
+                </div>
+            </MemoryRouter>,
+        );
+
+        expect(await screen.findByDisplayValue('Andy on Second')).toBeInTheDocument();
+        expect(screen.getByRole('button', { name: 'Connections' })).toBeInTheDocument();
     });
 });

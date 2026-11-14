@@ -1,6 +1,7 @@
 import { useEffect, useState, useMemo, useRef, useCallback } from 'react';
 import { useParams } from 'react-router-dom';
-import { StorageKeys, getProfileIdFromToken } from '../../../utils/storageKeys';
+import { StorageKeys } from '../../../utils/storageKeys';
+import { profileIdForServer } from '../../../api/client';
 import { iptvClientService } from '../../../api/Iptv/iptvClientService';
 import { type IptvChannelVM } from '../../../api/Iptv/iptvAdminService';
 import { profileDeviceSettingsService } from '../../../api/Users/profileDeviceSettingsService';
@@ -59,15 +60,7 @@ export default function RadioTab() {
     const [showHidden, setShowHidden] = useState(false);
     const [contextMenu, setContextMenu] = useState<{ x: number, y: number, channelId: string } | null>(null);
 
-    const profileId = useMemo(() => {
-        const token = localStorage.getItem(StorageKeys.profileToken);
-        if (!token) return '';
-        try {
-            return getProfileIdFromToken(token) ?? '';
-        } catch {
-            return '';
-        }
-    }, []);
+    const profileId = useMemo(() => profileIdForServer(serverId) ?? '', [serverId]);
     const deviceId = useMemo(() => localStorage.getItem(StorageKeys.deviceId) || 'unknown', []);
 
     useEffect(() => {

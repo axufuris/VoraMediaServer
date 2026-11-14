@@ -4,7 +4,8 @@ import { iptvClientService, type IptvProgramDto } from '../../../../api/Iptv/ipt
 import { dvrService, type IptvRecordingSessionVM } from '../../../../api/Iptv/dvrService';
 import { profileDeviceSettingsService } from '../../../../api/Users/profileDeviceSettingsService';
 import { serverVault } from '../../../../utils/serverVault';
-import { StorageKeys, getProfileIdFromToken } from '../../../../utils/storageKeys';
+import { StorageKeys } from '../../../../utils/storageKeys';
+import { profileIdForServer } from '../../../../api/client';
 import { useSignalREvent } from '../../../../hooks/useSignalREvent';
 
 export interface GuidePrefs {
@@ -40,8 +41,8 @@ export function parseGuidePrefs(json: string | null | undefined): GuidePrefs | n
 
 const readDeviceId = (): string => localStorage.getItem(StorageKeys.deviceId) || 'unknown';
 
-const activeProfileIdFor = (activeServer: { profileId: string }): string =>
-    getProfileIdFromToken(localStorage.getItem(StorageKeys.profileToken)) ?? activeServer.profileId;
+const profileIdFor = (serverId: string | undefined, activeServer: { profileId: string }): string =>
+    profileIdForServer(serverId) ?? activeServer.profileId;
 
 export interface UseGuideDataResult {
     channels: IptvChannelVM[];
@@ -67,7 +68,7 @@ export function useGuideData(serverId: string | undefined, timelineStart: Date, 
                 const activeServer = serverVault.getActiveServer();
                 if (!activeServer) return;
 
-                const sessions = await dvrService.getRecordingSessions(activeProfileIdFor(activeServer), activeServer.id);
+                const sessions = await dvrService.getRecordingSessions(profileIdFor(activeServer.id, activeServer), activeServer.id);
                 setRecordingSessions(sessions);
             } catch (e) {
                 console.error("SignalR: Failed to refresh DVR sessions", e);
@@ -81,7 +82,7 @@ export function useGuideData(serverId: string | undefined, timelineStart: Date, 
         const activeServer = serverVault.getActiveServer();
         if (!activeServer) return;
 
-        const profileId = activeProfileIdFor(activeServer);
+        const profileId = profileIdFor(serverId, activeServer);
         const deviceId = readDeviceId();
         const json = JSON.stringify(newPrefs);
         localStorage.setItem(StorageKeys.iptvPrefs(profileId, deviceId), json);
@@ -92,7 +93,7 @@ export function useGuideData(serverId: string | undefined, timelineStart: Date, 
     useSignalREvent('ChannelFavoritesUpdated', useCallback((eventProfileId: string) => {
         const activeServer = serverVault.getActiveServer();
         if (!activeServer) return;
-        const profileId = activeProfileIdFor(activeServer);
+        const profileId = profileIdFor(serverId, activeServer);
         if (eventProfileId.toLowerCase() !== profileId.toLowerCase()) return;
         if (Date.now() - lastLocalSaveAt.current < 2000) return;
 
@@ -110,7 +111,7 @@ export function useGuideData(serverId: string | undefined, timelineStart: Date, 
                 const activeServer = serverVault.getActiveServer();
                 if (!activeServer) return;
 
-                const activeProfileId = activeProfileIdFor(activeServer);
+                const activeProfileId = profileIdFor(serverId, activeServer);
                 const userId = localStorage.getItem(StorageKeys.userId) || activeProfileId;
                 const deviceId = readDeviceId();
                 const cacheKey = StorageKeys.iptvPrefs(activeProfileId, deviceId);
