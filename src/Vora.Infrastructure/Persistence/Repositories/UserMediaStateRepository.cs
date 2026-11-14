@@ -53,7 +53,7 @@ public class UserMediaStateRepository : IUserMediaStateRepository
             {
                 m.Id,
                 Type = m is Movie ? "Movie" : m is TvShow ? "TvShow" : m is Season ? "Season" : m is Episode ? "Episode" : "Unknown",
-                DirectorId = m.Cast.Where(c => (c.Roles & MediaCastRole.Director) != 0).Select(c => c.ActorId).FirstOrDefault(),
+                DirectorId = m.Cast.Where(c => (c.Roles & MediaCastRole.Director) != 0).OrderBy(c => c.Order).ThenBy(c => c.ActorId).Select(c => c.ActorId).FirstOrDefault(),
                 GenreIds = m.Genres.Select(g => g.Id).ToList(),
                 SeasonId = m is Episode ? ((Episode)m).SeasonId : (Guid?)null,
                 EpisodeNumber = m is Episode ? ((Episode)m).EpisodeNumber : (int?)null
@@ -184,7 +184,7 @@ public class UserMediaStateRepository : IUserMediaStateRepository
             {
                 var directorMovies = await _context.MediaCastMembers
                     .AsNoTracking()
-                    .Where(c => c.ActorId == currentMedia.DirectorId && c.MediaItemId != mediaId && c.MediaItem is Movie)
+                    .Where(c => c.ActorId == currentMedia.DirectorId && (c.Roles & MediaCastRole.Director) != 0 && c.MediaItemId != mediaId && c.MediaItem is Movie)
                     .Select(c => new UpNextItemVM
                     {
                         Id = c.MediaItem.Id,
