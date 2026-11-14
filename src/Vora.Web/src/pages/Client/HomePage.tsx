@@ -31,29 +31,30 @@ const readSavedHomeTab = (): HomeTab => {
     return saved === 'forYou' || saved === 'watchlist' || saved === 'collections' || saved === 'playlists' ? saved : 'overview';
 };
 
-function ContinueWatchingRow({ profileId, serverId, excludeLibraryIds }: { profileId: string, serverId?: string, excludeLibraryIds: string[] }) {
+function ContinueWatchingRow({ profileId, serverId }: { profileId: string, serverId?: string }) {
     const navigate = useNavigate();
     const dialog = useDialog();
     const [items, setItems] = useState<ContinueWatchingItem[]>([]);
     const [loading, setLoading] = useState(true);
-    const [refreshes, setRefreshes] = useState(0);
+
+    const fetchItems = useCallback(async (silent = false) => {
+        try {
+            const data = await syncService.getContinueWatching(profileId, serverId);
+            setItems(data);
+        } catch (error) {
+            console.error('Failed to fetch continue watching items', error);
+        } finally {
+            if (!silent) setLoading(false);
+        }
+    }, [profileId, serverId]);
 
     useEffect(() => {
-        let current = true;
-        syncService.getContinueWatching(profileId, serverId, excludeLibraryIds)
-            .then(data => {
-                if (current) setItems(data);
-            })
-            .catch(error => console.error('Failed to fetch continue watching items', error))
-            .finally(() => {
-                if (current) setLoading(false);
-            });
-        return () => { current = false; };
-    }, [profileId, serverId, excludeLibraryIds, refreshes]);
+        fetchItems();
+    }, [fetchItems]);
 
-    const refresh = useCallback(() => setRefreshes(count => count + 1), []);
-
-    useSignalREvent('UserMediaStateUpdated', refresh);
+    useSignalREvent('UserMediaStateUpdated', useCallback(() => {
+        fetchItems(true);
+    }, [fetchItems]));
 
     const handleHide = async (item: ContinueWatchingItem) => {
         const isEpisode = item.type === 'Episode';
@@ -93,7 +94,7 @@ function ContinueWatchingRow({ profileId, serverId, excludeLibraryIds }: { profi
                             imageUrl={item.posterUrl ?? item.backgroundUrl}
                             progressPercent={percent}
                             onClick={() => navigate(mediaPath(item, serverId))}
-                            menu={mediaMenuTarget(item, serverId, { onChanged: refresh })}
+                            menu={mediaMenuTarget(item, serverId, { onChanged: () => fetchItems(true) })}
                             hoverBadge={<PosterRemoveButton onClick={() => handleHide(item)} title="Hide from Continue Watching" />}
                         />
                     </MediaRowItem>
@@ -253,7 +254,7 @@ export default function HomePage() {
         );
     }
 
-    if (loading || excludeLibraryIds === null) {
+    if (loading) {
         return (
             <div className="min-h-full pb-20">
                 {tabBar}
@@ -292,7 +293,7 @@ export default function HomePage() {
                     />
                 ) : (
                     <div className="space-y-10 pt-2">
-                        {activeProfileId && <ContinueWatchingRow profileId={activeProfileId} serverId={serverId} excludeLibraryIds={excludeLibraryIds} />}
+                        {activeProfileId && <ContinueWatchingRow profileId={activeProfileId} serverId={serverId} />}
                         {displayLists.map(list => <SmartListRow key={list.id} list={list} serverId={serverId} excludeLibraryIds={excludeLibraryIds} />)}
                     </div>
                 )}

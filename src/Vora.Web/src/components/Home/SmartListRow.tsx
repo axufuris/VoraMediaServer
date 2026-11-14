@@ -18,7 +18,7 @@ import { mediaMenuTarget } from '../Media/ItemMenu/mediaItemMenu';
 interface SmartListRowProps {
     list: SmartListClientDto;
     serverId?: string;
-    excludeLibraryIds?: string[];
+    excludeLibraryIds?: string[] | null;
 }
 
 // One home-screen row. Library lists are posters that open the details page;
@@ -34,6 +34,7 @@ export default function SmartListRow({ list, serverId, excludeLibraryIds }: Smar
     const source: SmartListSource = list.source ?? 'Library';
 
     useEffect(() => {
+        if (excludeLibraryIds === null) return;
         let current = true;
         smartListService.getListEntries(list.id, serverId, excludeLibraryIds)
             .then(data => {

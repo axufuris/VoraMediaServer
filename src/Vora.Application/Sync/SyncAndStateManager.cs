@@ -6,14 +6,14 @@ namespace Vora.Application.Sync;
 
 public interface ISyncAndStateManager
 {
-    Task<IEnumerable<ContinueWatchingVM>> GetContinueWatchingFeedAsync(Guid profileId, int limit = 10, List<Guid>? excludedLibraryIds = null);
+    Task<IEnumerable<ContinueWatchingVM>> GetContinueWatchingFeedAsync(Guid profileId, int limit = 10);
     Task HideFromContinueWatchingAsync(Guid profileId, Guid mediaItemId);
 }
 
 public class SyncAndStateManager(IUserMediaStateRepository repository, ILogger<SyncAndStateManager> logger) : ISyncAndStateManager
 {
-    public async Task<IEnumerable<ContinueWatchingVM>> GetContinueWatchingFeedAsync(Guid profileId, int limit = 10, List<Guid>? excludedLibraryIds = null) =>
-        await repository.GetContinueWatchingAsync(profileId, limit, excludedLibraryIds);
+    public async Task<IEnumerable<ContinueWatchingVM>> GetContinueWatchingFeedAsync(Guid profileId, int limit = 10) =>
+        await repository.GetContinueWatchingAsync(profileId, limit);
 
     public async Task HideFromContinueWatchingAsync(Guid profileId, Guid mediaItemId)
     {

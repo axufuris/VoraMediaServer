@@ -79,39 +79,45 @@ afterEach(() => {
 });
 
 describe('HomePage and the libraries unpinned from the sidebar', () => {
-    it('waits for the sidebar, then asks for Continue Watching and each row without the unpinned libraries', async () => {
+    it('waits for the sidebar, then asks for each row without the unpinned libraries', async () => {
         const items = [library('movies', true), library('test-movies', false), library('test-shows', false)];
         const view = render(page(sidebar(items, false)));
 
         await waitFor(() => expect(mocks.getActiveLists).toHaveBeenCalled());
         await waitFor(() => expect(mocks.getHomeLayout).toHaveBeenCalled());
         await Promise.resolve();
-        expect(mocks.getContinueWatching).not.toHaveBeenCalled();
         expect(mocks.getListEntries).not.toHaveBeenCalled();
 
         view.rerender(page(sidebar(items)));
 
         expect(await screen.findByText('Recently Added Movies & Shows')).toBeTruthy();
-        expect(await screen.findByText('Continue Watching')).toBeTruthy();
-        expect(mocks.getContinueWatching).toHaveBeenCalledTimes(1);
-        expect(mocks.getContinueWatching).toHaveBeenCalledWith('profile-1', 'home', ['test-movies', 'test-shows']);
         expect(mocks.getListEntries).toHaveBeenCalledTimes(1);
         expect(mocks.getListEntries).toHaveBeenCalledWith('list-1', 'home', ['test-movies', 'test-shows']);
+    });
+
+    it('shows Continue Watching from every library without waiting for the sidebar', async () => {
+        render(page(sidebar([library('test-shows', false)], false)));
+
+        expect(await screen.findByText('Continue Watching')).toBeTruthy();
+        expect(screen.getByText('Alien')).toBeTruthy();
+        expect(mocks.getContinueWatching).toHaveBeenCalledTimes(1);
+        expect(mocks.getContinueWatching).toHaveBeenCalledWith('profile-1', 'home');
+        expect(mocks.getListEntries).not.toHaveBeenCalled();
     });
 
     it('follows a library pinned or unpinned in the sidebar without reloading the page', async () => {
         const view = render(page(sidebar([library('movies', true), library('test-shows', true)])));
         expect(await screen.findByText('Heat')).toBeTruthy();
+        expect(await screen.findByText('Alien')).toBeTruthy();
         expect(mocks.getListEntries).toHaveBeenLastCalledWith('list-1', 'home', []);
-        expect(mocks.getContinueWatching).toHaveBeenLastCalledWith('profile-1', 'home', []);
 
         mocks.getListEntries.mockResolvedValue([movie('m3', 'Arrival')]);
         view.rerender(page(sidebar([library('movies', true), library('test-shows', false)])));
 
         expect(await screen.findByText('Arrival')).toBeTruthy();
         expect(mocks.getListEntries).toHaveBeenLastCalledWith('list-1', 'home', ['test-shows']);
-        expect(mocks.getContinueWatching).toHaveBeenLastCalledWith('profile-1', 'home', ['test-shows']);
         expect(mocks.getActiveLists).toHaveBeenCalledTimes(1);
+        expect(mocks.getContinueWatching).toHaveBeenCalledTimes(1);
     });
 
     it('asks nothing again when the sidebar is only reordered', async () => {

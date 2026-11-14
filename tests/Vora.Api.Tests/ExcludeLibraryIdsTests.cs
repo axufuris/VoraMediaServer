@@ -9,8 +9,6 @@ using Vora.Application.Recommendations;
 using Vora.Application.Recommendations.ViewModels;
 using Vora.Application.SmartLists;
 using Vora.Application.SmartLists.ViewModels;
-using Vora.Application.Sync;
-using Vora.Application.Sync.ViewModels;
 
 namespace Vora.Api.Tests;
 
@@ -45,7 +43,6 @@ public sealed class ExcludeLibraryIdsEndpointTests : IClassFixture<VoraApiTestFa
 
     private readonly VoraApiTestFactory _factory;
     private readonly ISmartListManager _smartLists = Substitute.For<ISmartListManager>();
-    private readonly ISyncAndStateManager _sync = Substitute.For<ISyncAndStateManager>();
     private readonly IRecommendationManager _recommendations = Substitute.For<IRecommendationManager>();
     private readonly Guid _profileId = Guid.NewGuid();
 
@@ -53,7 +50,6 @@ public sealed class ExcludeLibraryIdsEndpointTests : IClassFixture<VoraApiTestFa
     {
         _factory = factory;
         _smartLists.GetSmartListEntriesAsync(Arg.Any<Guid>(), Arg.Any<SmartListViewer>()).Returns(new List<SmartListEntryVM>());
-        _sync.GetContinueWatchingFeedAsync(Arg.Any<Guid>(), Arg.Any<int>(), Arg.Any<List<Guid>?>()).Returns(new List<ContinueWatchingVM>());
         _recommendations.GetRecommendationsAsync(
                 Arg.Any<Guid>(), Arg.Any<Guid?>(), Arg.Any<bool>(), Arg.Any<List<Guid>>(), Arg.Any<List<string>>(), Arg.Any<List<string>>(),
                 Arg.Any<bool>(), Arg.Any<string?>(), Arg.Any<List<Guid>?>())
@@ -75,8 +71,6 @@ public sealed class ExcludeLibraryIdsEndpointTests : IClassFixture<VoraApiTestFa
         {
             services.RemoveAll<ISmartListManager>();
             services.AddSingleton(_smartLists);
-            services.RemoveAll<ISyncAndStateManager>();
-            services.AddSingleton(_sync);
             services.RemoveAll<IRecommendationManager>();
             services.AddSingleton(_recommendations);
         }));
@@ -100,17 +94,6 @@ public sealed class ExcludeLibraryIdsEndpointTests : IClassFixture<VoraApiTestFa
         response.StatusCode.Should().Be(HttpStatusCode.OK);
         await _smartLists.Received(1).GetSmartListEntriesAsync(listId,
             Arg.Is<SmartListViewer>(viewer => viewer.ProfileId == _profileId && viewer.ExcludedLibraryIds.SequenceEqual(Ids(expected))));
-    }
-
-    [Theory]
-    [MemberData(nameof(Queries))]
-    public async Task Continue_watching_reads_the_libraries_to_leave_out_from_the_query(string query, string expected)
-    {
-        var response = await Client().GetAsync($"/api/sync/profiles/{_profileId}/continue-watching{query}", TestContext.Current.CancellationToken);
-
-        response.StatusCode.Should().Be(HttpStatusCode.OK);
-        await _sync.Received(1).GetContinueWatchingFeedAsync(
-            Arg.Is(_profileId), Arg.Is(10), Arg.Is<List<Guid>?>(ids => ids != null && ids.SequenceEqual(Ids(expected))));
     }
 
     [Theory]

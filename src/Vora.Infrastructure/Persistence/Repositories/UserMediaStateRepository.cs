@@ -1,7 +1,6 @@
 using System.Linq.Expressions;
 using Microsoft.EntityFrameworkCore;
 using Npgsql;
-using NpgsqlTypes;
 using Vora.Application.Libraries.ViewModels;
 using Vora.Application.Media;
 using Vora.Application.Media.ViewModels;
@@ -229,13 +228,12 @@ public class UserMediaStateRepository : IUserMediaStateRepository
         return result;
     }
 
-    public Task<List<ContinueWatchingVM>> GetContinueWatchingAsync(Guid profileId, int limit = 15, List<Guid>? excludedLibraryIds = null) =>
+    public Task<List<ContinueWatchingVM>> GetContinueWatchingAsync(Guid profileId, int limit = 15) =>
         _context.Database
             .SqlQueryRaw<ContinueWatchingVM>(
                 ContinueWatchingQuery.Sql,
                 new NpgsqlParameter("profileId", profileId),
-                new NpgsqlParameter("limit", limit),
-                new NpgsqlParameter("excludedLibraryIds", NpgsqlDbType.Array | NpgsqlDbType.Uuid) { Value = (excludedLibraryIds ?? []).ToArray() })
+                new NpgsqlParameter("limit", limit))
             .ToListAsync();
 
     public async Task SetMediaPlayedStateAsync(Guid mediaItemId, Guid profileId, bool isPlayed)

@@ -18,11 +18,8 @@ export interface ContinueWatchingItem {
 }
 
 export const syncService = {
-    getContinueWatching: async (profileId: string, serverId?: string, excludeLibraryIds?: string[]): Promise<ContinueWatchingItem[]> => {
-        const response = await apiClient.get<ContinueWatchingItem[]>(`/sync/profiles/${profileId}/continue-watching`, {
-            params: { excludeLibraryIds: excludeLibraryIds?.join(',') || undefined },
-            serverId
-        });
+    getContinueWatching: async (profileId: string, serverId?: string): Promise<ContinueWatchingItem[]> => {
+        const response = await apiClient.get<ContinueWatchingItem[]>(`/sync/profiles/${profileId}/continue-watching`, { serverId });
         return response.data;
     },
 

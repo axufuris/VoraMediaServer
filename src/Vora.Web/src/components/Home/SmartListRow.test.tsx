@@ -153,6 +153,29 @@ describe('SmartListRow and the sidebar', () => {
         expect(mocks.getListEntries).toHaveBeenCalledWith('list-1', 'home', ['test-movies', 'test-shows']);
     });
 
+    it('waits while the libraries to leave out are not known yet, showing a library row as loading', async () => {
+        mocks.getListEntries.mockResolvedValue([movie('m1', 'Heat')]);
+        const view = render(
+            <MemoryRouter>
+                <SmartListRow list={row('Library', 'Recently Added')} excludeLibraryIds={null} />
+            </MemoryRouter>
+        );
+        await Promise.resolve();
+
+        expect(mocks.getListEntries).not.toHaveBeenCalled();
+        expect(view.container.querySelector('.vora-skeleton')).not.toBeNull();
+
+        view.rerender(
+            <MemoryRouter>
+                <SmartListRow list={row('Library', 'Recently Added')} excludeLibraryIds={['test-shows']} />
+            </MemoryRouter>
+        );
+
+        expect(await screen.findByText('Heat')).toBeInTheDocument();
+        expect(mocks.getListEntries).toHaveBeenCalledTimes(1);
+        expect(mocks.getListEntries).toHaveBeenCalledWith('list-1', undefined, ['test-shows']);
+    });
+
     it('asks again when a library is pinned or unpinned, keeping the row on screen meanwhile', async () => {
         mocks.getListEntries.mockResolvedValueOnce([movie('s1', 'Seinfeld'), movie('m1', 'Heat')]);
         const view = render(
