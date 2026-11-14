@@ -5,17 +5,24 @@ import { musicService, type GeneratedMixSummaryVM } from '../../api/Music/musicS
 import RecommendationRow from '../../components/Media/RecommendationRow';
 import EmptyState from '../../components/Client/Primitives/EmptyState';
 import { MadeForYouRow } from './Audio/Music/MixRow';
+import { useUnpinnedLibraryIds } from '../../layouts/sidebarItems';
 
-function AsyncProviderBlock({ providerId, serverId }: { providerId: string, serverId?: string }) {
+function AsyncProviderBlock({ providerId, serverId, excludeLibraryIds }: { providerId: string, serverId?: string, excludeLibraryIds: string[] }) {
     const [lists, setLists] = useState<RecommendationListVM[]>([]);
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
-        recommendationService.getGlobalRecommendations(providerId, serverId)
-            .then(setLists)
+        let current = true;
+        recommendationService.getGlobalRecommendations(providerId, serverId, excludeLibraryIds)
+            .then(data => {
+                if (current) setLists(data);
+            })
             .catch(console.error)
-            .finally(() => setLoading(false));
-    }, [providerId, serverId]);
+            .finally(() => {
+                if (current) setLoading(false);
+            });
+        return () => { current = false; };
+    }, [providerId, serverId, excludeLibraryIds]);
 
     if (loading) {
         return (
@@ -46,6 +53,7 @@ export default function RecommendationsPage() {
     const [loadingProviders, setLoadingProviders] = useState(true);
     const [mixes, setMixes] = useState<GeneratedMixSummaryVM[]>([]);
     const [loadingMixes, setLoadingMixes] = useState(true);
+    const excludeLibraryIds = useUnpinnedLibraryIds(serverId);
 
     useEffect(() => {
         recommendationService.getProviders(serverId)
@@ -67,7 +75,7 @@ export default function RecommendationsPage() {
     return (
         <div className="min-h-full pb-20">
             <div className="space-y-10 pt-2">
-                {loadingProviders || (providers.length === 0 && loadingMixes) ? (
+                {loadingProviders || excludeLibraryIds === null || (providers.length === 0 && loadingMixes) ? (
                     <div className="px-8 max-md:px-4">
                         <div className="vora-skeleton mb-4 h-6 w-48" />
                         <div className="vora-skeleton h-72 w-full" />
@@ -89,7 +97,7 @@ export default function RecommendationsPage() {
                             if (b === 'openai_recommendations') return 1;
                             return 0;
                         }).map(providerId => (
-                            <AsyncProviderBlock key={providerId} providerId={providerId} serverId={serverId} />
+                            <AsyncProviderBlock key={providerId} providerId={providerId} serverId={serverId} excludeLibraryIds={excludeLibraryIds} />
                         ))}
                         <MadeForYouRow mixes={mixes} onOpen={openMix} />
                     </>

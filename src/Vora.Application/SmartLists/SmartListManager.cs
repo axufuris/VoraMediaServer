@@ -222,7 +222,8 @@ public class SmartListManager(
             viewer.AllowedLibraryIds,
             viewer.AllowedMovieRatings,
             viewer.AllowedTvRatings,
-            viewer.BlockUnrated);
+            viewer.BlockUnrated,
+            viewer.ExcludedLibraryIds);
     }
 
     private static void Apply(SmartList list, SmartListSaveRequest request)

@@ -20,6 +20,7 @@ import PosterRemoveButton from '../../components/Client/Primitives/PosterRemoveB
 import { mediaPath } from '../../utils/mediaPath';
 import { useDialog } from '../../dialogs';
 import { mediaMenuTarget } from '../../components/Media/ItemMenu/mediaItemMenu';
+import { useUnpinnedLibraryIds } from '../../layouts/sidebarItems';
 
 type HomeTab = 'overview' | 'forYou' | 'watchlist' | 'collections' | 'playlists';
 
@@ -111,6 +112,7 @@ export default function HomePage() {
     const [loading, setLoading] = useState(true);
     const [isCustomizeOpen, setIsCustomizeOpen] = useState(false);
     const [activeTab, setActiveTab] = useState<HomeTab>(readSavedHomeTab);
+    const excludeLibraryIds = useUnpinnedLibraryIds(serverId);
 
     const handleTabChange = (tab: HomeTab) => {
         setActiveTab(tab);
@@ -292,7 +294,7 @@ export default function HomePage() {
                 ) : (
                     <div className="space-y-10 pt-2">
                         {activeProfileId && <ContinueWatchingRow profileId={activeProfileId} serverId={serverId} />}
-                        {displayLists.map(list => <SmartListRow key={list.id} list={list} serverId={serverId} />)}
+                        {displayLists.map(list => <SmartListRow key={list.id} list={list} serverId={serverId} excludeLibraryIds={excludeLibraryIds} />)}
                     </div>
                 )}
             </div>

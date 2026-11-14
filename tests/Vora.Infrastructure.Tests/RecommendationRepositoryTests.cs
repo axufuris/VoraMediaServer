@@ -187,4 +187,23 @@ public class RecommendationRepositoryTests
         taste.Kind.Should().Be("movies and TV shows");
         (await new OpenAiRecommendationRepository(_db).GetTasteContextAsync(_me, _shows, 10, 10)).Kind.Should().Be("TV shows");
     }
+
+    [Fact]
+    public async Task For_you_tiles_leave_out_the_libraries_the_client_unpinned()
+    {
+        var (seinfeld, _) = Show("Seinfeld");
+        var heat = Movie("Heat");
+        var alien = Movie("Alien");
+        alien.TmdbId = "348";
+        await _db.SaveChangesAsync(TestContext.Current.CancellationToken);
+        var stored = new List<Guid> { seinfeld.Id, heat.Id };
+
+        var everything = await Repository().GetHydratedMediaItemsAsync(_me, stored, ["348"], null, true, [], [], [], false, []);
+        var noShows = await Repository().GetHydratedMediaItemsAsync(_me, stored, ["348"], null, true, [], [], [], false, [_shows]);
+        var noMovies = await Repository().GetHydratedMediaItemsAsync(_me, stored, ["348"], null, true, [], [], [], false, [_movies]);
+
+        everything.Select(i => i.Title).Should().BeEquivalentTo(new[] { "Seinfeld", "Heat", "Alien" });
+        noShows.Select(i => i.Title).Should().BeEquivalentTo(new[] { "Heat", "Alien" });
+        noMovies.Select(i => i.Title).Should().BeEquivalentTo(new[] { "Seinfeld" });
+    }
 }

@@ -18,35 +18,40 @@ import { mediaMenuTarget } from '../Media/ItemMenu/mediaItemMenu';
 interface SmartListRowProps {
     list: SmartListClientDto;
     serverId?: string;
+    excludeLibraryIds?: string[] | null;
 }
 
 // One home-screen row. Library lists are posters that open the details page;
 // the other sources are channels, stations, episodes, albums and recordings
 // that play or open where they live. A row with nothing in it is not drawn.
-export default function SmartListRow({ list, serverId }: SmartListRowProps) {
+export default function SmartListRow({ list, serverId, excludeLibraryIds }: SmartListRowProps) {
     const navigate = useNavigate();
     const dialog = useDialog();
     const { playMedia } = usePlayer();
     const [entries, setEntries] = useState<SmartListEntry[]>([]);
     const [loading, setLoading] = useState(true);
+    const [refreshes, setRefreshes] = useState(0);
     const source: SmartListSource = list.source ?? 'Library';
 
-    const fetchEntries = useCallback((silent = false) => {
-        smartListService.getListEntries(list.id, serverId)
-            .then(setEntries)
+    useEffect(() => {
+        if (excludeLibraryIds === null) return;
+        let current = true;
+        smartListService.getListEntries(list.id, serverId, excludeLibraryIds)
+            .then(data => {
+                if (current) setEntries(data);
+            })
             .catch(console.error)
             .finally(() => {
-                if (!silent) setLoading(false);
+                if (current) setLoading(false);
             });
-    }, [list.id, serverId]);
+        return () => { current = false; };
+    }, [list.id, serverId, excludeLibraryIds, refreshes]);
 
-    useEffect(() => {
-        fetchEntries();
-    }, [fetchEntries]);
+    const refresh = useCallback(() => setRefreshes(count => count + 1), []);
 
     const refreshFor = useCallback((...sources: SmartListSource[]) => {
-        if (sources.includes(source)) fetchEntries(true);
-    }, [source, fetchEntries]);
+        if (sources.includes(source)) refresh();
+    }, [source, refresh]);
 
     useSignalREvent('LibraryUpdated', useCallback(() => refreshFor('Library', 'RecentlyAddedMusic'), [refreshFor]));
     useSignalREvent('MediaItemUpdated', useCallback(() => refreshFor('Library'), [refreshFor]));
@@ -97,7 +102,7 @@ export default function SmartListRow({ list, serverId }: SmartListRowProps) {
                     isPlayed={media.isPlayed}
                     unplayedCount={media.unplayedItemCount}
                     onClick={() => openMedia(media.id)}
-                    menu={mediaMenuTarget(media, serverId, { onChanged: () => fetchEntries(true) })}
+                    menu={mediaMenuTarget(media, serverId, { onChanged: refresh })}
                 />
             );
         }

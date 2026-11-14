@@ -23,9 +23,9 @@ export const recommendationService = {
         return response.data;
     },
 
-    getGlobalRecommendations: async (providerId?: string, serverId?: string): Promise<RecommendationListVM[]> => {
+    getGlobalRecommendations: async (providerId?: string, serverId?: string, excludeLibraryIds?: string[]): Promise<RecommendationListVM[]> => {
         const response = await apiClient.get<RecommendationListVM[]>('/recommendations/global', {
-            params: { providerId },
+            params: { providerId, excludeLibraryIds: excludeLibraryIds?.join(',') || undefined },
             serverId
         });
         return response.data;

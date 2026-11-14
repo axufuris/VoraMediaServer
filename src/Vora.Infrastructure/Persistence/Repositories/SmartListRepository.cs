@@ -27,7 +27,8 @@ public class SmartListRepository(VoraDbContext context) : ISmartListRepository
         List<Guid>? allowedLibs = null,
         List<string>? allowedMovieRatings = null,
         List<string>? allowedTvRatings = null,
-        bool blockUnrated = false)
+        bool blockUnrated = false,
+        List<Guid>? excludedLibs = null)
     {
         var query = context.MediaItems.AsNoTracking().AsQueryable();
         query = query.ApplyAccessFilters(hasAllAccess, allowedLibs ?? new List<Guid>(), allowedMovieRatings ?? new List<string>(), allowedTvRatings ?? new List<string>(), blockUnrated);
@@ -35,6 +36,11 @@ public class SmartListRepository(VoraDbContext context) : ISmartListRepository
         if (!hasAllAccess && allowedLibs != null)
         {
             query = query.Where(m => allowedLibs.Contains(m.LibraryId));
+        }
+
+        if (excludedLibs is { Count: > 0 })
+        {
+            query = query.Where(m => !excludedLibs.Contains(m.LibraryId));
         }
 
         if (libraryId.HasValue)

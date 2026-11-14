@@ -13,7 +13,8 @@ public interface IRecommendationRepository
         List<Guid> allowedLibs,
         List<string> allowedMovieRatings,
         List<string> allowedTvRatings,
-        bool blockUnrated);
+        bool blockUnrated,
+        List<Guid> excludedLibs);
 
     // The movies and shows the profile has watched or rated, in the library when
     // one is given. A show counts once, as soon as any of its episodes is played.

@@ -11,4 +11,7 @@ public sealed record SmartListViewer(
     List<string> AllowedMovieRatings,
     List<string> AllowedTvRatings,
     bool BlockUnrated,
-    MusicAccessFilter MusicAccess);
+    MusicAccessFilter MusicAccess)
+{
+    public List<Guid> ExcludedLibraryIds { get; init; } = [];
+}
