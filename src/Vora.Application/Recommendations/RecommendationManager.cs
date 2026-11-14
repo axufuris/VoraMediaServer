@@ -9,7 +9,7 @@ namespace Vora.Application.Recommendations;
 
 public interface IRecommendationManager
 {
-    Task<List<RecommendationListVM>> GetRecommendationsAsync(Guid profileId, Guid? libraryId, bool hasAllAccess, List<Guid> allowedLibs, List<string> allowedMovieRatings, List<string> allowedTvRatings, bool blockUnrated, string? targetProviderId = null);
+    Task<List<RecommendationListVM>> GetRecommendationsAsync(Guid profileId, Guid? libraryId, bool hasAllAccess, List<Guid> allowedLibs, List<string> allowedMovieRatings, List<string> allowedTvRatings, bool blockUnrated, string? targetProviderId = null, List<Guid>? excludedLibraryIds = null);
     Task<List<string>> GetActiveProviderIdsAsync();
 
     // Asks the provider for the profile's rows and stores them. ForYouRebuildWorker
@@ -64,8 +64,9 @@ public class RecommendationManager : IRecommendationManager
 
     private DateTime Now => _time.GetUtcNow().UtcDateTime;
 
-    public async Task<List<RecommendationListVM>> GetRecommendationsAsync(Guid profileId, Guid? libraryId, bool hasAllAccess, List<Guid> allowedLibs, List<string> allowedMovieRatings, List<string> allowedTvRatings, bool blockUnrated, string? targetProviderId = null)
+    public async Task<List<RecommendationListVM>> GetRecommendationsAsync(Guid profileId, Guid? libraryId, bool hasAllAccess, List<Guid> allowedLibs, List<string> allowedMovieRatings, List<string> allowedTvRatings, bool blockUnrated, string? targetProviderId = null, List<Guid>? excludedLibraryIds = null)
     {
+        var excludedLibs = excludedLibraryIds ?? new List<Guid>();
         var activeProviders = new List<IRecommendationProvider>();
 
         foreach (var provider in _providers)
@@ -119,7 +120,7 @@ public class RecommendationManager : IRecommendationManager
         var local = localIds.Count == 0
             ? new Dictionary<Guid, LibraryItemVM>()
             : (await _recommendationRepo.GetHydratedMediaItemsAsync(
-                profileId, localIds, new List<string>(), libraryId, hasAllAccess, allowedLibs, allowedMovieRatings, allowedTvRatings, blockUnrated))
+                profileId, localIds, new List<string>(), libraryId, hasAllAccess, allowedLibs, allowedMovieRatings, allowedTvRatings, blockUnrated, excludedLibs))
                 .ToDictionary(m => m.Id);
 
         var allLists = new List<RecommendationListVM>();
@@ -128,7 +129,7 @@ public class RecommendationManager : IRecommendationManager
             var matchedItems = list.ExternalTmdbIds.Count == 0
                 ? list.LocalItemIds.Distinct().Where(local.ContainsKey).Select(id => local[id]).ToList()
                 : (await _recommendationRepo.GetHydratedMediaItemsAsync(
-                    profileId, list.LocalItemIds, list.ExternalTmdbIds, libraryId, hasAllAccess, allowedLibs, allowedMovieRatings, allowedTvRatings, blockUnrated))
+                    profileId, list.LocalItemIds, list.ExternalTmdbIds, libraryId, hasAllAccess, allowedLibs, allowedMovieRatings, allowedTvRatings, blockUnrated, excludedLibs))
                     .OrderBy(m => list.LocalItemIds.IndexOf(m.Id))
                     .ToList();
 

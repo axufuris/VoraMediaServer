@@ -30,7 +30,7 @@ public class SmartListManagerTests
         _settingsRepository.GetSettingsAsync().Returns(_settings);
         _repository.GetSmartListItemsAsync(
                 Arg.Any<Guid?>(), Arg.Any<Guid?>(), Arg.Any<SmartListRulesDto?>(), Arg.Any<SmartListSortBy>(), Arg.Any<int>(),
-                Arg.Any<Guid?>(), Arg.Any<bool>(), Arg.Any<List<Guid>?>(), Arg.Any<List<string>?>(), Arg.Any<List<string>?>(), Arg.Any<bool>())
+                Arg.Any<Guid?>(), Arg.Any<bool>(), Arg.Any<List<Guid>?>(), Arg.Any<List<string>?>(), Arg.Any<List<string>?>(), Arg.Any<bool>(), Arg.Any<List<Guid>?>())
             .Returns(new List<LibraryItemVM>());
         _resolver.ResolveAsync(Arg.Any<SmartList>(), Arg.Any<SmartListRulesDto?>(), Arg.Any<SmartListViewer>()).Returns(new List<SmartListEntryVM>());
         _manager = new SmartListManager(_repository, _resolver, _settingsRepository, _notifier, NullLogger<SmartListManager>.Instance);
@@ -86,7 +86,7 @@ public class SmartListManagerTests
 
         await _repository.Received(1).GetSmartListItemsAsync(
             Viewer.ProfileId, libraryId, Arg.Any<SmartListRulesDto?>(), Arg.Any<SmartListSortBy>(), Arg.Any<int>(),
-            Arg.Any<Guid?>(), Arg.Any<bool>(), Arg.Any<List<Guid>?>(), Arg.Any<List<string>?>(), Arg.Any<List<string>?>(), Arg.Any<bool>());
+            Arg.Any<Guid?>(), Arg.Any<bool>(), Arg.Any<List<Guid>?>(), Arg.Any<List<string>?>(), Arg.Any<List<string>?>(), Arg.Any<bool>(), Arg.Any<List<Guid>?>());
     }
 
     [Fact]
@@ -96,7 +96,7 @@ public class SmartListManagerTests
         var track = new LibraryItemVM { Id = Guid.NewGuid(), Title = "Hey Ya!", Type = "Track", Artist = "OutKast", PosterUrl = "/art.jpg" };
         _repository.GetSmartListItemsAsync(
                 Arg.Any<Guid?>(), Arg.Any<Guid?>(), Arg.Any<SmartListRulesDto?>(), Arg.Any<SmartListSortBy>(), Arg.Any<int>(),
-                Arg.Any<Guid?>(), Arg.Any<bool>(), Arg.Any<List<Guid>?>(), Arg.Any<List<string>?>(), Arg.Any<List<string>?>(), Arg.Any<bool>())
+                Arg.Any<Guid?>(), Arg.Any<bool>(), Arg.Any<List<Guid>?>(), Arg.Any<List<string>?>(), Arg.Any<List<string>?>(), Arg.Any<bool>(), Arg.Any<List<Guid>?>())
             .Returns(new List<LibraryItemVM> { track });
 
         var entries = await _manager.GetSmartListEntriesAsync(list.Id, Viewer);
@@ -117,7 +117,34 @@ public class SmartListManagerTests
 
         await _repository.Received(1).GetSmartListItemsAsync(
             Viewer.ProfileId, Arg.Any<Guid?>(), Arg.Any<SmartListRulesDto?>(), Arg.Any<SmartListSortBy>(), Arg.Any<int>(),
-            Arg.Any<Guid?>(), Arg.Any<bool>(), Arg.Any<List<Guid>?>(), Arg.Any<List<string>?>(), Arg.Any<List<string>?>(), Arg.Any<bool>());
+            Arg.Any<Guid?>(), Arg.Any<bool>(), Arg.Any<List<Guid>?>(), Arg.Any<List<string>?>(), Arg.Any<List<string>?>(), Arg.Any<bool>(), Arg.Any<List<Guid>?>());
+    }
+
+    [Fact]
+    public async Task Library_items_leave_out_the_libraries_the_viewer_unpinned()
+    {
+        var list = Stored(SmartListSource.Library);
+        var unpinned = new List<Guid> { Guid.NewGuid(), Guid.NewGuid() };
+
+        await _manager.GetSmartListEntriesAsync(list.Id, Viewer with { ExcludedLibraryIds = unpinned });
+
+        await _repository.Received(1).GetSmartListItemsAsync(
+            Viewer.ProfileId, Arg.Any<Guid?>(), Arg.Any<SmartListRulesDto?>(), Arg.Any<SmartListSortBy>(), Arg.Any<int>(),
+            Arg.Any<Guid?>(), Arg.Any<bool>(), Arg.Any<List<Guid>?>(), Arg.Any<List<string>?>(), Arg.Any<List<string>?>(), Arg.Any<bool>(),
+            Arg.Is<List<Guid>?>(ids => ids != null && ids.SequenceEqual(unpinned)));
+    }
+
+    [Fact]
+    public async Task A_viewer_that_leaves_nothing_out_reads_every_library()
+    {
+        var list = Stored(SmartListSource.Library);
+
+        await _manager.GetSmartListEntriesAsync(list.Id, Viewer);
+
+        await _repository.Received(1).GetSmartListItemsAsync(
+            Arg.Any<Guid?>(), Arg.Any<Guid?>(), Arg.Any<SmartListRulesDto?>(), Arg.Any<SmartListSortBy>(), Arg.Any<int>(),
+            Arg.Any<Guid?>(), Arg.Any<bool>(), Arg.Any<List<Guid>?>(), Arg.Any<List<string>?>(), Arg.Any<List<string>?>(), Arg.Any<bool>(),
+            Arg.Is<List<Guid>?>(ids => ids != null && ids.Count == 0));
     }
 
     [Fact]

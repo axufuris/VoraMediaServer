@@ -20,6 +20,7 @@ import PosterRemoveButton from '../../components/Client/Primitives/PosterRemoveB
 import { mediaPath } from '../../utils/mediaPath';
 import { useDialog } from '../../dialogs';
 import { mediaMenuTarget } from '../../components/Media/ItemMenu/mediaItemMenu';
+import { useUnpinnedLibraryIds } from '../../layouts/sidebarItems';
 
 type HomeTab = 'overview' | 'forYou' | 'watchlist' | 'collections' | 'playlists';
 
@@ -30,30 +31,29 @@ const readSavedHomeTab = (): HomeTab => {
     return saved === 'forYou' || saved === 'watchlist' || saved === 'collections' || saved === 'playlists' ? saved : 'overview';
 };
 
-function ContinueWatchingRow({ profileId, serverId }: { profileId: string, serverId?: string }) {
+function ContinueWatchingRow({ profileId, serverId, excludeLibraryIds }: { profileId: string, serverId?: string, excludeLibraryIds: string[] }) {
     const navigate = useNavigate();
     const dialog = useDialog();
     const [items, setItems] = useState<ContinueWatchingItem[]>([]);
     const [loading, setLoading] = useState(true);
-
-    const fetchItems = useCallback(async (silent = false) => {
-        try {
-            const data = await syncService.getContinueWatching(profileId, serverId);
-            setItems(data);
-        } catch (error) {
-            console.error('Failed to fetch continue watching items', error);
-        } finally {
-            if (!silent) setLoading(false);
-        }
-    }, [profileId, serverId]);
+    const [refreshes, setRefreshes] = useState(0);
 
     useEffect(() => {
-        fetchItems();
-    }, [fetchItems]);
+        let current = true;
+        syncService.getContinueWatching(profileId, serverId, excludeLibraryIds)
+            .then(data => {
+                if (current) setItems(data);
+            })
+            .catch(error => console.error('Failed to fetch continue watching items', error))
+            .finally(() => {
+                if (current) setLoading(false);
+            });
+        return () => { current = false; };
+    }, [profileId, serverId, excludeLibraryIds, refreshes]);
 
-    useSignalREvent('UserMediaStateUpdated', useCallback(() => {
-        fetchItems(true);
-    }, [fetchItems]));
+    const refresh = useCallback(() => setRefreshes(count => count + 1), []);
+
+    useSignalREvent('UserMediaStateUpdated', refresh);
 
     const handleHide = async (item: ContinueWatchingItem) => {
         const isEpisode = item.type === 'Episode';
@@ -93,7 +93,7 @@ function ContinueWatchingRow({ profileId, serverId }: { profileId: string, serve
                             imageUrl={item.posterUrl ?? item.backgroundUrl}
                             progressPercent={percent}
                             onClick={() => navigate(mediaPath(item, serverId))}
-                            menu={mediaMenuTarget(item, serverId, { onChanged: () => fetchItems(true) })}
+                            menu={mediaMenuTarget(item, serverId, { onChanged: refresh })}
                             hoverBadge={<PosterRemoveButton onClick={() => handleHide(item)} title="Hide from Continue Watching" />}
                         />
                     </MediaRowItem>
@@ -111,6 +111,7 @@ export default function HomePage() {
     const [loading, setLoading] = useState(true);
     const [isCustomizeOpen, setIsCustomizeOpen] = useState(false);
     const [activeTab, setActiveTab] = useState<HomeTab>(readSavedHomeTab);
+    const excludeLibraryIds = useUnpinnedLibraryIds(serverId);
 
     const handleTabChange = (tab: HomeTab) => {
         setActiveTab(tab);
@@ -252,7 +253,7 @@ export default function HomePage() {
         );
     }
 
-    if (loading) {
+    if (loading || excludeLibraryIds === null) {
         return (
             <div className="min-h-full pb-20">
                 {tabBar}
@@ -291,8 +292,8 @@ export default function HomePage() {
                     />
                 ) : (
                     <div className="space-y-10 pt-2">
-                        {activeProfileId && <ContinueWatchingRow profileId={activeProfileId} serverId={serverId} />}
-                        {displayLists.map(list => <SmartListRow key={list.id} list={list} serverId={serverId} />)}
+                        {activeProfileId && <ContinueWatchingRow profileId={activeProfileId} serverId={serverId} excludeLibraryIds={excludeLibraryIds} />}
+                        {displayLists.map(list => <SmartListRow key={list.id} list={list} serverId={serverId} excludeLibraryIds={excludeLibraryIds} />)}
                     </div>
                 )}
             </div>

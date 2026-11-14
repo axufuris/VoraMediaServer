@@ -36,7 +36,10 @@ public class PostgresHomeRowIndexTests(PostgresDatabase database) : IClassFixtur
     [InlineData(SmartListSortBy.DateAddedDesc, "Movie", "IX_MediaItems_PresentByDateAdded")]
     [InlineData(SmartListSortBy.DateAddedDesc, "TvShow", "IX_MediaItems_PresentByDateAdded")]
     [InlineData(SmartListSortBy.DateAddedDesc, "Movie,TvShow,Season,Episode", "IX_MediaItems_PresentByDateAdded")]
-    public async Task A_default_home_row_reads_its_first_titles_from_an_index(SmartListSortBy sortBy, string mediaTypes, string index)
+    [InlineData(SmartListSortBy.ReleaseDateDesc, "Movie", "IX_MediaItems_PresentByReleaseDate", true)]
+    [InlineData(SmartListSortBy.DateAddedDesc, "Movie", "IX_MediaItems_PresentByDateAdded", true)]
+    [InlineData(SmartListSortBy.DateAddedDesc, "Movie,TvShow,Season,Episode", "IX_MediaItems_PresentByDateAdded", true)]
+    public async Task A_default_home_row_reads_its_first_titles_from_an_index(SmartListSortBy sortBy, string mediaTypes, string index, bool leavesOutALibrary = false)
     {
         Assert.SkipUnless(PostgresDatabase.IsConfigured, PostgresDatabase.SkipReason);
         var cancellationToken = TestContext.Current.CancellationToken;
@@ -54,7 +57,7 @@ public class PostgresHomeRowIndexTests(PostgresDatabase database) : IClassFixtur
         var commands = new Commands();
         await using var db = database.NewContext(commands);
         var rules = new SmartListRulesDto { MediaTypes = mediaTypes.Split(',').ToList() };
-        await new SmartListRepository(db).GetSmartListItemsAsync(Guid.NewGuid(), null, rules, sortBy, 20);
+        await new SmartListRepository(db).GetSmartListItemsAsync(Guid.NewGuid(), null, rules, sortBy, 20, excludedLibs: leavesOutALibrary ? [Guid.NewGuid()] : null);
 
         // The last command is the one that reads the tiles. With sequential
         // scans and sorts priced out, Postgres reads it from an index only if

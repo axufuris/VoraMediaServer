@@ -24,7 +24,8 @@ public class RecommendationRepository(VoraDbContext context) : IRecommendationRe
         List<Guid> allowedLibs,
         List<string> allowedMovieRatings,
         List<string> allowedTvRatings,
-        bool blockUnrated)
+        bool blockUnrated,
+        List<Guid> excludedLibs)
     {
         var query = context.MediaItems
             .AsNoTracking()
@@ -33,6 +34,11 @@ public class RecommendationRepository(VoraDbContext context) : IRecommendationRe
         if (libraryId.HasValue)
         {
             query = query.Where(m => m.LibraryId == libraryId.Value);
+        }
+
+        if (excludedLibs.Count > 0)
+        {
+            query = query.Where(m => !excludedLibs.Contains(m.LibraryId));
         }
 
         return await query

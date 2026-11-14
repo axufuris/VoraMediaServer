@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import SmartListRow from './SmartListRow';
 import type { SmartListClientDto, SmartListEntry } from '../../api/Collections/smartListService';
@@ -128,5 +128,77 @@ describe('SmartListRow', () => {
 
         expect(await screen.findByText('Music page')).toBeInTheDocument();
         expect(JSON.parse(sessionStorage.getItem('music_nav_state') ?? '{}')).toEqual({ view: 'album', artistId: 'ar1', albumId: 'a1' });
+    });
+});
+
+describe('SmartListRow and the sidebar', () => {
+    beforeEach(() => {
+        mocks.getListEntries.mockReset();
+        vi.stubGlobal('ResizeObserver', NoopResizeObserver);
+    });
+
+    const movie = (id: string, title: string): SmartListEntry =>
+        ({ kind: 'Media', id, title, media: { id, title, type: 'Movie', libraryId: 'lib' } });
+
+    it('asks for the row without the libraries the profile unpinned', async () => {
+        mocks.getListEntries.mockResolvedValue([movie('m1', 'Heat')]);
+
+        render(
+            <MemoryRouter>
+                <SmartListRow list={row('Library', 'Recently Added Movies & Shows')} serverId="home" excludeLibraryIds={['test-movies', 'test-shows']} />
+            </MemoryRouter>
+        );
+
+        expect(await screen.findByText('Recently Added Movies & Shows')).toBeInTheDocument();
+        expect(mocks.getListEntries).toHaveBeenCalledWith('list-1', 'home', ['test-movies', 'test-shows']);
+    });
+
+    it('asks again when a library is pinned or unpinned, keeping the row on screen meanwhile', async () => {
+        mocks.getListEntries.mockResolvedValueOnce([movie('s1', 'Seinfeld'), movie('m1', 'Heat')]);
+        const view = render(
+            <MemoryRouter>
+                <SmartListRow list={row('Library', 'Recently Added')} excludeLibraryIds={[]} />
+            </MemoryRouter>
+        );
+        expect(await screen.findByText('Seinfeld')).toBeInTheDocument();
+
+        let answer: (entries: SmartListEntry[]) => void = () => { };
+        mocks.getListEntries.mockReturnValueOnce(new Promise<SmartListEntry[]>(resolve => { answer = resolve; }));
+        view.rerender(
+            <MemoryRouter>
+                <SmartListRow list={row('Library', 'Recently Added')} excludeLibraryIds={['test-shows']} />
+            </MemoryRouter>
+        );
+
+        expect(mocks.getListEntries).toHaveBeenLastCalledWith('list-1', undefined, ['test-shows']);
+        expect(screen.getByText('Seinfeld')).toBeInTheDocument();
+
+        answer([movie('m1', 'Heat'), movie('m2', 'Alien')]);
+
+        await waitFor(() => expect(screen.queryByText('Seinfeld')).not.toBeInTheDocument());
+        expect(screen.getByText('Alien')).toBeInTheDocument();
+    });
+
+    it('keeps the answer to the latest question when an earlier one comes back late', async () => {
+        let answerFirst: (entries: SmartListEntry[]) => void = () => { };
+        mocks.getListEntries.mockReturnValueOnce(new Promise<SmartListEntry[]>(resolve => { answerFirst = resolve; }));
+        const view = render(
+            <MemoryRouter>
+                <SmartListRow list={row('Library', 'Recently Added')} excludeLibraryIds={[]} />
+            </MemoryRouter>
+        );
+
+        mocks.getListEntries.mockResolvedValueOnce([movie('m1', 'Heat')]);
+        view.rerender(
+            <MemoryRouter>
+                <SmartListRow list={row('Library', 'Recently Added')} excludeLibraryIds={['test-shows']} />
+            </MemoryRouter>
+        );
+        expect(await screen.findByText('Heat')).toBeInTheDocument();
+
+        await act(async () => answerFirst([movie('s1', 'Seinfeld')]));
+
+        expect(screen.getByText('Heat')).toBeInTheDocument();
+        expect(screen.queryByText('Seinfeld')).not.toBeInTheDocument();
     });
 });

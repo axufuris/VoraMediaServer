@@ -19,7 +19,8 @@ public interface ISmartListRepository
         List<Guid>? allowedLibs = null,
         List<string>? allowedMovieRatings = null,
         List<string>? allowedTvRatings = null,
-        bool blockUnrated = false);
+        bool blockUnrated = false,
+        List<Guid>? excludedLibs = null);
 
     Task<List<SmartListClientVM>> GetActiveClientListsAsync(bool isAdmin, DateOnly today);
     Task<List<SmartListAdminVM>> GetAllAdminListsAsync();

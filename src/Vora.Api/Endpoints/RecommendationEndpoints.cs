@@ -59,6 +59,7 @@ public static class RecommendationEndpoints
 
     private static async Task<IResult> GetGlobalAsync(
         [FromQuery] string? providerId,
+        [FromQuery] string? excludeLibraryIds,
         ClaimsPrincipal user,
         IRecommendationManager manager)
     {
@@ -76,7 +77,8 @@ public static class RecommendationEndpoints
             user.GetAllowedMovieRatings(),
             user.GetAllowedTvRatings(),
             user.BlockUnratedContent(),
-            providerId);
+            providerId,
+            QueryGuidList.Parse(excludeLibraryIds));
 
         return Results.Ok(lists);
     }

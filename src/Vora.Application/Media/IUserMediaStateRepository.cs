@@ -8,7 +8,7 @@ public interface IUserMediaStateRepository
 {
     Task<UpNextResultVM> GetUpNextAsync(Guid mediaId, string? contextType, Guid? contextId, Guid? profileId);
     Task SetMediaPlayedStateAsync(Guid mediaItemId, Guid profileId, bool isPlayed);
-    Task<List<ContinueWatchingVM>> GetContinueWatchingAsync(Guid profileId, int limit = 15);
+    Task<List<ContinueWatchingVM>> GetContinueWatchingAsync(Guid profileId, int limit = 15, List<Guid>? excludedLibraryIds = null);
     Task HideFromContinueWatchingAsync(Guid profileId, Guid mediaItemId);
 
     Task<Dictionary<Guid, decimal>> GetMediaRatingsAsync(Guid profileId, IEnumerable<Guid> mediaItemIds);

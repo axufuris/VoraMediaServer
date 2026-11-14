@@ -10,7 +10,9 @@ namespace Vora.Infrastructure.Persistence.Repositories;
 /// through, and each show's next episode by the rules EpisodeToPlay uses for
 /// the Play button (docs/frontend-client-ui.md). Shows are taken newest
 /// first and only until the row is full, so a long watch history costs no
-/// more than a short one. Parameters: <c>@profileId</c> and <c>@limit</c>.
+/// more than a short one. Titles in the libraries the client left out are
+/// dropped before that, so the row still fills. Parameters: <c>@profileId</c>,
+/// <c>@limit</c> and <c>@excludedLibraryIds</c> (a uuid[], empty for none).
 /// </summary>
 internal static class ContinueWatchingQuery
 {
@@ -43,6 +45,7 @@ internal static class ContinueWatchingQuery
             SELECT st.id, st.played, st.at, st.hidden, se.show, se.sn, e."EpisodeNumber" AS en
             FROM st
             JOIN "MediaItems" e ON e."Id" = st.id AND e."MediaType" = 'Episode' AND e."MissingSince" IS NULL
+                                AND e."LibraryId" <> ALL(@excludedLibraryIds)
             JOIN seasons se ON se.id = e."SeasonId"
             WHERE st.played OR st.pos >= {{ResumeSeconds}}
         ),
@@ -135,6 +138,7 @@ internal static class ContinueWatchingQuery
         top AS (
             SELECT st.id, st.at AS last_played FROM st
             JOIN "MediaItems" m ON m."Id" = st.id AND m."MediaType" = 'Movie' AND m."MissingSince" IS NULL
+                                AND m."LibraryId" <> ALL(@excludedLibraryIds)
             WHERE st.pos >= {{ResumeSeconds}} AND NOT st.played AND NOT st.hidden
             UNION ALL
             SELECT pick, last_played FROM show_picks

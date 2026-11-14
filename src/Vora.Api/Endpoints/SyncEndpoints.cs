@@ -1,4 +1,5 @@
-﻿using Vora.Application.Sync;
+﻿using Vora.Api.Extensions;
+using Vora.Application.Sync;
 using Vora.Application.Sync.ViewModels;
 
 namespace Vora.Api.Endpoints;
@@ -19,9 +20,9 @@ public static class SyncEndpoints
         return group;
     }
 
-    private static async Task<IResult> GetContinueWatchingAsync(Guid profileId, ISyncAndStateManager manager, int limit = 10)
+    private static async Task<IResult> GetContinueWatchingAsync(Guid profileId, ISyncAndStateManager manager, int limit = 10, string? excludeLibraryIds = null)
     {
-        var feed = await manager.GetContinueWatchingFeedAsync(profileId, limit);
+        var feed = await manager.GetContinueWatchingFeedAsync(profileId, limit, QueryGuidList.Parse(excludeLibraryIds));
         return Results.Ok(feed);
     }
 

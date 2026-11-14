@@ -1,5 +1,6 @@
-import { createContext, useContext } from 'react';
+import { createContext, useContext, useMemo } from 'react';
 import type { NavItem } from './MainLayout';
+import { serverVault } from '../utils/serverVault';
 
 export interface SidebarItems {
     items: NavItem[];
@@ -16,4 +17,18 @@ export const useSidebarItems = (): SidebarItems => useContext(SidebarItemsContex
 export function isLibraryUnpinned(items: NavItem[], library: { id: string }): boolean {
     const entry = items.find(item => item.type === 'library' && item.id === library.id);
     return entry !== undefined && !entry.isPinned;
+}
+
+export function unpinnedLibraryIds(items: NavItem[], serverId: string | undefined): string[] {
+    return items
+        .filter(item => item.type === 'library' && !item.isPinned && item.serverId === serverId)
+        .map(item => item.id)
+        .sort();
+}
+
+export function useUnpinnedLibraryIds(serverId?: string): string[] | null {
+    const { items, loaded } = useSidebarItems();
+    const activeServerId = serverId ?? serverVault.getActiveServerId() ?? undefined;
+    const key = loaded ? unpinnedLibraryIds(items, activeServerId).join(',') : null;
+    return useMemo(() => (key === null ? null : key === '' ? [] : key.split(',')), [key]);
 }

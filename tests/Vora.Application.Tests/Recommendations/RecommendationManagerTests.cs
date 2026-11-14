@@ -35,6 +35,7 @@ public class RecommendationManagerTests
     private DateTime? _lastActivity;
 
     private static readonly Guid A = Guid.NewGuid(), B = Guid.NewGuid(), C = Guid.NewGuid(), D = Guid.NewGuid(), Matched = Guid.NewGuid();
+    private static readonly Guid TestShows = Guid.NewGuid();
 
     public RecommendationManagerTests()
     {
@@ -53,15 +54,18 @@ public class RecommendationManagerTests
                 return new StoredRecommendations(_stored.Where(s => ids.Contains(s.ProviderId)).ToList(), withActivity ? _lastActivity : null);
             });
 
-        _repository.GetHydratedMediaItemsAsync(_profile, Arg.Any<List<Guid>>(), Arg.Any<List<string>>(), Arg.Any<Guid?>(), true, Arg.Any<List<Guid>>(), Arg.Any<List<string>>(), Arg.Any<List<string>>(), false)
+        _repository.GetHydratedMediaItemsAsync(_profile, Arg.Any<List<Guid>>(), Arg.Any<List<string>>(), Arg.Any<Guid?>(), true, Arg.Any<List<Guid>>(), Arg.Any<List<string>>(), Arg.Any<List<string>>(), false, Arg.Any<List<Guid>>())
             .Returns(call =>
             {
                 var ids = call.ArgAt<List<Guid>>(1);
                 var tmdb = call.ArgAt<List<string>>(2);
+                var leftOut = call.ArgAt<List<Guid>>(9);
                 _asked.Add(ids.ToList());
                 // Returned in no particular order, as the database does. D is
-                // gone, or not the viewer's to see.
-                var found = ids.Where(id => id != D).Select(id => new LibraryItemVM { Id = id, Title = id.ToString() }).Reverse().ToList();
+                // gone, or not the viewer's to see. C is in Test Shows.
+                var found = ids
+                    .Where(id => id != D && !(id == C && leftOut.Contains(TestShows)))
+                    .Select(id => new LibraryItemVM { Id = id, Title = id.ToString() }).Reverse().ToList();
                 if (tmdb.Contains("tt-1")) found.Add(new LibraryItemVM { Id = Matched, Title = "matched" });
                 return found;
             });
@@ -70,8 +74,8 @@ public class RecommendationManagerTests
     private RecommendationManager Manager(params IRecommendationProvider[] providers) =>
         new(providers.Length == 0 ? new[] { _ai, _local } : providers, _settings, _repository, _snapshots, _queue, _clock, NullLogger<RecommendationManager>.Instance);
 
-    private Task<List<RecommendationListVM>> RowsAsync(string? providerId = null, Guid? libraryId = null) =>
-        Manager().GetRecommendationsAsync(_profile, libraryId, true, new(), new(), new(), false, providerId);
+    private Task<List<RecommendationListVM>> RowsAsync(string? providerId = null, Guid? libraryId = null, List<Guid>? leftOut = null) =>
+        Manager().GetRecommendationsAsync(_profile, libraryId, true, new(), new(), new(), false, providerId, leftOut);
 
     private void Store(string providerId, TimeSpan age, params RecommendationListDto[] rows) =>
         _stored.Add(new StoredProviderRows(providerId, rows.ToList(), _clock.Now - age));
@@ -220,6 +224,35 @@ public class RecommendationManagerTests
         _queue.Received(1).TryQueue(new ForYouRebuild(_profile, null, AiId));
         await AskedNothingAsync(_ai);
         await _snapshots.DidNotReceiveWithAnyArgs().SaveAsync(default, default, default!, default!, default);
+    }
+
+    [Fact]
+    public async Task Stored_rows_leave_out_the_libraries_this_client_unpinned_and_stay_as_they_were()
+    {
+        Store(LocalId, TimeSpan.FromHours(1), Row("Because you watched Heat", 1, A, C, B));
+        Store(AiId, TimeSpan.FromHours(1), AiRow("Sitcoms", 1, C));
+
+        var unpinned = await RowsAsync(leftOut: [TestShows]);
+        var everything = await RowsAsync();
+
+        unpinned.Should().ContainSingle().Which.Items.Select(i => i.Id).Should().BeEquivalentTo(new[] { A, B });
+        everything.Select(r => r.Title).Should().Equal("Sitcoms", "Because you watched Heat");
+        everything[1].Items.Select(i => i.Id).Should().BeEquivalentTo(new[] { A, B, C });
+        _queue.DidNotReceiveWithAnyArgs().TryQueue(default);
+        await _snapshots.DidNotReceiveWithAnyArgs().SaveAsync(default, default, default!, default!, default);
+    }
+
+    [Fact]
+    public async Task Rows_built_while_the_page_waits_are_stored_whole_whatever_this_client_leaves_out()
+    {
+        _local.GetRecommendationsAsync(_profile, null, Arg.Any<CancellationToken>())
+            .Returns(new List<RecommendationListDto> { Row("Because you watched Heat", 1, A, C) });
+
+        var rows = await RowsAsync(LocalId, leftOut: [TestShows]);
+
+        rows.Should().ContainSingle().Which.Items.Select(i => i.Id).Should().Equal(A);
+        await _snapshots.Received(1).SaveAsync(_profile, null, LocalId,
+            Arg.Is<IReadOnlyList<RecommendationListDto>>(l => l.Single().LocalItemIds.SequenceEqual(new[] { A, C })), _clock.Now);
     }
 
     // A plugin that doesn't say whether it calls out is taken to, so it never

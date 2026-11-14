@@ -31,31 +31,36 @@ public class PostgresContinueWatchingTests(PostgresDatabase database) : IClassFi
 
         public Guid ProfileId { get; } = Guid.NewGuid();
         public MediaLibrary Library { get; }
+        public MediaLibrary Unpinned { get; }
 
         public Viewer()
         {
             Library = new MediaLibrary { Name = "Library " + _tag, Type = LibraryType.TvShow, FolderPaths = new List<string> { "/tv/" + _tag } };
+            Unpinned = new MediaLibrary { Name = "Test Shows " + _tag, Type = LibraryType.TvShow, FolderPaths = new List<string> { "/test-tv/" + _tag } };
         }
 
         public async Task AddProfileAsync(VoraDbContext db, UpNextOrder order)
         {
             var account = new User { Email = $"{_tag}@example.com", DisplayName = "Viewer " + _tag };
-            db.AddRange(Library, account, new UserProfile { Id = ProfileId, Name = "Viewer", UserId = account.Id, UpNextOrder = order });
+            db.AddRange(Library, Unpinned, account, new UserProfile { Id = ProfileId, Name = "Viewer", UserId = account.Id, UpNextOrder = order });
             await db.SaveChangesAsync(TestContext.Current.CancellationToken);
         }
 
-        public Show AddShow(VoraDbContext db, string title, params (int Season, int Episodes)[] seasons)
+        public Show AddShow(VoraDbContext db, string title, params (int Season, int Episodes)[] seasons) =>
+            AddShowTo(db, Library, title, seasons);
+
+        public Show AddShowTo(VoraDbContext db, MediaLibrary library, string title, params (int Season, int Episodes)[] seasons)
         {
-            var show = new Show { TvShow = new TvShow { Title = $"{title} {_tag}", LibraryId = Library.Id } };
+            var show = new Show { TvShow = new TvShow { Title = $"{title} {_tag}", LibraryId = library.Id } };
             db.Add(show.TvShow);
             foreach (var (number, count) in seasons)
             {
-                var season = new Season { Title = $"Season {number}", SeasonNumber = number, TvShowId = show.TvShow.Id, LibraryId = Library.Id };
+                var season = new Season { Title = $"Season {number}", SeasonNumber = number, TvShowId = show.TvShow.Id, LibraryId = library.Id };
                 db.Add(season);
                 show.Seasons[number] = season;
                 for (var e = 1; e <= count; e++)
                 {
-                    var episode = new Episode { Title = $"S{number}E{e}", EpisodeNumber = e, SeasonId = season.Id, LibraryId = Library.Id };
+                    var episode = new Episode { Title = $"S{number}E{e}", EpisodeNumber = e, SeasonId = season.Id, LibraryId = library.Id };
                     db.Add(episode);
                     show.Episodes[(number, e)] = episode;
                 }
@@ -63,9 +68,9 @@ public class PostgresContinueWatchingTests(PostgresDatabase database) : IClassFi
             return show;
         }
 
-        public Movie AddFilm(VoraDbContext db, string title)
+        public Movie AddFilm(VoraDbContext db, string title, MediaLibrary? library = null)
         {
-            var film = new Movie { Title = $"{title} {_tag}", LibraryId = Library.Id };
+            var film = new Movie { Title = $"{title} {_tag}", LibraryId = (library ?? Library).Id };
             db.Add(film);
             return film;
         }
@@ -84,8 +89,8 @@ public class PostgresContinueWatchingTests(PostgresDatabase database) : IClassFi
 
         public void Finish(VoraDbContext db, MediaItem item) => Watch(db, item, played: true);
 
-        public Task<List<ContinueWatchingVM>> RowAsync(VoraDbContext db, int limit = 15) =>
-            new UserMediaStateRepository(db).GetContinueWatchingAsync(ProfileId, limit);
+        public Task<List<ContinueWatchingVM>> RowAsync(VoraDbContext db, int limit = 15, List<Guid>? excluded = null) =>
+            new UserMediaStateRepository(db).GetContinueWatchingAsync(ProfileId, limit, excluded);
     }
 
     private async Task<(Viewer Viewer, VoraDbContext Db)> ViewerAsync(UpNextOrder order)
@@ -281,6 +286,29 @@ public class PostgresContinueWatchingTests(PostgresDatabase database) : IClassFi
 
         (await viewer.RowAsync(db)).Select(t => t.Id).Should().Equal(sicario.Id, lioness[1, 3].Id, shogun[1, 2].Id, heat.Id);
         (await viewer.RowAsync(db, limit: 2)).Select(t => t.Id).Should().Equal(sicario.Id, lioness[1, 3].Id);
+    }
+
+    [Fact]
+    public async Task Titles_in_libraries_the_client_left_out_are_passed_over_and_the_row_still_fills()
+    {
+        Assert.SkipUnless(PostgresDatabase.IsConfigured, PostgresDatabase.SkipReason);
+        var (viewer, db) = await ViewerAsync(UpNextOrder.WhereILeftOff);
+        await using var _ = db;
+        var lioness = viewer.AddShow(db, "Lioness", (1, 4));
+        var shogun = viewer.AddShow(db, "Shōgun", (1, 4));
+        var heat = viewer.AddFilm(db, "Heat");
+        var seinfeld = viewer.AddShowTo(db, viewer.Unpinned, "Seinfeld", (1, 4));
+        var testFilm = viewer.AddFilm(db, "Test Film", viewer.Unpinned);
+        viewer.Finish(db, lioness[1, 1]);
+        viewer.Watch(db, heat, resume: 600);
+        viewer.Finish(db, shogun[1, 1]);
+        viewer.Finish(db, seinfeld[1, 1]);
+        viewer.Watch(db, testFilm, resume: 600);
+        await SaveAsync(db);
+
+        (await viewer.RowAsync(db, limit: 3)).Select(t => t.Id).Should().Equal(testFilm.Id, seinfeld[1, 2].Id, shogun[1, 2].Id);
+        (await viewer.RowAsync(db, limit: 3, excluded: [viewer.Unpinned.Id])).Select(t => t.Id).Should().Equal(shogun[1, 2].Id, heat.Id, lioness[1, 2].Id);
+        (await viewer.RowAsync(db, limit: 3, excluded: [Guid.NewGuid()])).Select(t => t.Id).Should().Equal(testFilm.Id, seinfeld[1, 2].Id, shogun[1, 2].Id);
     }
 
     [Fact]

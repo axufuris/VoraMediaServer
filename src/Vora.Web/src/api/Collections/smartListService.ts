@@ -90,8 +90,11 @@ export const smartListService = {
         const response = await apiClient.get<LibraryItem[]>(`/smartlists/${listId}/items`, { serverId });
         return response.data;
     },
-    getListEntries: async (listId: string, serverId?: string): Promise<SmartListEntry[]> => {
-        const response = await apiClient.get<SmartListEntry[]>(`/smartlists/${listId}/entries`, { serverId });
+    getListEntries: async (listId: string, serverId?: string, excludeLibraryIds?: string[]): Promise<SmartListEntry[]> => {
+        const response = await apiClient.get<SmartListEntry[]>(`/smartlists/${listId}/entries`, {
+            params: { excludeLibraryIds: excludeLibraryIds?.join(',') || undefined },
+            serverId
+        });
         return response.data;
     },
 

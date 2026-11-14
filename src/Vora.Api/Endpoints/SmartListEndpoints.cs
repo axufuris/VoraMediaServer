@@ -93,9 +93,10 @@ public static class SmartListEndpoints
         return Results.Ok(items);
     }
 
-    private static async Task<IResult> GetListEntriesAsync(Guid id, ClaimsPrincipal user, ISmartListManager manager)
+    private static async Task<IResult> GetListEntriesAsync(Guid id, [FromQuery] string? excludeLibraryIds, ClaimsPrincipal user, ISmartListManager manager)
     {
-        var entries = await manager.GetSmartListEntriesAsync(id, Viewer(user));
+        var viewer = Viewer(user) with { ExcludedLibraryIds = QueryGuidList.Parse(excludeLibraryIds) };
+        var entries = await manager.GetSmartListEntriesAsync(id, viewer);
         return Results.Ok(entries);
     }
 

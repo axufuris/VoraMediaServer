@@ -1,8 +1,10 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { cleanup, fireEvent, render, screen } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom';
 import RecommendationsPage from './RecommendationsPage';
 import type { GeneratedMixSummaryVM } from '../../api/Music/musicService';
+import type { NavItem } from '../../layouts/MainLayout';
+import { SidebarItemsContext, type SidebarItems } from '../../layouts/sidebarItems';
 
 const mocks = vi.hoisted(() => ({
     getProviders: vi.fn(),
@@ -88,5 +90,50 @@ describe('RecommendationsPage music', () => {
         renderTab();
 
         expect(await screen.findByText('No recommendation engines enabled')).toBeTruthy();
+    });
+});
+
+describe('RecommendationsPage and the sidebar', () => {
+    const library = (id: string, isPinned: boolean): NavItem =>
+        ({ id, serverId: 'home', serverName: 'Home', title: id, path: `/server/home/library/${id}`, type: 'library', isPinned, order: 0 });
+
+    const sidebar = (items: NavItem[], loaded = true): SidebarItems => ({ items, loaded });
+
+    const tab = (value: SidebarItems) => (
+        <MemoryRouter initialEntries={['/server/home']}>
+            <SidebarItemsContext.Provider value={value}>
+                <Routes>
+                    <Route path="/server/:serverId" element={<RecommendationsPage />} />
+                </Routes>
+            </SidebarItemsContext.Provider>
+        </MemoryRouter>
+    );
+
+    it('waits for the sidebar, then asks without the libraries the profile unpinned', async () => {
+        const items = [library('movies', true), library('test-movies', false), library('test-shows', false)];
+        const view = render(tab(sidebar(items, false)));
+
+        await waitFor(() => expect(mocks.getProviders).toHaveBeenCalled());
+        await Promise.resolve();
+        expect(mocks.getGlobalRecommendations).not.toHaveBeenCalled();
+
+        view.rerender(tab(sidebar(items)));
+
+        expect(await screen.findByText('Because you watched Heat')).toBeTruthy();
+        expect(mocks.getGlobalRecommendations).toHaveBeenCalledTimes(1);
+        expect(mocks.getGlobalRecommendations).toHaveBeenCalledWith('openai_recommendations', 'home', ['test-movies', 'test-shows']);
+    });
+
+    it('asks again when a library is unpinned, without reloading the page', async () => {
+        const view = render(tab(sidebar([library('movies', true), library('test-shows', true)])));
+        expect(await screen.findByText('Because you watched Heat')).toBeTruthy();
+        expect(mocks.getGlobalRecommendations).toHaveBeenLastCalledWith('openai_recommendations', 'home', []);
+
+        mocks.getGlobalRecommendations.mockResolvedValue([{ title: "Top rated you haven't seen", weight: 1, items: [] }]);
+        view.rerender(tab(sidebar([library('movies', true), library('test-shows', false)])));
+
+        expect(await screen.findByText("Top rated you haven't seen")).toBeTruthy();
+        expect(mocks.getGlobalRecommendations).toHaveBeenLastCalledWith('openai_recommendations', 'home', ['test-shows']);
+        expect(mocks.getProviders).toHaveBeenCalledTimes(1);
     });
 });
