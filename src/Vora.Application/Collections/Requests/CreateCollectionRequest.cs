@@ -25,4 +25,5 @@ public class CreateCollectionRequest
     public Guid? LibraryId { get; set; }
     public string? RulesJson { get; set; }
     public PlaylistMediaType? SmartMediaType { get; set; }
+    public List<string> LockedFields { get; set; } = new();
 }

@@ -28,10 +28,15 @@ Vora ships its own collection posters: 75 of them in five groups, drawn by a scr
 ## Picking one
 
 - **What is saved.** A pick stores the address in the collection's `PosterUrl`; nothing is copied into the data folder. Backups carry the address and restore it on any server, because every server has the files. Unused files never sees them (`docs/unused-files.md`).
-- **Edit modal.** The Posters tab switches between **Your artwork** (`ArtworkPicker`) and **Vora posters** (`VoraPosterPicker`). A pick locks `PosterUrl`, like any picked artwork.
-- **Create modal.** The Posters tab shows the Vora posters above **Or paste an image URL**.
-  - While the admin has not chosen a poster, the one the title or the AI Theme text names is preselected. The General tab says so under the title ("Poster: the Vora Christmas poster. Change").
-  - Clicking the selected poster again leaves the collection without one; a pasted address wins over the suggestion.
+- **Both modals** draw their Posters and Backdrops tabs with `CollectionArtworkPanel` (`components/Collections/`). The Posters tab switches between **Your artwork** (`ArtworkPicker`: upload a file, add from a URL, fetch from an artwork provider, the lock on the selected poster) and **Vora posters** (`VoraPosterPicker`). Backdrops has Your artwork only. A pick locks `PosterUrl` (or `BackdropUrl`), like any picked artwork.
+- **Edit modal.** Uploads, links and fetches go straight to the collection (`/api/collections/{id}/artwork/upload`, `/url`, `/fetch`), and Save writes the pick.
+- **Create modal.** The same choices, before the collection exists. It opens Posters on the pill holding the current pick.
+  - While the admin has not chosen a poster, the one the title or the AI Theme text names is preselected. The General tab says so under the title ("Poster: the Vora Christmas poster. Change"). The suggestion never hides Your artwork, and any other pick replaces it.
+  - Clicking the selected poster again leaves the collection without one.
+  - **Uploads and links are staged** in the browser (`useStagedArtwork`, `stagedArtwork.ts`) and shown as Manual tiles. Nothing is sent before Create. After `POST /api/collections` returns the id, `saveStagedArtwork` uploads each staged file or link to the new collection (the picked ones first), then sets the picked one with `PUT /api/collections/{id}/artwork/selected?kind=Poster`, which writes only that address (no second sync).
+  - **Fetch Artwork** asks `GET /api/collections/artwork/search?providerId=…&title=…`, which saves nothing. A fetched pick goes into the create request like a Vora poster.
+  - **If staged artwork fails**, the collection stays, and a dialog names each file or link that was not saved and which of poster and backdrop the collection is left without (`stagedArtworkProblems`).
+- **Provider lookup** (`CollectionArtworkService`). A collection with a TMDB id (an automatic one) is looked up by that id. One made by hand, or not created yet, has none, so its title is searched on TMDB (`IMetadataProvider.FindCollectionIdAsync`, TMDB's `search/collection`, first result) and the found id is used for that fetch only, never saved. Providers that search by title (MyAnimeList) get the title as well. Fanart.tv has no collection artwork, so it finds nothing either way.
 - **The picker** (`components/Collections/VoraPosterPicker.tsx`):
   - a pill per group;
   - a search over titles and aliases;
@@ -85,4 +90,5 @@ A Vora poster is an ordinary relative poster address, so a TV app shows it like 
 - `CollectionPosterAddressTests`: the repository queries.
 - `VoraPosterThumbnailTests`: resizing from the shipped file.
 - `VoraPosterEndpointTests`: both routes, caching and the 404s.
-- Web: `voraPosters.test.ts`, `thumbnails.test.ts` and `CreateCollectionModal.test.tsx` (preselect, clicking it off, a pasted address).
+- `CollectionArtworkLookupTests` / `TmdbCollectionSearchTests`: a collection's provider artwork found by its TMDB id, else by its title. `CollectionManagerArtworkTests`: setting only the poster or backdrop, and the locks a new collection keeps. `CollectionArtworkEndpointTests`: the search and selected routes.
+- Web: `voraPosters.test.ts`, `thumbnails.test.ts`, `CreateCollectionModal.test.tsx` (preselect, clicking it off, both pills, a staged upload or link saved after create, a fetched poster, a failed upload keeping the collection) and `EditCollectionModal.test.tsx` (the same panel going straight to the collection).

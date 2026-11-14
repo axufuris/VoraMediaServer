@@ -101,6 +101,31 @@ public class TmdbMetadataProvider : IMetadataProvider, IPluginConnectionTest
             : string.Empty;
     }
 
+    public async Task<int?> FindCollectionIdAsync(string name, CancellationToken cancellationToken = default)
+    {
+        if (string.IsNullOrWhiteSpace(name)) return null;
+        var apiKey = await GetApiKeyAsync();
+        if (string.IsNullOrWhiteSpace(apiKey)) return null;
+
+        var lang = await GetLanguageAsync();
+        using var response = await _httpClient.GetAsync($"search/collection?api_key={apiKey}&language={lang}&query={Uri.EscapeDataString(name.Trim())}", cancellationToken);
+        if (!response.IsSuccessStatusCode) return null;
+
+        using var doc = JsonDocument.Parse(await response.Content.ReadAsStringAsync(cancellationToken));
+        return FirstCollectionId(doc.RootElement);
+    }
+
+    private static int? FirstCollectionId(JsonElement root)
+    {
+        if (!root.TryGetProperty("results", out var results) || results.ValueKind != JsonValueKind.Array) return null;
+
+        foreach (var result in results.EnumerateArray())
+        {
+            if (result.TryGetProperty("id", out var id) && id.ValueKind == JsonValueKind.Number && id.TryGetInt32(out var collectionId)) return collectionId;
+        }
+        return null;
+    }
+
     public async Task<List<string>?> FetchKeywordsAsync(string tmdbId, bool isShow, CancellationToken cancellationToken = default)
     {
         var apiKey = await GetApiKeyAsync();

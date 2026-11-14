@@ -16,6 +16,8 @@ public interface IMetadataProvider : IVoraPlugin
     Task<ActorMetadataResult?> FetchActorMetadataAsync(int personId, CancellationToken cancellationToken = default);
     Task<string?> FetchCollectionOverviewAsync(int collectionId, CancellationToken cancellationToken = default)
         => Task.FromResult<string?>(null);
+    Task<int?> FindCollectionIdAsync(string name, CancellationToken cancellationToken = default)
+        => Task.FromResult<int?>(null);
     Task<List<string>?> FetchKeywordsAsync(string tmdbId, bool isShow, CancellationToken cancellationToken = default)
         => Task.FromResult<List<string>?>(null);
     Task<IReadOnlyList<MetadataSearchCandidate>> SearchMovieCandidatesAsync(string query, int? year = null, CancellationToken cancellationToken = default)
