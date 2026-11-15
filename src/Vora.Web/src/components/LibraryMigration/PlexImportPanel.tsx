@@ -204,22 +204,20 @@ export default function PlexImportPanel({ serverId }: PlexImportPanelProps) {
     const jobUser = job?.users?.[0];
 
     return (
-        <section className="vora-card p-6 space-y-4">
-            <div className="flex items-start justify-between gap-4">
-                <div>
-                    <h2 className="m-0 mb-1 text-base font-semibold" style={{ color: 'var(--vora-text-primary)' }}>Import from Plex</h2>
-                    <p className="m-0 text-sm" style={{ color: 'var(--vora-text-secondary)' }}>
-                        Bring watch history and ratings over from Plex. Sign in with your own Plex account, so the history is yours.
-                        {isProfileAdmin && ' If you run a Plex Home, you can also bring over a Home user\'s history, a child\'s for example, into one of the profiles on your account.'}
-                        {' '}Nothing is kept after the import finishes.
-                    </p>
-                </div>
+        <section className="space-y-4 rounded-lg border border-[var(--vora-border-subtle)] bg-[var(--vora-bg-surface)] p-6 shadow-[var(--vora-shadow-lg)]">
+            <div className="flex items-center justify-between gap-4 border-b border-[var(--vora-border-subtle)] pb-2">
+                <h2 className="m-0 text-xl font-bold" style={{ color: 'var(--vora-text-primary)' }}>Import from Plex</h2>
                 {token && (
                     <button type="button" onClick={disconnect} className={subtleButton} style={{ color: 'var(--vora-text-muted)' }}>
                         Start over
                     </button>
                 )}
             </div>
+            <p className="m-0 text-sm" style={{ color: 'var(--vora-text-secondary)' }}>
+                Bring watch history and ratings over from Plex. Sign in with your own Plex account, so the history is yours.
+                {isProfileAdmin && ' If you run a Plex Home, you can also bring over a Home user\'s history, a child\'s for example, into one of the profiles on your account.'}
+                {' '}Nothing is kept after the import finishes.
+            </p>
 
             {!token && (
                 <button type="button" onClick={() => setPinOpen(true)} className={primaryButton} style={primaryStyle}>

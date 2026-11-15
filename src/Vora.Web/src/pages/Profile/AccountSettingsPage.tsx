@@ -14,6 +14,7 @@ import { authService } from '../../api/Auth/authService';
 import { musicService } from '../../api/Music/musicService';
 import ProviderAccessList from '../../components/Common/ProviderAccessList';
 import Spinner from '../../components/Common/Spinner';
+import PlexImportPanel from '../../components/LibraryMigration/PlexImportPanel';
 import { errorDetail } from '../../utils/apiError';
 export default function AccountSettingsPage() {
     const { serverId } = useParams<{ serverId?: string }>();
@@ -49,7 +50,7 @@ export default function AccountSettingsPage() {
                 const [userData, libs, iptvData, setupStatus] = await Promise.all([
                     userService.getUserAccount(userId, serverId),
                     libraryService.getLibraries(serverId),
-                    iptvClientService.getPlaylists(userId, serverId),
+                    iptvClientService.getPlaylists(userId, undefined, serverId),
                     authService.getSetupStatus(serverId).catch(() => null),
                 ]);
 
@@ -139,6 +140,11 @@ export default function AccountSettingsPage() {
                         onRefresh={() => setRefreshTrigger(prev => prev + 1)}
                         isProfileAdmin={isProfileAdmin}
                     />
+                )}
+                {user && (
+                    <div className="mt-8">
+                        <PlexImportPanel serverId={serverId} />
+                    </div>
                 )}
             </div>
         );
@@ -233,6 +239,10 @@ export default function AccountSettingsPage() {
                         <span className="font-bold text-[var(--vora-text-muted)] group-hover:text-[var(--vora-text-primary)]">Add Profile</span>
                     </div>
                 </div>
+            </div>
+
+            <div className="mt-8">
+                <PlexImportPanel serverId={serverId} />
             </div>
 
             {editingProfile && (
