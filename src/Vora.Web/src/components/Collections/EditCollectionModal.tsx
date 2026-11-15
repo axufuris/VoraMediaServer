@@ -6,7 +6,9 @@ import type { ArtworkKind, ArtworkResult } from '../../api/Media/artworkService'
 import { Modal } from '../Common/Modal';
 import { pluginAdminService, type PluginOptionVM } from '../../api/System/pluginAdminService';
 import { emptyDefinition, type SmartPlaylistDefinition } from '../../api/Music/smartPlaylistService';
-import RuleTreeEditor from '../Common/RuleTreeEditor';
+import { libraryService } from '../../api/Media/libraryService';
+import SmartCollectionRules from './SmartCollectionRules';
+import { pruneRules, savedSmartMedia, smartMediaForLibrary, type SmartCollectionMedia } from './smartCollectionMedia';
 import { useDialog } from '../../dialogs';
 import { errorDetail } from '../../utils/apiError';
 import SeasonalVisibilityFields from './SeasonalVisibilityFields';
@@ -79,6 +81,10 @@ export default function EditCollectionModal({
     const [syncIntervalDays, setSyncIntervalDays] = useState(collection.syncIntervalDays || 1);
     const [mirrorList, setMirrorList] = useState(collection.mirrorList || false);
     const [smartDefinition, setSmartDefinition] = useState<SmartPlaylistDefinition>(() => parseSmartDefinition(collection.rulesJson));
+    // A global collection picks what its rules match; a library one matches
+    // its library's kind (looked up below), falling back to what was saved.
+    const [globalSmartMedia, setGlobalSmartMedia] = useState<SmartCollectionMedia>(() => savedSmartMedia(collection.smartMediaType) ?? 'Mixed');
+    const [libraryType, setLibraryType] = useState<string | undefined>();
     const [artworkProviders, setArtworkProviders] = useState<PluginOptionVM[]>([]);
     const [selectedProviderId, setSelectedProviderId] = useState('tmdb_artwork');
 
@@ -116,6 +122,7 @@ export default function EditCollectionModal({
             setSyncIntervalDays(collection.syncIntervalDays || 1);
             setMirrorList(collection.mirrorList || false);
             setSmartDefinition(parseSmartDefinition(collection.rulesJson));
+            setGlobalSmartMedia(savedSmartMedia(collection.smartMediaType) ?? 'Mixed');
             setLockedFields(collection.lockedFields || []);
             setActiveTab('general');
             setPosterSource(isVoraPosterUrl(collection.posterUrl) ? 'vora' : 'artwork');
@@ -128,6 +135,15 @@ export default function EditCollectionModal({
             }).catch(console.error);
         }
     }, [isOpen, collection, serverId]);
+
+    useEffect(() => {
+        if (!isOpen || !collection.libraryId) return;
+        let cancelled = false;
+        libraryService.getLibraries(serverId)
+            .then(libraries => { if (!cancelled) setLibraryType(libraries.find(lib => lib.id === collection.libraryId)?.type); })
+            .catch(console.error);
+        return () => { cancelled = true; };
+    }, [isOpen, collection.libraryId, serverId]);
 
     useEffect(() => {
         if (isOpen && (activeTab === 'poster' || activeTab === 'backdrop') && artwork.length === 0) {
@@ -188,6 +204,11 @@ export default function EditCollectionModal({
         } catch { await dialog.alert("Failed to fetch artwork"); setLoadingArt(false); }
     };
 
+    const isGlobal = !collection.libraryId || makeGlobal;
+    const smartMedia: SmartCollectionMedia = isGlobal
+        ? globalSmartMedia
+        : (smartMediaForLibrary(libraryType) ?? savedSmartMedia(collection.smartMediaType) ?? 'Movies');
+
     const handleSubmit = async (e: React.SyntheticEvent) => {
         e.preventDefault();
         setIsSaving(true);
@@ -205,8 +226,8 @@ export default function EditCollectionModal({
                 contentSyncExternalId: contentSyncProviderId === SMART_CONTENT ? undefined : contentSyncExternalId,
                 syncIntervalDays: Math.max(1, syncIntervalDays),
                 mirrorList: contentSyncProviderId === SMART_CONTENT ? true : (contentSyncProviderId ? mirrorList : false),
-                rulesJson: contentSyncProviderId === SMART_CONTENT ? JSON.stringify(smartDefinition) : undefined,
-                smartMediaType: contentSyncProviderId === SMART_CONTENT ? 'Movies' : undefined
+                rulesJson: contentSyncProviderId === SMART_CONTENT ? JSON.stringify({ ...smartDefinition, root: pruneRules(smartDefinition.root, smartMedia) }) : undefined,
+                smartMediaType: contentSyncProviderId === SMART_CONTENT ? smartMedia : undefined
             }, serverId);
             onSaved();
             onClose();
@@ -327,12 +348,14 @@ export default function EditCollectionModal({
                                     <ContentProviderHelp providerId={contentSyncProviderId} />
 
                                     {contentSyncProviderId === SMART_CONTENT && (
-                                        <div className="pt-3 mt-3 border-t border-[var(--vora-border-subtle)]/50 space-y-3">
-                                            <p className="text-xs text-[var(--vora-text-muted)] leading-relaxed">
-                                                Build a rule-based collection of <span className="text-[var(--vora-text-secondary)]">movies</span> from your library — e.g. Genre contains Horror, and Year between 2010 and 2019. Membership updates automatically as your library changes. (Shows &amp; music coming soon.)
-                                            </p>
-                                            <RuleTreeEditor mediaType="Movies" value={smartDefinition.root} onChange={root => setSmartDefinition(d => ({ ...d, root }))} />
-                                        </div>
+                                        <SmartCollectionRules
+                                            idPrefix="edit-collection"
+                                            isGlobal={isGlobal}
+                                            media={smartMedia}
+                                            onMediaChange={setGlobalSmartMedia}
+                                            root={smartDefinition.root}
+                                            onRootChange={root => setSmartDefinition(d => ({ ...d, root }))}
+                                        />
                                     )}
 
                                     {contentSyncProviderId && contentSyncProviderId !== SMART_CONTENT && (

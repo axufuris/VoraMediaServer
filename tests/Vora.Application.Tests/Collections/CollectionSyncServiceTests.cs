@@ -7,6 +7,7 @@ using Vora.Application.Notifications;
 using Vora.Application.Tasks;
 using Vora.Domain.Entities.Collections;
 using Vora.Domain.Entities.Library;
+using Vora.Domain.Entities.Playlists;
 using Vora.Domain.Enums;
 using Vora.Plugins.Interfaces;
 
@@ -128,5 +129,46 @@ public class CollectionSyncServiceTests
             Arg.Is<string>(title => title.Contains("found nothing")), Arg.Any<string>(), Arg.Any<string?>(), Arg.Any<bool>());
         await _collectionRepo.Received(1).TouchContentSyncedAtAsync(collectionId);
         await _collectionRepo.DidNotReceive().AddItemsToCollectionAsync(Arg.Any<List<CollectionItem>>());
+    }
+
+    private const string EmptyRules = """{"root":{"match":"All","rules":[],"groups":[]}}""";
+
+    private void StoredSmart(Guid collectionId, PlaylistMediaType? kind)
+    {
+        _collectionRepo.GetProjectedByIdAsync(collectionId, Arg.Any<System.Linq.Expressions.Expression<Func<Collection, CollectionSyncService.SyncTarget>>>(), Arg.Any<bool>(), Arg.Any<List<Guid>?>())
+            .Returns(new CollectionSyncService.SyncTarget(collectionId, "Dramas", null, null, null, EmptyRules, kind, true, null));
+        _collectionRepo.GetCollectionMediaIdsAsync(collectionId).Returns(new HashSet<Guid>());
+        _collectionRepo.GetExcludedMediaIdsAsync(collectionId).Returns(new HashSet<Guid>());
+        _collectionRepo.GetManuallyAddedMediaIdsAsync(collectionId).Returns(new HashSet<Guid>());
+    }
+
+    [Theory]
+    [InlineData(PlaylistMediaType.Shows)]
+    [InlineData(PlaylistMediaType.Mixed)]
+    public async Task A_smart_collection_asks_for_the_kind_of_title_it_was_set_to_match(PlaylistMediaType kind)
+    {
+        var collectionId = Guid.NewGuid();
+        var severance = Guid.NewGuid();
+        StoredSmart(collectionId, kind);
+        _smartEvaluator.EvaluateCollectionIdsAsync(Arg.Any<SmartPlaylistDefinition>(), kind, Arg.Any<PlaylistAccessFilter>())
+            .Returns(new List<Guid> { severance });
+
+        await _service.SyncCollectionContentAsync(collectionId, TestContext.Current.CancellationToken);
+
+        await _smartEvaluator.Received(1).EvaluateCollectionIdsAsync(Arg.Any<SmartPlaylistDefinition>(), kind, Arg.Any<PlaylistAccessFilter>());
+        await _collectionRepo.Received(1).AddItemsToCollectionAsync(Arg.Is<List<CollectionItem>>(items => items.Single().MediaItemId == severance));
+    }
+
+    [Fact]
+    public async Task A_smart_collection_saved_before_it_had_a_kind_still_matches_films()
+    {
+        var collectionId = Guid.NewGuid();
+        StoredSmart(collectionId, null);
+        _smartEvaluator.EvaluateCollectionIdsAsync(Arg.Any<SmartPlaylistDefinition>(), Arg.Any<PlaylistMediaType>(), Arg.Any<PlaylistAccessFilter>())
+            .Returns(new List<Guid>());
+
+        await _service.SyncCollectionContentAsync(collectionId, TestContext.Current.CancellationToken);
+
+        await _smartEvaluator.Received(1).EvaluateCollectionIdsAsync(Arg.Any<SmartPlaylistDefinition>(), PlaylistMediaType.Movies, Arg.Any<PlaylistAccessFilter>());
     }
 }

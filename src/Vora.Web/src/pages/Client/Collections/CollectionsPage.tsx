@@ -110,6 +110,7 @@ export default function CollectionsPage() {
                 onClose={() => setIsCreateModalOpen(false)}
                 onSaved={() => { setLoading(true); fetchCollections(); }}
                 activeTab={activeTab}
+                libraryType={sortedLibraries.find(lib => lib.id === activeTab)?.type}
             />
 
             {createAction && <div className="flex justify-end px-8 max-md:px-4 pt-4">{createAction}</div>}

@@ -68,7 +68,7 @@ while the item set is unchanged, so they never re-audit.
 A collection can instead be filled by a **rule** rather than a provider list.
 It stores a `SmartPlaylistDefinition` in `Collection.RulesJson` plus a
 `SmartMediaType`, and reuses the smart-playlist engine: `CollectionSyncService`
-calls `ISmartPlaylistEvaluator.EvaluateIdsAsync` to get the matching
+calls `ISmartPlaylistEvaluator.EvaluateCollectionIdsAsync` to get the matching
 `MediaItem` ids, then feeds them through the same membership reconciliation as a
 provider sync (mirror always on for smart, so membership tracks the rule, while
 manual adds and exclusions still win). The rule builder is the shared
@@ -76,10 +76,25 @@ manual adds and exclusions still win). The rule builder is the shared
 watched/rating), surfaced as a **Smart (rule-based)** option in the collection
 create/edit modals.
 
-**Phase 1 is Movies only** — the evaluator's Movies path returns `Movie`
-entities, which map 1:1 to collection membership; its Shows path returns
-episodes and Music returns tracks, so those need a show/album-level evaluator
-before they fit a collection (a fast-follow). Freshness: smart collections join
+**What the rules match** (`SmartMediaType`) — a collection holds whole titles,
+never episodes or tracks:
+
+| `SmartMediaType` | Members |
+|---|---|
+| `Movies` | films |
+| `Shows` | the `TvShow` itself, matched on the show's own first-air year, genres, content rating, ratings and date added |
+| `Mixed` | both ("Movies & shows") |
+
+A **global** collection picks one in the **Match** dropdown (new ones start on
+Movies & shows). A **library** collection gets no choice: it matches its
+library's kind (Movie and Home Video libraries → `Movies`, TV libraries →
+`Shows`). Shows offer every movie field except Duration, which a show doesn't
+have; switching a global collection to Shows drops any Duration rule. A smart
+collection saved without a type (before this existed) still matches films.
+Music has no collections — use a smart playlist. This is collection-only:
+smart *playlists* keep matching episodes for Shows.
+
+Freshness: smart collections join
 the scheduled content-sync sweep (gated by a stamped `ContentSyncedAt`) and
 re-sync immediately on save; on-scan re-evaluation is a deferred enhancement.
 Use a smart collection for a **genre / decade / rating** grouping and the AI
