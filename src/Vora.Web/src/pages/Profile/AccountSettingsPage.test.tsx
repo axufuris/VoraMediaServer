@@ -32,8 +32,9 @@ vi.mock('../../api/Users/userImageService', () => ({
 vi.mock('../../api/Music/musicService', () => ({
     musicService: { startLastFmAuth: () => Promise.resolve({ authUrl: '', token: '' }), completeLastFmAuth: () => Promise.resolve(), disconnectLastFm: () => Promise.resolve() },
 }));
+const getPlaylists = vi.fn<(userId: string, profileId?: string, serverId?: string) => Promise<never[]>>(() => Promise.resolve([]));
 vi.mock('../../api/Iptv/iptvClientService', () => ({
-    iptvClientService: { getPlaylists: () => Promise.resolve([]) },
+    iptvClientService: { getPlaylists: (userId: string, profileId?: string, serverId?: string) => getPlaylists(userId, profileId, serverId) },
 }));
 vi.mock('../../api/Auth/authService', () => ({
     authService: { getSetupStatus: () => Promise.resolve({ emailEnabled: false }) },
@@ -143,5 +144,34 @@ describe('AccountSettingsPage on a second server', () => {
         expect(screen.getByRole('button', { name: 'Connections' })).toBeInTheDocument();
         expect(getUserAccount).toHaveBeenCalledWith('acct-2', 'second');
         expect(getUserAccount).not.toHaveBeenCalledWith('acct-1', expect.anything());
+    });
+});
+
+describe('AccountSettingsPage under a server id', () => {
+    const tokenFor = (profileId: string, accountId: string) => `header.${btoa(JSON.stringify({ sub: profileId, accountId }))}.signature`;
+
+    beforeEach(() => {
+        localStorage.clear();
+        localStorage.setItem(StorageKeys.userId, 'acct-1');
+        localStorage.setItem(StorageKeys.isProfileAdmin, 'true');
+        serverVault.addOrUpdateServer({ id: 'server_1793842485331', name: 'Home', url: 'http://home', token: tokenFor('profile-1', 'acct-1'), profileId: 'profile-1', isAdmin: true });
+        getUserAccount.mockReset();
+        getUserAccount.mockResolvedValue(account);
+        getPlaylists.mockClear();
+    });
+
+    // Back to client in the admin pages opens /server/<id>, and the profile menu keeps the id on the way to Account settings.
+    it("asks for the account's playlists without passing the server id as a profile", async () => {
+        render(
+            <MemoryRouter initialEntries={['/server/server_1793842485331/account']}>
+                <div data-vora-client="">
+                    <Routes><Route path="/server/:serverId/account" element={<AccountSettingsPage />} /></Routes>
+                </div>
+            </MemoryRouter>,
+        );
+
+        expect(await screen.findByDisplayValue('andy@example.com')).toBeInTheDocument();
+        expect(getPlaylists).toHaveBeenCalledWith('acct-1', undefined, 'server_1793842485331');
+        expect(screen.queryByRole('alert')).toBeNull();
     });
 });

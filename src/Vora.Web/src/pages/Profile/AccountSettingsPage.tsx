@@ -49,7 +49,7 @@ export default function AccountSettingsPage() {
                 const [userData, libs, iptvData, setupStatus] = await Promise.all([
                     userService.getUserAccount(userId, serverId),
                     libraryService.getLibraries(serverId),
-                    iptvClientService.getPlaylists(userId, serverId),
+                    iptvClientService.getPlaylists(userId, undefined, serverId),
                     authService.getSetupStatus(serverId).catch(() => null),
                 ]);
 
