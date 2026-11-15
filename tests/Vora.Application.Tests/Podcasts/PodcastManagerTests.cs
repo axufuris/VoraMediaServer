@@ -16,6 +16,7 @@ public class PodcastManagerTests
     private readonly IHttpClientFactory _httpFactory;
     private readonly IClientNotifier _notifier;
     private readonly List<IPodcastDiscoveryProvider> _discovery;
+    private readonly IPodcastStreamResolver _resolver;
     private readonly PodcastManager _manager;
 
     public PodcastManagerTests()
@@ -24,7 +25,8 @@ public class PodcastManagerTests
         _httpFactory = Substitute.For<IHttpClientFactory>();
         _notifier = Substitute.For<IClientNotifier>();
         _discovery = new List<IPodcastDiscoveryProvider>();
-        _manager = new PodcastManager(_repo, _httpFactory, _notifier, _discovery,
+        _resolver = Substitute.For<IPodcastStreamResolver>();
+        _manager = new PodcastManager(_repo, _httpFactory, _notifier, _discovery, _resolver,
             NullLogger<PodcastManager>.Instance);
     }
 
@@ -265,5 +267,54 @@ public class PodcastManagerTests
         var result = await _manager.GetSubscriptionsAsync(profileId);
 
         result.Single().FeedUrl.Should().Be("https://example.com/feed.xml");
+    }
+
+    // ---------- ResolveEpisodeAudioAsync ----------
+
+    private static PodcastEpisode MakeEpisode(Guid id, Guid showId) => new()
+    {
+        Id = id,
+        PodcastShowId = showId,
+        ExternalGuid = "guid-375",
+        Title = "Jensen Huang's Billion Dollar Bone",
+        AudioUrl = "https://dts.podtrac.com/redirect.mp3/traffic.libsyn.com/ep375.mp3"
+    };
+
+    [Fact]
+    public async Task ResolveEpisodeAudioAsync_walks_the_episodes_own_enclosure_with_the_players_user_agent()
+    {
+        var profileId = Guid.NewGuid();
+        var episode = MakeEpisode(Guid.NewGuid(), Guid.NewGuid());
+        _repo.GetEpisodeByIdAsync(episode.Id).Returns(episode);
+        _repo.ProfileSubscribesToShowAsync(profileId, episode.PodcastShowId).Returns(true);
+        _resolver.ResolveAsync(episode.AudioUrl, "Edg/142.0", Arg.Any<CancellationToken>())
+            .Returns("https://delivery-edge.libsyn.com/ep375.mp3");
+
+        var url = await _manager.ResolveEpisodeAudioAsync(profileId, episode.Id, "Edg/142.0", TestContext.Current.CancellationToken);
+
+        url.Should().Be("https://delivery-edge.libsyn.com/ep375.mp3");
+    }
+
+    [Fact]
+    public async Task ResolveEpisodeAudioAsync_refuses_a_show_the_profile_does_not_follow()
+    {
+        var episode = MakeEpisode(Guid.NewGuid(), Guid.NewGuid());
+        _repo.GetEpisodeByIdAsync(episode.Id).Returns(episode);
+        _repo.ProfileSubscribesToShowAsync(Arg.Any<Guid>(), episode.PodcastShowId).Returns(false);
+
+        var act = async () => await _manager.ResolveEpisodeAudioAsync(Guid.NewGuid(), episode.Id, null, TestContext.Current.CancellationToken);
+
+        await act.Should().ThrowAsync<UnauthorizedAccessException>();
+        await _resolver.DidNotReceive().ResolveAsync(Arg.Any<string>(), Arg.Any<string?>(), Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task ResolveEpisodeAudioAsync_throws_for_an_unknown_episode()
+    {
+        _repo.GetEpisodeByIdAsync(Arg.Any<Guid>()).Returns((PodcastEpisode?)null);
+
+        var act = async () => await _manager.ResolveEpisodeAudioAsync(Guid.NewGuid(), Guid.NewGuid(), null, TestContext.Current.CancellationToken);
+
+        await act.Should().ThrowAsync<InvalidOperationException>();
     }
 }

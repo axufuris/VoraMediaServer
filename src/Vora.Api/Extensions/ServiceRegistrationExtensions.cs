@@ -590,6 +590,14 @@ public static class ServiceRegistrationExtensions
             client.DefaultRequestHeaders.Add("User-Agent", "Vora/1.0 (Podcast Reader)");
             client.DefaultRequestHeaders.Add("Accept", "application/rss+xml, application/xml, text/xml");
         });
+        // Followed by hand (every hop is address-checked), so no auto-redirect.
+        services.AddHttpClient(PodcastStreamResolver.HttpClientName, client =>
+        {
+            client.Timeout = TimeSpan.FromSeconds(15);
+            client.DefaultRequestHeaders.Add("User-Agent", "Vora/1.0 (Podcast Player)");
+        })
+            .ConfigurePrimaryHttpMessageHandler(() => new HttpClientHandler { AllowAutoRedirect = false });
+        services.AddSingleton<IPodcastStreamResolver, PodcastStreamResolver>();
         // Singleton, not per-client-instance: the gap has to hold across every
         // request the process makes to MusicBrainz, and a handler created per
         // client would each keep their own idea of when the last one went out.

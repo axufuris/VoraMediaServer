@@ -4,7 +4,7 @@ import { serverVault, type VoraServer } from '../../utils/serverVault';
 
 interface FakeAnswer {
     status?: number;
-    data?: object[];
+    data?: object[] | object;
 }
 
 const mocks = vi.hoisted(() => ({ answers: new Map<string, FakeAnswer>() }));
@@ -130,3 +130,18 @@ describe('podcast catalog on every server', () => {
         expect(result.failedServerIds).toEqual(['office']);
     });
 });
+
+describe("resolving an episode's audio", () => {
+    it("asks the episode's own server where its redirects end", async () => {
+        answer('cabin', '/podcasts/episodes/ep-375/audio', { data: { url: 'https://delivery-edge.libsyn.com/ep375.mp3' } });
+
+        await expect(podcastService.resolveEpisodeAudio('ep-375', 'cabin')).resolves.toBe('https://delivery-edge.libsyn.com/ep375.mp3');
+    });
+
+    it('rejects when the server could not reach the file', async () => {
+        answer('cabin', '/podcasts/episodes/ep-375/audio', { status: 502 });
+
+        await expect(podcastService.resolveEpisodeAudio('ep-375', 'cabin')).rejects.toEqual({ status: 502 });
+    });
+});
+

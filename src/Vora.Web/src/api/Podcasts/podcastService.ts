@@ -181,6 +181,14 @@ export const podcastService = {
         await apiClient.post(`/podcasts/episodes/${episodeId}/state`, { positionSeconds, isPlayed }, { serverId });
     },
 
+    // Where the episode's tracking redirects end: the podcast host's own address
+    // for the file. The web player falls back to it when the browser can't walk
+    // the chain itself (a tracker blocker breaks it part-way).
+    resolveEpisodeAudio: async (episodeId: string, serverId?: string): Promise<string> => {
+        const response = await apiClient.get<{ url: string }>(`/podcasts/episodes/${episodeId}/audio`, { serverId });
+        return response.data.url;
+    },
+
     search: async (query: string, limit?: number, serverId?: string): Promise<DiscoveredPodcastVM[]> => {
         const response = await apiClient.get<DiscoveredPodcastVM[]>('/podcasts/search', {
             params: { q: query, ...(limit ? { limit } : {}) },

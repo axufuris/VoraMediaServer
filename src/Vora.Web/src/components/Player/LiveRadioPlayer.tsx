@@ -15,6 +15,16 @@ import PodcastNowPlaying from './PodcastNowPlaying';
 import { secureImageUrl } from '../../utils/secureImageUrl';
 import { useLivePermissions } from './useLivePermissions';
 
+const EPISODE_ERROR = 'This episode could not be played. Its podcast host may be offline or blocking playback.';
+
+const sameAddress = (a: string, b: string): boolean => {
+    try {
+        return new URL(a).href === new URL(b).href;
+    } catch {
+        return a === b;
+    }
+};
+
 export default function LiveRadioPlayer() {
     const { currentMedia, isPlaying, isMinimized, volume, togglePlayPause, setMinimized, closePlayer, setVolume, videoRef, playMedia, skipForward, skipBackward, seek, nextTrack, previousTrack, hasNext, hasPrevious, setFullscreen, isFullscreen } = usePlayer();
     const { currentTime, duration } = usePlayerTime();
@@ -69,13 +79,14 @@ export default function LiveRadioPlayer() {
 
         if (isAudioOnDemand) {
             const startPosition = currentMedia.startPosition ?? 0;
+            let resumeAt = startPosition;
             video.src = currentMedia.streamUrl;
 
             const onLoadedMetadata = () => {
                 if (!isMounted) return;
-                if (startPosition > 5 && (video.duration === 0 || startPosition < video.duration - 5)) {
+                if (resumeAt > 5 && (video.duration === 0 || resumeAt < video.duration - 5)) {
                     try {
-                        video.currentTime = startPosition;
+                        video.currentTime = resumeAt;
                     } catch (e) {
                         console.warn("Failed to seek to saved position", e);
                     }
@@ -83,16 +94,46 @@ export default function LiveRadioPlayer() {
                 video.play().catch(e => console.error(e));
             };
             const onPlaying = () => {
-                if (isMounted) setIsLoading(false);
+                if (isMounted) { setIsLoading(false); setStreamError(null); }
+            };
+
+            // An episode's address is the feed's, usually a chain of tracking
+            // redirects. A tracker blocker breaks it part-way (uBlock Origin
+            // fails the request at one of the hops) and the element reports a
+            // media error, so ask the server where the chain ends and play the
+            // podcast host's own address. If that fails too, say so rather
+            // than leave the player waiting. Music has no such fallback: its
+            // address is the server's own.
+            let triedResolved = false;
+            const failEpisode = () => {
+                if (!isMounted) return;
+                setIsLoading(false);
+                setStreamError(EPISODE_ERROR);
+            };
+            const onError = () => {
+                if (!isMounted) return;
+                if (triedResolved) { failEpisode(); return; }
+                triedResolved = true;
+                resumeAt = video.currentTime > 0 ? video.currentTime : startPosition;
+                const episodeServerId = currentMedia.serverId ?? serverVault.getActiveServer()?.id;
+                podcastService.resolveEpisodeAudio(currentMedia.id, episodeServerId)
+                    .then(url => {
+                        if (!isMounted) return;
+                        if (!url || sameAddress(url, currentMedia.streamUrl)) { failEpisode(); return; }
+                        video.src = url;
+                    })
+                    .catch(failEpisode);
             };
 
             video.addEventListener('loadedmetadata', onLoadedMetadata);
             video.addEventListener('playing', onPlaying);
+            if (isPodcast) video.addEventListener('error', onError);
 
             return () => {
                 isMounted = false;
                 video.removeEventListener('loadedmetadata', onLoadedMetadata);
                 video.removeEventListener('playing', onPlaying);
+                video.removeEventListener('error', onError);
                 video.removeAttribute('src');
                 video.load();
             };
@@ -231,7 +272,7 @@ export default function LiveRadioPlayer() {
                 timeshiftService.stopTimeshift(activeServer?.id).catch(() => { });
             }
         };
-    }, [currentMedia?.id, videoRef, canTimeshift, isAudioOnDemand, currentMedia?.streamUrl, currentMedia?.startPosition]);
+    }, [currentMedia?.id, currentMedia?.serverId, videoRef, canTimeshift, isAudioOnDemand, isPodcast, currentMedia?.streamUrl, currentMedia?.startPosition]);
 
     useEffect(() => {
         if (!isPodcast || !currentMedia?.id) return;
@@ -334,7 +375,12 @@ export default function LiveRadioPlayer() {
     return (
         <div ref={playerContainerRef} className={containerClass} style={containerStyle}>
 
-            <video ref={videoRef} autoPlay playsInline className="hidden" />
+            {/* Music feeds the element into the EQ's Web Audio graph
+                (ensureAudioGraph), and an element can't be taken out of one.
+                Through it, an episode from another site plays in silence
+                (no CORS, so the browser hands the graph zeros), so going
+                between music and anything else gets a new element. */}
+            <video key={isMusic ? 'music' : 'audio'} ref={videoRef} autoPlay playsInline className="hidden" />
 
             {!hiddenForFullscreen && (showBar ? (
                 <div className="flex h-full w-full items-center justify-between px-6 max-md:gap-2 max-md:px-3">
@@ -357,8 +403,8 @@ export default function LiveRadioPlayer() {
                             >
                                 {currentMedia.title}
                             </span>
-                            <span className="truncate text-sm" style={{ color: 'var(--vora-text-muted)' }}>
-                                {currentMedia.subtitle || 'Live Radio'}
+                            <span className="truncate text-sm" style={{ color: 'var(--vora-text-muted)' }} role={streamError ? 'alert' : undefined} title={streamError ?? undefined}>
+                                {streamError || currentMedia.subtitle || 'Live Radio'}
                             </span>
                         </div>
                     </div>
@@ -448,6 +494,7 @@ export default function LiveRadioPlayer() {
             ) : isPodcast ? (
                 <PodcastNowPlaying
                     episode={currentMedia}
+                    streamError={streamError}
                     isPlaying={isPlaying}
                     currentTime={currentTime}
                     duration={duration}
