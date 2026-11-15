@@ -1,4 +1,5 @@
 using System.Text.Json;
+using System.Text.RegularExpressions;
 using Vora.Plugins.Dtos;
 using Vora.Plugins.Interfaces;
 
@@ -263,13 +264,15 @@ public class OpenAiChronologyProvider(IOpenAiClient openAi) : IChronologyProvide
 
     private static string BuildScoringPrompt(string description, IReadOnlyList<CollectionOrderingItemDto> batch)
     {
-        var lines = batch.Select(i => $"{i.Index}: {DescribeItem(i)}");
+        var lines = batch.Select(i => $"{i.Index}: {DescribeItem(i)}{Synopsis(i)}");
 
         return
             $"You are ordering a media collection. It is described as: \"{description}\".\n" +
-            "Here is a batch of its items, one per line as `index: Title (ReleaseYear) [Type]` — the year shown is the RELEASE " +
-            "year:\n" +
+            "Here is a batch of its items, one per line as `index: Title (ReleaseYear) [Type]`, most followed by the title's own " +
+            "synopsis — the year shown is the RELEASE year:\n" +
             string.Join("\n", lines) + "\n\n" +
+            OneTimelineRule +
+            SynopsisRule +
             "Unless the description explicitly asks for release order, place each by the IN-UNIVERSE story timeline. For EVERY " +
             "index above give a DECIMAL setYear whose whole part is the year the story PRIMARILY takes place within the fictional " +
             "world and whose fractional part sequences events WITHIN that year (e.g. an event early in 2012 is 2012.1, one later in " +
@@ -300,14 +303,17 @@ public class OpenAiChronologyProvider(IOpenAiClient openAi) : IChronologyProvide
     // made saying nothing the cheap answer.
     private static string BuildVerificationPrompt(string description, IReadOnlyList<CollectionOrderingItemDto> ordered, Dictionary<int, double> setYears, HashSet<int> review)
     {
-        var lines = ordered.Select(i => $"{i.Index}: {DescribeItem(i)} — setYear {setYears[i.Index]:0.00}");
+        var lines = ordered.Select(i => $"{i.Index}: {DescribeItem(i)} — setYear {setYears[i.Index]:0.00}{Synopsis(i)}");
         var reviewList = string.Join(", ", review.OrderBy(x => x));
 
         return
             $"You are auditing the in-universe chronological order of a media collection described as: \"{description}\".\n" +
-            "Below is the current order, earliest first, one per line as `index: Title (ReleaseYear) [Type] — setYear <value>`:\n" +
+            "Below is the current order, earliest first, one per line as `index: Title (ReleaseYear) [Type] — setYear <value>`, " +
+            "most followed by the title's own synopsis:\n" +
             string.Join("\n", lines) + "\n\n" +
             $"Audit these indices: {reviewList}.\n" +
+            OneTimelineRule +
+            SynopsisRule +
             "For EACH of them, work out from your own knowledge of the story the year in which it PRIMARILY takes place, and " +
             "return that as a DECIMAL setYear — whole part the story year, fractional part sequencing it within that year. Decide " +
             "the story year on its own merits FIRST, from what happens in the title, and only then compare it with the value " +
@@ -341,11 +347,51 @@ public class OpenAiChronologyProvider(IOpenAiClient openAi) : IChronologyProvide
         }
     }
 
+    // Star Wars counts years Before and After the Battle of Yavin. Left to
+    // itself the model wrote 32 BBY as 32 and 9 ABY as 9, so sorting smallest
+    // first ran the prequel era backwards: Rogue One (0 BBY) opened a real
+    // collection and The Phantom Menace (32 BBY) closed it.
+    private const string OneTimelineRule =
+        "Every setYear is a point on ONE timeline where a LARGER number is ALWAYS LATER in the story. A franchise that counts " +
+        "years from an in-universe event must be put on that single line, with years BEFORE the event as NEGATIVE numbers: " +
+        "in Star Wars, 32 BBY is -32, 19 BBY is -19, 0 BBY is 0 and 9 ABY is 9; a BC year is negative too. Never write a " +
+        "years-before count as a positive number — that reverses the order. Larger is later within a year as well: of two " +
+        "events in 19 BBY, the earlier is -19.8 and the later -19.2.\n";
+
+    // The Continental (aired 2023, set in 1975) came back as 2023 from its
+    // title alone; its synopsis names the decade.
+    private const string SynopsisRule =
+        "Read each synopsis: it often states exactly when the story is set (\"in 1970s New York\", \"thirty years after\"), " +
+        "and that outranks the release year.\n";
+
+    private const int MaxSynopsisLength = 240;
+
+    private static string Synopsis(CollectionOrderingItemDto item)
+    {
+        if (string.IsNullOrWhiteSpace(item.Overview))
+        {
+            return string.Empty;
+        }
+
+        var text = string.Join(' ', item.Overview.Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries));
+        if (text.Length > MaxSynopsisLength)
+        {
+            var cut = text.LastIndexOf(' ', MaxSynopsisLength);
+            text = text[..(cut > 0 ? cut : MaxSynopsisLength)] + "…";
+        }
+
+        return $" — synopsis: {text}";
+    }
+
+    // "The Continental (2023)": the year a library adds to tell two shows apart
+    // is another release year, and the aired year already follows.
+    private static readonly Regex TitleYearSuffix = new(@"\s*\(\d{4}\)\s*$", RegexOptions.Compiled);
+
     private static string DescribeItem(CollectionOrderingItemDto item)
     {
         if (string.Equals(item.MediaType, "Season", StringComparison.OrdinalIgnoreCase))
         {
-            var show = string.IsNullOrWhiteSpace(item.ShowTitle) ? item.Title : item.ShowTitle;
+            var show = string.IsNullOrWhiteSpace(item.ShowTitle) ? item.Title : TitleYearSuffix.Replace(item.ShowTitle, string.Empty);
             var season = item.SeasonNumber.HasValue ? $" Season {item.SeasonNumber}" : string.Empty;
             var aired = item.Year.HasValue ? $" (aired {item.Year})" : string.Empty;
             return $"{show}{season}{aired} [Season]";
@@ -362,7 +408,9 @@ public class OpenAiChronologyProvider(IOpenAiClient openAi) : IChronologyProvide
         ImdbId = item.ImdbId,
         MediaType = item.MediaType,
         SortOrder = sortOrder,
-        SetYear = setYear
+        // Rounded so the 0.001 steps that keep years distinct are stored as
+        // 19.101, not 19.101000000000003 (shown as-is in the reorder dialog).
+        SetYear = setYear.HasValue ? Math.Round(setYear.Value, 3) : null
     };
 
     private class OrderResult

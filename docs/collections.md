@@ -56,6 +56,24 @@ year, so it reads as locally consistent, and silence confirms it. Black Panther
 (set 2016, released 2018) landed 13 places late in a real collection exactly that
 way. The audit now requires an explicit value for every reviewed index.
 
+**One timeline, larger is later.** Both prompts say every `setYear` sits on one
+number line, and a franchise that counts years from an in-universe event goes on
+it with the years *before* that event negative (Star Wars: 32 BBY → `-32`,
+0 BBY → `0`, 9 ABY → `9`). Without that rule the model wrote BBY counts as
+positive numbers, so the prequel era sorted backwards: Rogue One (0 BBY) opened a
+real collection and The Phantom Menace (32 BBY) closed it.
+
+**Each item carries its synopsis.** The prompt line is `index: Title (Year)
+[Type] — synopsis: …` (the title's overview, a season falling back to its
+show's, whitespace collapsed and cut at 240 characters). A synopsis often names
+the period outright; from its title alone the model put The Continental (aired
+2023, set in 1975) at 2023, after John Wick: Chapter 4. A show title's
+disambiguating year (`The Continental (2023)`) is dropped from the line, since
+it is another release year and the aired year already follows.
+
+Collections ordered before these changes keep their stored years until
+**Sync timeline** re-derives them.
+
 **"Sync timeline" is a full re-derivation, not a top-up.** The endpoint passes
 `force: true`, which discards the cached `InUniverseYear` of every *unlocked*
 item so the whole collection is scored and audited again. Locked items keep their
