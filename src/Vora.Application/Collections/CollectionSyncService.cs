@@ -196,7 +196,7 @@ public class CollectionSyncService(
             ? new PlaylistAccessFilter { HasAllLibraryAccess = false, AllowedLibraryIds = new List<Guid> { libraryId.Value } }
             : PlaylistAccessFilter.Unrestricted;
 
-        var ids = await smartEvaluator.EvaluateIdsAsync(definition, smartMediaType ?? PlaylistMediaType.Movies, Guid.Empty, access);
+        var ids = await smartEvaluator.EvaluateCollectionIdsAsync(definition, smartMediaType ?? PlaylistMediaType.Movies, access);
         return ids.ToHashSet();
     }
 

@@ -7,7 +7,8 @@ import { pluginAdminService, type PluginOptionVM } from '../../api/System/plugin
 import { emptyDefinition, type SmartPlaylistDefinition } from '../../api/Music/smartPlaylistService';
 import { useDialog } from '../../dialogs';
 import { Modal, ModalHeader, ModalBody, ModalFooter } from '../Common/Modal';
-import RuleTreeEditor from '../Common/RuleTreeEditor';
+import SmartCollectionRules from './SmartCollectionRules';
+import { pruneRules, smartMediaForLibrary, type SmartCollectionMedia } from './smartCollectionMedia';
 import SeasonalVisibilityFields from './SeasonalVisibilityFields';
 import ContentProviderHelp from './ContentProviderHelp';
 import { seasonalWindowFrom, seasonalWindowRequest, type SeasonalWindow } from './seasonalWindow';
@@ -23,10 +24,12 @@ interface CreateCollectionModalProps {
     onClose: () => void;
     onSaved: () => void;
     activeTab: string;
+    // The active tab's library type (Movie, TvShow, …); undefined on Global.
+    libraryType?: string;
 }
 
 export default function CreateCollectionModal({
-    isOpen, onClose, onSaved, activeTab }: CreateCollectionModalProps) {
+    isOpen, onClose, onSaved, activeTab, libraryType }: CreateCollectionModalProps) {
     const dialog = useDialog();
     const { serverId } = useParams<{ serverId?: string }>();
     const navigate = useNavigate();
@@ -48,6 +51,10 @@ export default function CreateCollectionModal({
     const [syncIntervalDays, setSyncIntervalDays] = useState(30);
     const [mirrorList, setMirrorList] = useState(false);
     const [smartDefinition, setSmartDefinition] = useState<SmartPlaylistDefinition>(() => ({ ...emptyDefinition(), limit: 2000, sortBy: 'DateAdded', sortDirection: 'Desc' }));
+    // A global collection picks what its rules match; a library one matches
+    // its library's kind.
+    const [globalSmartMedia, setGlobalSmartMedia] = useState<SmartCollectionMedia>('Mixed');
+    const smartMedia: SmartCollectionMedia = isGlobal ? globalSmartMedia : (smartMediaForLibrary(libraryType) ?? 'Movies');
 
     const [sortProviderId, setSortProviderId] = useState('');
     const [externalListId, setExternalListId] = useState('');
@@ -153,6 +160,7 @@ export default function CreateCollectionModal({
             setSyncIntervalDays(30);
             setMirrorList(false);
             setSmartDefinition({ ...emptyDefinition(), limit: 2000, sortBy: 'DateAdded', sortDirection: 'Desc' });
+            setGlobalSmartMedia('Mixed');
 
             pluginAdminService.getChronologyProviders(serverId)
                 .then(setChronologyProviders)
@@ -198,8 +206,8 @@ export default function CreateCollectionModal({
                 contentSyncExternalId: contentSyncProviderId === SMART_CONTENT ? undefined : (contentSyncExternalId || undefined),
                 syncIntervalDays: Math.max(1, syncIntervalDays),
                 mirrorList: contentSyncProviderId === SMART_CONTENT ? true : (contentSyncProviderId ? mirrorList : false),
-                rulesJson: contentSyncProviderId === SMART_CONTENT ? JSON.stringify(smartDefinition) : undefined,
-                smartMediaType: contentSyncProviderId === SMART_CONTENT ? 'Movies' : undefined
+                rulesJson: contentSyncProviderId === SMART_CONTENT ? JSON.stringify({ ...smartDefinition, root: pruneRules(smartDefinition.root, smartMedia) }) : undefined,
+                smartMediaType: contentSyncProviderId === SMART_CONTENT ? smartMedia : undefined
             }, serverId);
 
             const outcome = await saveStagedArtwork(newCollectionId, staged, { Poster: stagedPoster, Backdrop: stagedBackdrop }, serverId);
@@ -328,12 +336,14 @@ export default function CreateCollectionModal({
                         <ContentProviderHelp providerId={contentSyncProviderId} />
 
                         {contentSyncProviderId === SMART_CONTENT && (
-                            <div className="pt-3 mt-3 border-t border-[var(--vora-border-subtle)]/50 space-y-3">
-                                <p className="text-xs text-[var(--vora-text-muted)] leading-relaxed">
-                                    Build a rule-based collection of <span className="text-[var(--vora-text-secondary)]">movies</span> from your library — e.g. Genre contains Horror, and Year between 2010 and 2019. Membership updates automatically as your library changes. (Shows &amp; music coming soon.)
-                                </p>
-                                <RuleTreeEditor mediaType="Movies" value={smartDefinition.root} onChange={root => setSmartDefinition(d => ({ ...d, root }))} />
-                            </div>
+                            <SmartCollectionRules
+                                idPrefix="create-collection"
+                                isGlobal={isGlobal}
+                                media={smartMedia}
+                                onMediaChange={setGlobalSmartMedia}
+                                root={smartDefinition.root}
+                                onRootChange={root => setSmartDefinition(d => ({ ...d, root }))}
+                            />
                         )}
 
                         {contentSyncProviderId && contentSyncProviderId !== SMART_CONTENT && (

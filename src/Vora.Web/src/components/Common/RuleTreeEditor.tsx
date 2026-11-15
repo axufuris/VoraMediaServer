@@ -8,30 +8,11 @@ import {
     type SmartPlaylistMatch,
     type PlaylistMediaType
 } from '../../api/Music/smartPlaylistService';
+import { collectionFieldsFor, type RuleFieldDef, type RuleFieldKind } from '../Collections/smartCollectionMedia';
 
-type FieldKind = 'string' | 'int' | 'date' | 'bool';
+type FieldKind = RuleFieldKind;
 
-export interface FieldDef {
-    value: SmartPlaylistField;
-    label: string;
-    kind: FieldKind;
-}
-
-// Content-only fields for smart collections — no profile-scoped fields
-// (watched / my-rating / last-played) since a collection is shared, not
-// per-profile.
-const COLLECTION_FIELDS_BY_TYPE: Partial<Record<PlaylistMediaType, FieldDef[]>> = {
-    Movies: [
-        { value: 'Title', label: 'Title', kind: 'string' },
-        { value: 'Genre', label: 'Genre', kind: 'string' },
-        { value: 'ContentRating', label: 'Content Rating', kind: 'string' },
-        { value: 'ReleaseYear', label: 'Year', kind: 'int' },
-        { value: 'DurationSeconds', label: 'Duration (seconds)', kind: 'int' },
-        { value: 'ServerAdminRating', label: 'Admin Rating', kind: 'int' },
-        { value: 'AudienceRating', label: 'Audience Rating', kind: 'int' },
-        { value: 'DateAdded', label: 'Date Added', kind: 'date' }
-    ]
-};
+export type FieldDef = RuleFieldDef;
 
 const STRING_OPS: { value: SmartPlaylistOperator; label: string }[] = [
     { value: 'Equals', label: 'is' },
@@ -257,7 +238,7 @@ export default function RuleTreeEditor({ mediaType, value, onChange }: {
     value: SmartPlaylistRuleGroup;
     onChange: (root: SmartPlaylistRuleGroup) => void;
 }) {
-    const fields = COLLECTION_FIELDS_BY_TYPE[mediaType] ?? COLLECTION_FIELDS_BY_TYPE.Movies!;
+    const fields = collectionFieldsFor(mediaType);
 
     const addRule = (path: number[]) => onChange(applyAtPath(value, path, g => {
         const first = fields[0];

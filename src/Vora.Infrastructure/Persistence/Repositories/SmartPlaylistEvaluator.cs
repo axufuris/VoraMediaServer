@@ -51,8 +51,25 @@ public sealed class SmartPlaylistEvaluator : ISmartPlaylistEvaluator
         return ids.Where(byId.ContainsKey).Select(id => byId[id]).ToList();
     }
 
-    public Task<List<Guid>> EvaluateIdsAsync(SmartPlaylistDefinition definition, PlaylistMediaType mediaType, Guid profileId, PlaylistAccessFilter access) =>
-        BuildIdQuery(definition, mediaType, profileId, access).ToListAsync();
+    public async Task<List<Guid>> EvaluateCollectionIdsAsync(SmartPlaylistDefinition definition, PlaylistMediaType mediaType, PlaylistAccessFilter access)
+    {
+        int limit = definition.Limit.HasValue && definition.Limit.Value > 0 ? definition.Limit.Value : 2000;
+        var ids = new List<Guid>();
+
+        if (mediaType is PlaylistMediaType.Movies or PlaylistMediaType.Mixed)
+        {
+            var movies = ApplyVideoSort(BuildMovieRowQuery(definition, Guid.Empty, access), definition.SortBy, definition.SortDirection);
+            ids.AddRange(await movies.Take(limit).Select(r => r.ItemId).ToListAsync());
+        }
+
+        if (mediaType is PlaylistMediaType.Shows or PlaylistMediaType.Mixed)
+        {
+            var shows = ApplyVideoSort(BuildShowRowQuery(definition, access), definition.SortBy, definition.SortDirection);
+            ids.AddRange(await shows.Take(limit).Select(r => r.ItemId).ToListAsync());
+        }
+
+        return ids;
+    }
 
     public Task<int> CountAsync(SmartPlaylistDefinition definition, PlaylistMediaType mediaType, Guid profileId, PlaylistAccessFilter access) =>
         mediaType switch
@@ -230,6 +247,40 @@ public sealed class SmartPlaylistEvaluator : ISmartPlaylistEvaluator
                 .Where(s => s.ProfileId == profileId && s.MediaItemId == e.Id)
                 .Max(s => (DateTime?)s.LastPlayedAt)
         });
+
+        var predicate = BuildGroupPredicate<VideoRow>(definition.Root, VideoFieldAccessor);
+        if (predicate != null) rowQuery = rowQuery.Where(predicate);
+
+        return rowQuery;
+    }
+
+    // One row per show, for smart collections: a collection holds the show, not
+    // its episodes. Year is the first-air year; genres and ratings are the
+    // show's own. No duration or per-profile state — a show has no single
+    // running time, and a collection is shared by every profile.
+    private IQueryable<VideoRow> BuildShowRowQuery(SmartPlaylistDefinition definition, PlaylistAccessFilter access)
+    {
+        var rowQuery = VideoVisibleTo(access)
+            .OfType<TvShow>()
+            .Select(s => new VideoRow
+            {
+                ItemId = s.Id,
+                Title = s.Title,
+                ShowTitle = s.Title,
+                SeasonNumber = null,
+                EpisodeNumber = null,
+                ReleaseYear = s.ReleaseDate != null ? s.ReleaseDate.Value.Year : (int?)null,
+                ContentRating = s.ContentRating,
+                DurationSeconds = null,
+                AddedAt = s.AddedAt,
+                LibraryId = s.LibraryId,
+                Genres = s.Genres.Select(g => g.Name.ToLower()),
+                ServerAdminRating = s.ServerAdminRating,
+                AudienceRating = s.ThirdPartyRating1,
+                MyRating = null,
+                IsWatched = false,
+                LastPlayedAt = null
+            });
 
         var predicate = BuildGroupPredicate<VideoRow>(definition.Root, VideoFieldAccessor);
         if (predicate != null) rowQuery = rowQuery.Where(predicate);

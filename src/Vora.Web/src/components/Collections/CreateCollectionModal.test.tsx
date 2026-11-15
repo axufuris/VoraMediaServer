@@ -334,4 +334,81 @@ describe('CreateCollectionModal', () => {
         expect(screen.getByText(/Name a specific franchise or shared universe/)).toBeInTheDocument();
         expect(screen.queryByText(/titles TMDB tags with the theme/)).not.toBeInTheDocument();
     });
+
+    describe('Smart (rule-based)', () => {
+        const renderOn = (activeTab: string, libraryType?: string) => render(
+            <MemoryRouter>
+                <CreateCollectionModal isOpen onClose={() => {}} onSaved={() => {}} activeTab={activeTab} libraryType={libraryType} />
+            </MemoryRouter>,
+        );
+        const chooseSmart = () => fireEvent.change(screen.getByDisplayValue('Manual Management (None)'), { target: { value: '__smart__' } });
+
+        it('has no "coming soon" note', async () => {
+            renderOn('global');
+            chooseSmart();
+
+            expect(await screen.findByText(/that matches the rules below/)).toBeInTheDocument();
+            expect(screen.queryByText(/coming soon/i)).not.toBeInTheDocument();
+        });
+
+        it('lets a global collection match movies, shows or both, starting on both', async () => {
+            renderOn('global');
+            nameIt('Prestige Dramas');
+            chooseSmart();
+
+            const match = screen.getByLabelText('Match') as HTMLSelectElement;
+            expect(match.value).toBe('Mixed');
+            expect(Array.from(match.options).map(o => o.textContent)).toEqual(['Movies', 'Shows', 'Movies & shows']);
+
+            fireEvent.change(match, { target: { value: 'Shows' } });
+            create();
+
+            await waitFor(() => expect(mocks.createCollection).toHaveBeenCalled());
+            expect(mocks.createCollection.mock.calls[0][0]).toMatchObject({ smartMediaType: 'Shows', libraryId: undefined });
+        });
+
+        it("matches a show library's shows, with no choice to make", async () => {
+            renderOn('library-1', 'TvShow');
+            nameIt('Sitcoms');
+            chooseSmart();
+
+            expect(screen.queryByLabelText('Match')).not.toBeInTheDocument();
+            expect(screen.getByText(/in this library that matches/)).toHaveTextContent('Adds every show in this library');
+            create();
+
+            await waitFor(() => expect(mocks.createCollection).toHaveBeenCalled());
+            expect(mocks.createCollection.mock.calls[0][0]).toMatchObject({ smartMediaType: 'Shows', libraryId: 'library-1' });
+        });
+
+        it("matches a movie library's movies", async () => {
+            renderOn('library-1', 'Movie');
+            nameIt('Horror');
+            chooseSmart();
+            create();
+
+            await waitFor(() => expect(mocks.createCollection).toHaveBeenCalled());
+            expect(mocks.createCollection.mock.calls[0][0]).toMatchObject({ smartMediaType: 'Movies' });
+        });
+
+        it('drops a Duration rule when switching to shows, which have no running time', async () => {
+            renderOn('global');
+            nameIt('Short Films');
+            chooseSmart();
+            const match = screen.getByLabelText('Match');
+            fireEvent.change(match, { target: { value: 'Movies' } });
+            fireEvent.click(screen.getByRole('button', { name: '+ Rule' }));
+            fireEvent.change(screen.getByDisplayValue('Title'), { target: { value: 'DurationSeconds' } });
+            expect(screen.getByDisplayValue('Duration (seconds)')).toBeInTheDocument();
+
+            fireEvent.change(match, { target: { value: 'Shows' } });
+
+            expect(screen.queryByDisplayValue('Duration (seconds)')).not.toBeInTheDocument();
+            expect(screen.queryByRole('option', { name: 'Duration (seconds)' })).not.toBeInTheDocument();
+            create();
+
+            await waitFor(() => expect(mocks.createCollection).toHaveBeenCalled());
+            const rules = JSON.parse(mocks.createCollection.mock.calls[0][0].rulesJson);
+            expect(rules.root.rules).toEqual([]);
+        });
+    });
 });
