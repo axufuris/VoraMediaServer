@@ -1,5 +1,4 @@
 using System.Net;
-using System.Net.Sockets;
 using Microsoft.Extensions.Logging;
 using Vora.Application.Analysis;
 using Vora.Application.Podcasts.ViewModels;
@@ -18,6 +17,7 @@ public interface IPodcastManager
     Task RefreshShowAsync(Guid showId);
     Task<List<PodcastEpisodeVM>> GetEpisodesAsync(Guid profileId, Guid subscriptionId, int limit);
     Task SaveEpisodeStateAsync(Guid profileId, Guid episodeId, double positionSeconds, bool? explicitIsPlayed);
+    Task<string?> ResolveEpisodeAudioAsync(Guid profileId, Guid episodeId, string? userAgent, CancellationToken cancellationToken);
     Task<List<DiscoveredPodcastVM>> SearchAsync(string query, int limit, CancellationToken cancellationToken);
     Task<List<PodcastFeedEpisodeVM>> GetRecentEpisodesAsync(Guid profileId, int limit, int? daysBack);
     Task<List<CatalogPodcastVM>> GetCatalogAsync(Guid profileId);
@@ -40,6 +40,7 @@ public class PodcastManager : IPodcastManager
     private readonly IHttpClientFactory _httpClientFactory;
     private readonly IClientNotifier _notifier;
     private readonly IEnumerable<IPodcastDiscoveryProvider> _discoveryProviders;
+    private readonly IPodcastStreamResolver _streamResolver;
     private readonly ILogger<PodcastManager> _logger;
 
     public PodcastManager(
@@ -47,12 +48,14 @@ public class PodcastManager : IPodcastManager
         IHttpClientFactory httpClientFactory,
         IClientNotifier notifier,
         IEnumerable<IPodcastDiscoveryProvider> discoveryProviders,
+        IPodcastStreamResolver streamResolver,
         ILogger<PodcastManager> logger)
     {
         _repository = repository;
         _httpClientFactory = httpClientFactory;
         _notifier = notifier;
         _discoveryProviders = discoveryProviders;
+        _streamResolver = streamResolver;
         _logger = logger;
     }
 
@@ -286,6 +289,21 @@ public class PodcastManager : IPodcastManager
         await _repository.UpsertStateAsync(profileId, episodeId, clampedPosition, isPlayed);
     }
 
+    // The same gate as saving progress: an episode of a show the profile follows.
+    // Null when the chain doesn't end at a file (PodcastStreamResolver).
+    public async Task<string?> ResolveEpisodeAudioAsync(Guid profileId, Guid episodeId, string? userAgent, CancellationToken cancellationToken)
+    {
+        var episode = await _repository.GetEpisodeByIdAsync(episodeId)
+            ?? throw new InvalidOperationException("Episode not found.");
+
+        if (!await _repository.ProfileSubscribesToShowAsync(profileId, episode.PodcastShowId))
+        {
+            throw new UnauthorizedAccessException("Profile is not subscribed to this show.");
+        }
+
+        return await _streamResolver.ResolveAsync(episode.AudioUrl, userAgent, cancellationToken);
+    }
+
     public async Task<List<PodcastFeedEpisodeVM>> GetRecentEpisodesAsync(Guid profileId, int limit, int? daysBack)
     {
         var effectiveLimit = limit <= 0 ? 50 : Math.Min(limit, 200);
@@ -502,39 +520,10 @@ public class PodcastManager : IPodcastManager
             throw new InvalidOperationException("The feed URL could not be resolved.");
         }
 
-        if (addresses.Length == 0 || addresses.Any(IsDisallowedAddress))
+        if (addresses.Length == 0 || addresses.Any(PodcastAddressRules.IsDisallowedAddress))
         {
             throw new InvalidOperationException("The feed URL points to a disallowed address.");
         }
-    }
-
-    private static bool IsDisallowedAddress(IPAddress address)
-    {
-        var ip = address.IsIPv4MappedToIPv6 ? address.MapToIPv4() : address;
-
-        if (IPAddress.IsLoopback(ip)) return true;
-
-        if (ip.AddressFamily == AddressFamily.InterNetwork)
-        {
-            var b = ip.GetAddressBytes();
-            if (b[0] == 0) return true;
-            if (b[0] == 10) return true;
-            if (b[0] == 127) return true;
-            if (b[0] == 169 && b[1] == 254) return true;
-            if (b[0] == 172 && b[1] >= 16 && b[1] <= 31) return true;
-            if (b[0] == 192 && b[1] == 168) return true;
-            return false;
-        }
-
-        if (ip.AddressFamily == AddressFamily.InterNetworkV6)
-        {
-            if (ip.IsIPv6LinkLocal || ip.IsIPv6SiteLocal) return true;
-            var b = ip.GetAddressBytes();
-            if ((b[0] & 0xFE) == 0xFC) return true;
-            return false;
-        }
-
-        return true;
     }
 
     private async Task<int> UpsertFeedEpisodesAsync(Guid showId, PodcastFeedResult feed)

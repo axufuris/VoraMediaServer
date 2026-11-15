@@ -42,6 +42,12 @@ public static class PodcastEndpoints
             .Produces<IEnumerable<PodcastEpisodeVM>>(StatusCodes.Status200OK);
         group.MapPost("/episodes/{episodeId:guid}/state", SaveEpisodeStateAsync)
             .WithName("SavePodcastEpisodeState");
+        group.MapGet("/episodes/{episodeId:guid}/audio", ResolveEpisodeAudioAsync)
+            .WithName("ResolvePodcastEpisodeAudio")
+            .Produces<PodcastEpisodeAudioVM>(StatusCodes.Status200OK)
+            .Produces(StatusCodes.Status403Forbidden)
+            .Produces(StatusCodes.Status404NotFound)
+            .Produces(StatusCodes.Status502BadGateway);
         group.MapGet("/episodes/recent", GetRecentEpisodesAsync)
             .WithName("ListRecentPodcastEpisodes")
             .Produces<IEnumerable<PodcastFeedEpisodeVM>>(StatusCodes.Status200OK);
@@ -188,6 +194,30 @@ public static class PodcastEndpoints
         if (profileId == null) return Results.Unauthorized();
         var episodes = await manager.GetEpisodesAsync(profileId.Value, subscriptionId, limit ?? 100);
         return Results.Ok(episodes);
+    }
+
+    // Where the episode's audio redirect chain ends, for a player that couldn't
+    // walk it itself (the web player behind a tracker blocker).
+    private static async Task<IResult> ResolveEpisodeAudioAsync(Guid episodeId, HttpContext http, ClaimsPrincipal user, IPodcastManager manager, CancellationToken cancellationToken)
+    {
+        var profileId = user.GetProfileId();
+        if (profileId == null) return Results.Unauthorized();
+
+        try
+        {
+            var url = await manager.ResolveEpisodeAudioAsync(profileId.Value, episodeId, http.Request.Headers.UserAgent.ToString(), cancellationToken);
+            return url == null
+                ? Results.Json(new { error = "The episode's audio could not be reached." }, statusCode: StatusCodes.Status502BadGateway)
+                : Results.Ok(new PodcastEpisodeAudioVM { Url = url });
+        }
+        catch (UnauthorizedAccessException)
+        {
+            return Results.Forbid();
+        }
+        catch (InvalidOperationException)
+        {
+            return Results.NotFound();
+        }
     }
 
     private static async Task<IResult> SaveEpisodeStateAsync(Guid episodeId, [FromBody] SaveEpisodeStateDto request, ClaimsPrincipal user, IPodcastManager manager)

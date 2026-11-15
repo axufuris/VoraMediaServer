@@ -10,6 +10,9 @@ import { NowPlayingControlRow, NowPlayingPlayButton, NowPlayingSeekBar, NowPlayi
 // previous and next.
 interface PodcastNowPlayingProps {
     episode: PlayableMedia;
+    // Set when the episode couldn't be played, even through the address the
+    // server resolved; shown under the title, as the radio screen shows its.
+    streamError?: string | null;
     isPlaying: boolean;
     currentTime: number;
     duration: number;
@@ -30,6 +33,7 @@ const podcastIcon = <svg width="96" height="96" viewBox="0 0 24 24" fill="curren
 
 export default function PodcastNowPlaying({
     episode,
+    streamError,
     isPlaying,
     currentTime,
     duration,
@@ -75,6 +79,9 @@ export default function PodcastNowPlaying({
                     posterUrl={episode.posterUrl}
                     title={episode.title}
                     subtitle={episode.subtitle || 'Podcast'}
+                    meta={streamError ? (
+                        <p className="mx-auto mt-3 max-w-md text-sm" style={{ color: 'var(--vora-text-secondary)' }} role="alert">{streamError}</p>
+                    ) : undefined}
                     fallbackIcon={podcastIcon}
                 />
             </div>
