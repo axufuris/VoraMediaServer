@@ -38,6 +38,7 @@ export const VORA_EVENTS = {
     ProfileAccessUpdated: 'ProfileAccessUpdated',
     DvrSessionsUpdated: 'DvrSessionsUpdated',
     ChannelFavoritesUpdated: 'ChannelFavoritesUpdated',
+    WatchlistUpdated: 'WatchlistUpdated',
     PodcastEpisodesUpdated: 'PodcastEpisodesUpdated',
     MusicArtistUpdated: 'MusicArtistUpdated',
     MusicAlbumUpdated: 'MusicAlbumUpdated',

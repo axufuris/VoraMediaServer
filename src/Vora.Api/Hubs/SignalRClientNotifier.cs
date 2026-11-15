@@ -64,6 +64,9 @@ public class SignalRClientNotifier(IHubContext<VoraHub> hubContext) : IClientNot
     public Task NotifyChannelFavoritesUpdatedAsync(Guid profileId) =>
         hubContext.Clients.Group(VoraHub.ProfileGroupName(profileId)).SendAsync("ChannelFavoritesUpdated", profileId.ToString());
 
+    public Task NotifyWatchlistUpdatedAsync(Guid profileId) =>
+        hubContext.Clients.Group(VoraHub.ProfileGroupName(profileId)).SendAsync("WatchlistUpdated", profileId.ToString());
+
     public Task NotifyServerPlaybackUpdatedAsync() =>
         hubContext.Clients.All.SendAsync("ServerPlaybackUpdated");
 

@@ -7,6 +7,7 @@ import CastRow from '../../../components/Client/Primitives/CastRow';
 import VideoCard from '../../../components/Client/Primitives/VideoCard';
 import DetailHero, { HeroChip, HeroCredits } from '../../../components/Client/Primitives/DetailHero';
 import { watchlistService } from '../../../api/Watchlist/watchlistService';
+import { useWatchlistUpdated } from '../../../hooks/useWatchlistUpdated';
 import RatingBadge from '../../../components/Client/Primitives/RatingBadge';
 import TrailerOverlay from '../../../components/Client/Primitives/TrailerOverlay';
 import { BookmarkIcon } from '../../../components/Client/Primitives/ActionIcons';
@@ -58,6 +59,14 @@ export default function DiscoveryDetailsPage() {
 
         loadData();
     }, [providerId, type, externalId, serverId, activeProfileId]);
+
+    // Added or removed on another device.
+    useWatchlistUpdated(serverId, useCallback(() => {
+        if (!providerId || !externalId) return;
+        watchlistService.check({ externalId, providerId }, serverId)
+            .then(setInWatchlist)
+            .catch(() => { /* the bookmark keeps what it showed */ });
+    }, [providerId, externalId, serverId]));
 
     useEffect(() => {
         discoveryService.getTheaterAutoLoad(serverId)

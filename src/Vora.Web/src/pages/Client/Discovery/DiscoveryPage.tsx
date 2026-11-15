@@ -1,7 +1,8 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { discoveryService, type DiscoveryRowConfig, type DiscoveryItem } from '../../../api/Discovery/discoveryService';
 import { watchlistService } from '../../../api/Watchlist/watchlistService';
+import { useWatchlistUpdated } from '../../../hooks/useWatchlistUpdated';
 import { profileDeviceSettingsService } from '../../../api/Users/profileDeviceSettingsService';
 import { serverVault } from '../../../utils/serverVault';
 import ClientDiscoveryCustomizeModal, { type ClientLayoutItem } from '../../../components/Discovery/DiscoveryCustomizeModal';
@@ -24,6 +25,13 @@ export default function DiscoveryPage({ embedded = false }: DiscoveryPageProps =
     const [configs, setConfigs] = useState<(DiscoveryRowConfig & { uniqueId: string, serverId?: string, serverName?: string })[]>([]);
     const [clientLayout, setClientLayout] = useState<ClientLayoutItem[]>([]);
     const [watchlistIds, setWatchlistIds] = useState<Set<string>>(new Set());
+
+    // Added or removed anywhere on this profile.
+    useWatchlistUpdated(serverId, useCallback(() => {
+        watchlistService.getWatchlist(serverId)
+            .then(items => setWatchlistIds(new Set(items.map(i => watchlistKey(i.providerId, i.externalId)))))
+            .catch(() => { /* the posters keep what they showed */ });
+    }, [serverId]));
     const [isLoading, setIsLoading] = useState(true);
     const [isCustomizeOpen, setIsCustomizeOpen] = useState(false);
 

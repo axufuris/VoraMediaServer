@@ -24,6 +24,7 @@ public interface IClientNotifier
     Task NotifyMusicHistoryUpdatedAsync(Guid profileId);
     Task NotifyRadioPrefsUpdatedAsync(Guid profileId);
     Task NotifyChannelFavoritesUpdatedAsync(Guid profileId);
+    Task NotifyWatchlistUpdatedAsync(Guid profileId);
     Task NotifyServerPlaybackUpdatedAsync();
     Task NotifyAdminAlertAsync(string severity, string title, string message);
     Task NotifyAdminAlertUnreadChangedAsync();

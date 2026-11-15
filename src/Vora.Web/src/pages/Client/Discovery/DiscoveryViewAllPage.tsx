@@ -1,7 +1,8 @@
-import { useEffect, useState, useRef } from 'react';
+import { useCallback, useEffect, useState, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { discoveryService, type DiscoveryItem, type DiscoveryRowConfig } from '../../../api/Discovery/discoveryService';
 import { watchlistService } from '../../../api/Watchlist/watchlistService';
+import { useWatchlistUpdated } from '../../../hooks/useWatchlistUpdated';
 import PageHeader from '../../../components/Client/Primitives/PageHeader';
 import MediaCard from '../../../components/Client/Primitives/MediaCard';
 import MediaGrid from '../../../components/Client/Primitives/MediaGrid';
@@ -22,6 +23,13 @@ export default function DiscoveryViewAllPage() {
     const [rowName, setRowName] = useState<string>('Loading…');
     const [rowUnavailable, setRowUnavailable] = useState(false);
     const [watchlistIds, setWatchlistIds] = useState<Set<string>>(new Set());
+
+    // Added or removed anywhere on this profile.
+    useWatchlistUpdated(serverId, useCallback(() => {
+        watchlistService.getWatchlist(serverId)
+            .then(items => setWatchlistIds(new Set(items.map(i => watchlistKey(i.providerId, i.externalId)))))
+            .catch(() => { /* the posters keep what they showed */ });
+    }, [serverId]));
 
     const observerTarget = useRef<HTMLDivElement>(null);
 
