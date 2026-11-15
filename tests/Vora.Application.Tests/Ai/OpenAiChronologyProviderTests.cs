@@ -123,6 +123,47 @@ public class OpenAiChronologyProviderTests
     }
 
     [Fact]
+    public async Task A_negative_era_year_sorts_before_the_event_it_counts_from()
+    {
+        var rogueOne = Guid.NewGuid();
+        var mandalorian = Guid.NewGuid();
+        var phantomMenace = Guid.NewGuid();
+        var items = new List<CollectionOrderingItemDto>
+        {
+            Item(0, rogueOne, "Rogue One"),
+            Item(1, mandalorian, "The Mandalorian"),
+            Item(2, phantomMenace, "The Phantom Menace"),
+        };
+
+        var openAi = AiReturning(
+            "{\"items\":[{\"index\":0,\"setYear\":0},{\"index\":1,\"setYear\":9},{\"index\":2,\"setYear\":-32}]}",
+            "{\"items\":[]}");
+        var provider = new OpenAiChronologyProvider(openAi);
+        var result = await provider.GetChronologicalOrderAsync("Star Wars", null, items, TestContext.Current.CancellationToken);
+
+        var ordered = result.OrderBy(r => r.SortOrder).Select(r => r.LocalId!.Value).ToList();
+        Assert.Equal(new[] { phantomMenace, rogueOne, mandalorian }, ordered);
+        Assert.Equal(-32.0, result.Single(r => r.LocalId == phantomMenace).SetYear);
+    }
+
+    [Fact]
+    public async Task Stores_set_years_rounded_to_three_places()
+    {
+        var a = Guid.NewGuid();
+        var b = Guid.NewGuid();
+        var items = new List<CollectionOrderingItemDto> { Item(0, a, "A"), Item(1, b, "B") };
+
+        var openAi = AiReturning(
+            "{\"items\":[{\"index\":0,\"setYear\":19.1},{\"index\":1,\"setYear\":19.1}]}",
+            "{\"items\":[]}");
+        var provider = new OpenAiChronologyProvider(openAi);
+        var result = await provider.GetChronologicalOrderAsync("c", null, items, TestContext.Current.CancellationToken);
+
+        // 19.1 + 0.001 is 19.101000000000003 in floating point.
+        Assert.Equal(19.101, result.Single(r => r.LocalId == b).SetYear);
+    }
+
+    [Fact]
     public async Task No_two_items_keep_the_same_set_year_even_if_the_ai_leaves_a_tie()
     {
         var a = Guid.NewGuid();

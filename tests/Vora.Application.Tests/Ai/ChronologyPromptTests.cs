@@ -96,4 +96,47 @@ public class ChronologyPromptTests
         prompt.Should().Contain("Never fall back on the release year for a modern-era entry");
         prompt.Should().Contain("picking up days after an earlier film");
     }
+
+    private static string ScoringPrompt(params CollectionOrderingItemDto[] batch) =>
+        (string)typeof(OpenAiChronologyProvider)
+            .GetMethod("BuildScoringPrompt", BindingFlags.NonPublic | BindingFlags.Static)!
+            .Invoke(null, [ "Star Wars Universe", batch.ToList() ])!;
+
+    // Star Wars counts years before the Battle of Yavin; written as positive
+    // numbers they sorted the prequels last.
+    [Fact]
+    public void Both_prompts_put_era_counted_years_on_one_timeline()
+    {
+        var scoring = ScoringPrompt(new CollectionOrderingItemDto { Index = 0, Title = "Star Wars: Episode I - The Phantom Menace", Year = 1999, MediaType = "Movie" });
+
+        foreach (var prompt in new[] { scoring, AuditPrompt() })
+        {
+            prompt.Should().Contain("LARGER number is ALWAYS LATER");
+            prompt.Should().Contain("32 BBY is -32");
+            prompt.Should().Contain("the earlier is -19.8 and the later -19.2");
+        }
+    }
+
+    [Fact]
+    public void Scoring_shows_each_title_its_synopsis_on_one_trimmed_line()
+    {
+        var overview = "Set in the 1970s,\n  a young Winston Scott is dragged into the underworld. " + new string('x', 400);
+        var prompt = ScoringPrompt(new CollectionOrderingItemDto
+        {
+            Index = 0, Title = "Season 1", ShowTitle = "The Continental (2023)", SeasonNumber = 1, Year = 2023, MediaType = "Season", Overview = overview
+        });
+
+        prompt.Should().Contain("0: The Continental Season 1 (aired 2023) [Season] — synopsis: Set in the 1970s, a young Winston Scott is dragged");
+        prompt.Should().Contain("underworld.…");
+        prompt.Should().NotContain("xxxxxxxxxx");
+        prompt.Should().Contain("Read each synopsis");
+    }
+
+    [Fact]
+    public void A_title_without_a_synopsis_gets_no_synopsis_label()
+    {
+        var prompt = ScoringPrompt(new CollectionOrderingItemDto { Index = 0, Title = "John Wick", Year = 2014, MediaType = "Movie" });
+
+        prompt.Should().Contain("0: John Wick (2014) [Movie]\n");
+    }
 }

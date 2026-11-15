@@ -566,7 +566,8 @@ public partial class MediaRepository : IMediaRepository
             {
                 SeasonId = s.Id,
                 ShowTitle = s.TvShow.Title,
-                SeasonNumber = s.SeasonNumber
+                SeasonNumber = s.SeasonNumber,
+                ShowOverview = s.TvShow.Overview
             })
             .ToListAsync();
 

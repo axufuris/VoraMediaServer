@@ -11,6 +11,9 @@ public class CollectionOrderingItemDto
     public string? ImdbId { get; set; }
     public string? ShowTitle { get; set; }
     public int? SeasonNumber { get; set; }
+    // The title's own synopsis (a season falls back to its show's). It often
+    // says outright when the story is set, which a release year never does.
+    public string? Overview { get; set; }
     public double? KnownSetYear { get; set; }
     public bool SetYearLocked { get; set; }
 }

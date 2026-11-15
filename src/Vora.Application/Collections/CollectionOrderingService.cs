@@ -61,6 +61,9 @@ public class CollectionOrderingService(
                     ImdbId = i.MediaItem.ImdbId,
                     ShowTitle = seasonInfo.TryGetValue(i.MediaItemId, out var si) ? si.ShowTitle : null,
                     SeasonNumber = seasonInfo.TryGetValue(i.MediaItemId, out var sn) ? sn.SeasonNumber : (int?)null,
+                    Overview = string.IsNullOrWhiteSpace(i.MediaItem.Overview) && seasonInfo.TryGetValue(i.MediaItemId, out var so)
+                        ? so.ShowOverview
+                        : i.MediaItem.Overview,
                     KnownSetYear = i.InUniverseYearLocked ? i.InUniverseYear : (force ? null : i.InUniverseYear),
                     SetYearLocked = i.InUniverseYearLocked
                 })
