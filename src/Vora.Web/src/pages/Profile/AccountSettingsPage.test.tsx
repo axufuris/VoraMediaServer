@@ -39,6 +39,9 @@ vi.mock('../../api/Iptv/iptvClientService', () => ({
 vi.mock('../../api/Auth/authService', () => ({
     authService: { getSetupStatus: () => Promise.resolve({ emailEnabled: false }) },
 }));
+vi.mock('../../components/LibraryMigration/PlexImportPanel', () => ({
+    default: ({ serverId }: { serverId?: string }) => <section>Import from Plex{serverId ? ` on ${serverId}` : ''}</section>,
+}));
 vi.mock('../../dialogs', () => ({
     useDialog: () => ({ alert: () => Promise.resolve(), confirm: () => Promise.resolve(true), prompt: () => Promise.resolve(null) }),
 }));
@@ -105,6 +108,16 @@ describe('AccountSettingsPage', () => {
         expect(screen.queryByRole('alert')).toBeNull();
     });
 
+    it('offers the Plex import at the bottom, under the profiles', async () => {
+        getUserAccount.mockResolvedValue(account);
+
+        renderPage();
+
+        const plex = await screen.findByText('Import from Plex');
+        const profiles = screen.getByRole('heading', { name: 'Managed Profiles' });
+        expect(profiles.compareDocumentPosition(plex) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    });
+
     it('tells a signed-out device what is wrong rather than loading nothing', async () => {
         localStorage.removeItem(StorageKeys.userId);
 
@@ -145,6 +158,19 @@ describe('AccountSettingsPage on a second server', () => {
         expect(getUserAccount).toHaveBeenCalledWith('acct-2', 'second');
         expect(getUserAccount).not.toHaveBeenCalledWith('acct-1', expect.anything());
     });
+
+    it('offers a profile that is not the main one its own Plex import, on that server', async () => {
+        render(
+            <MemoryRouter initialEntries={['/server/second/account']}>
+                <div data-vora-client="">
+                    <Routes><Route path="/server/:serverId/account" element={<AccountSettingsPage />} /></Routes>
+                </div>
+            </MemoryRouter>,
+        );
+
+        expect(await screen.findByText('Import from Plex on second')).toBeInTheDocument();
+        expect(screen.getByDisplayValue('Andy on Second')).toBeInTheDocument();
+    });
 });
 
 describe('AccountSettingsPage under a server id', () => {
@@ -173,5 +199,6 @@ describe('AccountSettingsPage under a server id', () => {
         expect(await screen.findByDisplayValue('andy@example.com')).toBeInTheDocument();
         expect(getPlaylists).toHaveBeenCalledWith('acct-1', undefined, 'server_1793842485331');
         expect(screen.queryByRole('alert')).toBeNull();
+        expect(screen.getByText('Import from Plex on server_1793842485331')).toBeInTheDocument();
     });
 });

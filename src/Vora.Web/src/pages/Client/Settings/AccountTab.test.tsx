@@ -20,11 +20,11 @@ beforeEach(() => {
     profile.getMyLibrarySort.mockResolvedValue({ sort: null, descending: false });
 });
 
-it('leaves account, play history and switching profile to the profile menu', async () => {
+it('leaves account, play history, switching profile and the Plex import to the profile menu', async () => {
     render(<DialogProvider><AccountTab serverId="home" /></DialogProvider>);
 
     expect(await screen.findByText('Movie showtimes location')).toBeInTheDocument();
-    expect(screen.getByText('Import from Plex')).toBeInTheDocument();
+    expect(screen.queryByText('Import from Plex')).toBeNull();
     expect(screen.queryByText('Manage your profile')).toBeNull();
     expect(screen.queryByRole('link')).toBeNull();
 });

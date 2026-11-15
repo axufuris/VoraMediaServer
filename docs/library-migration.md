@@ -1,6 +1,6 @@
 # Library migration (Plex → Vora)
 
-**Settings → Account → Import from Plex** (`PlexImportPanel`) copies a Plex account's watch state and ratings onto a Vora profile. Every profile has it: the person signs in to their own Plex account (the plex.tv PIN flow), so the history is theirs. `LibraryMigrationManager.StartImportAsync` checks the request and `LibraryMigrationJobRunner` runs the job in the background, sending progress over SignalR (`LibraryMigrationUpdated`) to the account that started it and to nobody else; `GET /api/library-import/jobs/{id}` answers only that account. The Plex side is `PlexLibrarySyncProvider` (an `ILibrarySyncProvider`), and the database side is `LibraryMigrationRepository`.
+**Import from Plex** (`PlexImportPanel`, at the bottom of Account settings, `AccountSettingsPage`) copies a Plex account's watch state and ratings onto a Vora profile. Every profile has it: the person signs in to their own Plex account (the plex.tv PIN flow), so the history is theirs. `LibraryMigrationManager.StartImportAsync` checks the request and `LibraryMigrationJobRunner` runs the job in the background, sending progress over SignalR (`LibraryMigrationUpdated`) to the account that started it and to nobody else; `GET /api/library-import/jobs/{id}` answers only that account. The Plex side is `PlexLibrarySyncProvider` (an `ILibrarySyncProvider`), and the database side is `LibraryMigrationRepository`.
 
 ## Who can import what
 
