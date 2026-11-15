@@ -71,7 +71,10 @@ describe('ClearViewingHistoryModal', () => {
         }));
         renderModal();
 
-        fireEvent.click(await screen.findByRole('button', { name: 'Clear history' }));
+        // The button is there from the start but disabled until the profile's counts
+        // load, so wait for them: a click before that does nothing.
+        await screen.findByText(/13,293 titles watched, 37 in progress/);
+        fireEvent.click(screen.getByRole('button', { name: 'Clear history' }));
 
         expect(await screen.findByRole('alert')).toHaveTextContent('Pick the watch history, the ratings or both.');
     });
