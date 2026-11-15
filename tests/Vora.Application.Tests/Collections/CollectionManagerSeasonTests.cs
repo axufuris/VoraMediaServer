@@ -22,12 +22,13 @@ public class CollectionManagerSeasonTests
         Id = Guid.NewGuid(),
         Title = "Halloween",
         ItemCount = 12,
+        LibraryItemCount = 12,
         VisibleStartDate = new DateTime(2000, 10, 1, 0, 0, 0, DateTimeKind.Utc),
         VisibleEndDate = new DateTime(2000, 10, 31, 0, 0, 0, DateTimeKind.Utc),
         VisibleEveryYear = true,
     };
 
-    private static CollectionSummaryVM Marvel() => new() { Id = Guid.NewGuid(), Title = "Marvel", ItemCount = 30 };
+    private static CollectionSummaryVM Marvel() => new() { Id = Guid.NewGuid(), Title = "Marvel", ItemCount = 30, LibraryItemCount = 30 };
 
     private void Today(int year, int month, int day) => _calendar.TodayAsync().Returns(new DateOnly(year, month, day));
 

@@ -79,7 +79,7 @@ public class SearchRepository(VoraDbContext context) : ISearchRepository
             && l.MinimumCollectionSize > CollectionVisibility.HideAutomatic
             && c.Items.Count >= l.MinimumCollectionSize)));
 
-        dbQuery = dbQuery.InSeason(today);
+        dbQuery = dbQuery.Where(c => !c.Hidden).InSeason(today);
 
         var searchPattern = $"%{query}%";
         return await dbQuery

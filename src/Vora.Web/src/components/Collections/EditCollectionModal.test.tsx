@@ -218,3 +218,40 @@ describe('EditCollectionModal smart rules', () => {
         expect(mocks.updateCollection.mock.calls[0][1]).toMatchObject({ smartMediaType: 'Shows' });
     });
 });
+
+describe('EditCollectionModal hiding', () => {
+    beforeEach(() => {
+        Object.values(mocks).forEach(m => m.mockReset());
+        mocks.getChronologyProviders.mockResolvedValue([]);
+        mocks.getCollectionSyncProviders.mockResolvedValue([]);
+        mocks.getArtworkProviders.mockResolvedValue([]);
+        mocks.updateCollection.mockResolvedValue(undefined);
+        mocks.getLibraries.mockResolvedValue([]);
+    });
+
+    it('hides a system collection from viewers', async () => {
+        renderModal(collection({ title: 'John Wick Collection', systemGenerated: true, libraryId: 'movies' }));
+
+        const hide = screen.getByRole('checkbox', { name: 'Hide from viewers' });
+        expect(hide).not.toBeChecked();
+        expect(screen.getByText(/Takes it out of its library, search and its Home row/)).toBeInTheDocument();
+        fireEvent.click(hide);
+        save();
+
+        await waitFor(() => expect(mocks.updateCollection).toHaveBeenCalled());
+        expect(mocks.updateCollection.mock.calls[0][1]).toMatchObject({ hidden: true });
+    });
+
+    it('opens a hidden global collection ticked and can show it again', async () => {
+        renderModal(collection({ title: 'John Wick', hidden: true }));
+
+        const hide = screen.getByRole('checkbox', { name: 'Hide from viewers' });
+        expect(hide).toBeChecked();
+        expect(screen.getByText(/Takes it out of the Global tab and every library/)).toBeInTheDocument();
+        fireEvent.click(hide);
+        save();
+
+        await waitFor(() => expect(mocks.updateCollection).toHaveBeenCalled());
+        expect(mocks.updateCollection.mock.calls[0][1]).toMatchObject({ hidden: false });
+    });
+});

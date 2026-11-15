@@ -179,12 +179,14 @@ public class SmartListRepository(VoraDbContext context) : ISmartListRepository
                 l.CollectionId,
                 CollectionStartDate = l.Collection != null ? l.Collection.VisibleStartDate : null,
                 CollectionEndDate = l.Collection != null ? l.Collection.VisibleEndDate : null,
-                CollectionEveryYear = l.Collection != null && l.Collection.VisibleEveryYear
+                CollectionEveryYear = l.Collection != null && l.Collection.VisibleEveryYear,
+                CollectionHidden = l.Collection != null && l.Collection.Hidden
             })
             .ToListAsync();
 
         return lists
-            .Where(l => IsListActive(l.ActiveStartMonth, l.ActiveStartDay, l.ActiveEndMonth, l.ActiveEndDay, today)
+            .Where(l => !l.CollectionHidden
+                && IsListActive(l.ActiveStartMonth, l.ActiveStartDay, l.ActiveEndMonth, l.ActiveEndDay, today)
                 && CollectionSeason.IsOpen(l.CollectionStartDate, l.CollectionEndDate, l.CollectionEveryYear, today))
             .Select(l => new SmartListClientVM { Id = l.Id, Title = l.Title, DisplayOrder = l.DisplayOrder, Source = l.Source })
             .ToList();

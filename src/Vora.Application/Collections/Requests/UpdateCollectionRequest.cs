@@ -23,6 +23,8 @@ public class UpdateCollectionRequest
     public DateTime? VisibleStartDate { get; set; }
     public DateTime? VisibleEndDate { get; set; }
     public bool VisibleEveryYear { get; set; }
+    // Null (a client that doesn't know the setting) leaves it as it is.
+    public bool? Hidden { get; set; }
     public string? RulesJson { get; set; }
     public PlaylistMediaType? SmartMediaType { get; set; }
 }

@@ -46,6 +46,11 @@ public class Collection : LockableEntity
     public DateTime? VisibleEndDate { get; set; }
     public bool VisibleEveryYear { get; set; }
 
+    // Set by an admin to keep the collection from viewers everywhere (its
+    // library, the Global tab, search, its Home row). Admins still see it
+    // under Show hidden.
+    public bool Hidden { get; set; }
+
     public Guid? LibraryId { get; set; }
 
     public virtual ICollection<MediaItem> Items { get; set; } = new List<MediaItem>();

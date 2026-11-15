@@ -168,3 +168,25 @@ describe('CollectionsPage creating a collection', () => {
         expect(mocks.createCollection.mock.calls[0][0]).toMatchObject({ title: 'Heists', libraryId: 'movies' });
     });
 });
+
+describe('CollectionsPage hidden collections', () => {
+    it('lets an admin show the hidden global collections, each marked with why', async () => {
+        localStorage.setItem(StorageKeys.isServerAdmin, 'true');
+        mocks.getGlobalCollections.mockResolvedValue([
+            { id: 'marvel', title: 'Marvel', itemCount: 65, systemGenerated: false },
+            { id: 'wick', title: 'John Wick', itemCount: 5, systemGenerated: false, hiddenReason: 'Hidden' },
+            { id: 'halloween', title: 'Halloween', itemCount: 40, systemGenerated: false, hiddenReason: 'OutOfSeason' },
+        ]);
+        renderPage(pinnedEverywhere);
+
+        await screen.findByText('Marvel');
+        expect(mocks.getGlobalCollections).toHaveBeenCalledWith(undefined, true);
+        expect(screen.queryByText('John Wick')).toBeNull();
+
+        fireEvent.click(screen.getByRole('switch', { name: 'Show hidden (2)' }));
+
+        expect(screen.getByText('John Wick')).toBeInTheDocument();
+        expect(screen.getByText('Hidden')).toBeInTheDocument();
+        expect(screen.getByText('Out of season')).toBeInTheDocument();
+    });
+});

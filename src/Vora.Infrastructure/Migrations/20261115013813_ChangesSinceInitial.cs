@@ -371,11 +371,20 @@ WHERE CASE WHEN left(btrim(t.""AllowedIptvPlaylistIds""), 1) = '[' THEN EXISTS (
           SELECT 1 FROM jsonb_array_elements_text(t.""AllowedIptvPlaylistIds""::jsonb) AS e(id)
           WHERE NOT EXISTS (SELECT 1 FROM ""IptvPlaylists"" p WHERE p.""Id""::text = lower(e.id)))
       ELSE false END;");
+
+            // An admin can hide any collection from viewers, a system one
+            // included (docs/collections.md). Every collection starts shown.
+            migrationBuilder.Sql(@"
+ALTER TABLE ""Collections"" ADD COLUMN IF NOT EXISTS ""Hidden"" boolean NOT NULL DEFAULT FALSE;");
         }
 
         /// <inheritdoc />
         protected override void Down(MigrationBuilder migrationBuilder)
         {
+            migrationBuilder.DropColumn(
+                name: "Hidden",
+                table: "Collections");
+
             migrationBuilder.DropColumn(
                 name: "Referer",
                 table: "IptvChannels");

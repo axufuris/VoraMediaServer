@@ -71,6 +71,7 @@ export default function EditCollectionModal({
 
     const [sortTitle, setSortTitle] = useState(collection.sortTitle || '');
     const [season, setSeason] = useState<SeasonalWindow>(() => seasonalWindowFrom(collection.visibleStartDate, collection.visibleEndDate, collection.visibleEveryYear));
+    const [hidden, setHidden] = useState(!!collection.hidden);
 
     const [sortProviderId, setSortProviderId] = useState(collection.sortProviderId || '');
     const [externalListId, setExternalListId] = useState(collection.externalListId || '');
@@ -117,6 +118,7 @@ export default function EditCollectionModal({
             setAutoSyncChronology(collection.autoSyncChronology || false);
             setSortTitle(collection.sortTitle || '');
             setSeason(seasonalWindowFrom(collection.visibleStartDate, collection.visibleEndDate, collection.visibleEveryYear));
+            setHidden(!!collection.hidden);
             setContentSyncProviderId(collection.rulesJson ? SMART_CONTENT : (collection.contentSyncProviderId || ''));
             setContentSyncExternalId(collection.contentSyncExternalId || '');
             setSyncIntervalDays(collection.syncIntervalDays || 1);
@@ -222,6 +224,7 @@ export default function EditCollectionModal({
                 autoSyncChronology: sortProviderId ? autoSyncChronology : false,
                 sortTitle: sortTitle.trim() || undefined,
                 ...seasonalWindowRequest(season),
+                hidden,
                 contentSyncProviderId: contentSyncProviderId === SMART_CONTENT ? undefined : contentSyncProviderId,
                 contentSyncExternalId: contentSyncProviderId === SMART_CONTENT ? undefined : contentSyncExternalId,
                 syncIntervalDays: Math.max(1, syncIntervalDays),
@@ -289,6 +292,24 @@ export default function EditCollectionModal({
                             <div>
                                 <label className="flex items-center text-sm font-medium text-[var(--vora-text-muted)] mb-1">Sort Title <LockIcon field="SortTitle" /></label>
                                 <input type="text" value={sortTitle} onChange={e => setSortTitle(e.target.value)} className="w-full bg-[var(--vora-bg-raised)] border border-[var(--vora-border-subtle)] rounded-md p-2 text-[var(--vora-text-primary)] focus:border-[var(--vora-accent-500)] outline-none" />
+                            </div>
+
+                            <div className="p-4 bg-[var(--vora-bg-raised)]/50 border border-[var(--vora-border-subtle)] rounded-lg space-y-2">
+                                <div className="flex items-center gap-3">
+                                    <input
+                                        type="checkbox"
+                                        id="edit-collection-hidden"
+                                        checked={hidden}
+                                        onChange={e => setHidden(e.target.checked)}
+                                        className="w-4 h-4 accent-[var(--vora-accent-500)]"
+                                    />
+                                    <label htmlFor="edit-collection-hidden" className="text-sm text-[var(--vora-text-secondary)] font-medium cursor-pointer">
+                                        Hide from viewers
+                                    </label>
+                                </div>
+                                <p className="text-xs text-[var(--vora-text-muted)] leading-relaxed">
+                                    Takes it out of {collection.libraryId ? 'its library' : 'the Global tab and every library'}, search and its Home row, whatever its season. Admins can still find it with Show hidden.
+                                </p>
                             </div>
 
                             <div className="p-4 bg-[var(--vora-bg-raised)]/50 border border-[var(--vora-border-subtle)] rounded-lg space-y-4">

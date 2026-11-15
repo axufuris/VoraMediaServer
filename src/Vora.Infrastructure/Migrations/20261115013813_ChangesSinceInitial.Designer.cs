@@ -14,7 +14,7 @@ using Vora.Infrastructure.Persistence;
 namespace Vora.Infrastructure.Migrations
 {
     [DbContext(typeof(VoraDbContext))]
-    [Migration("20261114051129_ChangesSinceInitial")]
+    [Migration("20261115013813_ChangesSinceInitial")]
     partial class ChangesSinceInitial
     {
         /// <inheritdoc />
@@ -940,6 +940,9 @@ namespace Vora.Infrastructure.Migrations
                     b.Property<string>("ExternalListId")
                         .HasMaxLength(128)
                         .HasColumnType("character varying(128)");
+
+                    b.Property<bool>("Hidden")
+                        .HasColumnType("boolean");
 
                     b.Property<string>("ImdbId")
                         .HasMaxLength(64)

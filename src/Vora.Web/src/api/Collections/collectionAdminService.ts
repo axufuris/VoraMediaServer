@@ -18,6 +18,7 @@ export interface UpdateCollectionRequest {
     visibleStartDate?: string;
     visibleEndDate?: string;
     visibleEveryYear?: boolean;
+    hidden?: boolean;
     contentSyncProviderId?: string;
     contentSyncExternalId?: string;
     syncIntervalDays?: number;

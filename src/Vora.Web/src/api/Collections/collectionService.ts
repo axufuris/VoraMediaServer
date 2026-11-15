@@ -21,7 +21,7 @@ export interface CollectionSummary {
     hiddenReason?: CollectionHiddenReason | null;
 }
 
-export type CollectionHiddenReason = 'Empty' | 'AutomaticCollectionsHidden' | 'BelowMinimumSize' | 'OutOfSeason';
+export type CollectionHiddenReason = 'Empty' | 'AutomaticCollectionsHidden' | 'BelowMinimumSize' | 'OutOfSeason' | 'Hidden';
 
 export interface CollectionDetails {
     id: string;
@@ -48,6 +48,7 @@ export interface CollectionDetails {
     visibleEndDate?: string;
     visibleEveryYear?: boolean;
     systemGenerated: boolean;
+    hidden?: boolean;
     contentSyncProviderId?: string;
     contentSyncExternalId?: string;
     syncIntervalDays: number;
