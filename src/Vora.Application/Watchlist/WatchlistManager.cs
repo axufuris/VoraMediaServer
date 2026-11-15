@@ -1,4 +1,5 @@
 using Microsoft.Extensions.Logging;
+using Vora.Application.Analysis;
 using Vora.Application.Media;
 using Vora.Application.Watchlist.ViewModels;
 using Vora.Domain.Entities.Discovery;
@@ -35,6 +36,7 @@ public interface IWatchlistManager
 public class WatchlistManager(
     IWatchlistRepository repository,
     IMediaRepository mediaRepository,
+    IClientNotifier notifier,
     ILogger<WatchlistManager> logger) : IWatchlistManager
 {
     private const string TmdbProviderId = "tmdb_discovery";
@@ -83,35 +85,55 @@ public class WatchlistManager(
 
     public async Task<bool> ToggleAsync(Guid profileId, WatchlistRequest request)
     {
+        bool added;
         try
         {
-            var key = await ResolveKeyAsync(request);
-
-            var existing = await repository.FindAsync(profileId, key.ExternalId, key.ProviderId, key.MediaItemId);
-            if (existing != null)
-            {
-                await repository.RemoveAsync(existing);
-                return false;
-            }
-
-            await repository.AddAsync(new UserWatchlistItem
-            {
-                ProfileId = profileId,
-                ExternalId = key.ExternalId ?? string.Empty,
-                ProviderId = key.ProviderId ?? string.Empty,
-                MediaItemId = key.MediaItemId,
-                Type = request.Type,
-                Title = request.Title,
-                PosterUrl = request.PosterUrl,
-                ExpectedReleaseDate = request.ExpectedReleaseDate,
-            });
-            return true;
+            added = await AddOrRemoveAsync(profileId, request);
         }
         catch (Exception ex)
         {
             logger.LogError(ex, "Failed to toggle watchlist entry for profile {ProfileId}.", profileId);
             throw;
         }
+
+        // Every device on the profile re-reads its watchlist, so a title taken
+        // off on one is gone from the others too (docs/realtime.md). The change
+        // is already saved: a failed push mustn't turn it into an error.
+        try
+        {
+            await notifier.NotifyWatchlistUpdatedAsync(profileId);
+        }
+        catch (Exception ex)
+        {
+            logger.LogWarning(ex, "Couldn't tell the clients that profile {ProfileId}'s watchlist changed.", profileId);
+        }
+
+        return added;
+    }
+
+    private async Task<bool> AddOrRemoveAsync(Guid profileId, WatchlistRequest request)
+    {
+        var key = await ResolveKeyAsync(request);
+
+        var existing = await repository.FindAsync(profileId, key.ExternalId, key.ProviderId, key.MediaItemId);
+        if (existing != null)
+        {
+            await repository.RemoveAsync(existing);
+            return false;
+        }
+
+        await repository.AddAsync(new UserWatchlistItem
+        {
+            ProfileId = profileId,
+            ExternalId = key.ExternalId ?? string.Empty,
+            ProviderId = key.ProviderId ?? string.Empty,
+            MediaItemId = key.MediaItemId,
+            Type = request.Type,
+            Title = request.Title,
+            PosterUrl = request.PosterUrl,
+            ExpectedReleaseDate = request.ExpectedReleaseDate,
+        });
+        return true;
     }
 
     public async Task<bool> IsInWatchlistAsync(Guid profileId, string? externalId, string? providerId, Guid? mediaItemId)

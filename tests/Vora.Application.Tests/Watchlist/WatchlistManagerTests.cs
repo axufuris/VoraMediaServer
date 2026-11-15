@@ -1,4 +1,5 @@
 using Microsoft.Extensions.Logging.Abstractions;
+using Vora.Application.Analysis;
 using Vora.Application.Media;
 using Vora.Application.Watchlist;
 using Vora.Domain.Entities.Discovery;
@@ -11,6 +12,7 @@ public class WatchlistManagerTests
 
     private readonly IWatchlistRepository _repo = Substitute.For<IWatchlistRepository>();
     private readonly IMediaRepository _media = Substitute.For<IMediaRepository>();
+    private readonly IClientNotifier _notifier = Substitute.For<IClientNotifier>();
     private readonly WatchlistManager _manager;
 
     public WatchlistManagerTests()
@@ -19,7 +21,7 @@ public class WatchlistManagerTests
             .Returns(new Dictionary<string, Guid>());
         _media.GetPosterUrlsByIdsAsync(Arg.Any<IReadOnlyCollection<Guid>>())
             .Returns(new Dictionary<Guid, string>());
-        _manager = new WatchlistManager(_repo, _media, NullLogger<WatchlistManager>.Instance);
+        _manager = new WatchlistManager(_repo, _media, _notifier, NullLogger<WatchlistManager>.Instance);
     }
 
     private static WatchlistRequest External(string externalId = "603") => new()
@@ -55,6 +57,56 @@ public class WatchlistManagerTests
         added.Should().BeFalse();
         await _repo.Received(1).RemoveAsync(existing);
         await _repo.DidNotReceive().AddAsync(Arg.Any<UserWatchlistItem>());
+    }
+
+    // Every device on the profile re-reads its watchlist on WatchlistUpdated, so
+    // a title taken off on one is gone from the others too.
+    [Fact]
+    public async Task Adding_tells_the_profile_its_watchlist_changed()
+    {
+        var profileId = Guid.NewGuid();
+        _repo.FindAsync(profileId, "603", Tmdb, null).Returns((UserWatchlistItem?)null);
+
+        await _manager.ToggleAsync(profileId, External());
+
+        await _notifier.Received(1).NotifyWatchlistUpdatedAsync(profileId);
+    }
+
+    [Fact]
+    public async Task Removing_tells_the_profile_its_watchlist_changed()
+    {
+        var profileId = Guid.NewGuid();
+        _repo.FindAsync(profileId, "603", Tmdb, null).Returns(new UserWatchlistItem { ExternalId = "603", ProviderId = Tmdb });
+
+        await _manager.ToggleAsync(profileId, External());
+
+        await _notifier.Received(1).NotifyWatchlistUpdatedAsync(profileId);
+    }
+
+    [Fact]
+    public async Task A_change_that_fails_to_save_tells_no_one()
+    {
+        var profileId = Guid.NewGuid();
+        _repo.FindAsync(profileId, "603", Tmdb, null).Returns((UserWatchlistItem?)null);
+        _repo.AddAsync(Arg.Any<UserWatchlistItem>()).Returns(Task.FromException(new InvalidOperationException("db down")));
+
+        var toggle = () => _manager.ToggleAsync(profileId, External());
+
+        await toggle.Should().ThrowAsync<InvalidOperationException>();
+        await _notifier.DidNotReceive().NotifyWatchlistUpdatedAsync(Arg.Any<Guid>());
+    }
+
+    [Fact]
+    public async Task A_saved_change_is_reported_even_when_the_push_fails()
+    {
+        var profileId = Guid.NewGuid();
+        _repo.FindAsync(profileId, "603", Tmdb, null).Returns(new UserWatchlistItem { ExternalId = "603", ProviderId = Tmdb });
+        _notifier.NotifyWatchlistUpdatedAsync(profileId).Returns(Task.FromException(new InvalidOperationException("hub down")));
+
+        var added = await _manager.ToggleAsync(profileId, External());
+
+        added.Should().BeFalse();
+        await _repo.Received(1).RemoveAsync(Arg.Any<UserWatchlistItem>());
     }
 
     // The point of keying on TMDB: a library item and a Discovery entry for the

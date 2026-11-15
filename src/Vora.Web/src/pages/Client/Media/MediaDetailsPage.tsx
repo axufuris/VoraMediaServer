@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useRef } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { mediaService, type Episode, type MediaItem, type Season } from '../../../api/Media/mediaService';
 import CastRow from '../../../components/Client/Primitives/CastRow';
@@ -6,6 +6,7 @@ import MediaExtrasRow from '../../../components/Media/MediaExtrasRow';
 import EpisodeRail from '../../../components/Media/EpisodeRail';
 import EpisodeList from '../../../components/Media/EpisodeList';
 import { useSignalREvent } from '../../../hooks/useSignalREvent';
+import { useWatchlistUpdated } from '../../../hooks/useWatchlistUpdated';
 import { usePlayer } from '../../../contexts/usePlayer';
 import { streamingService } from '../../../api/Streaming/streamingService';
 import { usePlaybackCapabilities } from '../../../hooks/usePlaybackCapabilities';
@@ -255,6 +256,17 @@ export default function MediaDetailsPage() {
     useSignalREvent('MediaAnalysisUpdated', useCallback((updatedId: string) => {
         if (id && updatedId.toLowerCase() === id.toLowerCase()) reloadMedia();
     }, [id, reloadMedia]));
+
+    // Added or removed on another device: ask again, and drop the answer if the
+    // page has moved on to another title by then.
+    const watchlistFor = useRef(id);
+    useEffect(() => { watchlistFor.current = id; }, [id]);
+    useWatchlistUpdated(serverId, useCallback(() => {
+        if (!id) return;
+        watchlistService.check({ mediaItemId: id }, serverId)
+            .then(saved => { if (watchlistFor.current === id) setInWatchlist(saved); })
+            .catch(() => { /* the bookmark keeps what it showed */ });
+    }, [id, serverId]));
 
     const handlePlay = async (resume: boolean = true) => {
         if (!media) return;

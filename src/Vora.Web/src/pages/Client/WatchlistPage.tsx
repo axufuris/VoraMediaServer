@@ -7,6 +7,7 @@ import MediaCard from '../../components/Client/Primitives/MediaCard';
 import MediaGrid from '../../components/Client/Primitives/MediaGrid';
 import { profileIdForServer } from '../../api/client';
 import { discoveryTarget } from '../../utils/discoveryNavigation';
+import { useWatchlistUpdated } from '../../hooks/useWatchlistUpdated';
 
 interface WatchlistPageProps {
     embedded?: boolean;
@@ -34,6 +35,9 @@ export default function WatchlistPage({ embedded = false }: WatchlistPageProps =
     const reload = useCallback(() => {
         watchlistService.getWatchlist(serverId).then(setItems).catch(console.error);
     }, [serverId]);
+
+    // A title added or removed anywhere on this profile, this tab included.
+    useWatchlistUpdated(serverId, reload);
 
     // A bookmarked title that is in the library opens the local item, where it
     // can actually be played; anything else opens the provider page.
