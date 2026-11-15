@@ -795,6 +795,41 @@ public class PostgresMigrationHistoryTests(PostgresDatabase database) : IClassFi
         (await StoredProfileListsAsync(again, untouched.Id, cancellationToken)).Should().BeEquivalentTo(untouchedBefore);
     }
 
+    [Fact]
+    public async Task A_database_on_the_access_list_cleanup_migration_keeps_its_collections_and_shows_them_all()
+    {
+        Assert.SkipUnless(PostgresDatabase.IsConfigured, PostgresDatabase.SkipReason);
+        var cancellationToken = TestContext.Current.CancellationToken;
+        await using var legacy = new LegacyDatabase();
+        var systemId = Guid.NewGuid();
+        var globalId = Guid.NewGuid();
+        await legacy.BuildAccessListCleanupStateAsync(async db =>
+        {
+            var library = new MediaLibrary { Name = "Movies", Type = LibraryType.Movie, FolderPaths = new List<string> { "/movies" } };
+            db.Add(library);
+            db.Add(new Collection { Id = systemId, Title = "John Wick Collection", LibraryId = library.Id, SystemGenerated = true, TmdbId = 404609 });
+            db.Add(new Collection { Id = globalId, Title = "John Wick", VisibleEveryYear = true });
+            await db.SaveChangesAsync(cancellationToken);
+        }, cancellationToken);
+
+        await using (var before = legacy.NewContext())
+        {
+            (await before.Database.GetPendingMigrationsAsync(cancellationToken)).Should().Equal(MigrationHistoryTests.ChangesSinceInitial);
+            (await ColumnsAsync(before, "Collections", cancellationToken)).Should().NotContain("Hidden");
+        }
+
+        await legacy.MigrateAsync(cancellationToken);
+
+        await using var after = legacy.NewContext();
+        (await after.Database.GetPendingMigrationsAsync(cancellationToken)).Should().BeEmpty();
+        var collections = await after.Collections.AsNoTracking().OrderBy(c => c.Title).ToListAsync(cancellationToken);
+        collections.Select(c => c.Id).Should().Equal(globalId, systemId);
+        collections.Should().OnlyContain(c => !c.Hidden);
+        collections[0].VisibleEveryYear.Should().BeTrue();
+        collections[1].SystemGenerated.Should().BeTrue();
+        collections[1].TmdbId.Should().Be(404609);
+    }
+
     private static RecommendationSnapshot StoredRows(Guid profileId, Guid scope, string providerId, string rows) =>
         new() { ProfileId = profileId, LibraryScope = scope, ProviderId = providerId, Rows = rows, GeneratedAt = new DateTime(2026, 11, 12, 20, 0, 0, DateTimeKind.Utc) };
 

@@ -155,7 +155,7 @@ export default function CollectionsPage() {
                 ) : (
                     <LibraryCollectionGrid
                         collections={collections}
-                        isAdmin={isAdmin && activeTab !== 'global'}
+                        isAdmin={isAdmin}
                         onOpen={collection => navigate(serverId ? `/server/${serverId}/collection/${collection.id}` : `/collection/${collection.id}`)}
                         empty={(
                     <EmptyState

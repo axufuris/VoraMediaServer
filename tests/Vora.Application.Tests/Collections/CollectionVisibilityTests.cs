@@ -31,6 +31,16 @@ public class CollectionVisibilityTests
     }
 
     [Theory]
+    [InlineData(false, 0, 3, true)]
+    [InlineData(true, 1, 3, false)]
+    [InlineData(true, 10, 0, true)]
+    [InlineData(false, 30, 3, true)]
+    public void A_collection_an_admin_hid_says_so_before_any_other_reason(bool systemGenerated, int items, int minimum, bool inSeason)
+    {
+        CollectionVisibility.HiddenReason(systemGenerated, items, minimum, inSeason, hidden: true).Should().Be(CollectionHiddenReason.Hidden);
+    }
+
+    [Theory]
     [InlineData(null, 3, 3)]
     [InlineData(null, 7, 7)]
     [InlineData(0, 3, 0)]

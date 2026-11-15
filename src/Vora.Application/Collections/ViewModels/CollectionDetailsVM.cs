@@ -28,6 +28,7 @@ public class CollectionDetailsVM
     public DateTime? VisibleEndDate { get; set; }
     public bool VisibleEveryYear { get; set; }
     public bool SystemGenerated { get; set; }
+    public bool Hidden { get; set; }
     public int? TmdbId { get; set; }
     public string? ContentSyncProviderId { get; set; }
     public string? ContentSyncExternalId { get; set; }
@@ -68,6 +69,7 @@ public class CollectionDetailsVM
             VisibleEndDate = c.VisibleEndDate,
             VisibleEveryYear = c.VisibleEveryYear,
             SystemGenerated = c.SystemGenerated,
+            Hidden = c.Hidden,
             TmdbId = c.TmdbId,
             LockedFields = c.LockedFields,
             ContentSyncProviderId = c.ContentSyncProviderId,

@@ -63,10 +63,10 @@ public class CollectionManagerSortTests
             Arg.Any<List<Guid>?>())
             .Returns(_ => new List<CollectionSummaryVM>
             {
-                new() { Id = Guid.NewGuid(), Title = "Aladdin Collection", ItemCount = 3 },
-                new() { Id = Guid.NewGuid(), Title = "The Matrix Collection", SortTitle = "Matrix Collection", ItemCount = 4 },
-                new() { Id = Guid.NewGuid(), Title = "Halloween Season", SortTitle = "1_Halloween", ItemCount = 9 },
-                new() { Id = Guid.NewGuid(), Title = "Die Hard Collection", SortTitle = " ", ItemCount = 5 },
+                new() { Id = Guid.NewGuid(), Title = "Aladdin Collection", ItemCount = 3, LibraryItemCount = 3 },
+                new() { Id = Guid.NewGuid(), Title = "The Matrix Collection", SortTitle = "Matrix Collection", ItemCount = 4, LibraryItemCount = 4 },
+                new() { Id = Guid.NewGuid(), Title = "Halloween Season", SortTitle = "1_Halloween", ItemCount = 9, LibraryItemCount = 9 },
+                new() { Id = Guid.NewGuid(), Title = "Die Hard Collection", SortTitle = " ", ItemCount = 5, LibraryItemCount = 5 },
             });
 
         var expected = new[] { "Halloween Season", "Aladdin Collection", "Die Hard Collection", "The Matrix Collection" };

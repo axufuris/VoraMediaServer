@@ -28,6 +28,15 @@ describe('LibraryCollectionGrid', () => {
         expect(screen.getByText('Automatic off')).toHaveTextContent('Hidden · Automatic off');
     });
 
+    it('marks a collection an admin hid', () => {
+        render(<LibraryCollectionGrid collections={[collections[0], collection('John Wick Collection', { hiddenReason: 'Hidden' })]} isAdmin onOpen={vi.fn()} empty={<p>none</p>} />);
+
+        fireEvent.click(screen.getByRole('switch', { name: 'Show hidden (1)' }));
+
+        expect(screen.getByText('John Wick Collection')).toBeInTheDocument();
+        expect(screen.getByText('Marked collections are hidden from viewers.')).toBeInTheDocument();
+    });
+
     it('gives a viewer no hidden toggle', () => {
         render(<LibraryCollectionGrid collections={[collections[0]]} isAdmin={false} onOpen={vi.fn()} empty={<p>none</p>} />);
 

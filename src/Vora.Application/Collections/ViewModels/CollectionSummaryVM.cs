@@ -1,4 +1,5 @@
 ﻿using System.Linq.Expressions;
+using System.Text.Json.Serialization;
 using Vora.Domain.Entities.Library;
 
 namespace Vora.Application.Collections.ViewModels;
@@ -16,6 +17,16 @@ public class CollectionSummaryVM
     public bool SystemGenerated { get; set; }
     public CollectionHiddenReason? HiddenReason { get; set; }
 
+    // Read to work out HiddenReason; viewers get only the reason.
+    [JsonIgnore]
+    public bool Hidden { get; set; }
+
+    // A library's list shows every item of a global collection in ItemCount
+    // (what opening it shows), but whether the collection appears there at
+    // all, and the minimum-size rule, go by the items in that library.
+    [JsonIgnore]
+    public int LibraryItemCount { get; set; }
+
     public static Expression<Func<Collection, CollectionSummaryVM>> StandardProjection =>
         c => new CollectionSummaryVM
         {
@@ -27,7 +38,8 @@ public class CollectionSummaryVM
             VisibleStartDate = c.VisibleStartDate,
             VisibleEndDate = c.VisibleEndDate,
             VisibleEveryYear = c.VisibleEveryYear,
-            SystemGenerated = c.SystemGenerated
+            SystemGenerated = c.SystemGenerated,
+            Hidden = c.Hidden
         };
 
     public static Expression<Func<Collection, CollectionSummaryVM>> LibraryProjection(Guid libraryId) =>
@@ -41,6 +53,8 @@ public class CollectionSummaryVM
             VisibleEndDate = c.VisibleEndDate,
             VisibleEveryYear = c.VisibleEveryYear,
             SystemGenerated = c.SystemGenerated,
-            ItemCount = c.Items.Count(i => i.LibraryId == libraryId)
+            Hidden = c.Hidden,
+            ItemCount = c.Items.Count,
+            LibraryItemCount = c.Items.Count(i => i.LibraryId == libraryId)
         };
 }

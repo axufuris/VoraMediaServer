@@ -5,7 +5,9 @@ public enum CollectionHiddenReason
     Empty,
     AutomaticCollectionsHidden,
     BelowMinimumSize,
-    OutOfSeason
+    OutOfSeason,
+    // An admin hid it (Collection.Hidden), whatever its size or season.
+    Hidden
 }
 
 public static class CollectionVisibility
@@ -14,8 +16,9 @@ public static class CollectionVisibility
     public const int DefaultMinimum = 3;
     public const int MaxMinimum = 25;
 
-    public static CollectionHiddenReason? HiddenReason(bool systemGenerated, int itemCount, int libraryMinimum, bool inSeason = true)
+    public static CollectionHiddenReason? HiddenReason(bool systemGenerated, int itemCount, int libraryMinimum, bool inSeason = true, bool hidden = false)
     {
+        if (hidden) return CollectionHiddenReason.Hidden;
         if (itemCount <= 0) return CollectionHiddenReason.Empty;
         if (!inSeason) return CollectionHiddenReason.OutOfSeason;
         if (!systemGenerated) return null;

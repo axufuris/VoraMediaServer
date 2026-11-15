@@ -163,6 +163,7 @@ public class CollectionManager : ICollectionManager
         collection.VisibleStartDate = request.VisibleStartDate.HasValue ? DateTime.SpecifyKind(request.VisibleStartDate.Value, DateTimeKind.Utc) : null;
         collection.VisibleEndDate = request.VisibleEndDate.HasValue ? DateTime.SpecifyKind(request.VisibleEndDate.Value, DateTimeKind.Utc) : null;
         collection.VisibleEveryYear = request.VisibleEveryYear;
+        collection.Hidden = request.Hidden ?? collection.Hidden;
 
         if (request.MakeGlobal)
         {
@@ -239,7 +240,7 @@ public class CollectionManager : ICollectionManager
         var collections = (await _repository.GetAllProjectedAsync(CollectionSummaryVM.LibraryProjection(libraryId), libraryId, false, hasAllAccess, allowedLibs)).ToList();
         foreach (var collection in collections)
         {
-            collection.HiddenReason = CollectionVisibility.HiddenReason(collection.SystemGenerated, collection.ItemCount, minimum, InSeason(collection, today));
+            collection.HiddenReason = CollectionVisibility.HiddenReason(collection.SystemGenerated, collection.LibraryItemCount, minimum, InSeason(collection, today), collection.Hidden);
         }
 
         return InListOrder(collections.Where(c => includeHidden || c.HiddenReason == null));
@@ -257,7 +258,9 @@ public class CollectionManager : ICollectionManager
         var collections = (await _repository.GetAllProjectedAsync(CollectionSummaryVM.StandardProjection, null, true, hasAllAccess, allowedLibs)).ToList();
         foreach (var collection in collections)
         {
-            collection.HiddenReason = InSeason(collection, today) ? null : CollectionHiddenReason.OutOfSeason;
+            collection.HiddenReason = collection.Hidden ? CollectionHiddenReason.Hidden
+                : InSeason(collection, today) ? null
+                : CollectionHiddenReason.OutOfSeason;
         }
 
         return InListOrder(collections.Where(c => includeHidden || c.HiddenReason == null));
