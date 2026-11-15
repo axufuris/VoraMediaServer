@@ -261,12 +261,14 @@ public class AuthManager(
     public async Task<AuthResponseDto?> LoginAsync(string email, string password)
     {
         var key = email.Trim().ToLowerInvariant();
-        // A failed sign-in says why in the server log (never the password),
-        // so an admin can tell a mistyped email from a wrong password: the
-        // client only ever gets a bare 401.
+        // A failed sign-in says why in the server log, so an admin can tell a
+        // mistyped email from a wrong password: the client only ever gets a
+        // bare 401. The log never holds the email that was typed (no log
+        // message carries an address; CodeQL cs/exposure-of-sensitive-
+        // information) nor the password; a known account is named by its id.
         if (memoryCache.TryGetValue(LoginLockPrefix + key, out _))
         {
-            logger.LogWarning("Sign-in refused for '{Email}': locked out after {MaxFailures} failed attempts", email, MaxLoginFailures);
+            logger.LogWarning("Sign-in refused: locked out after {MaxFailures} failed attempts", MaxLoginFailures);
             return null;
         }
 
@@ -275,11 +277,11 @@ public class AuthManager(
         {
             if (user == null)
             {
-                logger.LogWarning("Sign-in failed for '{Email}': no account has that email", email);
+                logger.LogWarning("Sign-in failed: no account has that email");
             }
             else
             {
-                logger.LogWarning("Sign-in failed for '{Email}': wrong password ({PasswordLength} characters)", email, password.Length);
+                logger.LogWarning("Sign-in failed for account {UserId}: wrong password ({PasswordLength} characters)", user.Id, password.Length);
             }
             RegisterFailedLogin(key);
             return null;
