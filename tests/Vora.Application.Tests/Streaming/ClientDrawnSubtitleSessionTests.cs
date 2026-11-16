@@ -4,6 +4,7 @@ using Vora.Application.Devices;
 using Vora.Application.Settings;
 using Vora.Application.Streaming;
 using Vora.Application.Streaming.Dtos;
+using Vora.Application.Watchlist;
 using Vora.Domain.Entities.Media;
 using Vora.Domain.Entities.Settings;
 using Vora.Domain.Entities.Streaming;
@@ -51,7 +52,8 @@ public class ClientDrawnSubtitleSessionTests
             Options.Create(new StoragePathsOptions()),
             Substitute.For<IClientLocationResolver>(),
             Substitute.For<IMediaAnalyzerService>(),
-            Substitute.For<IHardwareCapabilityService>());
+            Substitute.For<IHardwareCapabilityService>(),
+            Substitute.For<IWatchlistManager>());
     }
 
     private static DeviceCapsDto Caps(bool? drawsImageSubtitles) =>

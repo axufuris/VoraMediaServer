@@ -1,6 +1,8 @@
 using Microsoft.EntityFrameworkCore;
+using Vora.Application.Libraries.ViewModels;
 using Vora.Application.Watchlist;
 using Vora.Domain.Entities.Discovery;
+using Vora.Domain.Entities.Media;
 
 namespace Vora.Infrastructure.Persistence.Repositories;
 
@@ -42,4 +44,29 @@ public class WatchlistRepository(VoraDbContext context) : IWatchlistRepository
         await context.UserWatchlistItems
             .Where(w => w.Id == watchlistItemId)
             .ExecuteUpdateAsync(s => s.SetProperty(w => w.MediaItemId, mediaItemId));
+
+    public async Task<WatchlistTitle?> GetTitleAsync(Guid mediaItemId)
+    {
+        var showId = await context.Set<Episode>().AsNoTracking()
+                .Where(e => e.Id == mediaItemId)
+                .Select(e => (Guid?)e.Season.TvShowId)
+                .FirstOrDefaultAsync()
+            ?? await context.Set<Season>().AsNoTracking()
+                .Where(s => s.Id == mediaItemId)
+                .Select(s => (Guid?)s.TvShowId)
+                .FirstOrDefaultAsync();
+        var titleId = showId ?? mediaItemId;
+
+        var type = await context.MediaItems.AsNoTracking()
+            .Where(m => m.Id == titleId)
+            .Select(m => m is Movie ? "Movie" : m is TvShow ? "TvShow" : null)
+            .FirstOrDefaultAsync();
+        return type is null ? null : new WatchlistTitle(titleId, type);
+    }
+
+    public Task<bool> IsFinishedAsync(Guid profileId, Guid titleId) =>
+        context.MediaItems.AsNoTracking()
+            .Where(m => m.Id == titleId)
+            .Where(TitleWatchState.IsPlayed(profileId, context.UserMediaStates))
+            .AnyAsync();
 }

@@ -4,6 +4,7 @@ using Vora.Application.Devices;
 using Vora.Application.Settings;
 using Vora.Application.Streaming;
 using Vora.Application.Streaming.Dtos;
+using Vora.Application.Watchlist;
 using Vora.Domain.Entities.Settings;
 using Vora.Domain.Entities.Streaming;
 using Vora.Domain.Entities.Users;
@@ -49,7 +50,8 @@ public class StreamSessionAddressTests
         Options.Create(new StoragePathsOptions()),
         _locations,
         Substitute.For<IMediaAnalyzerService>(),
-        Substitute.For<Vora.Application.Settings.IHardwareCapabilityService>());
+        Substitute.For<Vora.Application.Settings.IHardwareCapabilityService>(),
+        Substitute.For<IWatchlistManager>());
 
     private async Task<(StreamSession Session, string StreamUrl)> StartAsync(string? clientAddress)
     {

@@ -1,6 +1,7 @@
 ﻿using Vora.Application.Analysis;
 using Vora.Application.Media.Requests;
 using Vora.Application.Media.ViewModels;
+using Vora.Application.Watchlist;
 using Vora.Plugins.Interfaces;
 
 namespace Vora.Application.Media;
@@ -19,12 +20,14 @@ public class UserMediaStateManager : IUserMediaStateManager
     private readonly IUserMediaStateRepository _repository;
     private readonly IClientNotifier _notifier;
     private readonly Vora.Application.Tasks.ITaskQueueManager _taskQueueManager;
+    private readonly IWatchlistManager _watchlist;
 
-    public UserMediaStateManager(IUserMediaStateRepository repository, IClientNotifier notifier, Vora.Application.Tasks.ITaskQueueManager taskQueueManager)
+    public UserMediaStateManager(IUserMediaStateRepository repository, IClientNotifier notifier, Vora.Application.Tasks.ITaskQueueManager taskQueueManager, IWatchlistManager watchlist)
     {
         _repository = repository;
         _notifier = notifier;
         _taskQueueManager = taskQueueManager;
+        _watchlist = watchlist;
     }
 
     public async Task<UpNextResultVM> GetUpNextAsync(Guid mediaId, string? contextType, Guid? contextId, Guid? profileId)
@@ -38,6 +41,9 @@ public class UserMediaStateManager : IUserMediaStateManager
 
         await _notifier.NotifyMediaItemUpdatedAsync(mediaItemId);
         await _notifier.NotifyUserMediaStateUpdatedAsync(profileId);
+
+        // Marking something watched finishes it: off the watchlist it goes.
+        if (isPlayed) await _watchlist.RemoveIfFinishedAsync(profileId, mediaItemId);
     }
 
     public async Task<SetMediaRatingResult> SetMediaRatingAsync(Guid mediaItemId, Guid profileId, decimal? rating, bool isAdmin)

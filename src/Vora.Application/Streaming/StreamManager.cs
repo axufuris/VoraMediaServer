@@ -5,6 +5,7 @@ using Vora.Application.Devices;
 using Vora.Application.Settings;
 using Vora.Application.Streaming.Dtos;
 using Vora.Application.Streaming.ViewModels;
+using Vora.Application.Watchlist;
 using Vora.Domain.Entities.Settings;
 using Vora.Domain.Entities.Streaming;
 using Vora.Domain.Entities.Users;
@@ -50,9 +51,11 @@ public class StreamManager : IStreamManager
     private readonly IClientLocationResolver _locations;
     private readonly IMediaAnalyzerService _analyzer;
     private readonly IHardwareCapabilityService _hardware;
+    private readonly IWatchlistManager _watchlist;
 
-    public StreamManager(IStreamRepository repository, IBestPathDecisionManager decisionManager, ISystemSettingsRepository settingsRepo, IStreamingTokenSigner tokenSigner, IClientNotifier notifier, ITranscodeService transcodeService, IOptions<StoragePathsOptions> storagePaths, IClientLocationResolver locations, IMediaAnalyzerService analyzer, IHardwareCapabilityService hardware)
+    public StreamManager(IStreamRepository repository, IBestPathDecisionManager decisionManager, ISystemSettingsRepository settingsRepo, IStreamingTokenSigner tokenSigner, IClientNotifier notifier, ITranscodeService transcodeService, IOptions<StoragePathsOptions> storagePaths, IClientLocationResolver locations, IMediaAnalyzerService analyzer, IHardwareCapabilityService hardware, IWatchlistManager watchlist)
     {
+        _watchlist = watchlist;
         _hardware = hardware;
         _locations = locations;
         _analyzer = analyzer;
@@ -333,6 +336,7 @@ public class StreamManager : IStreamManager
         var now = DateTime.UtcNow;
         if (isPaused) session.TotalPausedDuration += (now - session.LastPingAt).TotalSeconds;
 
+        var wasComplete = WatchStateTransition.IsComplete(session.CurrentPosition, duration);
         session.CurrentPosition = currentPosition;
         session.IsPaused = isPaused;
         session.LastPingAt = now;
@@ -347,6 +351,14 @@ public class StreamManager : IStreamManager
         if (!session.ExtraId.HasValue && session.UserProfileId.HasValue)
         {
             await _repository.UpdateUserMediaStateAsync(session.UserProfileId.Value, session.MediaItemId, currentPosition, duration);
+
+            // The ping that takes an item past its finish line finishes it, so
+            // a movie, or a show's last episode, comes off the profile's
+            // watchlist. Only that ping: the ones after it have nothing to add.
+            if (!wasComplete && WatchStateTransition.IsComplete(currentPosition, duration))
+            {
+                await _watchlist.RemoveIfFinishedAsync(session.UserProfileId.Value, session.MediaItemId);
+            }
         }
     }
 

@@ -22,6 +22,7 @@ public interface IWatchlistManager
     Task<List<WatchlistItemVM>> GetWatchlistAsync(Guid profileId);
     Task<bool> ToggleAsync(Guid profileId, WatchlistRequest request);
     Task<bool> IsInWatchlistAsync(Guid profileId, string? externalId, string? providerId, Guid? mediaItemId);
+    Task<bool> RemoveIfFinishedAsync(Guid profileId, Guid mediaItemId);
 }
 
 // The watchlist spans both library items and titles that aren't in the library,
@@ -96,9 +97,49 @@ public class WatchlistManager(
             throw;
         }
 
-        // Every device on the profile re-reads its watchlist, so a title taken
-        // off on one is gone from the others too (docs/realtime.md). The change
-        // is already saved: a failed push mustn't turn it into an error.
+        await NotifyChangedAsync(profileId);
+        return added;
+    }
+
+    // A title leaves the watchlist once the profile has finished it: a movie
+    // that has played through, or a show with every episode in the library
+    // watched, by the same rule that puts the watched check on its poster.
+    // Called when an item's progress crosses the finish line and when someone
+    // marks it watched, with whichever item that was: an episode or season
+    // counts toward its show. Best effort, since a playback ping or a Mark as
+    // watched mustn't fail over the watchlist.
+    public async Task<bool> RemoveIfFinishedAsync(Guid profileId, Guid mediaItemId)
+    {
+        try
+        {
+            var title = await repository.GetTitleAsync(mediaItemId);
+            if (title is null) return false;
+
+            var key = await ResolveKeyAsync(new WatchlistRequest { MediaItemId = title.Id });
+            var entry = await repository.FindAsync(profileId, key.ExternalId, key.ProviderId, key.MediaItemId);
+
+            // A movie and a show can share a TMDB id, so the match also has to
+            // be the same kind of title.
+            if (entry is null || !string.Equals(entry.Type, title.Type, StringComparison.OrdinalIgnoreCase)) return false;
+            if (!await repository.IsFinishedAsync(profileId, title.Id)) return false;
+
+            await repository.RemoveAsync(entry);
+        }
+        catch (Exception ex)
+        {
+            logger.LogWarning(ex, "Couldn't check whether profile {ProfileId} finished {MediaItemId} off its watchlist.", profileId, mediaItemId);
+            return false;
+        }
+
+        await NotifyChangedAsync(profileId);
+        return true;
+    }
+
+    // Every device on the profile re-reads its watchlist, so a title taken
+    // off on one is gone from the others too (docs/realtime.md). The change
+    // is already saved: a failed push mustn't turn it into an error.
+    private async Task NotifyChangedAsync(Guid profileId)
+    {
         try
         {
             await notifier.NotifyWatchlistUpdatedAsync(profileId);
@@ -107,8 +148,6 @@ public class WatchlistManager(
         {
             logger.LogWarning(ex, "Couldn't tell the clients that profile {ProfileId}'s watchlist changed.", profileId);
         }
-
-        return added;
     }
 
     private async Task<bool> AddOrRemoveAsync(Guid profileId, WatchlistRequest request)

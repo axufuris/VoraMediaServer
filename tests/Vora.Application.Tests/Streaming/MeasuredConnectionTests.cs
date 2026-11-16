@@ -4,6 +4,7 @@ using Vora.Application.Devices;
 using Vora.Application.Settings;
 using Vora.Application.Streaming;
 using Vora.Application.Streaming.Dtos;
+using Vora.Application.Watchlist;
 using Vora.Domain.Entities.Settings;
 using Vora.Domain.Entities.Users;
 using Vora.Domain.Enums;
@@ -46,7 +47,8 @@ public class MeasuredConnectionTests
         Options.Create(new StoragePathsOptions()),
         Substitute.For<IClientLocationResolver>(),
         Substitute.For<IMediaAnalyzerService>(),
-        _hardware);
+        _hardware,
+        Substitute.For<IWatchlistManager>());
 
     private static DeviceCapsDto Caps(int measuredKbps = 0, int bitratePickKbps = 0, int displayWidth = 0, int displayHeight = 0) =>
         new(["hevc", "h264"], ["aac"], ["mp4"], 2, 10_000, bitratePickKbps, DisplayWidth: displayWidth, DisplayHeight: displayHeight, MeasuredBandwidthKbps: measuredKbps);
