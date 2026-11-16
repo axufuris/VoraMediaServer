@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { render } from '@testing-library/react';
-import { CheckGlyph, CornerChip, LibraryStatusBadge, PosterCorner, RequestedGlyph, UnplayedCountBadge, WatchedBadge } from './WatchedBadge';
+import { BookmarkGlyph, CheckGlyph, CornerChip, LibraryStatusBadge, PlayGlyph, PosterCorner, RequestedGlyph, UnplayedCountBadge, WatchedBadge } from './WatchedBadge';
 import { cornerLength } from './posterCornerLength';
 import { episodeCornerLabel } from '../../../utils/posterCaption';
 
@@ -18,16 +18,20 @@ function css(property: string, value: string): string {
     return read;
 }
 
-// The clock Discovery's Requested pill draws; the Android and Roku clients
-// draw the same circle and hands.
+// The clock for a requested title; the Android and Roku clients draw the same
+// circle and hands.
 const CLOCK_HANDS_PATH = 'M12 7v5l3 2';
 
+// The play triangle for a title in a library; the Android and Roku clients draw
+// the same three points.
+const PLAY_PATH = 'M8 5v14l11-7z';
+
 describe('library status badge', () => {
-    it('is a check, in the box the watched check uses, for a title in the library', () => {
+    it('is a play triangle, in the box the watched check uses, for a title in the library', () => {
         const status = render(<LibraryStatusBadge status="inLibrary" />).container.firstElementChild as HTMLElement;
         const watched = render(<WatchedBadge />).container.firstElementChild as HTMLElement;
 
-        expect(status.querySelector('path')?.getAttribute('d')).toBe(CHECK_PATH);
+        expect(status.querySelector('path')?.getAttribute('d')).toBe(PLAY_PATH);
         expect(status.querySelector('circle')).toBeNull();
         expect(status.style.borderRadius).toBe(watched.style.borderRadius);
         expect(status.style.background).toBe(watched.style.background);
@@ -54,12 +58,48 @@ describe('library status badge', () => {
         expect(requested.querySelectorAll('svg')).toHaveLength(1);
     });
 
-    it('colours the check with the accent and the clock with the info token', () => {
-        const check = render(<LibraryStatusBadge status="inLibrary" />).container.querySelector('svg') as SVGElement;
+    // The watched mark is the check; a title the viewer can play must not look
+    // like one they have already seen.
+    it('never draws the watched check for a title in the library', () => {
+        const { container } = render(<LibraryStatusBadge status="inLibrary" />);
+
+        expect(Array.from(container.querySelectorAll('path')).map(p => p.getAttribute('d'))).not.toContain(CHECK_PATH);
+    });
+
+    it('colours the triangle with the accent and the clock with the info token', () => {
+        const play = render(<LibraryStatusBadge status="inLibrary" />).container.querySelector('svg') as SVGElement;
         const clock = render(<LibraryStatusBadge status="requested" />).container.querySelector('svg') as SVGElement;
 
-        expect(check.style.color).toContain('--vora-accent-500');
+        expect(play.style.color).toContain('--vora-accent-500');
         expect(clock.style.color).toContain('--vora-info-text');
+    });
+
+    it('sizes the triangle and the bookmark like the check, from the tile they sit on', () => {
+        const play = render(<PlayGlyph size={cornerLength(12)} />).container.querySelector('svg') as SVGElement;
+        const bookmark = render(<BookmarkGlyph size={cornerLength(12)} />).container.querySelector('svg') as SVGElement;
+
+        expect(play.style.width).toBe(css('width', cornerLength(12)));
+        expect(bookmark.style.width).toBe(css('width', cornerLength(12)));
+    });
+
+    // On Discover a title can be on the watchlist as well as in a library or
+    // requested: both icons share the one box, the bookmark first.
+    it('puts the bookmark and the status icon side by side in the one box', () => {
+        const { container } = render(<LibraryStatusBadge status="requested" bookmarked />);
+
+        expect(container.children).toHaveLength(1);
+        const icons = Array.from(container.querySelectorAll('svg'));
+        expect(icons).toHaveLength(2);
+        expect(icons[0].querySelector('path')?.getAttribute('d')).toContain('M5 4a2 2 0 012-2h6');
+        expect(icons[1].querySelector('circle')).not.toBeNull();
+        expect(Array.from(container.querySelectorAll('.sr-only')).map(s => s.textContent)).toEqual(['On your watchlist', 'Requested']);
+    });
+
+    it('shows just the bookmark for a title on the watchlist that no library has and nobody asked for', () => {
+        const { container } = render(<LibraryStatusBadge bookmarked />);
+
+        expect(container.querySelectorAll('svg')).toHaveLength(1);
+        expect(container.querySelector('.sr-only')?.textContent).toBe('On your watchlist');
     });
 
     it('sizes the clock like the check, from the tile it sits on', () => {
@@ -68,10 +108,11 @@ describe('library status badge', () => {
         expect(clock.style.width).toBe(css('width', cornerLength(12)));
     });
 
-    it('leaves an episode chip as it was: its number, no status icon', () => {
+    it('leaves an episode chip as it was: its number, no status icon, no bookmark', () => {
         const { container } = render(<CornerChip label="E1" />);
 
         expect(container.querySelector('circle')).toBeNull();
+        expect(container.querySelector('svg')).toBeNull();
         expect(container.querySelector('.sr-only')).toBeNull();
     });
 });

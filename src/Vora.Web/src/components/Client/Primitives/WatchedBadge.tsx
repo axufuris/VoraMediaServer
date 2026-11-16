@@ -36,8 +36,8 @@ export function CheckGlyph({ size, className, color }: { size: string; className
     );
 }
 
-// The clock of Discovery's Requested pill, in the same circle and hands on every
-// client.
+// A clock for a title that is requested and hasn't arrived: the same circle and
+// hands on every client.
 export function RequestedGlyph({ size, className, color }: { size: string; className?: string; color?: string }) {
     return (
         <svg
@@ -55,8 +55,44 @@ export function RequestedGlyph({ size, className, color }: { size: string; class
     );
 }
 
+// A solid play triangle: a title the viewer's libraries hold and can play now.
+// Not a check, which is the watched mark and read as "I have seen this". The same
+// triangle on every client, softened at the corners the same way.
+export function PlayGlyph({ size, className, color }: { size: string; className?: string; color?: string }) {
+    return (
+        <svg
+            viewBox="0 0 24 24"
+            fill="currentColor"
+            stroke="currentColor"
+            strokeWidth={2}
+            strokeLinejoin="round"
+            className={className}
+            style={{ width: size, height: size, flexShrink: 0, ...(color ? { color } : {}) }}
+            aria-hidden="true"
+        >
+            <path d="M8 5v14l11-7z" />
+        </svg>
+    );
+}
+
+// The bookmark of the watchlist, the same one the tile used to carry in its
+// top-left corner.
+export function BookmarkGlyph({ size, className, color }: { size: string; className?: string; color?: string }) {
+    return (
+        <svg
+            viewBox="0 0 20 20"
+            fill="currentColor"
+            className={className}
+            style={{ width: size, height: size, flexShrink: 0, ...(color ? { color } : {}) }}
+            aria-hidden="true"
+        >
+            <path d="M5 4a2 2 0 012-2h6a2 2 0 012 2v14l-5-2.5L5 18V4z" />
+        </svg>
+    );
+}
+
 // Where a title stands against the viewer's libraries, drawn as the corner box's
-// icon: a check once it is in one, a clock while it is only requested.
+// icon: a play triangle once it is in one, a clock while it is only requested.
 export type LibraryStatus = 'inLibrary' | 'requested';
 
 const LIBRARY_STATUS_LABEL: Record<LibraryStatus, string> = { inLibrary: 'In your library', requested: 'Requested' };
@@ -98,7 +134,7 @@ export function HiddenGlyph({ size }: { size: string }) {
 
 // Never wider than the tile less its 6-in margin on each side, so a label too
 // long for one line wraps inside the tile instead of running off its left edge.
-export function CornerChip({ label, watched, hiddenFromViewers, status }: { label?: string | null; watched?: boolean; hiddenFromViewers?: boolean; status?: LibraryStatus }) {
+export function CornerChip({ label, watched, hiddenFromViewers, status, bookmarked }: { label?: string | null; watched?: boolean; hiddenFromViewers?: boolean; status?: LibraryStatus; bookmarked?: boolean }) {
     const checkOnly = !label;
     return (
         <span
@@ -116,7 +152,10 @@ export function CornerChip({ label, watched, hiddenFromViewers, status }: { labe
                 color: 'var(--vora-text-primary)',
             }}
         >
-            {(watched || status === 'inLibrary') && <CheckGlyph size={cornerLength(checkOnly ? FONT_SIZE * 1.2 : FONT_SIZE)} color="var(--vora-accent-500)" />}
+            {bookmarked && <BookmarkGlyph size={cornerLength(checkOnly ? FONT_SIZE * 1.2 : FONT_SIZE)} color="var(--vora-accent-500)" />}
+            {bookmarked && <span className="sr-only">On your watchlist</span>}
+            {watched && <CheckGlyph size={cornerLength(checkOnly ? FONT_SIZE * 1.2 : FONT_SIZE)} color="var(--vora-accent-500)" />}
+            {status === 'inLibrary' && <PlayGlyph size={cornerLength(checkOnly ? FONT_SIZE * 1.2 : FONT_SIZE)} color="var(--vora-accent-500)" />}
             {status === 'requested' && <RequestedGlyph size={cornerLength(checkOnly ? FONT_SIZE * 1.2 : FONT_SIZE)} color="var(--vora-info-text)" />}
             {status && <span className="sr-only">{LIBRARY_STATUS_LABEL[status]}</span>}
             {hiddenFromViewers && <HiddenGlyph size={cornerLength(FONT_SIZE * 1.1)} />}
@@ -131,9 +170,11 @@ export function WatchedBadge() {
     return <CornerChip watched />;
 }
 
-// The library status box for a title that is only on the watchlist.
-export function LibraryStatusBadge({ status }: { status: LibraryStatus }) {
-    return <CornerChip status={status} />;
+// The library status box: where the title stands against the libraries and, on
+// Discover, whether it is on the viewer's watchlist. Both are optional, and a
+// title with neither gets no box at all (the caller passes nothing).
+export function LibraryStatusBadge({ status, bookmarked }: { status?: LibraryStatus; bookmarked?: boolean }) {
+    return <CornerChip status={status} bookmarked={bookmarked} />;
 }
 
 // A show's or season's count of unwatched episodes.

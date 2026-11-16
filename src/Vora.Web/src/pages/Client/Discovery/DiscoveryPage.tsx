@@ -10,7 +10,7 @@ import PageHeader from '../../../components/Client/Primitives/PageHeader';
 import EmptyState from '../../../components/Client/Primitives/EmptyState';
 import MediaRow, { MediaRowItem } from '../../../components/Client/Primitives/MediaRow';
 import MediaCard from '../../../components/Client/Primitives/MediaCard';
-import DiscoveryStatusBadge from '../../../components/Discovery/DiscoveryStatusBadge';
+import { discoveryBadge } from '../../../components/Discovery/discoveryBadge';
 import { StorageKeys } from '../../../utils/storageKeys';
 import { profileIdForServer } from '../../../api/client';
 import { discoveryTarget } from '../../../utils/discoveryNavigation';
@@ -255,18 +255,14 @@ function DiscoveryRow({ config, serverId, watchlistIds }: { config: DiscoveryRow
         >
             {items.map(item => {
                 const inWatchlist = watchlistIds.has(watchlistKey(item.providerId, item.externalId));
-                const statusBadge = (item.inLibrary || item.requestStatus)
-                    ? <DiscoveryStatusBadge inLibrary={item.inLibrary} requestStatus={item.requestStatus} />
-                    : undefined;
                 return (
                     <MediaRowItem key={item.externalId}>
                         <MediaCard
                             imageUrl={item.posterUrl}
                             title={item.title}
                             captionLines={item.year ? [item.year.toString()] : []}
-                            inWatchlist={inWatchlist}
+                            badge={discoveryBadge(item, inWatchlist)}
                             onClick={() => navigate(discoveryTarget({ ...item, providerId: config.providerId }, serverId))}
-                            bottomLeftBadge={statusBadge}
                         />
                     </MediaRowItem>
                 );
