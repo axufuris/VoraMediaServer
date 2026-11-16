@@ -15,6 +15,8 @@ export interface WatchlistItem {
     // Present when the title is in the library, so the tile opens the local item
     // rather than the provider page.
     mediaItemId?: string;
+    // Not in a library yet, but someone has asked for it and it hasn't arrived.
+    isRequested?: boolean;
 }
 
 // Identify the title either by the library item it is, or by the external

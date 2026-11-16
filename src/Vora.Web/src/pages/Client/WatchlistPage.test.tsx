@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { act, render, screen, within } from '@testing-library/react';
+import { act, render, screen } from '@testing-library/react';
 import type { ReactNode } from 'react';
 import { MemoryRouter } from 'react-router-dom';
 import WatchlistPage from './WatchlistPage';
@@ -18,10 +18,10 @@ vi.mock('../../hooks/useSignalREvent', () => ({
     useSignalREvent: (name: string, handler: (payload: unknown) => void) => { mocks.handlers.set(name, handler); },
 }));
 vi.mock('../../components/Client/Primitives/MediaCard', () => ({
-    default: ({ title, inWatchlist, topLeftBadge }: { title: string; inWatchlist?: boolean; topLeftBadge?: ReactNode }) => (
-        <div data-testid="tile" data-bookmarked={inWatchlist ? 'yes' : undefined}>
+    default: ({ title, inWatchlist, badge, topLeftBadge }: { title: string; inWatchlist?: boolean; badge?: ReactNode; topLeftBadge?: ReactNode }) => (
+        <div data-testid="tile" data-bookmarked={inWatchlist ? 'yes' : undefined} data-has-top-left={topLeftBadge ? 'yes' : undefined}>
             {title}
-            {topLeftBadge}
+            <div data-testid="corner">{badge}</div>
         </div>
     ),
 }));
@@ -54,17 +54,38 @@ describe('WatchlistPage', () => {
         expect(mocks.getWatchlist).toHaveBeenCalledTimes(2);
     });
 
-    it('marks a title none of the libraries has yet, and only that one', async () => {
+    // The corner of each poster, where an episode's number goes, says where the
+    // title stands against the libraries: a check in one, a clock requested.
+    it('puts a check on a title in the library, a clock on a requested one, and nothing on the rest', async () => {
         mocks.getWatchlist.mockResolvedValue([
             { ...entry('1', 'Heat'), mediaItemId: 'library-heat' },
-            entry('2', 'Ronin'),
+            { ...entry('2', 'Ronin'), isRequested: true },
+            entry('3', 'Collateral'),
         ]);
         render(<MemoryRouter><WatchlistPage /></MemoryRouter>);
-        await screen.findByText('Ronin');
+        await screen.findByText('Collateral');
 
-        const [heat, ronin] = screen.getAllByTestId('tile');
-        expect(within(heat).queryByRole('img', { name: 'Not in your libraries yet' })).toBeNull();
-        expect(within(ronin).getByRole('img', { name: 'Not in your libraries yet' })).toBeInTheDocument();
+        const [heat, ronin, collateral] = screen.getAllByTestId('corner');
+        expect(heat).toHaveTextContent('In your library');
+        expect(ronin).toHaveTextContent('Requested');
+        expect(collateral).toBeEmptyDOMElement();
+    });
+
+    it('shows the check, not the clock, for a title that is in the library and also requested', async () => {
+        mocks.getWatchlist.mockResolvedValue([{ ...entry('1', 'Heat'), mediaItemId: 'library-heat', isRequested: true }]);
+        render(<MemoryRouter><WatchlistPage /></MemoryRouter>);
+        await screen.findByText('Heat');
+
+        expect(screen.getByTestId('corner')).toHaveTextContent('In your library');
+        expect(screen.getByTestId('corner')).not.toHaveTextContent('Requested');
+    });
+
+    it('keeps the old top-left marker off the posters', async () => {
+        mocks.getWatchlist.mockResolvedValue([entry('1', 'Heat')]);
+        render(<MemoryRouter><WatchlistPage /></MemoryRouter>);
+        await screen.findByText('Heat');
+
+        expect(screen.getByTestId('tile')).not.toHaveAttribute('data-has-top-left');
     });
 
     it("does not bookmark titles that are all on the watchlist already", async () => {

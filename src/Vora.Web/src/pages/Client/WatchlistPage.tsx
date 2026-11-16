@@ -5,7 +5,7 @@ import PageHeader from '../../components/Client/Primitives/PageHeader';
 import EmptyState from '../../components/Client/Primitives/EmptyState';
 import MediaCard from '../../components/Client/Primitives/MediaCard';
 import MediaGrid from '../../components/Client/Primitives/MediaGrid';
-import { NotInLibraryIcon } from '../../components/Client/Primitives/ActionIcons';
+import { LibraryStatusBadge, type LibraryStatus } from '../../components/Client/Primitives/WatchedBadge';
 import { profileIdForServer } from '../../api/client';
 import { discoveryTarget } from '../../utils/discoveryNavigation';
 import { useWatchlistUpdated } from '../../hooks/useWatchlistUpdated';
@@ -15,21 +15,16 @@ interface WatchlistPageProps {
 }
 
 // Every title here is on the watchlist, so a bookmark on each would say nothing.
-// What is worth marking is the one that can't be played yet.
-const NOT_IN_LIBRARY = 'Not in your libraries yet';
+// What is worth saying is where it stands against the libraries: a check once it
+// is in one, a clock while it is requested and hasn't arrived, nothing otherwise.
+function libraryStatusOf(item: WatchlistItem): LibraryStatus | undefined {
+    if (item.mediaItemId) return 'inLibrary';
+    return item.isRequested ? 'requested' : undefined;
+}
 
-function NotInLibraryBadge() {
-    return (
-        <div
-            role="img"
-            aria-label={NOT_IN_LIBRARY}
-            title={NOT_IN_LIBRARY}
-            className="rounded p-1.5 backdrop-blur-sm"
-            style={{ background: 'color-mix(in srgb, var(--vora-bg-canvas) 72%, transparent)', border: '1px solid var(--vora-border-strong)', color: 'var(--vora-text-secondary)' }}
-        >
-            <NotInLibraryIcon size={14} />
-        </div>
-    );
+function badgeFor(item: WatchlistItem) {
+    const status = libraryStatusOf(item);
+    return status ? <LibraryStatusBadge status={status} /> : undefined;
 }
 
 export default function WatchlistPage({ embedded = false }: WatchlistPageProps = {}) {
@@ -96,7 +91,7 @@ export default function WatchlistPage({ embedded = false }: WatchlistPageProps =
                                 imageUrl={item.posterUrl}
                                 title={item.title}
                                 captionLines={[item.type === 'TvShow' ? 'TV Series' : 'Movie']}
-                                topLeftBadge={item.mediaItemId ? undefined : <NotInLibraryBadge />}
+                                badge={badgeFor(item)}
                                 onClick={() => navigate(openPath(item))}
                                 menu={item.mediaItemId ? { id: item.mediaItemId, serverId, onChanged: reload } : undefined}
                                 fill
