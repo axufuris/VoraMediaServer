@@ -1,8 +1,11 @@
 using Microsoft.Extensions.Logging.Abstractions;
 using Vora.Application.Analysis;
 using Vora.Application.Media;
+using Vora.Application.Requests;
 using Vora.Application.Watchlist;
 using Vora.Domain.Entities.Discovery;
+using Vora.Domain.Entities.Requests;
+using Vora.Domain.Enums;
 
 namespace Vora.Application.Tests.Watchlist;
 
@@ -12,6 +15,7 @@ public class WatchlistManagerTests
 
     private readonly IWatchlistRepository _repo = Substitute.For<IWatchlistRepository>();
     private readonly IMediaRepository _media = Substitute.For<IMediaRepository>();
+    private readonly IRequestRepository _requests = Substitute.For<IRequestRepository>();
     private readonly IClientNotifier _notifier = Substitute.For<IClientNotifier>();
     private readonly WatchlistManager _manager;
 
@@ -21,7 +25,9 @@ public class WatchlistManagerTests
             .Returns(new Dictionary<string, Guid>());
         _media.GetPosterUrlsByIdsAsync(Arg.Any<IReadOnlyCollection<Guid>>())
             .Returns(new Dictionary<Guid, string>());
-        _manager = new WatchlistManager(_repo, _media, _notifier, NullLogger<WatchlistManager>.Instance);
+        _requests.GetRequestsAsync(Arg.Any<IEnumerable<string>>(), Arg.Any<string>())
+            .Returns(new Dictionary<string, MediaRequest>());
+        _manager = new WatchlistManager(_repo, _media, _requests, _notifier, NullLogger<WatchlistManager>.Instance);
     }
 
     private static WatchlistRequest External(string externalId = "603") => new()
@@ -374,5 +380,83 @@ public class WatchlistManagerTests
 
         removed.Should().BeFalse();
         await _notifier.DidNotReceive().NotifyWatchlistUpdatedAsync(Arg.Any<Guid>());
+    }
+
+    // --- The corner icon: a check for a title in the library, a clock for one
+    // that is requested and hasn't arrived
+
+    private static UserWatchlistItem Saved(string externalId, string type = "Movie") => new()
+    {
+        Id = Guid.NewGuid(), ProfileId = Guid.NewGuid(), ExternalId = externalId, ProviderId = Tmdb, Type = type, Title = "Title " + externalId,
+    };
+
+    private void Requested(string externalId, RequestStatus status, string type = "Movie") =>
+        _requests.GetRequestsAsync(Arg.Is<IEnumerable<string>>(ids => ids.Contains(externalId)), type)
+            .Returns(new Dictionary<string, MediaRequest> { [externalId] = new() { ExternalId = externalId, Type = type, Status = status } });
+
+    [Theory]
+    [InlineData(RequestStatus.Pending)]
+    [InlineData(RequestStatus.Approved)]
+    [InlineData(RequestStatus.Processing)]
+    public async Task A_title_that_is_requested_and_not_in_a_library_is_marked_requested(RequestStatus status)
+    {
+        var entry = Saved("603");
+        _repo.GetWatchlistAsync(entry.ProfileId).Returns([entry]);
+        Requested("603", status);
+
+        var list = await _manager.GetWatchlistAsync(entry.ProfileId);
+
+        list.Should().ContainSingle().Which.IsRequested.Should().BeTrue();
+    }
+
+    [Theory]
+    [InlineData(RequestStatus.Denied)]
+    [InlineData(RequestStatus.Available)]
+    public async Task A_denied_or_fulfilled_request_is_not_shown_as_requested(RequestStatus status)
+    {
+        var entry = Saved("603");
+        _repo.GetWatchlistAsync(entry.ProfileId).Returns([entry]);
+        Requested("603", status);
+
+        (await _manager.GetWatchlistAsync(entry.ProfileId)).Should().ContainSingle().Which.IsRequested.Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task A_title_nobody_asked_for_is_not_marked()
+    {
+        var entry = Saved("603");
+        _repo.GetWatchlistAsync(entry.ProfileId).Returns([entry]);
+
+        (await _manager.GetWatchlistAsync(entry.ProfileId)).Should().ContainSingle().Which.IsRequested.Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task A_title_in_the_library_gets_its_check_and_no_request_is_looked_up_for_it()
+    {
+        var entry = Saved("603");
+        var localId = Guid.NewGuid();
+        _repo.GetWatchlistAsync(entry.ProfileId).Returns([entry]);
+        _media.GetLocalIdsByExternalIdsAsync(Arg.Any<IEnumerable<string>>(), "Movie").Returns(new Dictionary<string, Guid> { ["603"] = localId });
+        Requested("603", RequestStatus.Pending);
+
+        var item = (await _manager.GetWatchlistAsync(entry.ProfileId)).Should().ContainSingle().Subject;
+
+        item.MediaItemId.Should().Be(localId);
+        item.IsRequested.Should().BeFalse();
+        await _requests.DidNotReceive().GetRequestsAsync(Arg.Any<IEnumerable<string>>(), Arg.Any<string>());
+    }
+
+    [Fact]
+    public async Task A_movie_and_a_show_with_the_same_id_are_looked_up_by_their_own_type()
+    {
+        var movie = Saved("1396", "Movie");
+        var show = Saved("1396", "TvShow");
+        _repo.GetWatchlistAsync(movie.ProfileId).Returns([movie, show]);
+        Requested("1396", RequestStatus.Pending, "TvShow");
+
+        var list = await _manager.GetWatchlistAsync(movie.ProfileId);
+
+        list.Single(i => i.Type == "TvShow").IsRequested.Should().BeTrue();
+        list.Single(i => i.Type == "Movie").IsRequested.Should().BeFalse();
     }
 }

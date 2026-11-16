@@ -36,6 +36,31 @@ export function CheckGlyph({ size, className, color }: { size: string; className
     );
 }
 
+// The clock of Discovery's Requested pill, in the same circle and hands on every
+// client.
+export function RequestedGlyph({ size, className, color }: { size: string; className?: string; color?: string }) {
+    return (
+        <svg
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth={2.6}
+            className={className}
+            style={{ width: size, height: size, flexShrink: 0, ...(color ? { color } : {}) }}
+            aria-hidden="true"
+        >
+            <circle cx="12" cy="12" r="9" />
+            <path strokeLinecap="round" strokeLinejoin="round" d="M12 7v5l3 2" />
+        </svg>
+    );
+}
+
+// Where a title stands against the viewer's libraries, drawn as the corner box's
+// icon: a check once it is in one, a clock while it is only requested.
+export type LibraryStatus = 'inLibrary' | 'requested';
+
+const LIBRARY_STATUS_LABEL: Record<LibraryStatus, string> = { inLibrary: 'In your library', requested: 'Requested' };
+
 // Measures the tile (a container the size of its artwork) and places the badge
 // in its top-right corner, 6 in on a 128-wide tile. A landscape tile measures
 // the right-hand LANDSCAPE_CORNER_SHARE of itself, so its box is that much
@@ -73,7 +98,7 @@ export function HiddenGlyph({ size }: { size: string }) {
 
 // Never wider than the tile less its 6-in margin on each side, so a label too
 // long for one line wraps inside the tile instead of running off its left edge.
-export function CornerChip({ label, watched, hiddenFromViewers }: { label?: string | null; watched?: boolean; hiddenFromViewers?: boolean }) {
+export function CornerChip({ label, watched, hiddenFromViewers, status }: { label?: string | null; watched?: boolean; hiddenFromViewers?: boolean; status?: LibraryStatus }) {
     const checkOnly = !label;
     return (
         <span
@@ -91,7 +116,9 @@ export function CornerChip({ label, watched, hiddenFromViewers }: { label?: stri
                 color: 'var(--vora-text-primary)',
             }}
         >
-            {watched && <CheckGlyph size={cornerLength(checkOnly ? FONT_SIZE * 1.2 : FONT_SIZE)} color="var(--vora-accent-500)" />}
+            {(watched || status === 'inLibrary') && <CheckGlyph size={cornerLength(checkOnly ? FONT_SIZE * 1.2 : FONT_SIZE)} color="var(--vora-accent-500)" />}
+            {status === 'requested' && <RequestedGlyph size={cornerLength(checkOnly ? FONT_SIZE * 1.2 : FONT_SIZE)} color="var(--vora-info-text)" />}
+            {status && <span className="sr-only">{LIBRARY_STATUS_LABEL[status]}</span>}
             {hiddenFromViewers && <HiddenGlyph size={cornerLength(FONT_SIZE * 1.1)} />}
             {hiddenFromViewers && <span className="sr-only">Hidden · </span>}
             {label}
@@ -102,6 +129,11 @@ export function CornerChip({ label, watched, hiddenFromViewers }: { label?: stri
 // The watched box for anything without an episode number.
 export function WatchedBadge() {
     return <CornerChip watched />;
+}
+
+// The library status box for a title that is only on the watchlist.
+export function LibraryStatusBadge({ status }: { status: LibraryStatus }) {
+    return <CornerChip status={status} />;
 }
 
 // A show's or season's count of unwatched episodes.

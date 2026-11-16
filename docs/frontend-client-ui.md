@@ -54,6 +54,19 @@ An entry is keyed by its external provider identity whenever one is known, so a
 title bookmarked from Discovery and the same title once it lands in the library
 are one row; a library item with no external match is keyed by its own id.
 
+**A watchlist poster says where the title stands against the libraries, with an
+icon and nothing else.** The top-right corner box, where an episode's number goes,
+holds a check when the entry has a `mediaItemId` (the title is in a library) and
+a clock when it has none but `isRequested` is set. `GET /api/watchlist` sets
+`isRequested` for a title that is in no library and has a request that is
+pending, approved or processing, looked up by external id and type like
+Discovery's `requestStatus`; a denied or fulfilled request doesn't count, and
+the check wins when both are true. Otherwise the corner is empty, and no poster
+carries a bookmark, since everything on the list is bookmarked. It is
+`LibraryStatusBadge` on the web (`WatchedBadge.tsx`, drawn in the same box as the
+watched check), `MediaPoster.kt` on Android and `PosterCard.bs` on the Roku.
+Discover's posters keep their text pills.
+
 **A finished title leaves the watchlist.** The server takes it off, for that
 profile only (`WatchlistManager.RemoveIfFinishedAsync`). A movie goes when its
 progress ping crosses 90% (`StreamManager.PingSessionAsync`, the ping that

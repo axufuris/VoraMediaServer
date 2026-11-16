@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { render } from '@testing-library/react';
-import { CheckGlyph, CornerChip, PosterCorner, UnplayedCountBadge, WatchedBadge } from './WatchedBadge';
+import { CheckGlyph, CornerChip, LibraryStatusBadge, PosterCorner, RequestedGlyph, UnplayedCountBadge, WatchedBadge } from './WatchedBadge';
 import { cornerLength } from './posterCornerLength';
 import { episodeCornerLabel } from '../../../utils/posterCaption';
 
@@ -17,6 +17,64 @@ function css(property: string, value: string): string {
     if (!read) throw new Error(`${property}: ${value} is not a length the browser keeps`);
     return read;
 }
+
+// The clock Discovery's Requested pill draws; the Android and Roku clients
+// draw the same circle and hands.
+const CLOCK_HANDS_PATH = 'M12 7v5l3 2';
+
+describe('library status badge', () => {
+    it('is a check, in the box the watched check uses, for a title in the library', () => {
+        const status = render(<LibraryStatusBadge status="inLibrary" />).container.firstElementChild as HTMLElement;
+        const watched = render(<WatchedBadge />).container.firstElementChild as HTMLElement;
+
+        expect(status.querySelector('path')?.getAttribute('d')).toBe(CHECK_PATH);
+        expect(status.querySelector('circle')).toBeNull();
+        expect(status.style.borderRadius).toBe(watched.style.borderRadius);
+        expect(status.style.background).toBe(watched.style.background);
+        expect(status.style.padding).toBe(watched.style.padding);
+    });
+
+    it('is a clock, in the same box, for a title that is requested', () => {
+        const status = render(<LibraryStatusBadge status="requested" />).container.firstElementChild as HTMLElement;
+        const watched = render(<WatchedBadge />).container.firstElementChild as HTMLElement;
+
+        expect(status.querySelector('circle')).not.toBeNull();
+        expect(status.querySelector('path')?.getAttribute('d')).toBe(CLOCK_HANDS_PATH);
+        expect(status.style.borderRadius).toBe(watched.style.borderRadius);
+        expect(status.style.background).toBe(watched.style.background);
+    });
+
+    it('draws no text, only the icon, and names it for a screen reader', () => {
+        const inLibrary = render(<LibraryStatusBadge status="inLibrary" />).container;
+        const requested = render(<LibraryStatusBadge status="requested" />).container;
+
+        expect(inLibrary.querySelector('.sr-only')?.textContent).toBe('In your library');
+        expect(requested.querySelector('.sr-only')?.textContent).toBe('Requested');
+        expect(inLibrary.querySelectorAll('svg')).toHaveLength(1);
+        expect(requested.querySelectorAll('svg')).toHaveLength(1);
+    });
+
+    it('colours the check with the accent and the clock with the info token', () => {
+        const check = render(<LibraryStatusBadge status="inLibrary" />).container.querySelector('svg') as SVGElement;
+        const clock = render(<LibraryStatusBadge status="requested" />).container.querySelector('svg') as SVGElement;
+
+        expect(check.style.color).toContain('--vora-accent-500');
+        expect(clock.style.color).toContain('--vora-info-text');
+    });
+
+    it('sizes the clock like the check, from the tile it sits on', () => {
+        const clock = render(<RequestedGlyph size={cornerLength(12)} />).container.querySelector('svg') as SVGElement;
+
+        expect(clock.style.width).toBe(css('width', cornerLength(12)));
+    });
+
+    it('leaves an episode chip as it was: its number, no status icon', () => {
+        const { container } = render(<CornerChip label="E1" />);
+
+        expect(container.querySelector('circle')).toBeNull();
+        expect(container.querySelector('.sr-only')).toBeNull();
+    });
+});
 
 describe('watched badge', () => {
     it('draws the same check path the Android client uses', () => {

@@ -1,8 +1,10 @@
 using Microsoft.Extensions.Logging;
 using Vora.Application.Analysis;
 using Vora.Application.Media;
+using Vora.Application.Requests;
 using Vora.Application.Watchlist.ViewModels;
 using Vora.Domain.Entities.Discovery;
+using Vora.Domain.Enums;
 
 namespace Vora.Application.Watchlist;
 
@@ -37,6 +39,7 @@ public interface IWatchlistManager
 public class WatchlistManager(
     IWatchlistRepository repository,
     IMediaRepository mediaRepository,
+    IRequestRepository requestRepository,
     IClientNotifier notifier,
     ILogger<WatchlistManager> logger) : IWatchlistManager
 {
@@ -65,6 +68,7 @@ public class WatchlistManager(
         var localIdsByEntry = items.ToDictionary(i => i.Id, i => i.MediaItemId ?? (resolved.TryGetValue(i.Id, out var localId) ? localId : null));
         var libraryPosters = await mediaRepository.GetPosterUrlsByIdsAsync(
             localIdsByEntry.Values.OfType<Guid>().Distinct().ToList());
+        var requested = await GetRequestedEntryIdsAsync(items.Where(i => localIdsByEntry[i.Id] is null).ToList());
 
         return items.Select(i =>
         {
@@ -80,8 +84,30 @@ public class WatchlistManager(
                 PosterUrl = mediaItemId is Guid id && libraryPosters.TryGetValue(id, out var poster) ? poster : i.PosterUrl,
                 AddedAt = i.AddedAt,
                 MediaItemId = mediaItemId,
+                IsRequested = requested.Contains(i.Id),
             };
         }).ToList();
+    }
+
+    // The entries, none of them in a library, that someone has asked for and
+    // that haven't arrived: a request that is pending, approved or being worked
+    // on. A denied one is no promise, and an available one is in the library.
+    private async Task<HashSet<Guid>> GetRequestedEntryIdsAsync(List<UserWatchlistItem> notInLibrary)
+    {
+        var requested = new HashSet<Guid>();
+        foreach (var group in notInLibrary.Where(i => !string.IsNullOrWhiteSpace(i.ExternalId)).GroupBy(i => i.Type))
+        {
+            var requests = await requestRepository.GetRequestsAsync(group.Select(i => i.ExternalId).Distinct().ToList(), group.Key);
+            foreach (var item in group)
+            {
+                if (requests.TryGetValue(item.ExternalId, out var request)
+                    && request.Status is RequestStatus.Pending or RequestStatus.Approved or RequestStatus.Processing)
+                {
+                    requested.Add(item.Id);
+                }
+            }
+        }
+        return requested;
     }
 
     public async Task<bool> ToggleAsync(Guid profileId, WatchlistRequest request)

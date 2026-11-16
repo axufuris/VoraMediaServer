@@ -14,6 +14,11 @@ public class WatchlistItemVM
     // Set when the title is in the library, so the client can open the local
     // item instead of the external provider page.
     public Guid? MediaItemId { get; set; }
+
+    // True when the title is not in a library yet but a request for it is
+    // pending, approved or being processed. The client draws a clock in the
+    // poster's corner for it, and a check when MediaItemId is set.
+    public bool IsRequested { get; set; }
 }
 
 public class WatchlistStatusVM
