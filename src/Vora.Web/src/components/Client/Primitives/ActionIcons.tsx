@@ -98,6 +98,17 @@ export function ShuffleIcon({ size = 18 }: { size?: number }) {
     );
 }
 
+// A film frame crossed out: a title none of the viewer's libraries has yet.
+export function NotInLibraryIcon({ size = 18 }: { size?: number }) {
+    return (
+        <svg width={size} height={size} viewBox="0 0 24 24" {...stroke} aria-hidden="true">
+            <rect x="3" y="5" width="18" height="14" rx="2" />
+            <path d="M8 5v14M16 5v14" />
+            <path d="M3.5 20.5 20.5 3.5" />
+        </svg>
+    );
+}
+
 // Outlined bookmark, matching the watchlist affordance viewers know from Plex.
 export function BookmarkIcon({ size = 18, filled = false }: { size?: number; filled?: boolean }) {
     return (

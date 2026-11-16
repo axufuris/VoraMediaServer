@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { act, render, screen } from '@testing-library/react';
+import { act, render, screen, within } from '@testing-library/react';
+import type { ReactNode } from 'react';
 import { MemoryRouter } from 'react-router-dom';
 import WatchlistPage from './WatchlistPage';
 import { type WatchlistItem } from '../../api/Watchlist/watchlistService';
@@ -17,7 +18,12 @@ vi.mock('../../hooks/useSignalREvent', () => ({
     useSignalREvent: (name: string, handler: (payload: unknown) => void) => { mocks.handlers.set(name, handler); },
 }));
 vi.mock('../../components/Client/Primitives/MediaCard', () => ({
-    default: ({ title }: { title: string }) => <div data-testid="tile">{title}</div>,
+    default: ({ title, inWatchlist, topLeftBadge }: { title: string; inWatchlist?: boolean; topLeftBadge?: ReactNode }) => (
+        <div data-testid="tile" data-bookmarked={inWatchlist ? 'yes' : undefined}>
+            {title}
+            {topLeftBadge}
+        </div>
+    ),
 }));
 
 const entry = (id: string, title: string): WatchlistItem => ({
@@ -46,6 +52,27 @@ describe('WatchlistPage', () => {
 
         expect(titles()).toEqual(['Heat']);
         expect(mocks.getWatchlist).toHaveBeenCalledTimes(2);
+    });
+
+    it('marks a title none of the libraries has yet, and only that one', async () => {
+        mocks.getWatchlist.mockResolvedValue([
+            { ...entry('1', 'Heat'), mediaItemId: 'library-heat' },
+            entry('2', 'Ronin'),
+        ]);
+        render(<MemoryRouter><WatchlistPage /></MemoryRouter>);
+        await screen.findByText('Ronin');
+
+        const [heat, ronin] = screen.getAllByTestId('tile');
+        expect(within(heat).queryByRole('img', { name: 'Not in your libraries yet' })).toBeNull();
+        expect(within(ronin).getByRole('img', { name: 'Not in your libraries yet' })).toBeInTheDocument();
+    });
+
+    it("does not bookmark titles that are all on the watchlist already", async () => {
+        mocks.getWatchlist.mockResolvedValue([{ ...entry('1', 'Heat'), mediaItemId: 'library-heat' }, entry('2', 'Ronin')]);
+        render(<MemoryRouter><WatchlistPage /></MemoryRouter>);
+        await screen.findByText('Ronin');
+
+        for (const tile of screen.getAllByTestId('tile')) expect(tile).not.toHaveAttribute('data-bookmarked');
     });
 
     it("leaves the list alone for another profile's change", async () => {
