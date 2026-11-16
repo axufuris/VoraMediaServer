@@ -3,6 +3,7 @@ using Vora.Application.Media;
 using Vora.Application.Media.Requests;
 using Vora.Application.Media.ViewModels;
 using Vora.Application.Tasks;
+using Vora.Application.Watchlist;
 
 namespace Vora.Application.Tests.Media;
 
@@ -11,6 +12,7 @@ public class UserMediaStateManagerTests
     private readonly IUserMediaStateRepository _repo;
     private readonly IClientNotifier _notifier;
     private readonly ITaskQueueManager _tasks;
+    private readonly IWatchlistManager _watchlist;
     private readonly UserMediaStateManager _manager;
 
     public UserMediaStateManagerTests()
@@ -18,7 +20,27 @@ public class UserMediaStateManagerTests
         _repo = Substitute.For<IUserMediaStateRepository>();
         _notifier = Substitute.For<IClientNotifier>();
         _tasks = Substitute.For<ITaskQueueManager>();
-        _manager = new UserMediaStateManager(_repo, _notifier, _tasks);
+        _watchlist = Substitute.For<IWatchlistManager>();
+        _manager = new UserMediaStateManager(_repo, _notifier, _tasks, _watchlist);
+    }
+
+    [Fact]
+    public async Task Marking_something_watched_checks_it_off_the_watchlist()
+    {
+        var mediaId = Guid.NewGuid();
+        var profileId = Guid.NewGuid();
+
+        await _manager.SetMediaPlayedStateAsync(mediaId, profileId, isPlayed: true);
+
+        await _watchlist.Received(1).RemoveIfFinishedAsync(profileId, mediaId);
+    }
+
+    [Fact]
+    public async Task Marking_something_unwatched_leaves_the_watchlist_alone()
+    {
+        await _manager.SetMediaPlayedStateAsync(Guid.NewGuid(), Guid.NewGuid(), isPlayed: false);
+
+        await _watchlist.DidNotReceive().RemoveIfFinishedAsync(Arg.Any<Guid>(), Arg.Any<Guid>());
     }
 
     [Fact]

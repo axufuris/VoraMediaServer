@@ -4,6 +4,7 @@ using Vora.Application.Devices;
 using Vora.Application.Settings;
 using Vora.Application.Streaming;
 using Vora.Application.Streaming.Dtos;
+using Vora.Application.Watchlist;
 using Vora.Domain.Entities.Media;
 using Vora.Domain.Entities.Settings;
 using Vora.Domain.Entities.Streaming;
@@ -55,7 +56,8 @@ public class RemoteBandwidthLimitTests
         Options.Create(new StoragePathsOptions()),
         Substitute.For<IClientLocationResolver>(),
         Substitute.For<IMediaAnalyzerService>(),
-        Substitute.For<IHardwareCapabilityService>());
+        Substitute.For<IHardwareCapabilityService>(),
+        Substitute.For<IWatchlistManager>());
 
     private static NowPlayingSessionDto RemoteStream(int kbps) => new() { DeviceId = "tv-" + Guid.NewGuid().ToString("N"), IpAddress = "198.51.100.7", BandwidthKbps = kbps };
 

@@ -54,6 +54,16 @@ An entry is keyed by its external provider identity whenever one is known, so a
 title bookmarked from Discovery and the same title once it lands in the library
 are one row; a library item with no external match is keyed by its own id.
 
+**A finished title leaves the watchlist.** The server takes it off, for that
+profile only (`WatchlistManager.RemoveIfFinishedAsync`). A movie goes when its
+progress ping crosses 90% (`StreamManager.PingSessionAsync`, the ping that
+crosses it and no other) or when someone marks it watched. A show goes when its
+last unwatched episode does, by the rule that puts the watched check on the
+poster (`TitleWatchState.IsPlayed`: every episode whose file is still there is
+watched), so a season or the show marked watched takes it off too, and a show
+with episodes left stays. A trailer never finishes the film, and a movie and a
+show that share a TMDB id are told apart by type.
+
 **A watchlist change shows everywhere at once.** Every add or remove sends
 `WatchlistUpdated` with the profile id to that profile's devices
 (`docs/realtime.md`). `useWatchlistUpdated` drops another profile's event,
@@ -61,6 +71,7 @@ and these re-read on it: the Watchlist page and tab, the bookmark on a title's
 page and on a Discovery title, and the posters' bookmarks on Discovery and its
 View all pages. The device that made the change updates from the toggle's own
 answer as well, so it never waits on the hub. Android and the Roku do the same.
+A title that finished comes off on every device, since the server sent the event.
 
 ## The media tile system
 

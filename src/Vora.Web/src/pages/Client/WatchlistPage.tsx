@@ -5,12 +5,31 @@ import PageHeader from '../../components/Client/Primitives/PageHeader';
 import EmptyState from '../../components/Client/Primitives/EmptyState';
 import MediaCard from '../../components/Client/Primitives/MediaCard';
 import MediaGrid from '../../components/Client/Primitives/MediaGrid';
+import { NotInLibraryIcon } from '../../components/Client/Primitives/ActionIcons';
 import { profileIdForServer } from '../../api/client';
 import { discoveryTarget } from '../../utils/discoveryNavigation';
 import { useWatchlistUpdated } from '../../hooks/useWatchlistUpdated';
 
 interface WatchlistPageProps {
     embedded?: boolean;
+}
+
+// Every title here is on the watchlist, so a bookmark on each would say nothing.
+// What is worth marking is the one that can't be played yet.
+const NOT_IN_LIBRARY = 'Not in your libraries yet';
+
+function NotInLibraryBadge() {
+    return (
+        <div
+            role="img"
+            aria-label={NOT_IN_LIBRARY}
+            title={NOT_IN_LIBRARY}
+            className="rounded p-1.5 backdrop-blur-sm"
+            style={{ background: 'color-mix(in srgb, var(--vora-bg-canvas) 72%, transparent)', border: '1px solid var(--vora-border-strong)', color: 'var(--vora-text-secondary)' }}
+        >
+            <NotInLibraryIcon size={14} />
+        </div>
+    );
 }
 
 export default function WatchlistPage({ embedded = false }: WatchlistPageProps = {}) {
@@ -77,7 +96,7 @@ export default function WatchlistPage({ embedded = false }: WatchlistPageProps =
                                 imageUrl={item.posterUrl}
                                 title={item.title}
                                 captionLines={[item.type === 'TvShow' ? 'TV Series' : 'Movie']}
-                                inWatchlist
+                                topLeftBadge={item.mediaItemId ? undefined : <NotInLibraryBadge />}
                                 onClick={() => navigate(openPath(item))}
                                 menu={item.mediaItemId ? { id: item.mediaItemId, serverId, onChanged: reload } : undefined}
                                 fill
