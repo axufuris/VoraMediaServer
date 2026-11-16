@@ -54,18 +54,26 @@ An entry is keyed by its external provider identity whenever one is known, so a
 title bookmarked from Discovery and the same title once it lands in the library
 are one row; a library item with no external match is keyed by its own id.
 
-**A watchlist poster says where the title stands against the libraries, with an
-icon and nothing else.** The top-right corner box, where an episode's number goes,
-holds a check when the entry has a `mediaItemId` (the title is in a library) and
-a clock when it has none but `isRequested` is set. `GET /api/watchlist` sets
-`isRequested` for a title that is in no library and has a request that is
-pending, approved or processing, looked up by external id and type like
-Discovery's `requestStatus`; a denied or fulfilled request doesn't count, and
-the check wins when both are true. Otherwise the corner is empty, and no poster
-carries a bookmark, since everything on the list is bookmarked. It is
-`LibraryStatusBadge` on the web (`WatchedBadge.tsx`, drawn in the same box as the
-watched check), `MediaPoster.kt` on Android and `PosterCard.bs` on the Roku.
-Discover's posters keep their text pills.
+**A watchlist or Discover poster says where the title stands against the
+libraries, with an icon and nothing else.** The top-right corner box, where an
+episode's number goes, holds a play triangle when the title is in a library (the
+entry has a `mediaItemId`, or Discover says `inLibrary`) and a clock when it is
+only requested. The triangle is not a check: the check is the watched mark, and a
+title you can play must not look like one you have already seen. `GET
+/api/watchlist` sets `isRequested` for a title that is in no library and has a
+request that is pending, approved or processing, looked up by external id and
+type like Discovery's `requestStatus`. A denied request doesn't count, a
+fulfilled one (`Available`) is in a library, and in a library wins when both are
+true (`utils/discoveryLibraryStatus.ts` is the rule for Discover; the Android and
+Roku clients apply the same one). Otherwise there is no status icon.
+
+On Discover the same box also holds the watchlist bookmark, to the left of the
+status icon, when the title is on the viewer's watchlist; it replaces the pills
+("In Library", "Requested") and the bookmark in the tile's top-left corner
+(`discoveryBadge`). The Watchlist page never draws the bookmark, since everything
+on it is bookmarked. It is `LibraryStatusBadge` on the web (`WatchedBadge.tsx`,
+drawn in the same box as the watched check), `MediaPoster.kt` on Android and
+`PosterCard.bs` on the Roku. Other screens keep their own bookmark.
 
 **A finished title leaves the watchlist.** The server takes it off, for that
 profile only (`WatchlistManager.RemoveIfFinishedAsync`). A movie goes when its

@@ -7,7 +7,7 @@ import PageHeader from '../../../components/Client/Primitives/PageHeader';
 import MediaCard from '../../../components/Client/Primitives/MediaCard';
 import MediaGrid from '../../../components/Client/Primitives/MediaGrid';
 import EmptyState from '../../../components/Client/Primitives/EmptyState';
-import DiscoveryStatusBadge from '../../../components/Discovery/DiscoveryStatusBadge';
+import { discoveryBadge } from '../../../components/Discovery/discoveryBadge';
 import { profileIdForServer } from '../../../api/client';
 import { discoveryTarget } from '../../../utils/discoveryNavigation';
 import { watchlistKey } from '../../../utils/watchlistKey';
@@ -124,18 +124,14 @@ export default function DiscoveryViewAllPage() {
                 <>
                 <MediaGrid>
                     {items.map(item => {
-                        const statusBadge = (item.inLibrary || item.requestStatus)
-                            ? <DiscoveryStatusBadge inLibrary={item.inLibrary} requestStatus={item.requestStatus} />
-                            : undefined;
                         return (
                             <MediaCard
                                 key={item.externalId}
                                 imageUrl={item.posterUrl}
                                 title={item.title}
                                 captionLines={item.year ? [item.year.toString()] : []}
-                                inWatchlist={watchlistIds.has(watchlistKey(item.providerId, item.externalId))}
+                                badge={discoveryBadge(item, watchlistIds.has(watchlistKey(item.providerId, item.externalId)))}
                                 onClick={() => navigate(discoveryTarget({ ...item, providerId: providerId! }, serverId))}
-                                bottomLeftBadge={statusBadge}
                                 fill
                             />
                         );
