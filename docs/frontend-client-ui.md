@@ -56,10 +56,13 @@ are one row; a library item with no external match is keyed by its own id.
 
 **A watchlist or Discover poster says where the title stands against the
 libraries, with an icon and nothing else.** The top-right corner box, where an
-episode's number goes, holds a play triangle when the title is in a library (the
-entry has a `mediaItemId`, or Discover says `inLibrary`) and a clock when it is
-only requested. The triangle is not a check: the check is the watched mark, and a
-title you can play must not look like one you have already seen. `GET
+episode's number goes, holds a play triangle when a Discover title is in a library
+(Discover says `inLibrary`) and a clock when it is only requested. The triangle is
+not a check: the check is the watched mark, and a title you can play must not look
+like one you have already seen. The Watchlist page draws no triangle: its sections
+already say "in Library", so an entry with a `mediaItemId` has no icon there, even
+when it is also requested, and only a requested title that is in no library gets
+the clock. `GET
 /api/watchlist` sets `isRequested` for a title that is in no library and has a
 request that is pending, approved or processing, looked up by external id and
 type like Discovery's `requestStatus`. A denied request doesn't count, a

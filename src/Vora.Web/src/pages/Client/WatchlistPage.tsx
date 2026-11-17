@@ -5,7 +5,7 @@ import PageHeader from '../../components/Client/Primitives/PageHeader';
 import EmptyState from '../../components/Client/Primitives/EmptyState';
 import MediaCard from '../../components/Client/Primitives/MediaCard';
 import MediaGrid from '../../components/Client/Primitives/MediaGrid';
-import { LibraryStatusBadge, type LibraryStatus } from '../../components/Client/Primitives/WatchedBadge';
+import { LibraryStatusBadge } from '../../components/Client/Primitives/WatchedBadge';
 import { profileIdForServer } from '../../api/client';
 import { discoveryTarget } from '../../utils/discoveryNavigation';
 import { useWatchlistUpdated } from '../../hooks/useWatchlistUpdated';
@@ -16,17 +16,8 @@ interface WatchlistPageProps {
     embedded?: boolean;
 }
 
-// Every title here is on the watchlist, so a bookmark on each would say nothing.
-// What is worth saying is where it stands against the libraries: a check once it
-// is in one, a clock while it is requested and hasn't arrived, nothing otherwise.
-function libraryStatusOf(item: WatchlistItem): LibraryStatus | undefined {
-    if (item.mediaItemId) return 'inLibrary';
-    return item.isRequested ? 'requested' : undefined;
-}
-
 function badgeFor(item: WatchlistItem) {
-    const status = libraryStatusOf(item);
-    return status ? <LibraryStatusBadge status={status} /> : undefined;
+    return !item.mediaItemId && item.isRequested ? <LibraryStatusBadge status="requested" /> : undefined;
 }
 
 export default function WatchlistPage({ embedded = false }: WatchlistPageProps = {}) {

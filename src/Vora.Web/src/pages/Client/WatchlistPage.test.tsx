@@ -55,7 +55,7 @@ describe('WatchlistPage', () => {
         expect(mocks.getWatchlist).toHaveBeenCalledTimes(2);
     });
 
-    it('puts a play triangle on a title in the library, a clock on a requested one, and nothing on the rest', async () => {
+    it('puts a clock on a requested title and nothing on a title in the library or one nobody asked for', async () => {
         mocks.getWatchlist.mockResolvedValue([
             { ...entry('1', 'Heat'), mediaItemId: 'library-heat' },
             { ...entry('2', 'Ronin'), isRequested: true },
@@ -65,18 +65,17 @@ describe('WatchlistPage', () => {
         await screen.findByText('Collateral');
 
         const [heat, ronin, collateral] = screen.getAllByTestId('corner');
-        expect(heat).toHaveTextContent('In your library');
+        expect(heat).toBeEmptyDOMElement();
         expect(ronin).toHaveTextContent('Requested');
         expect(collateral).toBeEmptyDOMElement();
     });
 
-    it('shows the triangle, not the clock, for a title that is in the library and also requested', async () => {
+    it('shows no icon at all for a title that is in the library and also requested', async () => {
         mocks.getWatchlist.mockResolvedValue([{ ...entry('1', 'Heat'), mediaItemId: 'library-heat', isRequested: true }]);
         render(<MemoryRouter><WatchlistPage /></MemoryRouter>);
         await screen.findByText('Heat');
 
-        expect(screen.getByTestId('corner')).toHaveTextContent('In your library');
-        expect(screen.getByTestId('corner')).not.toHaveTextContent('Requested');
+        expect(screen.getByTestId('corner')).toBeEmptyDOMElement();
     });
 
     it('keeps the old top-left marker off the posters', async () => {
