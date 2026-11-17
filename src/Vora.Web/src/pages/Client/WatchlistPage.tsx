@@ -9,6 +9,7 @@ import { LibraryStatusBadge, type LibraryStatus } from '../../components/Client/
 import { profileIdForServer } from '../../api/client';
 import { discoveryTarget } from '../../utils/discoveryNavigation';
 import { useWatchlistUpdated } from '../../hooks/useWatchlistUpdated';
+import { groupWatchlist } from '../../utils/watchlistGroups';
 
 interface WatchlistPageProps {
     embedded?: boolean;
@@ -34,6 +35,7 @@ export default function WatchlistPage({ embedded = false }: WatchlistPageProps =
     const [isLoading, setIsLoading] = useState(true);
 
     const activeProfileId = profileIdForServer(serverId) ?? '';
+    const groups = groupWatchlist(items);
 
     useEffect(() => {
         if (!activeProfileId) {
@@ -84,20 +86,25 @@ export default function WatchlistPage({ embedded = false }: WatchlistPageProps =
                         )}
                     />
                 ) : (
-                    <MediaGrid>
-                        {items.map(item => (
-                            <MediaCard
-                                key={item.id}
-                                imageUrl={item.posterUrl}
-                                title={item.title}
-                                captionLines={[item.type === 'TvShow' ? 'TV Series' : 'Movie']}
-                                badge={badgeFor(item)}
-                                onClick={() => navigate(openPath(item))}
-                                menu={item.mediaItemId ? { id: item.mediaItemId, serverId, onChanged: reload } : undefined}
-                                fill
-                            />
-                        ))}
-                    </MediaGrid>
+                    groups.map(group => (
+                        <section key={group.key} className="mb-10">
+                            <h2 className="m-0 mb-4 text-base font-semibold" style={{ color: 'var(--vora-text-muted)', letterSpacing: '0.04em' }}>{group.title}</h2>
+                            <MediaGrid>
+                                {group.items.map(item => (
+                                    <MediaCard
+                                        key={item.id}
+                                        imageUrl={item.posterUrl}
+                                        title={item.title}
+                                        captionLines={[item.type === 'TvShow' ? 'TV Series' : 'Movie']}
+                                        badge={badgeFor(item)}
+                                        onClick={() => navigate(openPath(item))}
+                                        menu={item.mediaItemId ? { id: item.mediaItemId, serverId, onChanged: reload } : undefined}
+                                        fill
+                                    />
+                                ))}
+                            </MediaGrid>
+                        </section>
+                    ))
                 )}
             </div>
         </div>
