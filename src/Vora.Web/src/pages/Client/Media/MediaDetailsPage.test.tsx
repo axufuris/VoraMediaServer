@@ -27,7 +27,16 @@ vi.mock('../../../api/Media/mediaService', () => ({
 vi.mock('../../../api/Streaming/streamingService', () => ({
     streamingService: { startSession: (mediaId: string, deviceId: string, start: number) => api.startSession(mediaId, deviceId, start) },
 }));
-vi.mock('../../../api/Watchlist/watchlistService', () => ({ watchlistService: { check: () => Promise.resolve(false) } }));
+const watchlist = vi.hoisted(() => ({
+    check: vi.fn<(target: { mediaItemId: string }) => Promise<boolean>>(),
+    toggle: vi.fn<(target: { mediaItemId: string }, details: { type: string; title: string }) => Promise<boolean>>(),
+}));
+vi.mock('../../../api/Watchlist/watchlistService', () => ({
+    watchlistService: {
+        check: (target: { mediaItemId: string }) => watchlist.check(target),
+        toggle: (target: { mediaItemId: string }, details: { type: string; title: string }) => watchlist.toggle(target, details),
+    },
+}));
 const prefs = vi.hoisted(() => ({ episodeLayout: 'Row' as 'Row' | 'List' }));
 vi.mock('../../../api/Users/profileService', () => ({
     profileService: {
@@ -145,6 +154,8 @@ beforeEach(() => {
     playMedia.mockReset();
     items = { 'season-1': season(1), 'season-2': season(2, { episodes: [episode(1)] }), 'ep-2': servantsOfTwoMasters, 'ep-3': tomorrowIsTomorrow, shogun: show(2) };
     api.alert.mockReset().mockResolvedValue(undefined);
+    watchlist.check.mockReset().mockResolvedValue(false);
+    watchlist.toggle.mockReset().mockResolvedValue(true);
     api.markAsPlayed.mockReset().mockResolvedValue(undefined);
     api.setRating.mockReset().mockResolvedValue(undefined);
     api.startSession.mockReset().mockResolvedValue({ sessionId: 'session', streamUrl: '/play' });
@@ -504,5 +515,58 @@ describe('a profile that shows episodes as a list', () => {
         expect(await screen.findByText('Seasons')).toBeInTheDocument();
         await screen.findByRole('button', { name: 'Resume S1 E2 20:50' });
         expect(screen.queryByRole('button', { name: '3. Tomorrow Is Tomorrow' })).toBeNull();
+    });
+});
+
+describe('the watchlist button on a show, a season and an episode', () => {
+    it.each([
+        ['a show page', '/media/shogun', 'shogun'],
+        ['a season page', '/media/season-1', 'season-1'],
+        ["an episode's link, which opens its season", '/media/ep-2', 'season-1'],
+    ])('reads as on for %s when the server says its show is on the watchlist', async (_name, path, askedAbout) => {
+        watchlist.check.mockResolvedValue(true);
+        openPage(path);
+
+        const button = await screen.findByRole('button', { name: 'Remove from watchlist' });
+
+        expect(button).toHaveAttribute('aria-pressed', 'true');
+        expect(watchlist.check).toHaveBeenCalledWith({ mediaItemId: askedAbout });
+    });
+
+    it.each([
+        ['a show page', '/media/shogun', 'shogun', 'TvShow'],
+        ['a season page', '/media/season-1', 'season-1', 'Season'],
+        ["an episode's link, which opens its season", '/media/ep-2', 'season-1', 'Season'],
+    ])('adds with the page\'s own id from %s, and the button follows what the server answers', async (_name, path, sent, type) => {
+        watchlist.check.mockResolvedValue(false);
+        watchlist.toggle.mockResolvedValue(true);
+        openPage(path);
+
+        fireEvent.click(await screen.findByRole('button', { name: 'Add to watchlist' }));
+
+        expect(await screen.findByRole('button', { name: 'Remove from watchlist' })).toHaveAttribute('aria-pressed', 'true');
+        expect(watchlist.toggle).toHaveBeenCalledWith({ mediaItemId: sent }, expect.objectContaining({ type }));
+    });
+
+    it('takes it off from a season page when the show is on the list, and the button follows', async () => {
+        watchlist.check.mockResolvedValue(true);
+        watchlist.toggle.mockResolvedValue(false);
+        openPage('/media/season-1');
+
+        fireEvent.click(await screen.findByRole('button', { name: 'Remove from watchlist' }));
+
+        expect(await screen.findByRole('button', { name: 'Add to watchlist' })).toHaveAttribute('aria-pressed', 'false');
+        expect(watchlist.toggle).toHaveBeenCalledWith({ mediaItemId: 'season-1' }, expect.anything());
+    });
+
+    it('asks again for the season it moves to, so each page shows what the server says for its own show', async () => {
+        watchlist.check.mockImplementation(target => Promise.resolve(target.mediaItemId === 'season-2'));
+        openPage('/media/season-1');
+        await screen.findByRole('button', { name: 'Add to watchlist' });
+
+        fireEvent.click(await screen.findByRole('button', { name: 'Season 2' }));
+
+        expect(await screen.findByRole('button', { name: 'Remove from watchlist' })).toBeInTheDocument();
+        expect(watchlist.check).toHaveBeenCalledWith({ mediaItemId: 'season-2' });
     });
 });
