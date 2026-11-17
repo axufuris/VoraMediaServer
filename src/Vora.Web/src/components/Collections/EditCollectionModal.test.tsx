@@ -219,6 +219,37 @@ describe('EditCollectionModal smart rules', () => {
     });
 });
 
+describe('EditCollectionModal smart rule templates', () => {
+    const RULES = JSON.stringify({ root: { match: 'All', rules: [{ field: 'Genre', operator: 'Contains', value: 'Comedy' }], groups: [] }, limit: 500, sortBy: 'Title', sortDirection: 'Asc' });
+
+    beforeEach(() => {
+        Object.values(mocks).forEach(m => m.mockReset());
+        mocks.alert.mockResolvedValue(undefined);
+        mocks.getChronologyProviders.mockResolvedValue([]);
+        mocks.getCollectionSyncProviders.mockResolvedValue([]);
+        mocks.getArtworkProviders.mockResolvedValue([]);
+        mocks.getArtworkOptions.mockResolvedValue([]);
+        mocks.updateCollection.mockResolvedValue(undefined);
+        mocks.getLibraries.mockResolvedValue([{ id: 'movies', name: 'Movies', type: 'Movie', isBeingWatched: false }]);
+    });
+
+    it('replaces the saved rules with a template, keeping the limit and sort, and saves them', async () => {
+        renderModal(collection({ title: 'Comedies', libraryId: 'movies', rulesJson: RULES, smartMediaType: 'Movies' }));
+
+        expect(await screen.findByDisplayValue('Comedy')).toBeInTheDocument();
+        fireEvent.change(screen.getByLabelText('Template'), { target: { value: 'pg-13' } });
+
+        await waitFor(() => expect(screen.queryByDisplayValue('Comedy')).not.toBeInTheDocument());
+        expect(screen.getByDisplayValue('PG-13')).toBeInTheDocument();
+        save();
+
+        await waitFor(() => expect(mocks.updateCollection).toHaveBeenCalled());
+        const rules = JSON.parse(mocks.updateCollection.mock.calls[0][1].rulesJson);
+        expect(rules).toMatchObject({ limit: 500, sortBy: 'Title', sortDirection: 'Asc' });
+        expect(rules.root).toEqual({ match: 'All', groups: [], rules: [{ field: 'ContentRating', operator: 'Equals', value: 'PG-13' }] });
+    });
+});
+
 describe('EditCollectionModal hiding', () => {
     beforeEach(() => {
         Object.values(mocks).forEach(m => m.mockReset());

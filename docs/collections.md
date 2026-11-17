@@ -114,6 +114,16 @@ collection saved without a type (before this existed) still matches films.
 Music has no collections — use a smart playlist. This is collection-only:
 smart *playlists* keep matching episodes for Shows.
 
+**Templates.** Above the rules, both modals have a **Template** list (*Start from a template…*) with one template for every Vora poster: 75 of them, in the posters' five groups (`components/Collections/smartCollectionTemplates.ts`, listed by `SmartCollectionRules`). Picking one replaces the rules, after asking when there are rules already; the limit and sort are left alone, and the list goes back to its prompt so the same template can be picked again. A template is only a starting point: edit the rules after.
+
+| Group | What a template matches |
+|---|---|
+| Genres (25) | Genre contains the name (`Any`). Where television names a genre differently the rule covers it: Science Fiction also matches *Sci-Fi* (so *Sci-Fi & Fantasy*), Action matches *Action & Adventure*, War matches *War & Politics*. Kids also takes the ratings TV-Y, TV-Y7 and G; Superhero also looks for a few well-known heroes in the title; Anime needs a provider that tags the genre Anime. |
+| Decades (11) | Release year between the first year of the decade and the ninth. |
+| Ratings (11) | Content rating is exactly that rating (G, PG, PG-13, R, NC-17, TV-Y, TV-Y7, TV-G, TV-PG, TV-14, TV-MA). |
+| Holidays (20) | Any of a few words in the title; Halloween, Memorial Day and Veterans Day also take the Horror or War genre. A holiday has no date or tag in a library's metadata, so these find few titles, and the template says so and points to the AI Theme provider (`theme-collections.md`), which fills a holiday from the library properly. Short words that sit inside others (*Mom* in *Moment*, *Tree* in *Street*) are left out on purpose. |
+| Popular (8) | Built from the audience rating and the date added: Recently Added (added in the last 30 days), New Releases (last year and this year, **filled in from today** and not moving by themselves), Popular (rated above 7), Top Rated (above 8). Vora has no view counts, awards, box-office figures or vote counts, so Trending (rated above 7 and added in the last 90 days), Award Winners (rated above 8 in Drama, Biography, History or War), Hidden Gems (rated 7 to 8) and Blockbusters (rated above 6 in Action, Adventure, Science Fiction, Fantasy or Animation) stand in with the nearest thing the rules can say, and each one's note says so. The cut-offs assume ratings out of 10, as TMDB and IMDb give. |
+
 Freshness: smart collections join
 the scheduled content-sync sweep (gated by a stamped `ContentSyncedAt`) and
 re-sync immediately on save; on-scan re-evaluation is a deferred enhancement.
