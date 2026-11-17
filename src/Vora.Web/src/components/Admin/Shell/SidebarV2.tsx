@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { NavLink, useParams } from 'react-router-dom';
 import { pluginAdminService } from '../../../api/System/pluginAdminService';
+import { usePendingRequestCount } from '../../../hooks/usePendingRequestCount';
 import StatusDot from '../Primitives/StatusDot';
 import { ADMIN_NAV, Icons, resolveAdminPath, type AdminNavEntry, type IconName, type NavSection } from './adminNavData';
 import ServerVersionBadge from './ServerVersionBadge';
@@ -11,9 +12,10 @@ interface NavItemProps {
     icon: IconName;
     end?: boolean;
     statusTone?: 'ok' | 'warn' | 'error' | 'info' | 'neutral';
+    count?: number;
 }
 
-function NavItem({ to, label, icon, end, statusTone }: NavItemProps) {
+function NavItem({ to, label, icon, end, statusTone, count }: NavItemProps) {
     return (
         <NavLink
             to={to}
@@ -34,6 +36,14 @@ function NavItem({ to, label, icon, end, statusTone }: NavItemProps) {
                     <svg className="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">{Icons[icon]}</svg>
                     <span className="flex-1 truncate">{label}</span>
                     {statusTone && <StatusDot tone={statusTone} />}
+                    {count ? (
+                        <span
+                            className="ml-auto inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-[var(--vora-danger-500)] px-1.5 text-[11px] font-bold leading-none tabular-nums text-white"
+                            aria-label={`${count} pending`}
+                        >
+                            {count > 99 ? '99+' : count}
+                        </span>
+                    ) : null}
                 </>
             )}
         </NavLink>
@@ -52,6 +62,7 @@ function SidebarSection({ title, children }: { title: string, children: ReactNod
 export default function SidebarV2() {
     const { serverId } = useParams<{ serverId?: string }>();
     const [hasAiPlugin, setHasAiPlugin] = useState(false);
+    const pendingRequests = usePendingRequestCount(serverId);
     const [pluginsTone, setPluginsTone] = useState<'ok' | 'warn' | 'error' | 'info' | 'neutral' | undefined>(undefined);
 
     useEffect(() => {
@@ -102,6 +113,7 @@ export default function SidebarV2() {
                                 icon={entry.icon}
                                 end={entry.end}
                                 statusTone={entry.pathTemplate === '/admin/plugins' ? pluginsTone : undefined}
+                                count={entry.pathTemplate === '/admin/requests' ? pendingRequests : undefined}
                             />
                         ))}
                     </SidebarSection>

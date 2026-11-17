@@ -42,3 +42,11 @@ Authoring a new built-in theme: see the row in `docs/architecture.md`. Plugin-sh
 ## Admin nav data (single source of truth)
 
 `components/Admin/Shell/adminNavData.tsx` exports `ADMIN_NAV` (the canonical list of admin pages with `label`, `pathTemplate`, `icon`, `section`, optional `keywords` for the palette, optional `requires: 'ai'` runtime gate). Both `SidebarV2` and `SearchPalette` consume this list. **Add a new admin page in exactly one place** — it will appear in the sidebar with the right icon/section and in the Cmd-K palette with the right keywords automatically. Same file exports `Icons` (the SVG-path map) and `resolveAdminPath(template, serverId)` (the `/admin/...` → `/admin/server/<id>/...` rewriter).
+
+## Request Queue
+
+`pages/Admin/RequestsPage.tsx` keeps **movie and show requests apart**: a Movies tab and a Shows tab (the shared `Tabs` strip), each counting what is pending, and under them the Pending / Processing / Available pills, counted for the type on show. A show is a request whose `type` is `TvShow`, in any case; everything else is a movie. It opens on Movies, or on Shows when only shows are waiting; after that, reloads (an approval, a delete) leave the tab alone.
+
+**The sidebar's Request Queue entry carries a red count of the requests waiting for a decision**, both kinds together (`GET /api/requests/pending-count`, admin only, `RequestStatus.Pending` only), capped at `99+` and not drawn at zero. `usePendingRequestCount` reads it on mount and again on `RequestQueueChanged`, which `RequestManager` sends to the admins group (`docs/realtime.md`) when a request is created, approved or deleted, so a new request shows up without a refresh. `SidebarV2` gives `NavItem` the count for `/admin/requests` only.
+
+**Approve & Send says it worked.** `useActionToast` (`components/Admin/Primitives/ActionToast.tsx`) returns a `toast` element to render at the end of the page and a `showToast(message)`; it is a polite live region, bottom right, gone after a few seconds. Approving shows `Approved "Title" and sent to Radarr.` (the default server for the request's type, or just `and sent.` when none is named). A failure keeps its alert and shows no toast.

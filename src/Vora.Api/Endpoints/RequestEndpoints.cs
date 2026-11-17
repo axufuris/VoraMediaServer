@@ -41,6 +41,8 @@ public static class RequestEndpoints
 
         group.MapGet("/", GetAllRequestsAsync)
             .Produces<IEnumerable<MediaRequestVM>>(StatusCodes.Status200OK);
+        group.MapGet("/pending-count", GetPendingCountAsync)
+            .Produces<RequestQueueCountVM>(StatusCodes.Status200OK);
         group.MapPut("/{id:guid}/approve", ApproveRequestAsync);
         group.MapDelete("/{id:guid}", DeleteRequestAsync);
 
@@ -57,6 +59,9 @@ public static class RequestEndpoints
 
     private static async Task<IResult> GetAllRequestsAsync(IRequestManager manager) =>
         Results.Ok(await manager.GetAllRequestsAsync());
+
+    private static async Task<IResult> GetPendingCountAsync(IRequestManager manager) =>
+        Results.Ok(new RequestQueueCountVM { Pending = await manager.GetPendingCountAsync() });
 
     private static async Task<IResult> GetRequestStatusAsync([FromQuery] string externalId, [FromQuery] string type, IRequestManager manager)
     {

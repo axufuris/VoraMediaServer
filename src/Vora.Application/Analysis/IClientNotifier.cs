@@ -28,6 +28,7 @@ public interface IClientNotifier
     Task NotifyServerPlaybackUpdatedAsync();
     Task NotifyAdminAlertAsync(string severity, string title, string message);
     Task NotifyAdminAlertUnreadChangedAsync();
+    Task NotifyRequestQueueChangedAsync();
     Task NotifyAdminThemeChangedAsync(string themeId);
     Task NotifyClientTemplateConfigurationChangedAsync();
     Task NotifyClientTemplateChangedForProfileAsync(Guid profileId);

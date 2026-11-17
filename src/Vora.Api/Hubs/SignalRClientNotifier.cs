@@ -76,6 +76,9 @@ public class SignalRClientNotifier(IHubContext<VoraHub> hubContext) : IClientNot
     public Task NotifyAdminAlertUnreadChangedAsync() =>
         hubContext.Clients.Group(VoraHub.AdminGroupName).SendAsync("AdminAlertUnreadChanged");
 
+    public Task NotifyRequestQueueChangedAsync() =>
+        hubContext.Clients.Group(VoraHub.AdminGroupName).SendAsync("RequestQueueChanged");
+
     public Task NotifyAdminThemeChangedAsync(string themeId) =>
         hubContext.Clients.All.SendAsync("AdminThemeChanged", themeId);
 
