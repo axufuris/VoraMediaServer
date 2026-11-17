@@ -5,7 +5,7 @@ import { collectionService, type CollectionDetails, type CollectionSortOrder } f
 import type { ArtworkKind, ArtworkResult } from '../../api/Media/artworkService';
 import { Modal } from '../Common/Modal';
 import { pluginAdminService, type PluginOptionVM } from '../../api/System/pluginAdminService';
-import { emptyDefinition, type SmartPlaylistDefinition } from '../../api/Music/smartPlaylistService';
+import type { SmartPlaylistDefinition } from '../../api/Music/smartPlaylistService';
 import { libraryService } from '../../api/Media/libraryService';
 import SmartCollectionRules from './SmartCollectionRules';
 import { pruneRules, savedSmartMedia, smartMediaForLibrary, type SmartCollectionMedia } from './smartCollectionMedia';
@@ -14,22 +14,12 @@ import { errorDetail } from '../../utils/apiError';
 import SeasonalVisibilityFields from './SeasonalVisibilityFields';
 import ContentProviderHelp from './ContentProviderHelp';
 import { seasonalWindowFrom, seasonalWindowRequest, type SeasonalWindow } from './seasonalWindow';
+import { parseSmartDefinition, SMART_CONTENT } from './collectionSeed';
 import CollectionArtworkPanel, { type PosterSource } from './CollectionArtworkPanel';
 import LockButton from './LockButton';
 import { useVoraPosters } from './useVoraPosters';
 import { isVoraPosterUrl, suggestVoraPoster } from '../../utils/voraPosters';
 
-const SMART_CONTENT = '__smart__';
-const defaultSmartDefinition = (): SmartPlaylistDefinition => ({ ...emptyDefinition(), limit: 2000, sortBy: 'DateAdded', sortDirection: 'Desc' });
-const parseSmartDefinition = (rulesJson?: string): SmartPlaylistDefinition => {
-    if (!rulesJson) return defaultSmartDefinition();
-    try {
-        const parsed = JSON.parse(rulesJson) as SmartPlaylistDefinition;
-        return parsed?.root ? parsed : defaultSmartDefinition();
-    } catch {
-        return defaultSmartDefinition();
-    }
-};
 
 interface EditCollectionModalProps {
     isOpen: boolean;

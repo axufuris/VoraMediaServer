@@ -3,6 +3,7 @@ import { fireEvent, render, screen, waitFor, within } from '@testing-library/rea
 import { MemoryRouter } from 'react-router-dom';
 import CreateCollectionModal from './CreateCollectionModal';
 import type { PluginOptionVM } from '../../api/System/pluginAdminService';
+import type { CollectionDetails } from '../../api/Collections/collectionService';
 
 const mocks = vi.hoisted(() => ({
     createCollection: vi.fn(),
@@ -333,6 +334,208 @@ describe('CreateCollectionModal', () => {
 
         expect(screen.getByText(/Name a specific franchise or shared universe/)).toBeInTheDocument();
         expect(screen.queryByText(/titles TMDB tags with the theme/)).not.toBeInTheDocument();
+    });
+
+    describe('cloning a collection', () => {
+        const ruleJson = JSON.stringify({
+            root: {
+                match: 'Any',
+                rules: [
+                    { field: 'Genre', operator: 'Contains', value: 'Horror' },
+                    { field: 'DurationSeconds', operator: 'LessThan', value: '7200' },
+                ],
+                groups: [],
+            },
+            limit: 500,
+            sortBy: 'Title',
+            sortDirection: 'Asc',
+        });
+
+        const original = (over: Partial<CollectionDetails> = {}): CollectionDetails => ({
+            id: 'original',
+            title: 'Halloween Movies',
+            description: 'Scary season picks',
+            posterUrl: HALLOWEEN_POSTER,
+            backdropUrl: 'https://image.tmdb.org/t/p/original/backdrop.jpg',
+            defaultSortName: 'Alphabetical',
+            isMixedCollection: false,
+            itemCount: 12,
+            lockedFields: ['PosterUrl'],
+            items: [],
+            defaultSort: 'Alphabetical',
+            libraryId: 'library-1',
+            autoSyncChronology: false,
+            sortTitle: '1_Halloween',
+            visibleStartDate: '2000-10-01T00:00:00Z',
+            visibleEndDate: '2000-10-31T00:00:00Z',
+            visibleEveryYear: true,
+            systemGenerated: false,
+            contentSyncProviderId: 'openai_theme',
+            contentSyncExternalId: 'Halloween',
+            syncIntervalDays: 7,
+            mirrorList: true,
+            ...over,
+        });
+
+        const renderClone = (template: CollectionDetails, activeTab = 'library-1', libraryType?: string) => render(
+            <MemoryRouter>
+                <CreateCollectionModal isOpen onClose={() => {}} onSaved={() => {}} activeTab={activeTab} libraryType={libraryType} template={template} />
+            </MemoryRouter>,
+        );
+
+        it('is the create dialog, headed as a clone, with the original values filled in', async () => {
+            renderClone(original());
+
+            expect(await screen.findByText('Clone Collection')).toBeInTheDocument();
+            expect(screen.queryByText('Create New Collection')).not.toBeInTheDocument();
+            expect(screen.getByLabelText('Title')).toHaveValue('Halloween Movies');
+            expect(screen.getByDisplayValue('Scary season picks')).toBeInTheDocument();
+            expect(screen.getByDisplayValue('1_Halloween')).toBeInTheDocument();
+            expect(screen.getByLabelText('Repeat every year')).toBeChecked();
+            expect(screen.getByDisplayValue('Alphabetical')).toBeInTheDocument();
+            expect(screen.getByDisplayValue('7')).toBeInTheDocument();
+            expect(screen.getByLabelText('Mirror the list exactly')).toBeChecked();
+            expect(await screen.findByDisplayValue('AI Theme')).toBeInTheDocument();
+            expect(screen.getByDisplayValue('Halloween')).toBeInTheDocument();
+            expect(screen.getByRole('button', { name: 'Create Collection' })).toBeInTheDocument();
+        });
+
+        it('creates a new collection with every value of the original, in the chosen library', async () => {
+            renderClone(original(), 'library-2');
+            await screen.findByDisplayValue('AI Theme');
+
+            create();
+
+            await waitFor(() => expect(mocks.createCollection).toHaveBeenCalled());
+            expect(mocks.createCollection.mock.calls[0][0]).toEqual({
+                title: 'Halloween Movies',
+                description: 'Scary season picks',
+                posterUrl: HALLOWEEN_POSTER,
+                backdropUrl: 'https://image.tmdb.org/t/p/original/backdrop.jpg',
+                lockedFields: ['PosterUrl'],
+                defaultSort: 'Alphabetical',
+                sortProviderId: undefined,
+                externalListId: undefined,
+                autoSyncChronology: false,
+                sortTitle: '1_Halloween',
+                visibleStartDate: '2000-10-01',
+                visibleEndDate: '2000-10-31',
+                visibleEveryYear: true,
+                libraryId: 'library-2',
+                contentSyncProviderId: 'openai_theme',
+                contentSyncExternalId: 'Halloween',
+                syncIntervalDays: 7,
+                mirrorList: true,
+                rulesJson: undefined,
+                smartMediaType: undefined,
+            });
+            expect(mocks.navigate).toHaveBeenCalledWith('/collection/new-collection');
+        });
+
+        it('clones to global with no library', async () => {
+            renderClone(original(), 'global');
+            await screen.findByDisplayValue('AI Theme');
+
+            create();
+
+            await waitFor(() => expect(mocks.createCollection).toHaveBeenCalled());
+            expect(mocks.createCollection.mock.calls[0][0].libraryId).toBeUndefined();
+        });
+
+        it('keeps the original poster, and does not swap it for a suggestion from the title', async () => {
+            renderClone(original({ title: 'Christmas Classics', posterUrl: TMDB_POSTER }));
+            await screen.findByDisplayValue('AI Theme');
+
+            expect(screen.queryByText(/Poster: the Vora/)).not.toBeInTheDocument();
+            create();
+
+            await waitFor(() => expect(mocks.createCollection).toHaveBeenCalled());
+            expect(mocks.createCollection.mock.calls[0][0].posterUrl).toBe(TMDB_POSTER);
+        });
+
+        it('keeps a collection that had no poster without one', async () => {
+            renderClone(original({ title: 'Christmas Classics', posterUrl: undefined, backdropUrl: undefined, lockedFields: [] }));
+            await screen.findByDisplayValue('AI Theme');
+
+            create();
+
+            await waitFor(() => expect(mocks.createCollection).toHaveBeenCalled());
+            expect(mocks.createCollection.mock.calls[0][0]).toMatchObject({ posterUrl: undefined, backdropUrl: undefined, lockedFields: [] });
+        });
+
+        it('copies the chronology provider and its list', async () => {
+            mocks.getChronologyProviders.mockResolvedValue([provider('openai_chronology', 'AI Chronology', 'Describe the ordering')]);
+            renderClone(original({
+                contentSyncProviderId: undefined, contentSyncExternalId: undefined, mirrorList: false,
+                defaultSort: 'Chronological', sortProviderId: 'openai_chronology', externalListId: 'Halloween in story order', autoSyncChronology: true,
+            }));
+
+            expect(await screen.findByDisplayValue('AI Chronology')).toBeInTheDocument();
+            expect(screen.getByDisplayValue('Halloween in story order')).toBeInTheDocument();
+            expect(screen.getByLabelText('Enable Auto-Sync')).toBeChecked();
+            create();
+
+            await waitFor(() => expect(mocks.createCollection).toHaveBeenCalled());
+            expect(mocks.createCollection.mock.calls[0][0]).toMatchObject({
+                defaultSort: 'Chronological', sortProviderId: 'openai_chronology', externalListId: 'Halloween in story order', autoSyncChronology: true,
+            });
+        });
+
+        it('copies a smart collection with its rules, and matches the library it lands in', async () => {
+            renderClone(original({ contentSyncProviderId: undefined, rulesJson: ruleJson, smartMediaType: 'Movies' }), 'library-1', 'Movie');
+
+            expect(await screen.findByDisplayValue('Smart (rule-based)')).toBeInTheDocument();
+            expect(screen.getByDisplayValue('Horror')).toBeInTheDocument();
+            expect(screen.getByDisplayValue('Duration (seconds)')).toBeInTheDocument();
+            create();
+
+            await waitFor(() => expect(mocks.createCollection).toHaveBeenCalled());
+            const request = mocks.createCollection.mock.calls[0][0];
+            expect(request).toMatchObject({ smartMediaType: 'Movies', contentSyncProviderId: undefined, mirrorList: true });
+            const rules = JSON.parse(request.rulesJson);
+            expect(rules).toMatchObject({ limit: 500, sortBy: 'Title', sortDirection: 'Asc' });
+            expect(rules.root.match).toBe('Any');
+            expect(rules.root.rules.map((r: { field: string }) => r.field)).toEqual(['Genre', 'DurationSeconds']);
+        });
+
+        it('drops the rules a show library cannot match when a movie collection is cloned into it', async () => {
+            renderClone(original({ contentSyncProviderId: undefined, rulesJson: ruleJson, smartMediaType: 'Movies' }), 'shows-1', 'TvShow');
+
+            expect(await screen.findByDisplayValue('Smart (rule-based)')).toBeInTheDocument();
+            expect(screen.getByDisplayValue('Horror')).toBeInTheDocument();
+            expect(screen.queryByDisplayValue('Duration (seconds)')).not.toBeInTheDocument();
+            create();
+
+            await waitFor(() => expect(mocks.createCollection).toHaveBeenCalled());
+            const request = mocks.createCollection.mock.calls[0][0];
+            expect(request.smartMediaType).toBe('Shows');
+            expect(JSON.parse(request.rulesJson).root.rules.map((r: { field: string }) => r.field)).toEqual(['Genre']);
+        });
+
+        it('keeps what a global smart collection matches when it is cloned to global', async () => {
+            renderClone(original({ libraryId: undefined, contentSyncProviderId: undefined, rulesJson: ruleJson, smartMediaType: 'Shows' }), 'global');
+
+            expect((await screen.findByLabelText('Match') as HTMLSelectElement).value).toBe('Shows');
+            create();
+
+            await waitFor(() => expect(mocks.createCollection).toHaveBeenCalled());
+            expect(mocks.createCollection.mock.calls[0][0]).toMatchObject({ smartMediaType: 'Shows', libraryId: undefined });
+        });
+
+        it('shows a fresh blank dialog for the next new collection', async () => {
+            const view = renderClone(original());
+            await screen.findByDisplayValue('AI Theme');
+
+            view.rerender(
+                <MemoryRouter>
+                    <CreateCollectionModal isOpen onClose={() => {}} onSaved={() => {}} activeTab="library-1" />
+                </MemoryRouter>,
+            );
+
+            await waitFor(() => expect(screen.getByLabelText('Title')).toHaveValue(''));
+            expect(screen.getByText('Create New Collection')).toBeInTheDocument();
+            expect(screen.getByDisplayValue('Manual Management (None)')).toBeInTheDocument();
+        });
     });
 
     describe('Smart (rule-based)', () => {

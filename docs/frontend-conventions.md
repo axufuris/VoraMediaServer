@@ -66,8 +66,8 @@ components/Media/         EpisodeRail, EpisodeList, SeasonPills, MediaExtrasRow,
                           RecommendationRow, EditMetadataModal,
                           MusicMetadataEditModal
 components/Collections/   AddToCollectionModal, CreateCollectionModal,
-                          EditCollectionModal, ReorderCollectionModal,
-                          AddToPlaylistModal
+                          CloneCollectionDialog, EditCollectionModal,
+                          ReorderCollectionModal, AddToPlaylistModal
 components/Home/          HomeCustomizeModal, SmartListRow
 components/Discovery/     DiscoveryCustomizeModal
 components/Admin/         AdminNotificationBell, UserAccessModal,
