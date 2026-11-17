@@ -4,6 +4,8 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { collectionService, type CollectionDetails, type CollectionSortOrder } from '../../../api/Collections/collectionService';
 import { collectionAdminService } from '../../../api/Collections/collectionAdminService';
 import EditCollectionModal from '../../../components/Collections/EditCollectionModal';
+import CloneCollectionDialog, { type CloneTarget } from '../../../components/Collections/CloneCollectionDialog';
+import CreateCollectionModal from '../../../components/Collections/CreateCollectionModal';
 import ReorderCollectionModal from '../../../components/Collections/ReorderCollectionModal';
 import MediaCard from '../../../components/Client/Primitives/MediaCard';
 import MediaGrid from '../../../components/Client/Primitives/MediaGrid';
@@ -44,6 +46,8 @@ export default function CollectionDetailsPage() {
     const [isSyncing, setIsSyncing] = useState(false);
     const [isEditModalOpen, setIsEditModalOpen] = useState(false);
     const [isReorderModalOpen, setIsReorderModalOpen] = useState(false);
+    const [isCloneChoiceOpen, setIsCloneChoiceOpen] = useState(false);
+    const [clone, setClone] = useState<{ source: CollectionDetails; target: CloneTarget } | null>(null);
     const isAdmin = localStorage.getItem(StorageKeys.isServerAdmin) === 'true';
 
     const fetchCollection = useCallback((silent = false) => {
@@ -155,6 +159,28 @@ export default function CollectionDetailsPage() {
                 />
             )}
 
+            {collection && isCloneChoiceOpen && (
+                <CloneCollectionDialog
+                    onClose={() => setIsCloneChoiceOpen(false)}
+                    collection={collection}
+                    onChoose={target => {
+                        setIsCloneChoiceOpen(false);
+                        setClone({ source: collection, target });
+                    }}
+                />
+            )}
+
+            {clone && (
+                <CreateCollectionModal
+                    isOpen
+                    onClose={() => setClone(null)}
+                    onSaved={() => setClone(null)}
+                    activeTab={clone.target.activeTab}
+                    libraryType={clone.target.libraryType}
+                    template={clone.source}
+                />
+            )}
+
             {collection && (
                 <ReorderCollectionModal
                     isOpen={isReorderModalOpen}
@@ -193,6 +219,15 @@ export default function CollectionDetailsPage() {
                                         title="Edit Metadata"
                                     >
                                         <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" /></svg>
+                                    </button>
+
+                                    <button
+                                        onClick={() => setIsCloneChoiceOpen(true)}
+                                        className="p-2 bg-[var(--vora-bg-sunken)] hover:bg-[var(--vora-accent-hover)] rounded-full text-[var(--vora-text-muted)] hover:text-[var(--vora-text-primary)] transition-colors shadow-[var(--vora-shadow-lg)] cursor-pointer"
+                                        title="Clone Collection"
+                                        aria-label="Clone Collection"
+                                    >
+                                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" /></svg>
                                     </button>
 
                                     {isAdmin && collection.defaultSort === 'Chronological' && (

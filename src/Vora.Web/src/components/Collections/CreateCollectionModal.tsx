@@ -1,10 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { collectionAdminService } from '../../api/Collections/collectionAdminService';
-import type { CollectionSortOrder } from '../../api/Collections/collectionService';
+import type { CollectionDetails, CollectionSortOrder } from '../../api/Collections/collectionService';
 import type { ArtworkResult } from '../../api/Media/artworkService';
 import { pluginAdminService, type PluginOptionVM } from '../../api/System/pluginAdminService';
-import { emptyDefinition, type SmartPlaylistDefinition } from '../../api/Music/smartPlaylistService';
+import type { SmartPlaylistDefinition } from '../../api/Music/smartPlaylistService';
 import { useDialog } from '../../dialogs';
 import { Modal, ModalHeader, ModalBody, ModalFooter } from '../Common/Modal';
 import SmartCollectionRules from './SmartCollectionRules';
@@ -12,12 +12,11 @@ import { pruneRules, smartMediaForLibrary, type SmartCollectionMedia } from './s
 import SeasonalVisibilityFields from './SeasonalVisibilityFields';
 import ContentProviderHelp from './ContentProviderHelp';
 import { seasonalWindowFrom, seasonalWindowRequest, type SeasonalWindow } from './seasonalWindow';
+import { blankSeed, cloneSeed, defaultSmartDefinition, SMART_CONTENT } from './collectionSeed';
 import CollectionArtworkPanel, { type CollectionArtworkKind, type PosterSource } from './CollectionArtworkPanel';
 import { saveStagedArtwork, stagedArtworkOption, stagedArtworkProblems, useStagedArtwork, webImageAddress } from './stagedArtwork';
 import { useVoraPosters } from './useVoraPosters';
 import { isVoraPosterUrl, suggestVoraPoster } from '../../utils/voraPosters';
-
-const SMART_CONTENT = '__smart__';
 
 interface CreateCollectionModalProps {
     isOpen: boolean;
@@ -26,10 +25,11 @@ interface CreateCollectionModalProps {
     activeTab: string;
     // The active tab's library type (Movie, TvShow, …); undefined on Global.
     libraryType?: string;
+    template?: CollectionDetails;
 }
 
 export default function CreateCollectionModal({
-    isOpen, onClose, onSaved, activeTab, libraryType }: CreateCollectionModalProps) {
+    isOpen, onClose, onSaved, activeTab, libraryType, template }: CreateCollectionModalProps) {
     const dialog = useDialog();
     const { serverId } = useParams<{ serverId?: string }>();
     const navigate = useNavigate();
@@ -50,7 +50,7 @@ export default function CreateCollectionModal({
     const [contentSyncExternalId, setContentSyncExternalId] = useState('');
     const [syncIntervalDays, setSyncIntervalDays] = useState(30);
     const [mirrorList, setMirrorList] = useState(false);
-    const [smartDefinition, setSmartDefinition] = useState<SmartPlaylistDefinition>(() => ({ ...emptyDefinition(), limit: 2000, sortBy: 'DateAdded', sortDirection: 'Desc' }));
+    const [smartDefinition, setSmartDefinition] = useState<SmartPlaylistDefinition>(defaultSmartDefinition);
     // A global collection picks what its rules match; a library one matches
     // its library's kind.
     const [globalSmartMedia, setGlobalSmartMedia] = useState<SmartCollectionMedia>('Mixed');
@@ -132,35 +132,40 @@ export default function CreateCollectionModal({
         }
     };
 
+    const seedLibraryType = template ? libraryType : undefined;
+
     useEffect(() => {
         if (isOpen) {
-            setTitle('');
-            setDescription('');
-            setPosterUrl('');
-            setPosterChosen(false);
-            setBackdropUrl('');
-            setDefaultSort('ReleaseDateAsc');
-            setSortProviderId('');
-            setExternalListId('');
-            setIsGlobal(activeTab === 'global');
+            const global = activeTab === 'global';
+            const seed = template ? cloneSeed(template, global, seedLibraryType) : blankSeed();
+
+            setTitle(seed.title);
+            setDescription(seed.description);
+            setPosterUrl(seed.posterUrl);
+            setPosterChosen(seed.posterChosen);
+            setBackdropUrl(seed.backdropUrl);
+            setDefaultSort(seed.defaultSort);
+            setSortProviderId(seed.sortProviderId);
+            setExternalListId(seed.externalListId);
+            setIsGlobal(global);
             setIsCreating(false);
-            setAutoSyncChronology(false);
+            setAutoSyncChronology(seed.autoSyncChronology);
             setActiveSection('general');
-            setLockedFields([]);
+            setLockedFields(seed.lockedFields);
             setPosterSource(null);
             setFetchedArtwork([]);
             setFetchingArtwork(false);
             clearStaged();
 
-            setSortTitle('');
-            setSeason(seasonalWindowFrom());
+            setSortTitle(seed.sortTitle);
+            setSeason(seed.season);
 
-            setContentSyncProviderId('');
-            setContentSyncExternalId('');
-            setSyncIntervalDays(30);
-            setMirrorList(false);
-            setSmartDefinition({ ...emptyDefinition(), limit: 2000, sortBy: 'DateAdded', sortDirection: 'Desc' });
-            setGlobalSmartMedia('Mixed');
+            setContentSyncProviderId(seed.contentSyncProviderId);
+            setContentSyncExternalId(seed.contentSyncExternalId);
+            setSyncIntervalDays(seed.syncIntervalDays);
+            setMirrorList(seed.mirrorList);
+            setSmartDefinition(seed.smartDefinition);
+            setGlobalSmartMedia(seed.globalSmartMedia);
 
             pluginAdminService.getChronologyProviders(serverId)
                 .then(setChronologyProviders)
@@ -175,7 +180,7 @@ export default function CreateCollectionModal({
                 if (providers.length > 0) setSelectedProviderId(providers[0].id);
             }).catch(console.error);
         }
-    }, [isOpen, activeTab, serverId, clearStaged]);
+    }, [isOpen, activeTab, serverId, clearStaged, template, seedLibraryType]);
 
     const handleSubmit = async (e: React.SyntheticEvent) => {
         e.preventDefault();
@@ -230,7 +235,7 @@ export default function CreateCollectionModal({
 
     return (
         <Modal isOpen={isOpen} onClose={onClose} size="4xl" cardClassName="flex flex-col max-h-[90vh]">
-            <ModalHeader title="Create New Collection" onClose={onClose} />
+            <ModalHeader title={template ? 'Clone Collection' : 'Create New Collection'} onClose={onClose} />
 
             <ModalBody className="p-6">
                 <div className="flex gap-1 border-b border-[var(--vora-border-subtle)] mb-5">

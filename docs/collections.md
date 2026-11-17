@@ -120,6 +120,17 @@ re-sync immediately on save; on-scan re-evaluation is a deferred enhancement.
 Use a smart collection for a **genre / decade / rating** grouping and the AI
 List for a **franchise** — the two are complementary.
 
+## Cloning a collection
+
+An admin clones a collection from its page: the **Clone Collection** button beside Edit. It is all in the web client, with no server endpoint of its own.
+
+1. **`CloneCollectionDialog`** asks what kind of collection the copy will be: **Movie**, **Show** or **Global**. It starts on the kind the original is. Movie and Show mean a library of that kind (`smartMediaForLibrary`: Movie and Home Video libraries are Movie, TV libraries are Show; music has no collections); a kind with no library is disabled and says so, and when there is more than one library of the kind a **Library** list appears.
+2. **`CreateCollectionModal`** then opens, headed **Clone Collection**, with `template` set to the original. It is the ordinary create dialog: the same fields, the same **Create Collection** button, and it creates through `POST /collections` and opens the new collection.
+
+`cloneSeed` (`components/Collections/collectionSeed.ts`) fills the create dialog's fields from the original: title, description, sort title, seasonal window, default sort, the chronology provider with its list and auto-sync, the Auto-Fill provider with its list id, mirror and recheck interval, a smart collection's rules (with their limit and sort), the poster and backdrop, and which fields are locked. The title is copied as it is; it is the admin's to change. The poster counts as chosen, so a title never swaps it for a suggested Vora poster, and a collection without one is cloned without one. A smart collection's rules lose the fields the new kind has no use for (Duration on a show library or a shows-only global one), as when the Match is switched by hand; a global copy keeps what the original matched, or Movies & shows when it never said.
+
+**Not copied.** The items a collection holds: an Auto-Fill or smart collection fills itself again by sync, and one managed by hand starts empty. Also not copied: Hide from viewers (the create dialog has no such field) and the automatic (TMDB) flag, since a clone is always an admin-created collection. An uploaded poster is shared with the original by address (`/api/artwork/custom/…`), not copied, so deleting that picture from the original's artwork list removes it from the clone as well.
+
 ## Matching the list to the library (`CollectionMembershipResolver`)
 
 External ids (TMDB/IMDb) match first; everything else matches by title
