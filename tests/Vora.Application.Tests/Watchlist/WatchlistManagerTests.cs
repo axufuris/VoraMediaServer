@@ -1,5 +1,8 @@
 using Microsoft.Extensions.Logging.Abstractions;
 using Vora.Application.Analysis;
+using Vora.Application.Discovery;
+using Vora.Application.Watchlist.ViewModels;
+using DiscoveryItemDetailsVM = Vora.Application.Discovery.ViewModels.DiscoveryItemDetailsVM;
 using Vora.Application.Media;
 using Vora.Application.Requests;
 using Vora.Application.Watchlist;
@@ -16,6 +19,7 @@ public class WatchlistManagerTests
     private readonly IWatchlistRepository _repo = Substitute.For<IWatchlistRepository>();
     private readonly IMediaRepository _media = Substitute.For<IMediaRepository>();
     private readonly IRequestRepository _requests = Substitute.For<IRequestRepository>();
+    private readonly IDiscoveryManager _discovery = Substitute.For<IDiscoveryManager>();
     private readonly IClientNotifier _notifier = Substitute.For<IClientNotifier>();
     private readonly WatchlistManager _manager;
 
@@ -25,9 +29,11 @@ public class WatchlistManagerTests
             .Returns(new Dictionary<string, Guid>());
         _media.GetPosterUrlsByIdsAsync(Arg.Any<IReadOnlyCollection<Guid>>())
             .Returns(new Dictionary<Guid, string>());
+        _media.GetReleaseDatesByIdsAsync(Arg.Any<IReadOnlyCollection<Guid>>())
+            .Returns(new Dictionary<Guid, DateOnly>());
         _requests.GetRequestsAsync(Arg.Any<IEnumerable<string>>(), Arg.Any<string>())
             .Returns(new Dictionary<string, MediaRequest>());
-        _manager = new WatchlistManager(_repo, _media, _requests, _notifier, NullLogger<WatchlistManager>.Instance);
+        _manager = new WatchlistManager(_repo, _media, _requests, _discovery, _notifier, NullLogger<WatchlistManager>.Instance);
     }
 
     private static WatchlistRequest External(string externalId = "603") => new()
@@ -373,6 +379,139 @@ public class WatchlistManagerTests
 
         await _repo.Received(1).AddAsync(Arg.Is<UserWatchlistItem>(w =>
             w.MediaItemId == movieId && w.Title == "The Matrix (sent)" && w.PosterUrl == "/sent.jpg" && w.Type == "Movie"));
+    }
+
+    private static UserWatchlistItem Entry(string externalId, DateOnly? stored = null, Guid? mediaItemId = null, string type = "Movie") => new()
+    {
+        Id = Guid.NewGuid(),
+        ExternalId = externalId,
+        ProviderId = Tmdb,
+        Type = type,
+        Title = "A title " + externalId,
+        ReleaseDate = stored,
+        MediaItemId = mediaItemId,
+    };
+
+    private Task<List<WatchlistItemVM>> ReadAsync(params UserWatchlistItem[] entries)
+    {
+        var profileId = Guid.NewGuid();
+        _repo.GetWatchlistAsync(profileId).Returns(entries.ToList());
+        return _manager.GetWatchlistAsync(profileId);
+    }
+
+    [Fact]
+    public async Task A_title_in_the_library_carries_the_librarys_release_date_over_the_one_stored()
+    {
+        var libraryId = Guid.NewGuid();
+        _media.GetReleaseDatesByIdsAsync(Arg.Any<IReadOnlyCollection<Guid>>())
+            .Returns(new Dictionary<Guid, DateOnly> { [libraryId] = new DateOnly(1999, 3, 31) });
+
+        var result = await ReadAsync(Entry("603", new DateOnly(1999, 1, 1), libraryId));
+
+        result.Single().ReleaseDate.Should().Be(new DateOnly(1999, 3, 31));
+        await _discovery.DidNotReceive().GetItemDetailsAsync(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string>(), Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task A_title_outside_the_library_carries_the_release_date_stored_with_it_and_is_not_looked_up()
+    {
+        var result = await ReadAsync(Entry("27205", new DateOnly(2010, 7, 16)));
+
+        result.Single().ReleaseDate.Should().Be(new DateOnly(2010, 7, 16));
+        await _discovery.DidNotReceive().GetItemDetailsAsync(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string>(), Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task A_title_with_no_release_date_is_looked_up_on_its_provider_and_the_answer_is_kept()
+    {
+        var entry = Entry("27205");
+        _discovery.GetItemDetailsAsync(Tmdb, "27205", "Movie", Arg.Any<CancellationToken>())
+            .Returns(new DiscoveryItemDetailsVM { ReleaseDate = new DateOnly(2010, 7, 16) });
+
+        var result = await ReadAsync(entry);
+
+        result.Single().ReleaseDate.Should().Be(new DateOnly(2010, 7, 16));
+        await _repo.Received(1).SetReleaseDateAsync(entry.Id, new DateOnly(2010, 7, 16));
+    }
+
+    [Fact]
+    public async Task A_lookup_that_finds_nothing_leaves_the_date_blank_and_is_not_asked_again_at_once()
+    {
+        var entry = Entry("404");
+        var profileId = Guid.NewGuid();
+        _repo.GetWatchlistAsync(profileId).Returns(new List<UserWatchlistItem> { entry });
+
+        (await _manager.GetWatchlistAsync(profileId)).Single().ReleaseDate.Should().BeNull();
+        (await _manager.GetWatchlistAsync(profileId)).Single().ReleaseDate.Should().BeNull();
+
+        await _discovery.Received(1).GetItemDetailsAsync(Tmdb, "404", "Movie", Arg.Any<CancellationToken>());
+        await _repo.DidNotReceive().SetReleaseDateAsync(Arg.Any<Guid>(), Arg.Any<DateOnly>());
+    }
+
+    [Fact]
+    public async Task A_lookup_that_fails_does_not_fail_the_read()
+    {
+        _discovery.GetItemDetailsAsync(Tmdb, "500", "Movie", Arg.Any<CancellationToken>())
+            .Returns<DiscoveryItemDetailsVM?>(_ => throw new HttpRequestException("provider down"));
+
+        var result = await ReadAsync(Entry("500"), Entry("501", new DateOnly(2001, 2, 3)));
+
+        result.Select(r => r.ReleaseDate).Should().Equal(null, new DateOnly(2001, 2, 3));
+    }
+
+    [Fact]
+    public async Task No_more_than_ten_titles_are_looked_up_in_one_read()
+    {
+        var entries = Enumerable.Range(0, 12).Select(n => Entry("9" + n)).ToArray();
+
+        await ReadAsync(entries);
+
+        await _discovery.Received(10).GetItemDetailsAsync(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string>(), Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task A_title_with_no_provider_entry_is_not_looked_up()
+    {
+        var entry = Entry("");
+        entry.ProviderId = string.Empty;
+
+        await ReadAsync(entry);
+
+        await _discovery.DidNotReceive().GetItemDetailsAsync(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string>(), Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task Adding_from_discovery_keeps_the_release_date_the_client_sent()
+    {
+        var profileId = Guid.NewGuid();
+        _repo.FindAsync(profileId, "1396", Tmdb, null).Returns((UserWatchlistItem?)null);
+
+        await _manager.ToggleAsync(profileId, new WatchlistRequest
+        {
+            ExternalId = "1396",
+            ProviderId = Tmdb,
+            Type = "TvShow",
+            Title = "MobLand",
+            ReleaseDate = new DateOnly(2025, 3, 30),
+            ExpectedReleaseDate = new DateOnly(2026, 12, 1),
+        });
+
+        await _repo.Received(1).AddAsync(Arg.Is<UserWatchlistItem>(w =>
+            w.ReleaseDate == new DateOnly(2025, 3, 30) && w.ExpectedReleaseDate == new DateOnly(2026, 12, 1)));
+    }
+
+    [Fact]
+    public async Task A_movie_added_without_a_release_date_takes_its_expected_date_for_it_and_a_show_does_not()
+    {
+        var profileId = Guid.NewGuid();
+        _repo.FindAsync(profileId, "27205", Tmdb, null).Returns((UserWatchlistItem?)null);
+        _repo.FindAsync(profileId, "1396", Tmdb, null).Returns((UserWatchlistItem?)null);
+
+        await _manager.ToggleAsync(profileId, new WatchlistRequest { ExternalId = "27205", ProviderId = Tmdb, Type = "Movie", Title = "Inception", ExpectedReleaseDate = new DateOnly(2010, 7, 16) });
+        await _manager.ToggleAsync(profileId, new WatchlistRequest { ExternalId = "1396", ProviderId = Tmdb, Type = "TvShow", Title = "MobLand", ExpectedReleaseDate = new DateOnly(2026, 12, 1) });
+
+        await _repo.Received(1).AddAsync(Arg.Is<UserWatchlistItem>(w => w.ExternalId == "27205" && w.ReleaseDate == new DateOnly(2010, 7, 16)));
+        await _repo.Received(1).AddAsync(Arg.Is<UserWatchlistItem>(w => w.ExternalId == "1396" && w.ReleaseDate == null));
     }
 
     // --- A finished title leaves the watchlist

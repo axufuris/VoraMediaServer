@@ -111,6 +111,19 @@ public partial class MediaRepository : IMediaRepository
         return rows.ToDictionary(r => r.Id, r => r.PosterUrl ?? string.Empty);
     }
 
+    public async Task<Dictionary<Guid, DateOnly>> GetReleaseDatesByIdsAsync(IReadOnlyCollection<Guid> ids)
+    {
+        if (ids.Count == 0) return new Dictionary<Guid, DateOnly>();
+
+        var rows = await _context.MediaItems
+            .AsNoTracking()
+            .Where(m => ids.Contains(m.Id) && m.ReleaseDate != null)
+            .Select(m => new { m.Id, m.ReleaseDate })
+            .ToListAsync();
+
+        return rows.ToDictionary(r => r.Id, r => r.ReleaseDate!.Value);
+    }
+
     public async Task<Guid?> GetMovieIdByTitleAndYearAsync(string title, int? year, Guid libraryId, string? tmdbId = null, string? imdbId = null)
     {
         // Match on a normalized title (lowercased, punctuation stripped) so a

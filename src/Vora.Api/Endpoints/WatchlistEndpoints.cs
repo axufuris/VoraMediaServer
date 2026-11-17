@@ -16,6 +16,7 @@ public class ToggleWatchlistRequest
     public string Title { get; set; } = string.Empty;
     public string? PosterUrl { get; set; }
     public DateOnly? ExpectedReleaseDate { get; set; }
+    public DateOnly? ReleaseDate { get; set; }
 }
 
 // Deliberately outside the /api/discovery group: that group is gated on the
@@ -82,6 +83,7 @@ public static class WatchlistEndpoints
             Title = request.Title,
             PosterUrl = request.PosterUrl,
             ExpectedReleaseDate = request.ExpectedReleaseDate,
+            ReleaseDate = request.ReleaseDate,
         });
 
         // Auto-request only applies to titles that aren't in the library.

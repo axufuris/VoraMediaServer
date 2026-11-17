@@ -13,14 +13,14 @@ const GROUPS: { key: WatchlistGroup['key']; title: string; show: boolean; inLibr
     { key: 'showsNotInLibrary', title: 'Shows Not Yet in Library', show: true, inLibrary: false },
 ];
 
-const isShow = (item: WatchlistItem) => item.type.toLowerCase() === 'tvshow';
+export const isShowEntry = (item: WatchlistItem) => item.type.toLowerCase() === 'tvshow';
 
 export function groupWatchlist(items: WatchlistItem[]): WatchlistGroup[] {
     return GROUPS
         .map(({ key, title, show, inLibrary }) => ({
             key,
             title,
-            items: items.filter(item => isShow(item) === show && Boolean(item.mediaItemId) === inLibrary),
+            items: items.filter(item => isShowEntry(item) === show && Boolean(item.mediaItemId) === inLibrary),
         }))
         .filter(group => group.items.length > 0);
 }
