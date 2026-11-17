@@ -84,12 +84,12 @@ Operation IDs must be **unique within the whole document** — Swashbuckle will 
 
 Every endpoint must declare its auth requirement explicitly. The two policies:
 
-- **`RequireAuthorization("AdminOnly")`** — server administration. The `AdminOnly` policy requires the `IsAdmin` claim with value `True`.
+- **`RequireAuthorization("AdminOnly")`** — server administration. The `AdminOnly` policy requires the `isAdmin` claim with value `True`, which only a profile token carries.
 - **`RequireAuthorization()`** — any authenticated user.
 
 **Public exceptions** (via `.AllowAnonymous()` or by leaving the route off any auth group):
 
-- `AuthEndpoints` — `setup-status`, `setup`, `login`, `register`, `exchange-profile-token`
+- `AuthEndpoints` — `setup-status`, `setup`, `login`, `register`, `refresh`, `logout`, `forgot-password`, `reset-password`, `confirm-email-change`, `invitations/validate` (`exchange-profile-token` needs a token; `invite-code` and the invitation list/create/revoke routes are `AdminOnly`)
 - `ArtworkEndpoints` — `GET /api/artwork/custom/{fileName}`, `GET /api/artwork/local/{mediaItemId}/{fileName}`, `GET /api/artwork/vora/{category}/{fileName}` and `GET /api/artwork/thumb` (image tags can't carry a JWT; `thumb` serves the resized-artwork cache — see `docs/artwork-image-cache.md`; `local` serves only a title's own artwork from its media folder — see `docs/local-metadata.md`; `vora` serves only the posters that ship with Vora — see `docs/vora-posters.md`)
 - `UserImageEndpoints` — `GET /api/users/images/custom/{fileName}` (same reason)
 - `StreamingEndpoints` — `GET /api/streaming/play/{sessionId}` and `GET /api/streaming/hls/{fileName}` (the `<video>` element fetches these directly; auth is implicit via short-lived session token in the URL)

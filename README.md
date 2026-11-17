@@ -121,7 +121,7 @@ docker run -d \
   ghcr.io/axufuris/vora-media-server:latest
 ```
 
-Vora is now reachable at `http://<host>:8080`. The first profile you
+Vora is now reachable at `http://<host>:8080`. The first account you
 create through the setup flow becomes the server admin.
 
 Key environment variables:
@@ -143,8 +143,9 @@ Key environment variables:
   Use the **container name** of the Postgres service as `Host` when
   both run on the same Docker network.
 - `Jwt__SecretKey` — long random string used to sign profile and
-  account tokens. Generate once and keep it stable; rotating it
-  invalidates every existing session.
+  account tokens, at least 32 characters (the server refuses to start
+  with a shorter one or the placeholder). Generate once and keep it
+  stable; rotating it invalidates every existing session.
 - `TZ` — the container's time zone, e.g. `America/Chicago`. Without
   it a container runs on **UTC**, and every scheduled time in the
   admin settings (nightly scan, intro/credit detection, thumbnail
@@ -364,7 +365,7 @@ instead.
 Apply. Vora will auto-migrate the database on first launch (watch the
 container log if you want to confirm — you should see
 `Applying N pending database migration(s)`). Once it's up, open
-`http://<unraid-ip>:8080` and create the first profile, which becomes
+`http://<unraid-ip>:8080` and create the first account, which becomes
 the server admin.
 
 For an Intel or AMD GPU on Unraid, set the template's **Intel/AMD GPU**

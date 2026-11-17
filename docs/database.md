@@ -196,7 +196,7 @@ These are easy to overflow accidentally — note the limit when sending data fro
 | `PasswordResetTicket.TokenHash` | SHA-256 of the reset token (hex, lowercased) | 128 |
 | `InvitationTicket.Email` | invited email address | 256 |
 | `InvitationTicket.TokenHash` | SHA-256 of the invite token (hex, lowercased) | 128 |
-| `RegistrationTicket.SecretCode` | legacy 3-word shared invite code | 128 |
+| `RegistrationTicket.SecretCode` | shared 4-digit invite PIN (unique, valid 30 minutes, deleted when used) | 128 |
 
 When auditing column lengths, look at `ConfigureXxx` helpers in `VoraDbContext.cs` — those have the truth.
 

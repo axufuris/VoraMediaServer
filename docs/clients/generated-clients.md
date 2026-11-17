@@ -172,10 +172,10 @@ When `Vora.Api` ships a schema change:
 
 The generated clients don't know how Vora's auth headers work. Wrap each with a thin middleware (Swift) or OkHttp interceptor (Kotlin) that:
 
-- Reads the current account / profile token from secure storage (Keychain on Apple, EncryptedSharedPreferences on Android).
+- Reads the current account / profile token from storage (the Keychain on Apple; app-private SharedPreferences on Android, kept in plain text so a token survives an app update).
 - Adds `Authorization: Bearer <token>` to every outbound request.
 - Adds the `X-Vora-*` device headers (see `docs/auth-and-devices.md`) — `X-Vora-Device-Id`, `X-Vora-Client`, `X-Vora-Device`, `X-Vora-Device-Type`, `X-Vora-OS`.
-- On 401, triggers a re-auth flow (clear token, route user back to login).
+- On 401, trades the refresh token at `POST /api/auth/refresh` once and retries; only when that fails, clears the token and routes the user back to login (see `docs/auth-tokens.md`).
 
 The web client does the same thing in `src/api/client.ts`'s axios interceptor; the native shape mirrors it.
 
