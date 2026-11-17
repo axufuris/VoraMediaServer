@@ -62,6 +62,7 @@ export default function MediaExtrasRow({ videos, extras = [], serverId }: Props)
                         <VideoCard
                             title={extra.title}
                             label={formatExtraType(extra.extraType)}
+                            imageUrl={extra.thumbnailUrl}
                             onClick={() => playLocalExtra(extra)}
                         />
                     </MediaRowItem>

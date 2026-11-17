@@ -144,7 +144,7 @@ Everything that renders a piece of media as a tile goes through one small set of
 | `MediaGrid` | The wrapping-grid counterpart to `MediaRow`, on the same card metrics. |
 | `PersonCard` | The cast/crew tile. |
 | `CastRow` | `MediaRow` + `PersonCard`, with actors sorted ahead of crew. Used by both the media details page and the discovery details page. |
-| `VideoCard` | The 16:9 trailer/extra tile. |
+| `VideoCard` | The 16:9 trailer/extra tile. A local extra passes its `thumbnailUrl` as `imageUrl` (`docs/artwork-image-cache.md`). |
 | `SectionHeader` | The heading shared by `MediaRow` and `MediaGrid`, so a rail title and a grid title match. |
 | `DetailHero` | **The** top block of a detail page — backdrop, poster, title, chips, ratings, credits, actions, overview. Used by the media details page (Movie / TV Show / Season / Episode) and the discovery details page. `HeroChip` renders each hero fact; `HeroCredits` renders the director / genres / studio rows. |
 

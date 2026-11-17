@@ -92,3 +92,17 @@ Two things follow from the guard that are easy to get wrong:
 The endpoints bind the artwork type as **`[FromQuery] ArtworkKind kind`**. The web client builds that query in one place, `artworkKindQuery` in `api/Media/artworkService.ts`, used by `artworkService` and `collectionAdminService`. The edit modals previously posted `?type=` inline, which left the required parameter unbound, so every upload and add-from-URL was rejected by ASP.NET with a bare 400 before any Vora code ran — including the downloader above. `ArtworkUrlEndpointContractTests` pins the server side. Don't rename the server parameter to match a client: the OpenAPI document, and the native clients generated from it, use `kind`.
 
 Failures raise `InvalidOperationException` with a specific message, which the global handler turns into a 400 carrying that message in `ProblemDetails.detail`. Client handlers should surface it with `errorDetail(err, "…")` from `utils/apiError.ts` rather than alerting a fixed string — otherwise a precisely-explained failure reaches the viewer as "Failed to add URL" and the only way to diagnose it is the container log.
+
+## Thumbnails for local extras
+
+A local trailer or featurette has no artwork of its own, so the details page gave it a blank tile. Every entry of `MediaDetailsVM.Extras` now carries `ThumbnailUrl`, `/api/artwork/extra/{extraId}`. It is built from the id (`MediaExtraVM.ThumbnailUrl`, a read-only property), not stored, so nothing is migrated and the details query is unchanged.
+
+`GET /api/artwork/extra/{extraId}` is anonymous like the other artwork routes (the id is the address, and the image is the same kind of thing as a poster). `IExtraThumbnailService` answers it in this order:
+
+1. **A frame from the extra's own file.** `IVideoFrameArtworkService.GetExtraThumbnailAsync` takes the first part's file at a third, half and two thirds of its length and keeps the first frame that is not nearly black (the same choice a home video's poster makes, so a studio logo card or a fade-in is passed over). Each extra is its own file, so each gets its own frame: three trailers on one film show three different pictures. The frame is composed into a 960×540 JPEG (a blurred, darkened copy fills any space a non-16:9 video leaves) and kept as `media_extra_{extraId:N}_{partId:N}_frame.jpg` in `StoragePaths:CustomArtwork`. It is served `public, max-age=2592000, immutable`.
+2. **The title's backdrop** (`MediaItem.BackgroundUrl`, the show's for a show's extra), resized to 780 px through `IArtworkThumbnailService` like any backdrop, when the file is missing or no frame can be taken. Served `public, max-age=300`, so a frame that becomes possible later (the file reappears) is picked up soon.
+3. **404** when there is neither. Clients keep their placeholder tile.
+
+Frames are taken on first request, not on scan, and at most two ffmpeg grabs run at once (`ExtraFrameGate`), so a details page with many extras cannot start them all together; a second request for an extra already being made waits, then finds the file. The `media_` prefix means **Unused files** (`docs/unused-files.md`) treats these as removable, since no row names them: a sweep clears the cache and the next view makes the frames again. A file left by a deleted extra is cleaned the same way.
+
+Clients: web `MediaExtrasRow` passes it to `VideoCard`; Android `LocalExtraCard`, Roku `MediaDetailScreen` (extras rail) and tvOS `MediaExtraTile` draw it under the play disc and type chip. The field is optional on the clients, so an older server shows today's placeholder.

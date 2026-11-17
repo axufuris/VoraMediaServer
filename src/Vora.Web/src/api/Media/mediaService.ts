@@ -13,6 +13,7 @@ export interface MediaExtra {
     title: string;
     extraType: string;
     container?: string | null;
+    thumbnailUrl?: string | null;
 }
 
 export interface VideoTrack {

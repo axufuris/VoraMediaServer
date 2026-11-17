@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Options;
 using Vora.Application.Artwork;
 using Vora.Application.FileSystem;
+using Vora.Application.Media;
 using Vora.Application.Settings;
 using Vora.Domain.Enums;
 
@@ -24,6 +25,9 @@ public static partial class ArtworkEndpoints
             .AllowAnonymous();
 
         group.MapGet("/artwork/thumb", ServeThumbnailAsync)
+            .AllowAnonymous();
+
+        group.MapGet("/artwork/extra/{extraId:guid}", ServeExtraThumbnailAsync)
             .AllowAnonymous();
 
         group.MapGet("/artwork/vora/{category}/{fileName}", ServeVoraPoster)
@@ -76,6 +80,37 @@ public static partial class ArtworkEndpoints
 
         httpContext.Response.Headers.CacheControl = "public, max-age=2592000, immutable";
         return Results.File(path, ImageContentType(path));
+    }
+
+    private static async Task<IResult> ServeExtraThumbnailAsync(
+        Guid extraId,
+        IExtraThumbnailService extras,
+        IArtworkThumbnailService thumbnails,
+        HttpContext httpContext,
+        CancellationToken cancellationToken)
+    {
+        var thumbnail = await extras.GetAsync(extraId, cancellationToken);
+        if (thumbnail == null)
+        {
+            return Results.NotFound();
+        }
+
+        if (thumbnail.FramePath != null && File.Exists(thumbnail.FramePath))
+        {
+            httpContext.Response.Headers.CacheControl = "public, max-age=2592000, immutable";
+            return Results.File(thumbnail.FramePath, "image/jpeg");
+        }
+
+        var fallback = thumbnail.FallbackUrl == null
+            ? null
+            : await thumbnails.GetOrCreateThumbnailAsync(thumbnail.FallbackUrl, 780, "backdrop", cancellationToken);
+        if (fallback == null || !File.Exists(fallback))
+        {
+            return Results.NotFound();
+        }
+
+        httpContext.Response.Headers.CacheControl = "public, max-age=300";
+        return Results.File(fallback, ThumbnailContentType(fallback));
     }
 
     private static IResult ServeVoraPoster(string category, string fileName, IVoraPosterCatalog posters, HttpContext httpContext)

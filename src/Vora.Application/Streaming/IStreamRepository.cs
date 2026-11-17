@@ -1,4 +1,5 @@
 ﻿using System.Linq.Expressions;
+using Vora.Application.Media;
 using Vora.Application.Streaming.Dtos;
 using Vora.Domain.Entities.Media;
 using Vora.Domain.Entities.Streaming;
@@ -25,6 +26,7 @@ public interface IStreamRepository
     Task UpdateUserMediaStateAsync(Guid profileId, Guid mediaItemId, double currentPosition, double mediaDuration);
     Task<MediaPart?> GetMediaPartForSessionAsync(Guid sessionId);
     Task<MediaExtra?> GetMediaExtraAsync(Guid extraId);
+    Task<ExtraThumbnailSourceDto?> GetExtraThumbnailSourceAsync(Guid extraId);
     Task<MediaStreamInfoDto?> GetExtraStreamInfoAsync(Guid extraId);
     Task<(List<HistorySessionDto> Data, int Total)> GetGroupedHistoryAsync(StreamHistoryQuery query);
     Task<IEnumerable<T>> GetProjectedActiveStreamsAsync<T>(TimeSpan activeThreshold, Expression<Func<StreamSession, T>> projection);
