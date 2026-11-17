@@ -71,7 +71,7 @@ The `EmailTemplate` entity stores per-key admin overrides (`SubjectOverride`, `H
 
 ## Use case wiring
 
-**Password reset** — `AuthManager.RequestPasswordResetAsync`. Throttled to 3/hour/email via `IMemoryCache`. Tokens are 32 random bytes, base64url, SHA-256 hashed before storage in `PasswordResetTicket`. Lifetime 60 minutes. On successful reset, all outstanding tickets for that user are deleted.
+**Password reset** — `AuthManager.RequestPasswordResetAsync`. Throttled to 3/hour/email via `IMemoryCache`. Tokens are 32 random bytes, base64url, SHA-256 hashed before storage in `PasswordResetTicket`. Lifetime 60 minutes. On successful reset, all outstanding tickets for that user are deleted and the account's security stamp rotates, which signs every session of that account out (`docs/auth-tokens.md`).
 
 **Admin invitation** — `InvitationManager.CreateInvitationAsync`. Per-email `InvitationTicket` with SHA-256 hashed token. Default 7 day lifetime (max 60). Sending a new invite for an email with an outstanding one invalidates the old one. Accepting an invite **bypasses** `RegistrationMode.Disabled` — the link is an explicit per-email exemption.
 
