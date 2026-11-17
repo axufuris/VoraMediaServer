@@ -1,5 +1,6 @@
 using System.Linq.Expressions;
 using Microsoft.EntityFrameworkCore;
+using Vora.Application.Media;
 using Vora.Application.Streaming;
 using Vora.Application.Streaming.Dtos;
 using Vora.Domain.Entities.Media;
@@ -253,6 +254,22 @@ public class StreamRepository(VoraDbContext context) : IStreamRepository
 
     public Task<MediaExtra?> GetMediaExtraAsync(Guid extraId) =>
         context.MediaExtras.AsNoTracking().FirstOrDefaultAsync(e => e.Id == extraId);
+
+    public Task<ExtraThumbnailSourceDto?> GetExtraThumbnailSourceAsync(Guid extraId) =>
+        context.MediaExtras
+            .AsNoTracking()
+            .Where(e => e.Id == extraId)
+            .Select(e => new ExtraThumbnailSourceDto
+            {
+                ExtraId = e.Id,
+                FallbackUrl = e.MediaItem.BackgroundUrl,
+                Part = e.Parts
+                    .OrderBy(p => p.PartNumber)
+                    .ThenBy(p => p.Id)
+                    .Select(p => new ExtraThumbnailPartDto { Id = p.Id, FilePath = p.FilePath, Duration = p.Duration })
+                    .FirstOrDefault()
+            })
+            .FirstOrDefaultAsync();
 
     public Task<MediaStreamInfoDto?> GetExtraStreamInfoAsync(Guid extraId) =>
         context.MediaExtras

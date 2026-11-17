@@ -14,6 +14,8 @@ namespace Vora.Application.Metadata;
 public interface IVideoFrameArtworkService
 {
     Task<List<MediaArtwork>> GetFrameArtworkAsync(MediaItem item, bool needsPoster, bool needsBackdrop, CancellationToken cancellationToken = default);
+
+    Task<string?> GetExtraThumbnailAsync(Guid extraId, Guid partId, string filePath, TimeSpan? duration, CancellationToken cancellationToken = default);
 }
 
 public sealed class VideoFrameArtworkService(
@@ -24,10 +26,13 @@ public sealed class VideoFrameArtworkService(
     public const string ProviderId = "video_frame";
     public static readonly Size PosterSize = new(720, 1080);
     public static readonly Size BackdropSize = new(1920, 1080);
+    public static readonly Size ExtraThumbnailSize = new(960, 540);
 
     private const string UrlPrefix = "/api/artwork/custom/";
     private const double DarkFrameLuminance = 0.08;
     private static readonly double[] FramePositions = [1d / 3, 1d / 2, 2d / 3];
+
+    private static readonly SemaphoreSlim ExtraFrameGate = new(2);
 
     private readonly string _artworkFolder = StorageRoots.CustomArtwork(storagePaths.Value);
 
@@ -47,6 +52,36 @@ public sealed class VideoFrameArtworkService(
         if (needsPoster) artwork.Add(Artwork(item, ArtworkKind.Poster, poster, PosterSize));
         if (needsBackdrop) artwork.Add(Artwork(item, ArtworkKind.Backdrop, backdrop, BackdropSize));
         return artwork;
+    }
+
+    public async Task<string?> GetExtraThumbnailAsync(Guid extraId, Guid partId, string filePath, TimeSpan? duration, CancellationToken cancellationToken = default)
+    {
+        if (string.IsNullOrWhiteSpace(filePath) || !File.Exists(filePath)) return null;
+
+        var path = Path.Combine(_artworkFolder, $"media_extra_{extraId:N}_{partId:N}_frame.jpg");
+        if (File.Exists(path)) return path;
+
+        await ExtraFrameGate.WaitAsync(cancellationToken);
+        try
+        {
+            if (File.Exists(path)) return path;
+
+            using var frame = await GrabFrameAsync(filePath, duration, cancellationToken);
+            if (frame == null)
+            {
+                logger.LogWarning("Could not take a frame from {FilePath} for its thumbnail", filePath);
+                return null;
+            }
+
+            Directory.CreateDirectory(_artworkFolder);
+            using var thumbnail = Compose(frame, ExtraThumbnailSize);
+            await SaveAsync(thumbnail, path, cancellationToken);
+            return path;
+        }
+        finally
+        {
+            ExtraFrameGate.Release();
+        }
     }
 
     public static Image<Rgb24> Compose(Image<Rgb24> frame, Size size)
@@ -78,7 +113,7 @@ public sealed class VideoFrameArtworkService(
 
     private async Task<bool> WriteFrameArtworkAsync(MediaPart part, string posterPath, string backdropPath, CancellationToken cancellationToken)
     {
-        using var frame = await GrabFrameAsync(part, cancellationToken);
+        using var frame = await GrabFrameAsync(part.FilePath, part.Duration, cancellationToken);
         if (frame == null)
         {
             logger.LogWarning("Could not take a frame from {FilePath} for its poster", part.FilePath);
@@ -91,9 +126,9 @@ public sealed class VideoFrameArtworkService(
         return true;
     }
 
-    private async Task<Image<Rgb24>?> GrabFrameAsync(MediaPart part, CancellationToken cancellationToken)
+    private async Task<Image<Rgb24>?> GrabFrameAsync(string filePath, TimeSpan? knownDuration, CancellationToken cancellationToken)
     {
-        var duration = part.Duration ?? await generator.ProbeDurationAsync(part.FilePath, cancellationToken);
+        var duration = knownDuration ?? await generator.ProbeDurationAsync(filePath, cancellationToken);
         IEnumerable<TimeSpan> positions = duration is { TotalSeconds: > 1 } known
             ? FramePositions.Select(position => known * position)
             : [TimeSpan.Zero];
@@ -105,7 +140,7 @@ public sealed class VideoFrameArtworkService(
             var temp = Path.Combine(Path.GetTempPath(), $"vora-frame-{Guid.NewGuid():N}.jpg");
             try
             {
-                if (!await generator.ExtractFrameAsync(part.FilePath, at, temp, cancellationToken)) continue;
+                if (!await generator.ExtractFrameAsync(filePath, at, temp, cancellationToken)) continue;
 
                 var frame = await Image.LoadAsync<Rgb24>(temp, cancellationToken);
                 var luminance = MeanLuminance(frame);
@@ -128,7 +163,7 @@ public sealed class VideoFrameArtworkService(
             }
             catch (Exception ex) when (ex is IOException or ImageFormatException)
             {
-                logger.LogWarning(ex, "Could not read the frame taken from {FilePath} at {At}", part.FilePath, at);
+                logger.LogWarning(ex, "Could not read the frame taken from {FilePath} at {At}", filePath, at);
             }
             finally
             {

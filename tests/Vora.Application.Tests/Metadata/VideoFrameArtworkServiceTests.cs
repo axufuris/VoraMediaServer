@@ -132,6 +132,86 @@ public class VideoFrameArtworkServiceTests : IDisposable
         await _generator.Received(1).ExtractFrameAsync(Arg.Any<string>(), Arg.Any<TimeSpan>(), Arg.Any<string>(), Arg.Any<CancellationToken>());
     }
 
+    private string ExtraFile(string name)
+    {
+        var file = Path.Combine(_root, "Movie", "Trailers", name);
+        Directory.CreateDirectory(Path.GetDirectoryName(file) ?? _root);
+        File.WriteAllText(file, string.Empty);
+        return file;
+    }
+
+    [Fact]
+    public async Task An_extra_gets_a_widescreen_thumbnail_from_its_own_file()
+    {
+        _frames.Enqueue((1920, 1080, Lit));
+
+        var path = await _service.GetExtraThumbnailAsync(Guid.NewGuid(), Guid.NewGuid(), ExtraFile("Trailer.mkv"), TimeSpan.FromSeconds(90), TestContext.Current.CancellationToken);
+
+        path.Should().NotBeNull();
+        using var thumbnail = await Image.LoadAsync<Rgb24>(path!, TestContext.Current.CancellationToken);
+        thumbnail.Size.Should().Be(VideoFrameArtworkService.ExtraThumbnailSize);
+        thumbnail[thumbnail.Width / 2, thumbnail.Height / 2].R.Should().BeInRange(205, 235);
+    }
+
+    [Fact]
+    public async Task Each_extra_gets_a_thumbnail_of_its_own()
+    {
+        var teaser = ExtraFile("Teaser.mkv");
+        var featurette = ExtraFile("Making.of.mkv");
+        _frames.Enqueue((1920, 1080, Lit));
+        _frames.Enqueue((1920, 1080, new Rgb24(40, 120, 200)));
+
+        var first = await _service.GetExtraThumbnailAsync(Guid.NewGuid(), Guid.NewGuid(), teaser, TimeSpan.FromSeconds(90), TestContext.Current.CancellationToken);
+        var second = await _service.GetExtraThumbnailAsync(Guid.NewGuid(), Guid.NewGuid(), featurette, TimeSpan.FromSeconds(300), TestContext.Current.CancellationToken);
+
+        first.Should().NotBe(second);
+        using var one = await Image.LoadAsync<Rgb24>(first!, TestContext.Current.CancellationToken);
+        using var two = await Image.LoadAsync<Rgb24>(second!, TestContext.Current.CancellationToken);
+        one[one.Width / 2, one.Height / 2].R.Should().BeGreaterThan(200);
+        two[two.Width / 2, two.Height / 2].B.Should().BeGreaterThan(150);
+        await _generator.Received(1).ExtractFrameAsync(teaser, TimeSpan.FromSeconds(30), Arg.Any<string>(), Arg.Any<CancellationToken>());
+        await _generator.Received(1).ExtractFrameAsync(featurette, TimeSpan.FromSeconds(100), Arg.Any<string>(), Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task An_extra_thumbnail_is_taken_once_and_kept()
+    {
+        var extraId = Guid.NewGuid();
+        var partId = Guid.NewGuid();
+        var file = ExtraFile("Trailer.mkv");
+        _frames.Enqueue((1920, 1080, Lit));
+
+        var first = await _service.GetExtraThumbnailAsync(extraId, partId, file, TimeSpan.FromSeconds(90), TestContext.Current.CancellationToken);
+        var again = await _service.GetExtraThumbnailAsync(extraId, partId, file, TimeSpan.FromSeconds(90), TestContext.Current.CancellationToken);
+
+        again.Should().Be(first);
+        await _generator.Received(1).ExtractFrameAsync(Arg.Any<string>(), Arg.Any<TimeSpan>(), Arg.Any<string>(), Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task A_dark_opening_is_passed_over_for_an_extra_too()
+    {
+        var file = ExtraFile("Trailer.mkv");
+        _frames.Enqueue((1920, 1080, Dark));
+        _frames.Enqueue((1920, 1080, Lit));
+
+        var path = await _service.GetExtraThumbnailAsync(Guid.NewGuid(), Guid.NewGuid(), file, TimeSpan.FromSeconds(90), TestContext.Current.CancellationToken);
+
+        using var thumbnail = await Image.LoadAsync<Rgb24>(path!, TestContext.Current.CancellationToken);
+        thumbnail[thumbnail.Width / 2, thumbnail.Height / 2].R.Should().BeGreaterThan(200);
+        await _generator.DidNotReceive().ExtractFrameAsync(Arg.Any<string>(), TimeSpan.FromSeconds(60), Arg.Any<string>(), Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task An_extra_without_a_readable_file_or_a_frame_has_no_thumbnail()
+    {
+        var missing = Path.Combine(_root, "Movie", "Trailers", "Gone.mkv");
+
+        (await _service.GetExtraThumbnailAsync(Guid.NewGuid(), Guid.NewGuid(), missing, null, TestContext.Current.CancellationToken)).Should().BeNull();
+        (await _service.GetExtraThumbnailAsync(Guid.NewGuid(), Guid.NewGuid(), ExtraFile("Corrupt.mkv"), TimeSpan.FromSeconds(90), TestContext.Current.CancellationToken)).Should().BeNull();
+        await _generator.DidNotReceive().ExtractFrameAsync(missing, Arg.Any<TimeSpan>(), Arg.Any<string>(), Arg.Any<CancellationToken>());
+    }
+
     [Fact]
     public async Task Nothing_is_made_without_a_readable_file_or_a_frame()
     {

@@ -8,4 +8,5 @@ public class MediaExtraVM
     public string Title { get; set; } = string.Empty;
     public MediaExtraType ExtraType { get; set; }
     public string? Container { get; set; }
+    public string ThumbnailUrl => $"/api/artwork/extra/{Id}";
 }
