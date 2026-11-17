@@ -1298,4 +1298,51 @@ public class PostgresMigrationHistoryTests(PostgresDatabase database) : IClassFi
         var afterSecondRun = await again.UserWatchlistItems.AsNoTracking().OrderBy(w => w.ProfileId).ThenBy(w => w.AddedAt).ToListAsync(cancellationToken);
         afterSecondRun.Should().BeEquivalentTo(afterFirstRun);
     }
+
+    [Fact]
+    public async Task A_database_on_the_watchlist_shows_migration_gains_release_dates_for_the_movies_on_its_watchlists_and_no_others()
+    {
+        Assert.SkipUnless(PostgresDatabase.IsConfigured, PostgresDatabase.SkipReason);
+        var cancellationToken = TestContext.Current.CancellationToken;
+        await using var legacy = new LegacyDatabase();
+        var profile = Guid.NewGuid();
+        var day = new DateTime(2026, 11, 1, 12, 0, 0, DateTimeKind.Utc);
+
+        var dated = WatchlistRow(profile, "Dune: Part Three", "Movie", "1170608", "tmdb_discovery", null, day);
+        dated.ExpectedReleaseDate = new DateOnly(2026, 12, 18);
+        var undated = WatchlistRow(profile, "Hexed", "Movie", "1100", "tmdb_discovery", null, day.AddDays(1));
+        var airing = WatchlistRow(profile, "MobLand", "TvShow", "1396", "tmdb_discovery", null, day.AddDays(2));
+        airing.ExpectedReleaseDate = new DateOnly(2026, 12, 1);
+
+        await legacy.BuildWatchlistShowsStateAsync(async db =>
+        {
+            db.AddRange(dated, undated, airing);
+            await db.SaveChangesAsync(cancellationToken);
+        }, cancellationToken);
+
+        await using (var before = legacy.NewContext())
+        {
+            (await before.Database.GetPendingMigrationsAsync(cancellationToken)).Should().Equal(MigrationHistoryTests.ChangesSinceInitial);
+            (await ColumnsAsync(before, "UserWatchlistItems", cancellationToken)).Should().NotContain("ReleaseDate");
+        }
+
+        await legacy.MigrateAsync(cancellationToken);
+
+        List<UserWatchlistItem> afterFirstRun;
+        await using (var after = legacy.NewContext())
+        {
+            (await after.Database.GetPendingMigrationsAsync(cancellationToken)).Should().BeEmpty();
+            afterFirstRun = await after.UserWatchlistItems.AsNoTracking().OrderBy(w => w.AddedAt).ToListAsync(cancellationToken);
+
+            afterFirstRun.Select(w => w.ReleaseDate).Should().Equal(new DateOnly(2026, 12, 18), null, null);
+            afterFirstRun.Select(w => w.ExpectedReleaseDate).Should().Equal(new DateOnly(2026, 12, 18), null, new DateOnly(2026, 12, 1));
+
+            await after.Database.ExecuteSqlAsync($"DELETE FROM \"__EFMigrationsHistory\" WHERE \"MigrationId\" = {MigrationHistoryTests.ChangesSinceInitial}", cancellationToken);
+        }
+
+        await legacy.MigrateAsync(cancellationToken);
+
+        await using var again = legacy.NewContext();
+        (await again.UserWatchlistItems.AsNoTracking().OrderBy(w => w.AddedAt).ToListAsync(cancellationToken)).Should().BeEquivalentTo(afterFirstRun);
+    }
 }

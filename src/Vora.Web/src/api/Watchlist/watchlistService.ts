@@ -11,6 +11,7 @@ export interface WatchlistItem {
     type: string;
     title: string;
     posterUrl?: string;
+    releaseDate?: string;
     addedAt: string;
     // Present when the title is in the library, so the tile opens the local item
     // rather than the provider page.
@@ -31,6 +32,7 @@ interface ToggleBody extends Partial<{ mediaItemId: string; externalId: string; 
     title: string;
     posterUrl?: string;
     expectedReleaseDate?: string;
+    releaseDate?: string;
 }
 
 export const watchlistService = {
@@ -52,7 +54,7 @@ export const watchlistService = {
     // Returns the state the title is in after the toggle.
     toggle: async (
         target: WatchlistTarget,
-        details: { type: string; title: string; posterUrl?: string; expectedReleaseDate?: string },
+        details: { type: string; title: string; posterUrl?: string; expectedReleaseDate?: string; releaseDate?: string },
         serverId?: string
     ): Promise<boolean> => {
         const body: ToggleBody = { ...target, ...details };

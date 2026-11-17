@@ -1,5 +1,7 @@
+using System.Collections.Concurrent;
 using Microsoft.Extensions.Logging;
 using Vora.Application.Analysis;
+using Vora.Application.Discovery;
 using Vora.Application.Media;
 using Vora.Application.Requests;
 using Vora.Application.Watchlist.ViewModels;
@@ -17,6 +19,7 @@ public class WatchlistRequest
     public string Title { get; set; } = string.Empty;
     public string? PosterUrl { get; set; }
     public DateOnly? ExpectedReleaseDate { get; set; }
+    public DateOnly? ReleaseDate { get; set; }
 }
 
 public interface IWatchlistManager
@@ -40,10 +43,15 @@ public class WatchlistManager(
     IWatchlistRepository repository,
     IMediaRepository mediaRepository,
     IRequestRepository requestRepository,
+    IDiscoveryManager discovery,
     IClientNotifier notifier,
     ILogger<WatchlistManager> logger) : IWatchlistManager
 {
     private const string TmdbProviderId = "tmdb_discovery";
+    private const int MaxReleaseDateLookups = 10;
+    private static readonly TimeSpan ReleaseDateLookupBudget = TimeSpan.FromSeconds(3);
+    private static readonly TimeSpan ReleaseDateRetryAfter = TimeSpan.FromMinutes(15);
+    private static readonly ConcurrentDictionary<Guid, DateTime> ReleaseDateLookups = new();
 
     public async Task<List<WatchlistItemVM>> GetWatchlistAsync(Guid profileId)
     {
@@ -69,6 +77,7 @@ public class WatchlistManager(
         var libraryPosters = await mediaRepository.GetPosterUrlsByIdsAsync(
             localIdsByEntry.Values.OfType<Guid>().Distinct().ToList());
         var requested = await GetRequestedEntryIdsAsync(items.Where(i => localIdsByEntry[i.Id] is null).ToList());
+        var releaseDates = await GetReleaseDatesAsync(items, localIdsByEntry);
 
         return items.Select(i =>
         {
@@ -82,11 +91,61 @@ public class WatchlistManager(
                 Type = i.Type,
                 Title = i.Title,
                 PosterUrl = mediaItemId is Guid id && libraryPosters.TryGetValue(id, out var poster) ? poster : i.PosterUrl,
+                ReleaseDate = releaseDates.TryGetValue(i.Id, out var releaseDate) ? releaseDate : null,
                 AddedAt = i.AddedAt,
                 MediaItemId = mediaItemId,
                 IsRequested = requested.Contains(i.Id),
             };
         }).ToList();
+    }
+
+    private async Task<Dictionary<Guid, DateOnly>> GetReleaseDatesAsync(List<UserWatchlistItem> items, Dictionary<Guid, Guid?> localIdsByEntry)
+    {
+        var libraryDates = await mediaRepository.GetReleaseDatesByIdsAsync(localIdsByEntry.Values.OfType<Guid>().Distinct().ToList());
+        var dates = new Dictionary<Guid, DateOnly>();
+        var unknown = new List<UserWatchlistItem>();
+
+        foreach (var item in items)
+        {
+            var mediaItemId = localIdsByEntry[item.Id];
+            if (mediaItemId is Guid id && libraryDates.TryGetValue(id, out var libraryDate)) dates[item.Id] = libraryDate;
+            else if (item.ReleaseDate is DateOnly stored) dates[item.Id] = stored;
+            else if (mediaItemId is null && item.ProviderId.Length > 0 && item.ExternalId.Length > 0) unknown.Add(item);
+        }
+
+        foreach (var (entryId, date) in await LookUpReleaseDatesAsync(unknown)) dates[entryId] = date;
+        return dates;
+    }
+
+    private async Task<Dictionary<Guid, DateOnly>> LookUpReleaseDatesAsync(List<UserWatchlistItem> unknown)
+    {
+        var found = new Dictionary<Guid, DateOnly>();
+        var now = DateTime.UtcNow;
+        var due = unknown
+            .Where(i => !ReleaseDateLookups.TryGetValue(i.Id, out var tried) || now - tried > ReleaseDateRetryAfter)
+            .Take(MaxReleaseDateLookups);
+
+        using var budget = new CancellationTokenSource(ReleaseDateLookupBudget);
+        foreach (var item in due)
+        {
+            if (budget.IsCancellationRequested) break;
+
+            ReleaseDateLookups[item.Id] = now;
+            try
+            {
+                var details = await discovery.GetItemDetailsAsync(item.ProviderId, item.ExternalId, item.Type, budget.Token);
+                if (details?.ReleaseDate is not DateOnly date) continue;
+
+                await repository.SetReleaseDateAsync(item.Id, date);
+                found[item.Id] = date;
+                ReleaseDateLookups.TryRemove(item.Id, out _);
+            }
+            catch (Exception ex)
+            {
+                logger.LogWarning(ex, "Couldn't look up the release date of watchlist entry {EntryId}.", item.Id);
+            }
+        }
+        return found;
     }
 
     // The entries, none of them in a library, that someone has asked for and
@@ -198,6 +257,7 @@ public class WatchlistManager(
             Title = request.Title,
             PosterUrl = request.PosterUrl,
             ExpectedReleaseDate = request.ExpectedReleaseDate,
+            ReleaseDate = request.ReleaseDate ?? (string.Equals(request.Type, "Movie", StringComparison.OrdinalIgnoreCase) ? request.ExpectedReleaseDate : null),
         });
         return true;
     }

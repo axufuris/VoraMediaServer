@@ -45,6 +45,11 @@ public class WatchlistRepository(VoraDbContext context) : IWatchlistRepository
             .Where(w => w.Id == watchlistItemId)
             .ExecuteUpdateAsync(s => s.SetProperty(w => w.MediaItemId, mediaItemId));
 
+    public async Task SetReleaseDateAsync(Guid watchlistItemId, DateOnly releaseDate) =>
+        await context.UserWatchlistItems
+            .Where(w => w.Id == watchlistItemId)
+            .ExecuteUpdateAsync(s => s.SetProperty(w => w.ReleaseDate, releaseDate));
+
     public async Task<WatchlistTitle?> GetTitleAsync(Guid mediaItemId)
     {
         var showId = await context.Set<Episode>().AsNoTracking()

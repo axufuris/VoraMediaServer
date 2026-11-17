@@ -9,6 +9,7 @@ public class WatchlistItemVM
     public string Type { get; set; } = string.Empty;
     public string Title { get; set; } = string.Empty;
     public string? PosterUrl { get; set; }
+    public DateOnly? ReleaseDate { get; set; }
     public DateTime AddedAt { get; set; }
 
     // Set when the title is in the library, so the client can open the local

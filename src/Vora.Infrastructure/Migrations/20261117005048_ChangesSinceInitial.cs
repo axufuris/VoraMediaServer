@@ -426,11 +426,26 @@ WHERE w.""Id"" = f.""EntryId""
                     AND o.""ProviderId"" = CASE WHEN f.""ShowTmdbId"" IS NULL THEN '' ELSE 'tmdb_discovery' END);
 
 DROP TABLE ""_WatchlistShowFix"";");
+
+            // The watchlist keeps each title's own release date, the year its poster
+            // is captioned with (docs/frontend-client-ui.md). A movie's expected date
+            // is its release date, so those carry over; the others are looked up
+            // the next time the Watchlist is read. Running it again changes nothing.
+            migrationBuilder.Sql(@"
+ALTER TABLE ""UserWatchlistItems"" ADD COLUMN IF NOT EXISTS ""ReleaseDate"" date;
+
+UPDATE ""UserWatchlistItems""
+SET ""ReleaseDate"" = ""ExpectedReleaseDate""
+WHERE ""ReleaseDate"" IS NULL AND ""Type"" = 'Movie' AND ""ExpectedReleaseDate"" IS NOT NULL;");
         }
 
         /// <inheritdoc />
         protected override void Down(MigrationBuilder migrationBuilder)
         {
+            migrationBuilder.DropColumn(
+                name: "ReleaseDate",
+                table: "UserWatchlistItems");
+
             migrationBuilder.DropColumn(
                 name: "Hidden",
                 table: "Collections");

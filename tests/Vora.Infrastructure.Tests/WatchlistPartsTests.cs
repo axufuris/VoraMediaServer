@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging.Abstractions;
 using Vora.Application.Analysis;
+using Vora.Application.Discovery;
 using Vora.Application.Requests;
 using Vora.Application.Watchlist;
 using Vora.Domain.Entities.Library;
@@ -26,7 +27,7 @@ public class WatchlistPartsTests
     private static async Task<Seeded> SeedAsync(VoraDbContext db)
     {
         var library = new MediaLibrary { Id = Guid.NewGuid(), Name = "Library", Type = LibraryType.TvShow, FolderPaths = new List<string> { "/tv" } };
-        var show = new TvShow { Id = Guid.NewGuid(), Title = "MobLand", TmdbId = "1396", PosterUrl = "/api/artwork/custom/mobland.jpg", LibraryId = library.Id };
+        var show = new TvShow { Id = Guid.NewGuid(), Title = "MobLand", TmdbId = "1396", PosterUrl = "/api/artwork/custom/mobland.jpg", ReleaseDate = new DateOnly(2025, 3, 30), LibraryId = library.Id };
         var season = new Season { Id = Guid.NewGuid(), Title = "Season 1", SeasonNumber = 1, TvShowId = show.Id, LibraryId = library.Id, PosterUrl = "/api/artwork/custom/season-one.jpg" };
         var episode = new Episode { Id = Guid.NewGuid(), Title = "Pilot", EpisodeNumber = 1, SeasonId = season.Id, LibraryId = library.Id };
         var otherShow = new TvShow { Id = Guid.NewGuid(), Title = "Severance", TmdbId = "95396", LibraryId = library.Id };
@@ -45,6 +46,7 @@ public class WatchlistPartsTests
             new WatchlistRepository(db),
             new MediaRepository(NullLogger<MediaRepository>.Instance, db),
             requests,
+            Substitute.For<IDiscoveryManager>(),
             Substitute.For<IClientNotifier>(),
             NullLogger<WatchlistManager>.Instance);
     }
@@ -80,6 +82,7 @@ public class WatchlistPartsTests
         entry.MediaItemId.Should().Be(seeded.Show.Id);
         entry.ExternalId.Should().Be("1396");
         entry.PosterUrl.Should().Be("/api/artwork/custom/mobland.jpg");
+        entry.ReleaseDate.Should().Be(new DateOnly(2025, 3, 30));
     }
 
     [Fact]

@@ -19,6 +19,7 @@ public class UserWatchlistItem
     public Guid? MediaItemId { get; set; }
 
     public DateOnly? ExpectedReleaseDate { get; set; }
+    public DateOnly? ReleaseDate { get; set; }
     public DateTime AddedAt { get; set; } = DateTime.UtcNow;
 
     public Guid ProfileId { get; set; }

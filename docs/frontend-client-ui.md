@@ -87,6 +87,19 @@ and Roku clients use the same order and the same four titles. "Not Yet" rather
 than "Upcoming" because a title there may be old and simply in no library; the
 clock in its corner marks the ones that are on their way.
 
+**A Watchlist poster reads Title, then Year,** as a movie or a show does on the home
+page (`posterCaption`): no "Movie" or "TV Series" line, and no second line when the
+year is not known. Each `/api/watchlist` entry carries `releaseDate`. For a title
+in a library it is the library item's own date; otherwise it is the date stored
+with the entry (`UserWatchlistItems.ReleaseDate`), which Discover sends when it
+adds a title, a film's expected date stands in for when none was sent, and what the
+Discover provider says fills in an older entry (`WatchlistManager.GetWatchlistAsync`
+looks up at most ten such entries per read, for three seconds in all, keeps what it
+finds, and does not ask again for fifteen minutes after a miss, so a provider that
+is down does not slow every visit). A show's `ExpectedReleaseDate` is its next air
+date, so it is never taken for its year. The Android and Roku clients caption the
+same way from the same field.
+
 **A finished title leaves the watchlist.** The server takes it off, for that
 profile only (`WatchlistManager.RemoveIfFinishedAsync`). A movie goes when its
 progress ping crosses 90% (`StreamManager.PingSessionAsync`, the ping that

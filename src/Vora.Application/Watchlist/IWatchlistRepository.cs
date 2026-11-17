@@ -9,6 +9,7 @@ public interface IWatchlistRepository
     Task AddAsync(UserWatchlistItem item);
     Task RemoveAsync(UserWatchlistItem item);
     Task SetMediaItemIdAsync(Guid watchlistItemId, Guid mediaItemId);
+    Task SetReleaseDateAsync(Guid watchlistItemId, DateOnly releaseDate);
 
     // The movie or show a library item counts toward: an episode or a season
     // belongs to its show. Null for anything a watchlist can't hold.

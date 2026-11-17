@@ -9,7 +9,8 @@ import { LibraryStatusBadge, type LibraryStatus } from '../../components/Client/
 import { profileIdForServer } from '../../api/client';
 import { discoveryTarget } from '../../utils/discoveryNavigation';
 import { useWatchlistUpdated } from '../../hooks/useWatchlistUpdated';
-import { groupWatchlist } from '../../utils/watchlistGroups';
+import { groupWatchlist, isShowEntry } from '../../utils/watchlistGroups';
+import { posterCaption } from '../../utils/posterCaption';
 
 interface WatchlistPageProps {
     embedded?: boolean;
@@ -95,7 +96,7 @@ export default function WatchlistPage({ embedded = false }: WatchlistPageProps =
                                         key={item.id}
                                         imageUrl={item.posterUrl}
                                         title={item.title}
-                                        captionLines={[item.type === 'TvShow' ? 'TV Series' : 'Movie']}
+                                        captionLines={posterCaption({ type: isShowEntry(item) ? 'TvShow' : 'Movie', title: item.title, releaseDate: item.releaseDate }).lines}
                                         badge={badgeFor(item)}
                                         onClick={() => navigate(openPath(item))}
                                         menu={item.mediaItemId ? { id: item.mediaItemId, serverId, onChanged: reload } : undefined}

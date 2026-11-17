@@ -148,6 +148,7 @@ export default function DiscoveryDetailsPage() {
                     // A show that is still airing bookmarks against its next
                     // episode rather than its original premiere.
                     expectedReleaseDate: expectedDate,
+                    releaseDate: details.releaseDate,
                 },
                 serverId
             );

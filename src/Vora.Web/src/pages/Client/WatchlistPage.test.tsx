@@ -18,10 +18,11 @@ vi.mock('../../hooks/useSignalREvent', () => ({
     useSignalREvent: (name: string, handler: (payload: unknown) => void) => { mocks.handlers.set(name, handler); },
 }));
 vi.mock('../../components/Client/Primitives/MediaCard', () => ({
-    default: ({ title, inWatchlist, badge, topLeftBadge }: { title: string; inWatchlist?: boolean; badge?: ReactNode; topLeftBadge?: ReactNode }) => (
+    default: ({ title, captionLines, inWatchlist, badge, topLeftBadge }: { title: string; captionLines?: string[]; inWatchlist?: boolean; badge?: ReactNode; topLeftBadge?: ReactNode }) => (
         <div data-testid="tile" data-bookmarked={inWatchlist ? 'yes' : undefined} data-has-top-left={topLeftBadge ? 'yes' : undefined}>
             {title}
             <div data-testid="corner">{badge}</div>
+            <div data-testid="caption">{(captionLines ?? []).join('|')}</div>
         </div>
     ),
 }));
@@ -30,7 +31,7 @@ const entry = (id: string, title: string): WatchlistItem => ({
     id, profileId: PROFILE, externalId: id, providerId: 'tmdb_discovery', type: 'Movie', title, addedAt: '2026-11-15T00:00:00Z',
 });
 
-const titles = () => screen.queryAllByTestId('tile').map(t => t.textContent);
+const titles = () => screen.queryAllByTestId('tile').map(t => t.childNodes[0].textContent);
 
 const fire = async (payload: unknown) => {
     await act(async () => { mocks.handlers.get('WatchlistUpdated')?.(payload); });
@@ -110,7 +111,7 @@ describe('WatchlistPage', () => {
             'Movies Not Yet in Library',
             'Shows Not Yet in Library',
         ]);
-        expect(screen.getAllByTestId('tile').map(tile => tile.childNodes[0].textContent)).toEqual(['Heat', 'MobLand', 'Dune: Part Three', 'Severance']);
+        expect(titles()).toEqual(['Heat', 'MobLand', 'Dune: Part Three', 'Severance']);
     });
 
     it('draws a group only when something is in it', async () => {
@@ -139,6 +140,25 @@ describe('WatchlistPage', () => {
         await fire(PROFILE);
 
         expect(screen.getAllByRole('heading', { level: 2 }).map(h => h.textContent)).toEqual(['Movies in Library']);
+    });
+
+    it('puts the year under each title, as the home page does, for a movie and for a show', async () => {
+        mocks.getWatchlist.mockResolvedValue([
+            { ...entry('1', 'Heat'), releaseDate: '1995-12-15' },
+            { ...entry('2', 'MobLand'), type: 'TvShow', releaseDate: '2025-03-30' },
+        ]);
+        render(<MemoryRouter><WatchlistPage /></MemoryRouter>);
+        await screen.findByText('Heat');
+
+        expect(screen.getAllByTestId('caption').map(c => c.textContent)).toEqual(['1995', '2025']);
+    });
+
+    it('draws no second line for a title whose year is not known, and never the type', async () => {
+        mocks.getWatchlist.mockResolvedValue([entry('1', 'Heat'), { ...entry('2', 'MobLand'), type: 'TvShow' }]);
+        render(<MemoryRouter><WatchlistPage /></MemoryRouter>);
+        await screen.findByText('Heat');
+
+        expect(screen.getAllByTestId('caption').map(c => c.textContent)).toEqual(['', '']);
     });
 
     it("leaves the list alone for another profile's change", async () => {
