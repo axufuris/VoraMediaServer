@@ -593,6 +593,50 @@ describe('CreateCollectionModal', () => {
             expect(mocks.createCollection.mock.calls[0][0]).toMatchObject({ smartMediaType: 'Movies' });
         });
 
+        it('fills the rules from a template, and saves them', async () => {
+            renderOn('library-1', 'Movie');
+            nameIt('Halloween Movies');
+            chooseSmart();
+
+            fireEvent.change(screen.getByLabelText('Template'), { target: { value: 'halloween' } });
+            expect(await screen.findByDisplayValue('Halloween')).toBeInTheDocument();
+            expect(screen.getByText(/set the List Provider to AI Theme/)).toBeInTheDocument();
+            create();
+
+            await waitFor(() => expect(mocks.createCollection).toHaveBeenCalled());
+            const request = mocks.createCollection.mock.calls[0][0];
+            expect(request.smartMediaType).toBe('Movies');
+            const rules = JSON.parse(request.rulesJson);
+            expect(rules).toMatchObject({ limit: 2000, sortBy: 'DateAdded', sortDirection: 'Desc' });
+            expect(rules.root).toEqual({
+                match: 'Any',
+                groups: [],
+                rules: [
+                    { field: 'Genre', operator: 'Contains', value: 'Horror' },
+                    { field: 'Title', operator: 'Contains', value: 'Halloween' },
+                    { field: 'Title', operator: 'Contains', value: 'Trick or Treat' },
+                    { field: 'Title', operator: 'Contains', value: 'Spooky' },
+                ],
+            });
+        });
+
+        it('lets a global collection start from a decade template and still choose what it matches', async () => {
+            renderOn('global');
+            nameIt('Eighties');
+            chooseSmart();
+
+            fireEvent.change(screen.getByLabelText('Template'), { target: { value: '1980s' } });
+            fireEvent.change(screen.getByLabelText('Match'), { target: { value: 'Shows' } });
+            create();
+
+            await waitFor(() => expect(mocks.createCollection).toHaveBeenCalled());
+            const request = mocks.createCollection.mock.calls[0][0];
+            expect(request.smartMediaType).toBe('Shows');
+            expect(JSON.parse(request.rulesJson).root.rules).toEqual([
+                { field: 'ReleaseYear', operator: 'Between', value: '1980', secondValue: '1989' },
+            ]);
+        });
+
         it('drops a Duration rule when switching to shows, which have no running time', async () => {
             renderOn('global');
             nameIt('Short Films');

@@ -73,7 +73,7 @@ node tools/vora-posters/render.mjs --sheet sheet.jpg halloween 1980s pg-13   # a
   - an inner frame and a little grain.
 - **Ownership.** Every shape is drawn by the script, with no third-party images. The decade typefaces (Limelight, Playfair Display, Abril Fatface, Pacifico, Righteous, Shrikhand, Monoton, Bungee, Orbitron) are Google Fonts under the Open Font License, which allows using them in images.
 
-**Adding a poster:** add an entry to `posters.mjs` and a look in its group's `art/` file, render it, review it on a contact sheet, then commit the JPEG with the new `posters.json`. `VoraPosterCatalogTests` fails if:
+**Adding a poster:** add an entry to `posters.mjs` and a look in its group's `art/` file, render it, review it on a contact sheet, then commit the JPEG with the new `posters.json`, and add its smart-rule template to `smartCollectionTemplates.ts` (the web test `smartCollectionTemplates.test.ts` fails when a poster has no template, or a template has no poster). `VoraPosterCatalogTests` fails if:
 - a listed file is missing, or a file is not listed;
 - a version does not match its file;
 - an alias is shared;
@@ -91,4 +91,4 @@ A Vora poster is an ordinary relative poster address, so a TV app shows it like 
 - `VoraPosterThumbnailTests`: resizing from the shipped file.
 - `VoraPosterEndpointTests`: both routes, caching and the 404s.
 - `CollectionArtworkLookupTests` / `TmdbCollectionSearchTests`: a collection's provider artwork found by its TMDB id, else by its title. `CollectionManagerArtworkTests`: setting only the poster or backdrop, and the locks a new collection keeps. `CollectionArtworkEndpointTests`: the search and selected routes.
-- Web: `voraPosters.test.ts`, `thumbnails.test.ts`, `CreateCollectionModal.test.tsx` (preselect, clicking it off, both pills, a staged upload or link saved after create, a fetched poster, a failed upload keeping the collection) and `EditCollectionModal.test.tsx` (the same panel going straight to the collection).
+- Web: `smartCollectionTemplates.test.ts` (a template for every poster, in the poster's group; every rule valid for the editor) and `SmartCollectionRules.test.tsx` (the Template list), `voraPosters.test.ts`, `thumbnails.test.ts`, `CreateCollectionModal.test.tsx` (preselect, clicking it off, both pills, a staged upload or link saved after create, a fetched poster, a failed upload keeping the collection) and `EditCollectionModal.test.tsx` (the same panel going straight to the collection).
