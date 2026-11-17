@@ -12,6 +12,7 @@ public interface IRequestRepository
     Task UpdateRequestAsync(MediaRequest request);
     Task DeleteRequestAsync(Guid id);
     Task<List<MediaRequestVM>> GetAllRequestsAsync();
+    Task<int> GetPendingCountAsync();
     Task SaveChangesAsync();
 
     Task<RequestServerVM?> GetServerAsync(Guid? serverId, string mediaType);

@@ -76,6 +76,11 @@ export const requestAdminService = {
         return response.data;
     },
 
+    getPendingCount: async (serverId?: string): Promise<number> => {
+        const response = await apiClient.get<{ pending: number }>('/requests/pending-count', { serverId });
+        return response.data.pending;
+    },
+
     approveRequest: async (requestId: string, profileId?: number, serverId?: string): Promise<void> => {
         let url = `/requests/${requestId}/approve`;
         if (profileId) url += `?profileId=${profileId}`;

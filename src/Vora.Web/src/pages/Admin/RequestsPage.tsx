@@ -1,10 +1,16 @@
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useRef, type ReactNode } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { requestAdminService, type MediaRequestVM, type RequestServerVM, type ProviderOptionDto } from '../../api/Discovery/requestAdminService';
 import { useDialog } from '../../dialogs';
 import PageHeader from '../../components/Admin/Primitives/PageHeader';
 import HealthBadge from '../../components/Admin/Primitives/HealthBadge';
 import EmptyState from '../../components/Admin/Primitives/EmptyState';
+import { useActionToast } from '../../components/Admin/Primitives/ActionToast';
+import Tabs from '../../components/Client/Primitives/Tabs';
+
+type RequestType = 'Movie' | 'TvShow';
+
+const isShowRequest = (request: MediaRequestVM) => request.type.toLowerCase() === 'tvshow';
 
 export default function RequestsPage() {
     const dialog = useDialog();
@@ -13,6 +19,9 @@ export default function RequestsPage() {
     const [requests, setRequests] = useState<MediaRequestVM[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [activeStatus, setActiveStatus] = useState<number>(0);
+    const [activeType, setActiveType] = useState<RequestType>('Movie');
+    const typeDecided = useRef(false);
+    const { toast, showToast } = useActionToast();
 
     const [servers, setServers] = useState<RequestServerVM[]>([]);
     const [profilesMap, setProfilesMap] = useState<Record<string, ProviderOptionDto[]>>({});
@@ -27,6 +36,12 @@ export default function RequestsPage() {
             ]);
             setRequests(reqs);
             setServers(srvs);
+
+            if (!typeDecided.current) {
+                typeDecided.current = true;
+                const pendingOf = (shows: boolean) => reqs.filter(r => r.status === 0 && isShowRequest(r) === shows).length;
+                setActiveType(pendingOf(false) === 0 && pendingOf(true) > 0 ? 'TvShow' : 'Movie');
+            }
 
             const defaults = srvs.filter(s => s.isEnabled && s.isDefault);
             const newProfileMap: Record<string, ProviderOptionDto[]> = {};
@@ -77,10 +92,12 @@ export default function RequestsPage() {
         loadData();
     }, [loadData]);
 
-    const handleApprove = async (requestId: string) => {
+    const handleApprove = async (request: MediaRequestVM) => {
         try {
-            const profileId = selectedProfiles[requestId];
-            await requestAdminService.approveRequest(requestId, profileId, serverId);
+            const profileId = selectedProfiles[request.id];
+            await requestAdminService.approveRequest(request.id, profileId, serverId);
+            const sentTo = servers.find(s => s.mediaType === request.type && s.isDefault && s.isEnabled)?.name;
+            showToast(sentTo ? `Approved "${request.title}" and sent to ${sentTo}.` : `Approved "${request.title}" and sent.`);
             await loadData();
         } catch {
             await dialog.alert('Failed to send request to the provider. Check your server settings!');
@@ -97,13 +114,14 @@ export default function RequestsPage() {
         }
     };
 
-    const filteredRequests = requests.filter(r => r.status === activeStatus);
+    const pendingCount = (shows: boolean) => requests.filter(r => r.status === 0 && isShowRequest(r) === shows).length;
+    const typeRequests = requests.filter(r => isShowRequest(r) === (activeType === 'TvShow'));
+    const filteredRequests = typeRequests.filter(r => r.status === activeStatus);
 
-    const groupedRequests = filteredRequests.reduce((acc, req) => {
-        if (!acc[req.type]) acc[req.type] = [];
-        acc[req.type].push(req);
-        return acc;
-    }, {} as Record<string, MediaRequestVM[]>);
+    const typeTabs: { key: RequestType; label: string; badge: ReactNode }[] = [
+        { key: 'Movie', label: 'Movies', badge: <span className="text-xs tabular-nums opacity-70" title={`${pendingCount(false)} pending`}>({pendingCount(false)})</span> },
+        { key: 'TvShow', label: 'Shows', badge: <span className="text-xs tabular-nums opacity-70" title={`${pendingCount(true)} pending`}>({pendingCount(true)})</span> },
+    ];
 
     const statusPills: { value: number, label: string, tone: 'accent' | 'info' | 'success' }[] = [
         { value: 0, label: 'Pending', tone: 'accent' },
@@ -119,9 +137,11 @@ export default function RequestsPage() {
             />
 
             <div className="px-8 max-md:px-4 pb-10 max-w-7xl mx-auto pt-2">
+                <Tabs tabs={typeTabs} active={activeType} onChange={setActiveType} className="mb-5" />
+
                 <div className="flex gap-2 mb-6">
                             {statusPills.map(pill => {
-                                const count = requests.filter(r => r.status === pill.value).length;
+                                const count = typeRequests.filter(r => r.status === pill.value).length;
                                 const isActive = activeStatus === pill.value;
                                 const activeBg =
                                     pill.tone === 'accent' ? 'bg-[var(--vora-accent-500)] text-[var(--vora-accent-contrast)]' :
@@ -150,98 +170,91 @@ export default function RequestsPage() {
                                 />
                             </div>
                         ) : (
-                            Object.entries(groupedRequests).map(([type, typeRequests]) => (
-                                <div key={type} className="mb-8">
-                                    <h2 className="text-xs font-bold text-[var(--vora-text-muted)] mb-3 uppercase tracking-widest">
-                                        {type} Requests
-                                        <span className="ml-2 text-[var(--vora-text-disabled)] font-medium normal-case tracking-normal">· {typeRequests.length}</span>
-                                    </h2>
-                                    <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-4">
-                                        {typeRequests.map(req => {
-                                            const defaultServer = servers.find(s => s.mediaType === req.type && s.isDefault && s.isEnabled);
-                                            const availableProfiles = defaultServer ? profilesMap[defaultServer.providerId] : [];
+                            <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-4">
+                                {filteredRequests.map(req => {
+                                    const defaultServer = servers.find(s => s.mediaType === req.type && s.isDefault && s.isEnabled);
+                                    const availableProfiles = defaultServer ? profilesMap[defaultServer.providerId] : [];
 
-                                            return (
-                                                <div key={req.id} className="vora-card overflow-hidden flex">
-                                                    <div
-                                                        className="w-28 bg-[var(--vora-bg-sunken)] shrink-0 cursor-pointer"
+                                    return (
+                                        <div key={req.id} className="vora-card overflow-hidden flex">
+                                            <div
+                                                className="w-28 bg-[var(--vora-bg-sunken)] shrink-0 cursor-pointer"
+                                                onClick={() => navigate(serverId ? `/server/${serverId}/discovery/${req.providerId}/${req.type}/${req.externalId}` : `/discovery/${req.providerId}/${req.type}/${req.externalId}`)}
+                                            >
+                                                {req.posterUrl
+                                                    ? <img src={req.posterUrl} alt={req.title} className="w-full h-full object-cover hover:opacity-80 transition-opacity" />
+                                                    : <div className="w-full h-full flex items-center justify-center text-[var(--vora-text-disabled)] text-xs">No art</div>}
+                                            </div>
+                                            <div className="p-4 flex-1 flex flex-col min-w-0">
+                                                <div className="flex justify-between items-start mb-1 gap-2">
+                                                    <h3
+                                                        className="text-sm font-semibold text-[var(--vora-text-primary)] leading-tight line-clamp-2 cursor-pointer hover:text-[var(--vora-accent-text)] transition-colors"
                                                         onClick={() => navigate(serverId ? `/server/${serverId}/discovery/${req.providerId}/${req.type}/${req.externalId}` : `/discovery/${req.providerId}/${req.type}/${req.externalId}`)}
                                                     >
-                                                        {req.posterUrl
-                                                            ? <img src={req.posterUrl} alt={req.title} className="w-full h-full object-cover hover:opacity-80 transition-opacity" />
-                                                            : <div className="w-full h-full flex items-center justify-center text-[var(--vora-text-disabled)] text-xs">No art</div>}
-                                                    </div>
-                                                    <div className="p-4 flex-1 flex flex-col min-w-0">
-                                                        <div className="flex justify-between items-start mb-1 gap-2">
-                                                            <h3
-                                                                className="text-sm font-semibold text-[var(--vora-text-primary)] leading-tight line-clamp-2 cursor-pointer hover:text-[var(--vora-accent-text)] transition-colors"
-                                                                onClick={() => navigate(serverId ? `/server/${serverId}/discovery/${req.providerId}/${req.type}/${req.externalId}` : `/discovery/${req.providerId}/${req.type}/${req.externalId}`)}
-                                                            >
-                                                                {req.title}
-                                                            </h3>
+                                                        {req.title}
+                                                    </h3>
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => handleDelete(req.id)}
+                                                        className="text-[var(--vora-text-muted)] hover:text-[var(--vora-danger-500)] transition-colors cursor-pointer shrink-0 mt-0.5"
+                                                        title="Delete request"
+                                                    >
+                                                        <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                                                    </button>
+                                                </div>
+
+                                                <p className="text-[10px] text-[var(--vora-text-muted)] mb-2">
+                                                    {new Date(req.createdAt).toLocaleDateString()} · {new Date(req.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                                </p>
+
+                                                <div className="flex flex-wrap gap-1.5 mb-3">
+                                                    {req.requesters.map(ru => (
+                                                        <div key={ru.profileId} className="flex items-center gap-1.5 bg-[var(--vora-bg-sunken)] px-2 py-0.5 rounded-full">
+                                                            <div className="w-4 h-4 rounded-full bg-[var(--vora-accent-500)] flex items-center justify-center text-[9px] font-bold text-[var(--vora-accent-contrast)] uppercase">{ru.profile.name.charAt(0)}</div>
+                                                            <span className="text-[11px] text-[var(--vora-text-secondary)] pr-1">{ru.profile.name}</span>
+                                                        </div>
+                                                    ))}
+                                                </div>
+
+                                                <div className="mt-auto">
+                                                    {activeStatus === 0 && (
+                                                        <>
+                                                            {defaultServer && availableProfiles && availableProfiles.length > 0 && (
+                                                                <div className="mb-3">
+                                                                    <label className="block text-[10px] font-bold text-[var(--vora-text-muted)] uppercase tracking-widest mb-1">Quality Profile Override</label>
+                                                                    <select
+                                                                        value={selectedProfiles[req.id] || ''}
+                                                                        onChange={e => setSelectedProfiles(prev => ({ ...prev, [req.id]: parseInt(e.target.value) }))}
+                                                                        className="vora-input !py-1 text-xs cursor-pointer"
+                                                                    >
+                                                                        {availableProfiles.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+                                                                    </select>
+                                                                </div>
+                                                            )}
                                                             <button
                                                                 type="button"
-                                                                onClick={() => handleDelete(req.id)}
-                                                                className="text-[var(--vora-text-muted)] hover:text-[var(--vora-danger-500)] transition-colors cursor-pointer shrink-0 mt-0.5"
-                                                                title="Delete request"
+                                                                onClick={() => handleApprove(req)}
+                                                                className="vora-button-primary w-full text-xs"
                                                             >
-                                                                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                                                                Approve & Send
                                                             </button>
-                                                        </div>
-
-                                                        <p className="text-[10px] text-[var(--vora-text-muted)] mb-2">
-                                                            {new Date(req.createdAt).toLocaleDateString()} · {new Date(req.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                                                        </p>
-
-                                                        <div className="flex flex-wrap gap-1.5 mb-3">
-                                                            {req.requesters.map(ru => (
-                                                                <div key={ru.profileId} className="flex items-center gap-1.5 bg-[var(--vora-bg-sunken)] px-2 py-0.5 rounded-full">
-                                                                    <div className="w-4 h-4 rounded-full bg-[var(--vora-accent-500)] flex items-center justify-center text-[9px] font-bold text-[var(--vora-accent-contrast)] uppercase">{ru.profile.name.charAt(0)}</div>
-                                                                    <span className="text-[11px] text-[var(--vora-text-secondary)] pr-1">{ru.profile.name}</span>
-                                                                </div>
-                                                            ))}
-                                                        </div>
-
-                                                        <div className="mt-auto">
-                                                            {activeStatus === 0 && (
-                                                                <>
-                                                                    {defaultServer && availableProfiles && availableProfiles.length > 0 && (
-                                                                        <div className="mb-3">
-                                                                            <label className="block text-[10px] font-bold text-[var(--vora-text-muted)] uppercase tracking-widest mb-1">Quality Profile Override</label>
-                                                                            <select
-                                                                                value={selectedProfiles[req.id] || ''}
-                                                                                onChange={e => setSelectedProfiles(prev => ({ ...prev, [req.id]: parseInt(e.target.value) }))}
-                                                                                className="vora-input !py-1 text-xs cursor-pointer"
-                                                                            >
-                                                                                {availableProfiles.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
-                                                                            </select>
-                                                                        </div>
-                                                                    )}
-                                                                    <button
-                                                                        type="button"
-                                                                        onClick={() => handleApprove(req.id)}
-                                                                        className="vora-button-primary w-full text-xs"
-                                                                    >
-                                                                        Approve & Send
-                                                                    </button>
-                                                                </>
-                                                            )}
-                                                            {activeStatus === 3 && (
-                                                                <div className="w-full flex justify-center"><HealthBadge tone="info">Sent to provider</HealthBadge></div>
-                                                            )}
-                                                            {activeStatus === 4 && (
-                                                                <div className="w-full flex justify-center"><HealthBadge tone="ok">In library</HealthBadge></div>
-                                                            )}
-                                                        </div>
-                                                    </div>
+                                                        </>
+                                                    )}
+                                                    {activeStatus === 3 && (
+                                                        <div className="w-full flex justify-center"><HealthBadge tone="info">Sent to provider</HealthBadge></div>
+                                                    )}
+                                                    {activeStatus === 4 && (
+                                                        <div className="w-full flex justify-center"><HealthBadge tone="ok">In library</HealthBadge></div>
+                                                    )}
                                                 </div>
-                                            );
-                                        })}
-                                    </div>
-                                </div>
-                            ))
+                                            </div>
+                                        </div>
+                                    );
+                                })}
+                            </div>
                         )}
             </div>
+            {toast}
         </div>
     );
 }

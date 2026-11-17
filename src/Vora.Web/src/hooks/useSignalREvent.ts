@@ -47,6 +47,7 @@ export const VORA_EVENTS = {
     ServerPlaybackUpdated: 'ServerPlaybackUpdated',
     AdminAlert: 'AdminAlert',
     AdminAlertUnreadChanged: 'AdminAlertUnreadChanged',
+    RequestQueueChanged: 'RequestQueueChanged',
     AdminThemeChanged: 'AdminThemeChanged',
     ClientTemplateConfigurationChanged: 'ClientTemplateConfigurationChanged',
     BackupCreated: 'BackupCreated',

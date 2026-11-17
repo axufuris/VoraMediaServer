@@ -2,6 +2,7 @@ using Microsoft.EntityFrameworkCore;
 using Vora.Application.Requests;
 using Vora.Application.Requests.ViewModels;
 using Vora.Domain.Entities.Requests;
+using Vora.Domain.Enums;
 
 namespace Vora.Infrastructure.Persistence.Repositories;
 
@@ -58,6 +59,9 @@ public class RequestRepository(VoraDbContext context) : IRequestRepository
             .OrderByDescending(r => r.CreatedAt)
             .Select(MediaRequestVM.Projection)
             .ToListAsync();
+
+    public Task<int> GetPendingCountAsync() =>
+        context.MediaRequests.CountAsync(r => r.Status == RequestStatus.Pending);
 
     public Task<RequestServerVM?> GetServerAsync(Guid? serverId, string mediaType)
     {

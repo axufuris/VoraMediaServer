@@ -1,8 +1,10 @@
 ﻿using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 using System;
 using System.Collections.Generic;
 using System.Text;
 using System.Text.Json;
+using Vora.Application.Analysis;
 using Vora.Application.Media;
 using Vora.Application.Requests.Dtos;
 using Vora.Application.Requests.ViewModels;
@@ -23,6 +25,7 @@ public interface IRequestManager
     Task UpdateServerAsync(Guid id, SaveRequestServerDto dto);
     Task DeleteServerAsync(Guid id);
     Task<List<MediaRequestVM>> GetAllRequestsAsync();
+    Task<int> GetPendingCountAsync();
     Task<IEnumerable<ProviderOptionDto>> GetProviderOptionsAsync(string providerId, string optionType, string host, int port, bool useSsl, string urlBase, string apiKey, CancellationToken cancellationToken = default);
     Task DeleteRequestAsync(Guid id);
     Task ResolveRequestAsync(string externalId, string type, Guid? mediaItemId = null);
@@ -35,6 +38,8 @@ public class RequestManager : IRequestManager
     private readonly IMediaRepository _mediaRepo;
     private readonly IUserRepository _userRepo;
     private readonly IRequestNotificationService _notificationService;
+    private readonly IClientNotifier _clients;
+    private readonly ILogger<RequestManager> _logger;
     private readonly IServiceProvider _serviceProvider;
 
     public RequestManager(
@@ -42,13 +47,29 @@ public class RequestManager : IRequestManager
         IMediaRepository mediaRepo,
         IUserRepository userRepo,
         IRequestNotificationService notificationService,
+        IClientNotifier clients,
+        ILogger<RequestManager> logger,
         IServiceProvider serviceProvider)
     {
         _requestRepo = requestRepo;
         _mediaRepo = mediaRepo;
         _userRepo = userRepo;
         _notificationService = notificationService;
+        _clients = clients;
+        _logger = logger;
         _serviceProvider = serviceProvider;
+    }
+
+    private async Task NotifyQueueChangedAsync()
+    {
+        try
+        {
+            await _clients.NotifyRequestQueueChangedAsync();
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Couldn't tell the admins that the request queue changed.");
+        }
     }
 
     public async Task ProcessWatchlistAdditionAsync(string externalId, string providerId, string title, string type, string posterUrl, Guid profileId, DateOnly? expectedReleaseDate)
@@ -97,6 +118,7 @@ public class RequestManager : IRequestManager
         newRequest.Requesters.Add(new MediaRequestUser { ProfileId = profileId });
 
         await _requestRepo.AddRequestAsync(newRequest);
+        await NotifyQueueChangedAsync();
 
         if (user.AutoApproveRequests)
         {
@@ -150,6 +172,7 @@ public class RequestManager : IRequestManager
             request.AssignedServerId = serverToUse.Id;
             request.UpdatedAt = DateTime.UtcNow;
             await _requestRepo.UpdateRequestAsync(request);
+            await NotifyQueueChangedAsync();
         }
 
         return success;
@@ -207,6 +230,8 @@ public class RequestManager : IRequestManager
 
     public async Task<List<MediaRequestVM>> GetAllRequestsAsync() => await _requestRepo.GetAllRequestsAsync();
 
+    public async Task<int> GetPendingCountAsync() => await _requestRepo.GetPendingCountAsync();
+
     public async Task<IEnumerable<ProviderOptionDto>> GetProviderOptionsAsync(string providerId, string optionType, string host, int port, bool useSsl, string urlBase, string apiKey, CancellationToken cancellationToken = default)
     {
         var allPlugins = _serviceProvider.GetServices<IVoraPlugin>();
@@ -229,7 +254,11 @@ public class RequestManager : IRequestManager
         return new List<ProviderOptionDto>();
     }
 
-    public async Task DeleteRequestAsync(Guid id) => await _requestRepo.DeleteRequestAsync(id);
+    public async Task DeleteRequestAsync(Guid id)
+    {
+        await _requestRepo.DeleteRequestAsync(id);
+        await NotifyQueueChangedAsync();
+    }
 
     public async Task ResolveRequestAsync(string externalId, string type, Guid? mediaItemId = null)
     {

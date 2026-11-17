@@ -1,3 +1,5 @@
+using Microsoft.Extensions.Logging.Abstractions;
+using Vora.Application.Analysis;
 using Vora.Application.Media;
 using Vora.Application.Requests;
 using Vora.Application.Requests.ViewModels;
@@ -5,6 +7,7 @@ using Vora.Application.Users;
 using Vora.Domain.Entities.Requests;
 using Vora.Domain.Entities.Users;
 using Vora.Domain.Enums;
+using Vora.Plugins.Interfaces;
 
 namespace Vora.Application.Tests.Requests;
 
@@ -14,6 +17,7 @@ public class RequestManagerTests
     private readonly IMediaRepository _media;
     private readonly IUserRepository _users;
     private readonly IRequestNotificationService _notifier;
+    private readonly IClientNotifier _clients;
     private readonly IServiceProvider _services;
     private readonly RequestManager _manager;
 
@@ -23,9 +27,10 @@ public class RequestManagerTests
         _media = Substitute.For<IMediaRepository>();
         _users = Substitute.For<IUserRepository>();
         _notifier = Substitute.For<IRequestNotificationService>();
+        _clients = Substitute.For<IClientNotifier>();
         _services = Substitute.For<IServiceProvider>();
 
-        _manager = new RequestManager(_requests, _media, _users, _notifier, _services);
+        _manager = new RequestManager(_requests, _media, _users, _notifier, _clients, NullLogger<RequestManager>.Instance, _services);
     }
 
     private static UserProfile NewProfile(Guid userId) => new()
@@ -191,6 +196,115 @@ public class RequestManagerTests
             r.Status == RequestStatus.Pending &&
             r.ExpectedReleaseDate == expectedRelease &&
             r.Requesters.Any(u => u.ProfileId == profileId)));
+    }
+
+    private void GivenAWatchlistedMovieNobodyHasRequested(Guid profileId)
+    {
+        var userId = Guid.NewGuid();
+        var profile = NewProfile(userId); profile.Id = profileId;
+        _media.MediaExistsByExternalIdAsync(Arg.Any<string>(), Arg.Any<string>()).Returns(false);
+        _users.GetProfileByIdAsync(profileId).Returns(profile);
+        _users.GetUserByIdAsync(userId).Returns(NewUser());
+        _requests.GetAllServersAsync().Returns(new List<RequestServerVM> { NewServer("Movie") });
+        _requests.GetRequestAsync("603", "Movie").Returns((MediaRequest?)null);
+    }
+
+    [Fact]
+    public async Task ProcessWatchlistAdditionAsync_tells_the_admins_when_it_creates_a_request()
+    {
+        var profileId = Guid.NewGuid();
+        GivenAWatchlistedMovieNobodyHasRequested(profileId);
+
+        await _manager.ProcessWatchlistAdditionAsync("603", "tmdb", "Matrix", "Movie", "poster.jpg", profileId, null);
+
+        await _clients.Received(1).NotifyRequestQueueChangedAsync();
+    }
+
+    [Fact]
+    public async Task ProcessWatchlistAdditionAsync_does_not_tell_the_admins_when_it_only_adds_a_requester()
+    {
+        var userId = Guid.NewGuid();
+        var profileId = Guid.NewGuid();
+        var profile = NewProfile(userId); profile.Id = profileId;
+        _media.MediaExistsByExternalIdAsync(Arg.Any<string>(), Arg.Any<string>()).Returns(false);
+        _users.GetProfileByIdAsync(profileId).Returns(profile);
+        _users.GetUserByIdAsync(userId).Returns(NewUser());
+        _requests.GetAllServersAsync().Returns(new List<RequestServerVM> { NewServer("Movie") });
+        _requests.GetRequestAsync("603", "Movie").Returns(new MediaRequest { ExternalId = "603", Type = "Movie", Status = RequestStatus.Pending });
+
+        await _manager.ProcessWatchlistAdditionAsync("603", "tmdb", "Matrix", "Movie", "p", profileId, null);
+
+        await _clients.DidNotReceive().NotifyRequestQueueChangedAsync();
+    }
+
+    [Fact]
+    public async Task ProcessWatchlistAdditionAsync_still_creates_the_request_when_the_admins_cannot_be_told()
+    {
+        var profileId = Guid.NewGuid();
+        GivenAWatchlistedMovieNobodyHasRequested(profileId);
+        _clients.NotifyRequestQueueChangedAsync().Returns(Task.FromException(new InvalidOperationException("hub down")));
+
+        var act = () => _manager.ProcessWatchlistAdditionAsync("603", "tmdb", "Matrix", "Movie", "poster.jpg", profileId, null);
+
+        await act.Should().NotThrowAsync();
+        await _requests.Received(1).AddRequestAsync(Arg.Any<MediaRequest>());
+    }
+
+    [Fact]
+    public async Task DeleteRequestAsync_deletes_it_and_tells_the_admins()
+    {
+        var id = Guid.NewGuid();
+
+        await _manager.DeleteRequestAsync(id);
+
+        await _requests.Received(1).DeleteRequestAsync(id);
+        await _clients.Received(1).NotifyRequestQueueChangedAsync();
+    }
+
+    [Fact]
+    public async Task GetPendingCountAsync_is_what_the_repository_counts()
+    {
+        _requests.GetPendingCountAsync().Returns(9);
+
+        (await _manager.GetPendingCountAsync()).Should().Be(9);
+    }
+
+    private (IRequestProvider Provider, MediaRequest Request) GivenAPendingMovieRequestAndARadarr(bool radarrAccepts)
+    {
+        var plugin = Substitute.For<IVoraPlugin, IRequestProvider>();
+        plugin.Id.Returns("radarr");
+        var provider = (IRequestProvider)plugin;
+        provider.SupportedMediaTypes.Returns(new[] { "Movie" });
+        provider.SubmitRequestAsync(default!, default!, default!, default, default, default!, default!, default!, default)
+            .ReturnsForAnyArgs(radarrAccepts);
+        _services.GetService(typeof(IEnumerable<IVoraPlugin>)).Returns((IEnumerable<IVoraPlugin>)new[] { plugin });
+
+        var request = new MediaRequest { Id = Guid.NewGuid(), ExternalId = "603", Type = "Movie", Title = "Matrix", Status = RequestStatus.Pending };
+        _requests.GetRequestByIdAsync(request.Id).Returns(request);
+        _requests.GetServerAsync(Arg.Any<Guid?>(), "Movie").Returns(NewServer("Movie"));
+        return (provider, request);
+    }
+
+    [Fact]
+    public async Task ApproveRequestAsync_tells_the_admins_once_the_provider_has_taken_it()
+    {
+        var (_, request) = GivenAPendingMovieRequestAndARadarr(radarrAccepts: true);
+
+        (await _manager.ApproveRequestAsync(request.Id)).Should().BeTrue();
+
+        request.Status.Should().Be(RequestStatus.Processing);
+        await _clients.Received(1).NotifyRequestQueueChangedAsync();
+    }
+
+    [Fact]
+    public async Task ApproveRequestAsync_tells_nobody_when_the_provider_refuses_it()
+    {
+        var (_, request) = GivenAPendingMovieRequestAndARadarr(radarrAccepts: false);
+
+        (await _manager.ApproveRequestAsync(request.Id)).Should().BeFalse();
+
+        request.Status.Should().Be(RequestStatus.Pending);
+        await _clients.DidNotReceive().NotifyRequestQueueChangedAsync();
     }
 
     [Fact]
