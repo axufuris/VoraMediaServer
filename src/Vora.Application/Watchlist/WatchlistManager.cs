@@ -176,8 +176,9 @@ public class WatchlistManager(
         }
     }
 
-    private async Task<bool> AddOrRemoveAsync(Guid profileId, WatchlistRequest request)
+    private async Task<bool> AddOrRemoveAsync(Guid profileId, WatchlistRequest submitted)
     {
+        var request = await ResolveToShowOrMovieAsync(submitted);
         var key = await ResolveKeyAsync(request);
 
         var existing = await repository.FindAsync(profileId, key.ExternalId, key.ProviderId, key.MediaItemId);
@@ -203,14 +204,31 @@ public class WatchlistManager(
 
     public async Task<bool> IsInWatchlistAsync(Guid profileId, string? externalId, string? providerId, Guid? mediaItemId)
     {
-        var key = await ResolveKeyAsync(new WatchlistRequest
+        var title = await ResolveToShowOrMovieAsync(new WatchlistRequest
         {
             ExternalId = externalId,
             ProviderId = providerId,
             MediaItemId = mediaItemId,
         });
+        var key = await ResolveKeyAsync(title);
 
         return await repository.FindAsync(profileId, key.ExternalId, key.ProviderId, key.MediaItemId) != null;
+    }
+
+    private async Task<WatchlistRequest> ResolveToShowOrMovieAsync(WatchlistRequest request)
+    {
+        if (request.MediaItemId is not Guid mediaItemId) return request;
+
+        var title = await repository.GetTitleAsync(mediaItemId);
+        if (title is null || title.Id == mediaItemId) return request;
+
+        return new WatchlistRequest
+        {
+            MediaItemId = title.Id,
+            Type = title.Type,
+            Title = title.Title,
+            PosterUrl = title.PosterUrl,
+        };
     }
 
     // Fills in whichever half of the identity the caller didn't supply: a

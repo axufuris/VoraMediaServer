@@ -240,6 +240,8 @@ public sealed class LegacyDatabase : IAsyncDisposable
 
     public const string AccessListCleanupMigration = "20261114051129_ChangesSinceInitial";
 
+    public const string HiddenCollectionMigration = "20261115013813_ChangesSinceInitial";
+
     private const string CollectionHiddenColumns = """
         ALTER TABLE "Collections" ADD COLUMN IF NOT EXISTS "Hidden" boolean NOT NULL DEFAULT FALSE;
         """;
@@ -565,6 +567,14 @@ public sealed class LegacyDatabase : IAsyncDisposable
         await seed(db);
         await db.Database.ExecuteSqlRawAsync(ColumnsSinceAccessListCleanup, cancellationToken);
         await ReplaceCombinedMigrationAsync(db, AccessListCleanupMigration, "10.0.9", cancellationToken);
+    }
+
+    public async Task BuildHiddenCollectionStateAsync(Func<VoraDbContext, Task> seed, CancellationToken cancellationToken)
+    {
+        await using var db = NewContext();
+        await db.Database.MigrateAsync(cancellationToken);
+        await seed(db);
+        await ReplaceCombinedMigrationAsync(db, HiddenCollectionMigration, "10.0.9", cancellationToken);
     }
 
     private static async Task ReplaceCombinedMigrationAsync(VoraDbContext db, string migrationId, string productVersion, CancellationToken cancellationToken)

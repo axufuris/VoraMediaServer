@@ -275,13 +275,113 @@ public class WatchlistManagerTests
         result.Select(r => r.PosterUrl).Should().Equal("https://image.tmdb.org/t/p/w500/unowned.jpg", "/api/artwork/custom/holiday.jpg");
     }
 
+    [Fact]
+    public async Task Watchlisting_a_season_adds_its_show_under_the_shows_own_title_poster_and_type()
+    {
+        var profileId = Guid.NewGuid();
+        var seasonId = Guid.NewGuid();
+        _repo.GetTitleAsync(seasonId).Returns(new WatchlistTitle(ShowId, "TvShow", "Mobland", "/api/artwork/custom/mobland.jpg"));
+        _media.GetTmdbIdAsync(ShowId).Returns("1396");
+        _repo.FindAsync(profileId, "1396", Tmdb, ShowId).Returns((UserWatchlistItem?)null);
+
+        var added = await _manager.ToggleAsync(profileId, new WatchlistRequest { MediaItemId = seasonId, Type = "Season", Title = "Season 1", PosterUrl = "/season.jpg" });
+
+        added.Should().BeTrue();
+        await _repo.Received(1).AddAsync(Arg.Is<UserWatchlistItem>(w =>
+            w.ProfileId == profileId && w.MediaItemId == ShowId && w.ExternalId == "1396" && w.ProviderId == Tmdb
+            && w.Type == "TvShow" && w.Title == "Mobland" && w.PosterUrl == "/api/artwork/custom/mobland.jpg"));
+    }
+
+    [Fact]
+    public async Task Watchlisting_an_episode_adds_its_show_and_not_the_episodes_release_date()
+    {
+        var profileId = Guid.NewGuid();
+        var episodeId = Guid.NewGuid();
+        _repo.GetTitleAsync(episodeId).Returns(new WatchlistTitle(ShowId, "TvShow", "Mobland", null));
+        _media.GetTmdbIdAsync(ShowId).Returns("1396");
+        _repo.FindAsync(profileId, "1396", Tmdb, ShowId).Returns((UserWatchlistItem?)null);
+
+        await _manager.ToggleAsync(profileId, new WatchlistRequest
+        {
+            MediaItemId = episodeId,
+            Type = "Episode",
+            Title = "Pilot",
+            ExpectedReleaseDate = new DateOnly(2026, 12, 25),
+        });
+
+        await _repo.Received(1).AddAsync(Arg.Is<UserWatchlistItem>(w =>
+            w.MediaItemId == ShowId && w.Title == "Mobland" && w.ExpectedReleaseDate == null));
+    }
+
+    [Fact]
+    public async Task Watchlisting_a_season_of_a_show_already_on_the_watchlist_takes_the_show_off()
+    {
+        var profileId = Guid.NewGuid();
+        var seasonId = Guid.NewGuid();
+        var existing = new UserWatchlistItem { ExternalId = "1396", ProviderId = Tmdb, Type = "TvShow" };
+        _repo.GetTitleAsync(seasonId).Returns(new WatchlistTitle(ShowId, "TvShow", "Mobland", null));
+        _media.GetTmdbIdAsync(ShowId).Returns("1396");
+        _repo.FindAsync(profileId, "1396", Tmdb, ShowId).Returns(existing);
+
+        var added = await _manager.ToggleAsync(profileId, new WatchlistRequest { MediaItemId = seasonId, Type = "Season", Title = "Season 1" });
+
+        added.Should().BeFalse();
+        await _repo.Received(1).RemoveAsync(existing);
+        await _repo.DidNotReceive().AddAsync(Arg.Any<UserWatchlistItem>());
+    }
+
+    [Fact]
+    public async Task A_season_and_an_episode_read_as_on_the_watchlist_when_their_show_is()
+    {
+        var profileId = Guid.NewGuid();
+        var seasonId = Guid.NewGuid();
+        var episodeId = Guid.NewGuid();
+        _repo.GetTitleAsync(seasonId).Returns(new WatchlistTitle(ShowId, "TvShow", "Mobland", null));
+        _repo.GetTitleAsync(episodeId).Returns(new WatchlistTitle(ShowId, "TvShow", "Mobland", null));
+        _media.GetTmdbIdAsync(ShowId).Returns("1396");
+        _repo.FindAsync(profileId, "1396", Tmdb, ShowId).Returns(new UserWatchlistItem());
+
+        (await _manager.IsInWatchlistAsync(profileId, null, null, seasonId)).Should().BeTrue();
+        (await _manager.IsInWatchlistAsync(profileId, null, null, episodeId)).Should().BeTrue();
+    }
+
+    [Fact]
+    public async Task A_show_with_no_provider_id_is_added_by_its_own_id_when_a_season_is_watchlisted()
+    {
+        var profileId = Guid.NewGuid();
+        var seasonId = Guid.NewGuid();
+        _repo.GetTitleAsync(seasonId).Returns(new WatchlistTitle(ShowId, "TvShow", "Home Videos", null));
+        _media.GetTmdbIdAsync(ShowId).Returns((string?)null);
+        _repo.FindAsync(profileId, null, null, ShowId).Returns((UserWatchlistItem?)null);
+
+        await _manager.ToggleAsync(profileId, new WatchlistRequest { MediaItemId = seasonId, Type = "Season", Title = "Season 1" });
+
+        await _repo.Received(1).AddAsync(Arg.Is<UserWatchlistItem>(w =>
+            w.MediaItemId == ShowId && w.ExternalId == "" && w.ProviderId == "" && w.Type == "TvShow"));
+    }
+
+    [Fact]
+    public async Task Watchlisting_a_movie_keeps_what_the_client_sent()
+    {
+        var profileId = Guid.NewGuid();
+        var movieId = Guid.NewGuid();
+        _repo.GetTitleAsync(movieId).Returns(new WatchlistTitle(movieId, "Movie", "The Matrix", null));
+        _media.GetTmdbIdAsync(movieId).Returns("603");
+        _repo.FindAsync(profileId, "603", Tmdb, movieId).Returns((UserWatchlistItem?)null);
+
+        await _manager.ToggleAsync(profileId, new WatchlistRequest { MediaItemId = movieId, Type = "Movie", Title = "The Matrix (sent)", PosterUrl = "/sent.jpg" });
+
+        await _repo.Received(1).AddAsync(Arg.Is<UserWatchlistItem>(w =>
+            w.MediaItemId == movieId && w.Title == "The Matrix (sent)" && w.PosterUrl == "/sent.jpg" && w.Type == "Movie"));
+    }
+
     // --- A finished title leaves the watchlist
 
     private static readonly Guid ShowId = Guid.NewGuid();
 
     private void LibraryTitle(Guid titleId, string type, string? tmdbId)
     {
-        _repo.GetTitleAsync(Arg.Any<Guid>()).Returns(new WatchlistTitle(titleId, type));
+        _repo.GetTitleAsync(Arg.Any<Guid>()).Returns(new WatchlistTitle(titleId, type, "A title", null));
         _media.GetTmdbIdAsync(titleId).Returns(tmdbId);
     }
 
@@ -308,7 +408,7 @@ public class WatchlistManagerTests
         var profileId = Guid.NewGuid();
         var episodeId = Guid.NewGuid();
         var entry = new UserWatchlistItem { ExternalId = "1396", ProviderId = Tmdb, Type = "TvShow" };
-        _repo.GetTitleAsync(episodeId).Returns(new WatchlistTitle(ShowId, "TvShow"));
+        _repo.GetTitleAsync(episodeId).Returns(new WatchlistTitle(ShowId, "TvShow", "Mobland", null));
         _media.GetTmdbIdAsync(ShowId).Returns("1396");
         _repo.FindAsync(profileId, "1396", Tmdb, ShowId).Returns(entry);
         _repo.IsFinishedAsync(profileId, ShowId).Returns(true);

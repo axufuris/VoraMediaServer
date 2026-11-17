@@ -376,6 +376,56 @@ WHERE CASE WHEN left(btrim(t.""AllowedIptvPlaylistIds""), 1) = '[' THEN EXISTS (
             // included (docs/collections.md). Every collection starts shown.
             migrationBuilder.Sql(@"
 ALTER TABLE ""Collections"" ADD COLUMN IF NOT EXISTS ""Hidden"" boolean NOT NULL DEFAULT FALSE;");
+
+            // A season or an episode is never what a watchlist holds: it holds the
+            // show (docs/frontend-client-ui.md). An entry that names a season or an episode
+            // becomes its show's, one per profile and show, the earliest kept; a
+            // profile that already has the show loses the extra entry. An entry the
+            // show's key would collide with stays as it is. Running it again
+            // changes nothing.
+            migrationBuilder.Sql(@"
+DROP TABLE IF EXISTS ""_WatchlistShowFix"";
+
+CREATE TEMP TABLE ""_WatchlistShowFix"" AS
+SELECT w.""Id"" AS ""EntryId"",
+       w.""ProfileId"",
+       sh.""Id"" AS ""ShowId"",
+       sh.""Title"" AS ""ShowTitle"",
+       sh.""PosterUrl"" AS ""ShowPoster"",
+       sh.""TmdbId"" AS ""ShowTmdbId"",
+       row_number() OVER (PARTITION BY w.""ProfileId"", sh.""Id"" ORDER BY w.""AddedAt"", w.""Id"") AS ""Place""
+FROM ""UserWatchlistItems"" w
+JOIN ""MediaItems"" part ON part.""Id"" = w.""MediaItemId"" AND part.""MediaType"" IN ('Season', 'Episode')
+LEFT JOIN ""MediaItems"" season ON part.""MediaType"" = 'Episode' AND season.""Id"" = part.""SeasonId""
+JOIN ""MediaItems"" sh ON sh.""MediaType"" = 'TvShow'
+    AND sh.""Id"" = CASE WHEN part.""MediaType"" = 'Season' THEN part.""TvShowId"" ELSE season.""TvShowId"" END;
+
+DELETE FROM ""UserWatchlistItems"" w
+USING ""_WatchlistShowFix"" f
+WHERE w.""Id"" = f.""EntryId""
+  AND (f.""Place"" > 1
+       OR EXISTS (SELECT 1 FROM ""UserWatchlistItems"" o
+                  WHERE o.""ProfileId"" = f.""ProfileId"" AND o.""Id"" <> f.""EntryId""
+                    AND (o.""MediaItemId"" = f.""ShowId""
+                         OR (f.""ShowTmdbId"" IS NOT NULL AND o.""Type"" = 'TvShow'
+                             AND o.""ExternalId"" = f.""ShowTmdbId"" AND o.""ProviderId"" = 'tmdb_discovery'))));
+
+UPDATE ""UserWatchlistItems"" w
+SET ""MediaItemId"" = f.""ShowId"",
+    ""Type"" = 'TvShow',
+    ""Title"" = f.""ShowTitle"",
+    ""PosterUrl"" = CASE WHEN length(f.""ShowPoster"") <= 1024 THEN f.""ShowPoster"" END,
+    ""ExternalId"" = COALESCE(f.""ShowTmdbId"", ''),
+    ""ProviderId"" = CASE WHEN f.""ShowTmdbId"" IS NULL THEN '' ELSE 'tmdb_discovery' END,
+    ""ExpectedReleaseDate"" = NULL
+FROM ""_WatchlistShowFix"" f
+WHERE w.""Id"" = f.""EntryId""
+  AND NOT EXISTS (SELECT 1 FROM ""UserWatchlistItems"" o
+                  WHERE o.""ProfileId"" = f.""ProfileId"" AND o.""Id"" <> f.""EntryId""
+                    AND o.""ExternalId"" = COALESCE(f.""ShowTmdbId"", '')
+                    AND o.""ProviderId"" = CASE WHEN f.""ShowTmdbId"" IS NULL THEN '' ELSE 'tmdb_discovery' END);
+
+DROP TABLE ""_WatchlistShowFix"";");
         }
 
         /// <inheritdoc />

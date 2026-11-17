@@ -35,10 +35,11 @@ public class PostgresWatchlistFinishedTests(PostgresDatabase database) : IClassF
         await db.SaveChangesAsync(cancellationToken);
         var repository = new WatchlistRepository(db);
 
-        (await repository.GetTitleAsync(episodes[1].Id)).Should().Be(new WatchlistTitle(show.Id, "TvShow"));
-        (await repository.GetTitleAsync(season.Id)).Should().Be(new WatchlistTitle(show.Id, "TvShow"));
-        (await repository.GetTitleAsync(show.Id)).Should().Be(new WatchlistTitle(show.Id, "TvShow"));
-        (await repository.GetTitleAsync(movie.Id)).Should().Be(new WatchlistTitle(movie.Id, "Movie"));
+        var showTitle = new WatchlistTitle(show.Id, "TvShow", show.Title, show.PosterUrl);
+        (await repository.GetTitleAsync(episodes[1].Id)).Should().Be(showTitle);
+        (await repository.GetTitleAsync(season.Id)).Should().Be(showTitle);
+        (await repository.GetTitleAsync(show.Id)).Should().Be(showTitle);
+        (await repository.GetTitleAsync(movie.Id)).Should().Be(new WatchlistTitle(movie.Id, "Movie", movie.Title, movie.PosterUrl));
         (await repository.GetTitleAsync(Guid.NewGuid())).Should().BeNull();
 
         db.UserMediaStates.AddRange(episodes.Take(2).Select(e => new UserMediaState { ProfileId = profile, MediaItemId = e.Id, IsPlayed = true, LastPlayedAt = DateTime.UtcNow }));
