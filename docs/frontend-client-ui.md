@@ -85,6 +85,17 @@ watched), so a season or the show marked watched takes it off too, and a show
 with episodes left stays. A trailer never finishes the film, and a movie and a
 show that share a TMDB id are told apart by type.
 
+**The watchlist holds titles, never their parts.** A season or an episode is not
+what someone wants to watch later; its show is. `WatchlistManager` turns a season
+or an episode, whichever the client sends as `mediaItemId` to `POST
+/api/watchlist/toggle` or `GET /api/watchlist/check`, into its show before it
+looks the entry up, so the entry is added, found and removed under the show's
+id, TMDB id, title, poster and type (`TvShow`), and the season's or episode's own
+title, poster and release date are not kept. The Add to watchlist action stays on
+seasons and episodes, and reads as on when the show is on the list. The entries
+stored before that were turned into their shows by `ChangesSinceInitial`
+(`20261117002611`, `docs/database.md`).
+
 **A watchlist change shows everywhere at once.** Every add or remove sends
 `WatchlistUpdated` with the profile id to that profile's devices
 (`docs/realtime.md`). `useWatchlistUpdated` drops another profile's event,

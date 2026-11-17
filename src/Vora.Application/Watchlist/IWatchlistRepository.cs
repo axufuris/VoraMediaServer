@@ -20,4 +20,4 @@ public interface IWatchlistRepository
 }
 
 // Type is what a watchlist entry calls it: "Movie" or "TvShow".
-public sealed record WatchlistTitle(Guid Id, string Type);
+public sealed record WatchlistTitle(Guid Id, string Type, string Title, string? PosterUrl);

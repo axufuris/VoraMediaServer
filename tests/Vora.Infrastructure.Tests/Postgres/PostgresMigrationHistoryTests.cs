@@ -1,6 +1,7 @@
 using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
 using Vora.Application.SmartLists;
+using Vora.Domain.Entities.Discovery;
 using Vora.Domain.Entities.Iptv;
 using Vora.Domain.Entities.Library;
 using Vora.Domain.Entities.Media;
@@ -1193,5 +1194,108 @@ public class PostgresMigrationHistoryTests(PostgresDatabase database) : IClassFi
             .Select(l => (l.DefaultKey, l.DisplayOrder));
 
         lists.Should().Equal(SmartListDefaults.All.Select(d => ((string?)d.Key, d.DisplayOrder)));
+    }
+
+    private static UserWatchlistItem WatchlistRow(Guid profileId, string title, string type, string externalId, string providerId, Guid? mediaItemId, DateTime addedAt) => new()
+    {
+        ProfileId = profileId,
+        Title = title,
+        Type = type,
+        ExternalId = externalId,
+        ProviderId = providerId,
+        MediaItemId = mediaItemId,
+        AddedAt = addedAt,
+    };
+
+    [Fact]
+    public async Task A_database_on_the_hidden_collection_migration_has_the_seasons_and_episodes_on_its_watchlists_turned_into_their_shows()
+    {
+        Assert.SkipUnless(PostgresDatabase.IsConfigured, PostgresDatabase.SkipReason);
+        var cancellationToken = TestContext.Current.CancellationToken;
+        await using var legacy = new LegacyDatabase();
+        var library = new MediaLibrary { Name = "Shows", Type = LibraryType.TvShow, FolderPaths = new List<string> { "/media/shows" } };
+        var mobland = new TvShow { Title = "MobLand", TmdbId = "1396", PosterUrl = "/api/artwork/custom/mobland.jpg", LibraryId = library.Id };
+        var severance = new TvShow { Title = "Severance", TmdbId = "95396", LibraryId = library.Id };
+        var homeVideos = new TvShow { Title = "Home Videos", LibraryId = library.Id };
+        var movie = new Movie { Title = "The Matrix", TmdbId = "603", LibraryId = library.Id };
+        var moblandOne = new Season { Title = "Season 1", SeasonNumber = 1, TvShowId = mobland.Id, LibraryId = library.Id };
+        var moblandTwo = new Season { Title = "Season 2", SeasonNumber = 2, TvShowId = mobland.Id, LibraryId = library.Id };
+        var severanceOne = new Season { Title = "Season 1", SeasonNumber = 1, TvShowId = severance.Id, LibraryId = library.Id };
+        var severancePilot = new Episode { Title = "Pilot", EpisodeNumber = 1, SeasonId = severanceOne.Id, LibraryId = library.Id };
+        var homeOne = new Season { Title = "Season 1", SeasonNumber = 1, TvShowId = homeVideos.Id, LibraryId = library.Id };
+
+        var collapsing = Guid.NewGuid();
+        var alreadyThere = Guid.NewGuid();
+        var unmatched = Guid.NewGuid();
+        var unmatchedTaken = Guid.NewGuid();
+        var movieTakesTheId = Guid.NewGuid();
+        var day = new DateTime(2026, 11, 1, 12, 0, 0, DateTimeKind.Utc);
+
+        var firstSeason = WatchlistRow(collapsing, "Season 1", "Movie", "", "", moblandOne.Id, day);
+        var secondSeason = WatchlistRow(collapsing, "Season 2", "Season", "77001", "tmdb_discovery", moblandTwo.Id, day.AddDays(1));
+        var ownMovie = WatchlistRow(collapsing, "The Matrix", "Movie", "603", "tmdb_discovery", movie.Id, day.AddDays(2));
+        var discoveryShow = WatchlistRow(alreadyThere, "Severance", "TvShow", "95396", "tmdb_discovery", null, day);
+        var episodeOfIt = WatchlistRow(alreadyThere, "Pilot", "Episode", "", "", severancePilot.Id, day.AddDays(1));
+        var unmatchedSeason = WatchlistRow(unmatched, "Season 1", "Season", "", "", homeOne.Id, day);
+        var someoneElsesUnmatched = WatchlistRow(unmatchedTaken, "Wedding", "Movie", "", "", Guid.NewGuid(), day);
+        var blockedSeason = WatchlistRow(unmatchedTaken, "Season 1", "Season", "88002", "tmdb_discovery", homeOne.Id, day.AddDays(1));
+        var blockingMovie = WatchlistRow(movieTakesTheId, "Another film", "Movie", "1396", "tmdb_discovery", null, day);
+        var movieIdSeason = WatchlistRow(movieTakesTheId, "Season 1", "Season", "", "", moblandOne.Id, day.AddDays(1));
+
+        await legacy.BuildHiddenCollectionStateAsync(async db =>
+        {
+            db.AddRange(library, mobland, severance, homeVideos, movie, moblandOne, moblandTwo, severanceOne, severancePilot, homeOne);
+            db.AddRange(firstSeason, secondSeason, ownMovie, discoveryShow, episodeOfIt, unmatchedSeason, someoneElsesUnmatched, blockedSeason, blockingMovie, movieIdSeason);
+            await db.SaveChangesAsync(cancellationToken);
+        }, cancellationToken);
+
+        await using (var before = legacy.NewContext())
+        {
+            (await before.Database.GetPendingMigrationsAsync(cancellationToken)).Should().Equal(MigrationHistoryTests.ChangesSinceInitial);
+        }
+
+        await legacy.MigrateAsync(cancellationToken);
+
+        List<UserWatchlistItem> afterFirstRun;
+        await using (var after = legacy.NewContext())
+        {
+            (await after.Database.GetPendingMigrationsAsync(cancellationToken)).Should().BeEmpty();
+            afterFirstRun = await after.UserWatchlistItems.AsNoTracking().OrderBy(w => w.ProfileId).ThenBy(w => w.AddedAt).ToListAsync(cancellationToken);
+
+            var collapsed = afterFirstRun.Where(w => w.ProfileId == collapsing && w.MediaItemId == mobland.Id).ToList();
+            collapsed.Should().ContainSingle();
+            collapsed[0].Id.Should().Be(firstSeason.Id);
+            collapsed[0].Type.Should().Be("TvShow");
+            collapsed[0].Title.Should().Be("MobLand");
+            collapsed[0].PosterUrl.Should().Be("/api/artwork/custom/mobland.jpg");
+            collapsed[0].ExternalId.Should().Be("1396");
+            collapsed[0].ProviderId.Should().Be("tmdb_discovery");
+            collapsed[0].AddedAt.Should().Be(day);
+            afterFirstRun.Should().NotContain(w => w.Id == secondSeason.Id);
+            afterFirstRun.Single(w => w.Id == ownMovie.Id).Should().BeEquivalentTo(ownMovie);
+
+            afterFirstRun.Where(w => w.ProfileId == alreadyThere).Should().ContainSingle()
+                .Which.Should().BeEquivalentTo(discoveryShow);
+
+            var unmatchedShow = afterFirstRun.Single(w => w.Id == unmatchedSeason.Id);
+            unmatchedShow.MediaItemId.Should().Be(homeVideos.Id);
+            unmatchedShow.Type.Should().Be("TvShow");
+            unmatchedShow.Title.Should().Be("Home Videos");
+            unmatchedShow.ExternalId.Should().BeEmpty();
+            unmatchedShow.ProviderId.Should().BeEmpty();
+
+            afterFirstRun.Single(w => w.Id == blockedSeason.Id).Should().BeEquivalentTo(blockedSeason);
+            afterFirstRun.Single(w => w.Id == someoneElsesUnmatched.Id).Should().BeEquivalentTo(someoneElsesUnmatched);
+            afterFirstRun.Single(w => w.Id == movieIdSeason.Id).Should().BeEquivalentTo(movieIdSeason);
+            afterFirstRun.Single(w => w.Id == blockingMovie.Id).Should().BeEquivalentTo(blockingMovie);
+
+            await after.Database.ExecuteSqlAsync($"DELETE FROM \"__EFMigrationsHistory\" WHERE \"MigrationId\" = {MigrationHistoryTests.ChangesSinceInitial}", cancellationToken);
+        }
+
+        await legacy.MigrateAsync(cancellationToken);
+
+        await using var again = legacy.NewContext();
+        var afterSecondRun = await again.UserWatchlistItems.AsNoTracking().OrderBy(w => w.ProfileId).ThenBy(w => w.AddedAt).ToListAsync(cancellationToken);
+        afterSecondRun.Should().BeEquivalentTo(afterFirstRun);
     }
 }

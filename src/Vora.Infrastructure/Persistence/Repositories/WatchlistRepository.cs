@@ -57,11 +57,11 @@ public class WatchlistRepository(VoraDbContext context) : IWatchlistRepository
                 .FirstOrDefaultAsync();
         var titleId = showId ?? mediaItemId;
 
-        var type = await context.MediaItems.AsNoTracking()
+        var title = await context.MediaItems.AsNoTracking()
             .Where(m => m.Id == titleId)
-            .Select(m => m is Movie ? "Movie" : m is TvShow ? "TvShow" : null)
+            .Select(m => new { Type = m is Movie ? "Movie" : m is TvShow ? "TvShow" : null, m.Title, m.PosterUrl })
             .FirstOrDefaultAsync();
-        return type is null ? null : new WatchlistTitle(titleId, type);
+        return title?.Type is null ? null : new WatchlistTitle(titleId, title.Type, title.Title, title.PosterUrl);
     }
 
     public Task<bool> IsFinishedAsync(Guid profileId, Guid titleId) =>

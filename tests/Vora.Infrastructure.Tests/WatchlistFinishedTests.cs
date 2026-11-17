@@ -49,10 +49,11 @@ public class WatchlistFinishedTests
         var seeded = await SeedAsync(db);
         var repository = new WatchlistRepository(db);
 
-        (await repository.GetTitleAsync(seeded.Episodes[1].Id)).Should().Be(new WatchlistTitle(seeded.Show.Id, "TvShow"));
-        (await repository.GetTitleAsync(seeded.Season.Id)).Should().Be(new WatchlistTitle(seeded.Show.Id, "TvShow"));
-        (await repository.GetTitleAsync(seeded.Show.Id)).Should().Be(new WatchlistTitle(seeded.Show.Id, "TvShow"));
-        (await repository.GetTitleAsync(seeded.Movie.Id)).Should().Be(new WatchlistTitle(seeded.Movie.Id, "Movie"));
+        var show = new WatchlistTitle(seeded.Show.Id, "TvShow", seeded.Show.Title, seeded.Show.PosterUrl);
+        (await repository.GetTitleAsync(seeded.Episodes[1].Id)).Should().Be(show);
+        (await repository.GetTitleAsync(seeded.Season.Id)).Should().Be(show);
+        (await repository.GetTitleAsync(seeded.Show.Id)).Should().Be(show);
+        (await repository.GetTitleAsync(seeded.Movie.Id)).Should().Be(new WatchlistTitle(seeded.Movie.Id, "Movie", seeded.Movie.Title, seeded.Movie.PosterUrl));
     }
 
     [Fact]
