@@ -75,6 +75,18 @@ on it is bookmarked. It is `LibraryStatusBadge` on the web (`WatchedBadge.tsx`,
 drawn in the same box as the watched check), `MediaPoster.kt` on Android and
 `PosterCard.bs` on the Roku. Other screens keep their own bookmark.
 
+**The Watchlist page is grouped, the way a library is by letter.** Up to four
+sections, each under a small muted `h2` (the library page's letter header), in
+this order: **Movies in Library**, **Shows in Library**, **Movies Not Yet in
+Library**, **Shows Not Yet in Library**. A section with nothing in it is not
+drawn, and inside one the server's order stays (newest added first). In the
+library means the entry has a `mediaItemId`; a show is `type` `TvShow`, in any
+case, and anything else counts as a movie. `groupWatchlist`
+(`utils/watchlistGroups.ts`) is the one place that decides it, and the Android
+and Roku clients use the same order and the same four titles. "Not Yet" rather
+than "Upcoming" because a title there may be old and simply in no library; the
+clock in its corner marks the ones that are on their way.
+
 **A finished title leaves the watchlist.** The server takes it off, for that
 profile only (`WatchlistManager.RemoveIfFinishedAsync`). A movie goes when its
 progress ping crosses 90% (`StreamManager.PingSessionAsync`, the ping that

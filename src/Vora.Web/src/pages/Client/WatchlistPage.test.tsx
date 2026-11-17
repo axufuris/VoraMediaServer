@@ -54,9 +54,7 @@ describe('WatchlistPage', () => {
         expect(mocks.getWatchlist).toHaveBeenCalledTimes(2);
     });
 
-    // The corner of each poster, where an episode's number goes, says where the
-    // title stands against the libraries: a check in one, a clock requested.
-    it('puts a check on a title in the library, a clock on a requested one, and nothing on the rest', async () => {
+    it('puts a play triangle on a title in the library, a clock on a requested one, and nothing on the rest', async () => {
         mocks.getWatchlist.mockResolvedValue([
             { ...entry('1', 'Heat'), mediaItemId: 'library-heat' },
             { ...entry('2', 'Ronin'), isRequested: true },
@@ -71,7 +69,7 @@ describe('WatchlistPage', () => {
         expect(collateral).toBeEmptyDOMElement();
     });
 
-    it('shows the check, not the clock, for a title that is in the library and also requested', async () => {
+    it('shows the triangle, not the clock, for a title that is in the library and also requested', async () => {
         mocks.getWatchlist.mockResolvedValue([{ ...entry('1', 'Heat'), mediaItemId: 'library-heat', isRequested: true }]);
         render(<MemoryRouter><WatchlistPage /></MemoryRouter>);
         await screen.findByText('Heat');
@@ -94,6 +92,53 @@ describe('WatchlistPage', () => {
         await screen.findByText('Ronin');
 
         for (const tile of screen.getAllByTestId('tile')) expect(tile).not.toHaveAttribute('data-bookmarked');
+    });
+
+    it('puts a header over each group, in the order movies in the library, shows in the library, movies not yet in it, shows not yet in it', async () => {
+        mocks.getWatchlist.mockResolvedValue([
+            { ...entry('1', 'Dune: Part Three'), isRequested: true },
+            { ...entry('2', 'Severance'), type: 'TvShow' },
+            { ...entry('3', 'Heat'), mediaItemId: 'library-heat' },
+            { ...entry('4', 'MobLand'), type: 'TvShow', mediaItemId: 'library-mobland' },
+        ]);
+        render(<MemoryRouter><WatchlistPage /></MemoryRouter>);
+        await screen.findByText('Heat');
+
+        expect(screen.getAllByRole('heading', { level: 2 }).map(h => h.textContent)).toEqual([
+            'Movies in Library',
+            'Shows in Library',
+            'Movies Not Yet in Library',
+            'Shows Not Yet in Library',
+        ]);
+        expect(screen.getAllByTestId('tile').map(tile => tile.childNodes[0].textContent)).toEqual(['Heat', 'MobLand', 'Dune: Part Three', 'Severance']);
+    });
+
+    it('draws a group only when something is in it', async () => {
+        mocks.getWatchlist.mockResolvedValue([{ ...entry('1', 'Heat'), mediaItemId: 'library-heat' }]);
+        render(<MemoryRouter><WatchlistPage /></MemoryRouter>);
+        await screen.findByText('Heat');
+
+        expect(screen.getAllByRole('heading', { level: 2 }).map(h => h.textContent)).toEqual(['Movies in Library']);
+    });
+
+    it('draws no group header for an empty watchlist', async () => {
+        mocks.getWatchlist.mockResolvedValue([]);
+        render(<MemoryRouter><WatchlistPage /></MemoryRouter>);
+        await screen.findByText('Your watchlist is empty');
+
+        expect(screen.queryAllByRole('heading', { level: 2 })).toEqual([]);
+    });
+
+    it('moves a title between groups when the server says it reached the library', async () => {
+        mocks.getWatchlist.mockResolvedValueOnce([entry('1', 'Heat')]);
+        render(<MemoryRouter><WatchlistPage /></MemoryRouter>);
+        await screen.findByText('Heat');
+        expect(screen.getAllByRole('heading', { level: 2 }).map(h => h.textContent)).toEqual(['Movies Not Yet in Library']);
+
+        mocks.getWatchlist.mockResolvedValueOnce([{ ...entry('1', 'Heat'), mediaItemId: 'library-heat' }]);
+        await fire(PROFILE);
+
+        expect(screen.getAllByRole('heading', { level: 2 }).map(h => h.textContent)).toEqual(['Movies in Library']);
     });
 
     it("leaves the list alone for another profile's change", async () => {
