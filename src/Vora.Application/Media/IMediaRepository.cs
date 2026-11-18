@@ -107,6 +107,8 @@ public interface IMediaRepository
     Task AddMediaExtraAsync(MediaExtra extra);
     Task DeleteMediaByFilePathAsync(string filePath);
     Task MarkMediaMissingByFilePathAsync(string filePath);
+    Task<bool> AnyMediaUnderPathAsync(string folderPath);
+    Task<int> MarkMediaMissingUnderPathAsync(string folderPath);
     Task<List<TrashMediaItemVM>> GetMissingMediaAsync();
     Task<List<Guid>> GetExpiredMissingMediaIdsAsync(DateTime cutoffUtc);
     Task RestoreMissingMediaAsync(Guid id);

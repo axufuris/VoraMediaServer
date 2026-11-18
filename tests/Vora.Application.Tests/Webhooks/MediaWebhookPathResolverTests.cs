@@ -1,0 +1,126 @@
+using Vora.Application.Webhooks;
+using Vora.Domain.Enums;
+
+namespace Vora.Application.Tests.Webhooks;
+
+public class MediaWebhookPathResolverTests
+{
+    private static readonly string Movies = Path.Combine(Path.GetTempPath(), "vora-resolver", "movies");
+    private static readonly string Tv = Path.Combine(Path.GetTempPath(), "vora-resolver", "tv");
+
+    private static readonly MediaWebhookLibrary MovieLibrary = new(Guid.NewGuid(), "Movies", LibraryType.Movie, new List<string> { Movies }, new List<string>());
+    private static readonly MediaWebhookLibrary TvLibrary = new(Guid.NewGuid(), "TV", LibraryType.TvShow, new List<string> { Tv }, new List<string>());
+
+    private static MediaWebhookPathResolver Resolver(string mappings, Func<string, bool>? anchorExists = null, params MediaWebhookLibrary[] libraries) =>
+        new(
+            MediaWebhookPathMappings.Parse(mappings),
+            libraries.Length == 0 ? new[] { MovieLibrary, TvLibrary } : libraries,
+            top => Task.FromResult(anchorExists?.Invoke(top) ?? false));
+
+    [Fact]
+    public void Mappings_are_one_per_line_and_bad_lines_are_dropped()
+    {
+        var mappings = MediaWebhookPathMappings.Parse("/tv => /media/tv\r\n\r\nnonsense\n=> /x\n/y =>\n C:\\Media\\Movies=>/media/movies ");
+
+        mappings.Should().Equal(new MediaWebhookPathMapping("/tv", "/media/tv"), new MediaWebhookPathMapping("C:\\Media\\Movies", "/media/movies"));
+        MediaWebhookPathMappings.Parse(null).Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task A_mapping_puts_the_file_in_the_library_folder_it_names()
+    {
+        var resolution = await Resolver($"/data/tv => {Tv}").ResolveAsync("/data/tv/Show/Season 1/e1.mkv");
+
+        resolution.Target.Should().NotBeNull();
+        resolution.Target!.Library.Should().Be(TvLibrary);
+        resolution.Target.Root.Should().Be(Tv);
+        resolution.Target.Path.Should().Be(Path.Combine(Tv, "Show", "Season 1", "e1.mkv"));
+    }
+
+    [Fact]
+    public async Task The_longest_matching_mapping_wins()
+    {
+        var other = Path.Combine(Path.GetTempPath(), "vora-resolver", "tv-kids");
+        var kids = new MediaWebhookLibrary(Guid.NewGuid(), "Kids", LibraryType.TvShow, new List<string> { other }, new List<string>());
+
+        var resolution = await Resolver($"/data => {Tv}\n/data/kids => {other}", null, TvLibrary, kids).ResolveAsync("/data/kids/Bluey/S1/e1.mkv");
+
+        resolution.Target!.Library.Should().Be(kids);
+        resolution.Target.Path.Should().Be(Path.Combine(other, "Bluey", "S1", "e1.mkv"));
+    }
+
+    [Fact]
+    public async Task A_windows_path_maps_through_a_windows_mapping()
+    {
+        var resolution = await Resolver($"D:\\Media\\Movies => {Movies}").ResolveAsync("D:\\Media\\Movies\\Film (2020)\\Film.mkv");
+
+        resolution.Target!.Path.Should().Be(Path.Combine(Movies, "Film (2020)", "Film.mkv"));
+    }
+
+    [Fact]
+    public async Task A_mapping_to_somewhere_that_is_not_a_library_says_so()
+    {
+        var resolution = await Resolver("/tv => /somewhere/else").ResolveAsync("/tv/Show/e1.mkv");
+
+        resolution.Target.Should().BeNull();
+        resolution.Reason.Should().Contain("/tv => /somewhere/else").And.Contain("not inside any library folder");
+    }
+
+    [Fact]
+    public async Task A_path_already_inside_a_library_folder_needs_no_mapping()
+    {
+        var path = Path.Combine(Movies, "Film (2020)", "Film.mkv");
+
+        var resolution = await Resolver(string.Empty).ResolveAsync(path);
+
+        resolution.Target!.Library.Should().Be(MovieLibrary);
+        resolution.Target.Path.Should().Be(path);
+    }
+
+    [Fact]
+    public async Task With_no_mapping_the_leading_folders_are_stripped_until_a_folder_that_exists_under_a_library()
+    {
+        var resolution = await Resolver(
+            string.Empty,
+            top => top == Path.Combine(Tv, "Show")).ResolveAsync("/data/media/tv/Show/Season 1/e1.mkv");
+
+        resolution.Target!.Library.Should().Be(TvLibrary);
+        resolution.Target.Path.Should().Be(Path.Combine(Tv, "Show", "Season 1", "e1.mkv"));
+    }
+
+    [Fact]
+    public async Task Stripping_takes_as_little_as_it_can()
+    {
+        var resolution = await Resolver(
+            string.Empty,
+            top => top == Path.Combine(Tv, "Show") || top == Path.Combine(Tv, "Season 1")).ResolveAsync("/tv/Show/Season 1/e1.mkv");
+
+        resolution.Target!.Path.Should().Be(Path.Combine(Tv, "Show", "Season 1", "e1.mkv"));
+    }
+
+    [Fact]
+    public async Task With_nothing_to_anchor_on_it_asks_for_a_mapping()
+    {
+        var resolution = await Resolver(string.Empty).ResolveAsync("/tv/Unknown Show/e1.mkv");
+
+        resolution.Target.Should().BeNull();
+        resolution.Reason.Should().Contain("path mapping");
+    }
+
+    [Fact]
+    public async Task Only_the_libraries_it_was_given_are_considered()
+    {
+        var resolution = await Resolver($"/tv => {Tv}", null, MovieLibrary).ResolveAsync("/tv/Show/e1.mkv");
+
+        resolution.Target.Should().BeNull();
+    }
+
+    [Fact]
+    public async Task A_path_that_climbs_out_of_its_folder_is_refused_but_dots_in_a_name_are_fine()
+    {
+        (await Resolver($"/tv => {Tv}").ResolveAsync("/tv/../etc/passwd")).Target.Should().BeNull();
+        (await Resolver($"/tv => {Tv}").ResolveAsync("/tv/Wait... What (2020)/Wait... What.mkv")).Target!.Path
+            .Should().Be(Path.Combine(Tv, "Wait... What (2020)", "Wait... What.mkv"));
+        (await Resolver(string.Empty).ResolveAsync(string.Empty)).Target.Should().BeNull();
+    }
+}

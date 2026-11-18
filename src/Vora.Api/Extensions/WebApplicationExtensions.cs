@@ -153,6 +153,7 @@ public static class WebApplicationExtensions
         app.MapSearchEndpoints();
         app.MapSettingsEndpoints();
         app.MapSmartListEndpoints();
+        app.MapMediaWebhookEndpoints();
         app.MapSmartPlaylistEndpoints();
         app.MapStreamingEndpoints();
         app.MapSubtitleSearchEndpoints();

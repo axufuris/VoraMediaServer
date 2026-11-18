@@ -499,6 +499,9 @@ in addition to the keys shown.
 | `imdb_chronology` | IMDB Community Lists | — |
 | `itunes_podcast_discovery` | iTunes Podcast Discovery | — |
 | `opensubtitles_search` | OpenSubtitles | `api_key`, `auth_mode`, `username`, `password`, `default_languages` |
+| `radarr_webhook` | Radarr Webhook (`docs/media-webhooks.md`) | `secret`, `path_mappings` |
+| `sonarr_webhook` | Sonarr Webhook | `secret`, `path_mappings` |
+| `lidarr_webhook` | Lidarr Webhook | `secret`, `path_mappings` |
 | `openai_recommendations` | AI Smart Recommendations (holds the AI connection for every AI feature) | `base_url`, `api_key`, `chat_model`, `collections_model`, `music_playlists_model`, `embedding_model`, `schedule_time`, `monthly_token_limit` |
 | `local_imagesharp_overlays` | Vora Native Overlays | `enable_schedule`, `schedule_time` |
 | `local_metadata` | Local Assets (NFO & Images) | — |

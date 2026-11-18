@@ -49,6 +49,7 @@ public interface ITaskQueueManager
     void QueueResolveTvdbIds();
     void QueueMergeDuplicateShows();
     void QueueRemoveOrphanedMedia(string filePath);
+    void QueueRemoveMissingMediaUnder(string folderPath);
     void QueueCollectionChronologySync(Guid collectionId, string title, bool force = false);
     void QueueCollectionContentSync(Guid collectionId, string title);
     void QueueGeneratePosterOverlays(Guid mediaItemId);
@@ -546,6 +547,15 @@ public class TaskQueueManager : ITaskQueueManager
             var mediaRepo = sp.GetRequiredService<IMediaRepository>();
             await mediaRepo.MarkMediaMissingByFilePathAsync(filePath);
         }, recipe: TaskRecipe.Of(nameof(QueueRemoveOrphanedMedia), new { filePath }));
+    }
+
+    public void QueueRemoveMissingMediaUnder(string folderPath)
+    {
+        Enqueue($"Auto-Cleanup: {Path.GetFileName(folderPath.TrimEnd('/', '\\'))}", async (ct, sp) =>
+        {
+            var mediaRepo = sp.GetRequiredService<IMediaRepository>();
+            await mediaRepo.MarkMediaMissingUnderPathAsync(folderPath);
+        }, recipe: TaskRecipe.Of(nameof(QueueRemoveMissingMediaUnder), new { folderPath }));
     }
 
     public void QueueCollectionChronologySync(Guid collectionId, string title, bool force = false)
