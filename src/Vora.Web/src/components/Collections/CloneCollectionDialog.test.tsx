@@ -34,6 +34,7 @@ const renderDialog = (collection: CollectionDetails) => render(
 
 const radio = (name: string) => screen.getByRole('radio', { name: new RegExp(`^${name}`) }) as HTMLInputElement;
 const proceed = () => fireEvent.click(screen.getByRole('button', { name: 'Continue' }));
+const loaded = () => waitFor(() => expect(screen.getByRole('button', { name: 'Continue' })).toBeEnabled());
 
 describe('CloneCollectionDialog', () => {
     beforeEach(() => {
@@ -128,7 +129,8 @@ describe('CloneCollectionDialog', () => {
         mocks.getLibraries.mockResolvedValue([MUSIC]);
         renderDialog(source(undefined));
 
-        await waitFor(() => expect(radio('Movie').disabled).toBe(true));
+        await loaded();
+        expect(radio('Movie').disabled).toBe(true);
         expect(radio('Global').checked).toBe(true);
         expect(radio('Show').disabled).toBe(true);
     });
@@ -138,7 +140,8 @@ describe('CloneCollectionDialog', () => {
         mocks.getLibraries.mockRejectedValue(new Error('offline'));
         renderDialog(source('movies-1'));
 
-        await waitFor(() => expect(radio('Movie').disabled).toBe(true));
+        await loaded();
+        expect(radio('Movie').disabled).toBe(true);
         expect(radio('Global').checked).toBe(true);
         proceed();
         expect(mocks.onChoose).toHaveBeenCalledWith({ activeTab: 'global' });
