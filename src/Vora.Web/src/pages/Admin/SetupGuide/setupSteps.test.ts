@@ -6,16 +6,16 @@ const ids = (c: SetupContent, options: Partial<SetupStepOptions> = {}) => buildS
 
 describe('setup guide steps', () => {
     it('always starts with the basics and access, and ends with AI, backups and done', () => {
-        expect(ids(content())).toEqual(['welcome', 'server', 'playback', 'content', 'remote', 'signup', 'ai', 'backups', 'done']);
+        expect(ids(content())).toEqual(['welcome', 'server', 'playback', 'content', 'remote', 'signup', 'signin', 'ai', 'backups', 'done']);
     });
 
     it('asks about email right after sign-ups when it is needed', () => {
-        expect(ids(content(), { email: true })).toEqual(['welcome', 'server', 'playback', 'content', 'remote', 'signup', 'email', 'ai', 'backups', 'done']);
+        expect(ids(content(), { email: true })).toEqual(['welcome', 'server', 'playback', 'content', 'remote', 'signup', 'signin', 'email', 'ai', 'backups', 'done']);
     });
 
     it('asks about intro detection and thumbnails inside Movies & TV, after the plugins', () => {
         expect(ids(content({ moviesAndShows: true }))).toEqual([
-            'welcome', 'server', 'playback', 'content', 'remote', 'signup',
+            'welcome', 'server', 'playback', 'content', 'remote', 'signup', 'signin',
             'metadata', 'artwork', 'ratings', 'detection', 'thumbnails', 'requests', 'subtitles', 'ai', 'backups', 'done',
         ]);
     });
@@ -28,7 +28,7 @@ describe('setup guide steps', () => {
 
     it('adds a section for each other kind of content picked', () => {
         expect(ids(content({ liveTv: true, internetRadio: true, podcasts: true, music: true }))).toEqual([
-            'welcome', 'server', 'playback', 'content', 'remote', 'signup', 'livetv', 'radio', 'podcasts', 'lastfm', 'lyrics', 'ai', 'backups', 'done',
+            'welcome', 'server', 'playback', 'content', 'remote', 'signup', 'signin', 'livetv', 'radio', 'podcasts', 'lastfm', 'lyrics', 'ai', 'backups', 'done',
         ]);
     });
 

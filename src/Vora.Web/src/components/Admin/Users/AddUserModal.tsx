@@ -1,6 +1,7 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Modal, ModalHeader } from '../../Common/Modal';
 import { userService } from '../../../api/Users/userService';
+import { externalSignInService, type SignInProviders } from '../../../api/Auth/externalSignInService';
 import { resolveReason } from '../../../utils/apiError';
 
 // An admin adding someone directly, whatever the registration mode. The admin
@@ -29,9 +30,24 @@ export default function AddUserModal({ serverId, onClose, onCreated }: AddUserMo
     const [password, setPassword] = useState(() => generatePassword());
     const [saving, setSaving] = useState(false);
     const [error, setError] = useState<string | null>(null);
-    const [created, setCreated] = useState<{ email: string; password: string } | null>(null);
+    const [created, setCreated] = useState<{ email: string; password: string | null } | null>(null);
+    const [providers, setProviders] = useState<SignInProviders | null>(null);
+    const [ssoChoice, setSsoChoice] = useState(false);
 
-    const canSave = displayName.trim() && email.includes('@') && password.length >= MIN_PASSWORD_LENGTH && !saving;
+    useEffect(() => {
+        let cancelled = false;
+        externalSignInService.getProvidersFor(serverId)
+            .then(result => { if (!cancelled) setProviders(result); })
+            .catch(() => { if (!cancelled) setProviders(null); });
+        return () => { cancelled = true; };
+    }, [serverId]);
+
+    const providerNames = providers?.providers.map(p => p.displayName) ?? [];
+    const hasProviders = providerNames.length > 0;
+    const passwordAllowed = !hasProviders || providers?.passwordSignInEnabled !== false;
+    const ssoOnly = hasProviders && (ssoChoice || !passwordAllowed);
+
+    const canSave = displayName.trim() && email.includes('@') && (ssoOnly || password.length >= MIN_PASSWORD_LENGTH) && !saving;
 
     const handleSubmit = async (e: React.SyntheticEvent) => {
         e.preventDefault();
@@ -39,8 +55,13 @@ export default function AddUserModal({ serverId, onClose, onCreated }: AddUserMo
         setSaving(true);
         setError(null);
         try {
-            await userService.createUser(email.trim(), displayName.trim(), password, serverId);
-            setCreated({ email: email.trim().toLowerCase(), password });
+            if (ssoOnly) {
+                await userService.createSsoOnlyUser(email.trim(), displayName.trim(), serverId);
+                setCreated({ email: email.trim().toLowerCase(), password: null });
+            } else {
+                await userService.createUser(email.trim(), displayName.trim(), password, serverId);
+                setCreated({ email: email.trim().toLowerCase(), password });
+            }
             onCreated();
         } catch (err) {
             setError(resolveReason(err) ?? 'Could not create the account.');
@@ -56,11 +77,13 @@ export default function AddUserModal({ serverId, onClose, onCreated }: AddUserMo
             {created ? (
                 <div className="space-y-4">
                     <p className="text-sm text-[var(--vora-text-secondary)]">
-                        Give these to them. They can change the password from their account settings after signing in.
+                        {created.password === null
+                            ? `Tell them to sign in with ${providerNames.join(' or ')} using this email. Their first sign-in links to this account.`
+                            : 'Give these to them. They can change the password from their account settings after signing in.'}
                     </p>
                     <dl className="space-y-2 rounded-[var(--vora-radius-md)] border border-[var(--vora-border-subtle)] bg-[var(--vora-bg-sunken)] p-4 text-sm">
                         <div className="flex justify-between gap-4"><dt className="text-[var(--vora-text-muted)]">Email</dt><dd className="font-mono text-[var(--vora-text-primary)]">{created.email}</dd></div>
-                        <div className="flex justify-between gap-4"><dt className="text-[var(--vora-text-muted)]">Password</dt><dd className="font-mono text-[var(--vora-text-primary)]">{created.password}</dd></div>
+                        {created.password !== null && <div className="flex justify-between gap-4"><dt className="text-[var(--vora-text-muted)]">Password</dt><dd className="font-mono text-[var(--vora-text-primary)]">{created.password}</dd></div>}
                     </dl>
                     <div className="flex justify-end">
                         <button type="button" onClick={onClose} className="vora-button-primary">Done</button>
@@ -76,6 +99,22 @@ export default function AddUserModal({ serverId, onClose, onCreated }: AddUserMo
                         <label htmlFor="add-user-email" className="block text-xs font-bold uppercase tracking-widest text-[var(--vora-text-muted)] mb-1.5">Email</label>
                         <input id="add-user-email" type="email" value={email} onChange={e => setEmail(e.target.value)} className="vora-input w-full" />
                     </div>
+                    {hasProviders && passwordAllowed && (
+                        <div role="radiogroup" aria-label="How they sign in" className="grid gap-2 sm:grid-cols-2">
+                            <button type="button" role="radio" aria-checked={!ssoOnly} onClick={() => setSsoChoice(false)} className={`cursor-pointer rounded-[var(--vora-radius-md)] border p-3 text-left text-sm transition-colors ${!ssoOnly ? 'border-[var(--vora-accent-500)] bg-[var(--vora-accent-soft)]' : 'border-[var(--vora-border-strong)]'}`}>
+                                <span className="block font-semibold text-[var(--vora-text-primary)]">With a password</span>
+                                <span className="text-xs text-[var(--vora-text-muted)]">You give them a starting password.</span>
+                            </button>
+                            <button type="button" role="radio" aria-checked={ssoOnly} onClick={() => setSsoChoice(true)} className={`cursor-pointer rounded-[var(--vora-radius-md)] border p-3 text-left text-sm transition-colors ${ssoOnly ? 'border-[var(--vora-accent-500)] bg-[var(--vora-accent-soft)]' : 'border-[var(--vora-border-strong)]'}`}>
+                                <span className="block font-semibold text-[var(--vora-text-primary)]">Sign in with a provider</span>
+                                <span className="text-xs text-[var(--vora-text-muted)]">No password. Their first sign-in with this email links to the account.</span>
+                            </button>
+                        </div>
+                    )}
+                    {hasProviders && !passwordAllowed && (
+                        <p className="text-xs text-[var(--vora-text-muted)]">Password sign-in is off, so this account signs in with {providerNames.join(' or ')}.</p>
+                    )}
+                    {!ssoOnly && (
                     <div>
                         <label htmlFor="add-user-password" className="block text-xs font-bold uppercase tracking-widest text-[var(--vora-text-muted)] mb-1.5">Starting password</label>
                         <div className="flex gap-2">
@@ -84,6 +123,7 @@ export default function AddUserModal({ serverId, onClose, onCreated }: AddUserMo
                         </div>
                         <p className="mt-1 text-xs text-[var(--vora-text-muted)]">At least {MIN_PASSWORD_LENGTH} characters. You'll see it again on the next screen.</p>
                     </div>
+                    )}
                     {error && <p role="alert" className="text-sm text-[var(--vora-danger-text)]">{error}</p>}
                     <div className="flex justify-end gap-2 pt-2">
                         <button type="button" onClick={onClose} className="vora-button-secondary">Cancel</button>

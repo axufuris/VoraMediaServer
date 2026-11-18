@@ -5,6 +5,7 @@ import { authService } from '../../../api/Auth/authService';
 import { invitationsAdminService } from '../../../api/Auth/invitationsAdminService';
 import { resolveReason } from '../../../utils/apiError';
 import { copyText } from '../../../utils/copyText';
+import { resolveAdminPath } from '../Shell/adminNavData';
 
 // How new people get an account, and the one thing to do about it, on the page
 // where accounts are managed. The mode used to live only in System Settings and
@@ -154,6 +155,11 @@ export default function SignUpCard({ serverId, invitationsPath }: SignUpCardProp
                     <Link to={invitationsPath} className="text-xs font-semibold text-[var(--vora-accent-text)] hover:underline">Manage invitations</Link>
                 </form>
             )}
+
+            <p className="text-xs text-[var(--vora-text-muted)]">
+                People who sign in with a provider are held to this setting too, unless a provider is set to decide for itself.{' '}
+                <Link to={resolveAdminPath('/admin/sign-in-providers', serverId)} className="font-semibold text-[var(--vora-accent-text)] hover:underline">Sign-in providers</Link>
+            </p>
 
             {inviteStatus && <p role="status" className="text-sm text-[var(--vora-text-secondary)]">{inviteStatus}</p>}
             {error && <p role="alert" className="text-sm text-[var(--vora-danger-text)]">{error}</p>}

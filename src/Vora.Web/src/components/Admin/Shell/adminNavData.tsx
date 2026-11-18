@@ -12,7 +12,7 @@ export type IconName =
     | 'dashboard' | 'settings' | 'tasks' | 'plugins' | 'users' | 'devices'
     | 'history' | 'music-note' | 'chart' | 'folder' | 'layers' | 'image'
     | 'copy' | 'list' | 'inbox' | 'compass' | 'star' | 'calendar'
-    | 'tv' | 'record' | 'radio' | 'mic' | 'palette' | 'logs' | 'backup' | 'trash';
+    | 'tv' | 'record' | 'radio' | 'mic' | 'palette' | 'logs' | 'backup' | 'trash' | 'key';
 
 export const Icons: Record<IconName, ReactNode> = {
     dashboard: <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75} d="M3 12l9-9 9 9M5 10v10a1 1 0 001 1h3v-7h6v7h3a1 1 0 001-1V10" />,
@@ -40,6 +40,7 @@ export const Icons: Record<IconName, ReactNode> = {
     palette: <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75} d="M12 21a9 9 0 110-18 9 9 0 015.66 16.06A2.4 2.4 0 0116 21h-2a2 2 0 01-2-2v0a2 2 0 00-2-2h-1.5a2.5 2.5 0 010-5H10a2 2 0 002-2v0M9 8h.01M15.5 9h.01M17.5 13h.01" />,
     logs: <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75} d="M4 4h12l4 4v12a2 2 0 01-2 2H4a2 2 0 01-2-2V6a2 2 0 012-2zm10 0v6h6M7 14h10M7 18h7M7 10h4" />,
     backup: <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75} d="M21 12a9 9 0 11-9-9 9 9 0 019 9zM12 7v5l3 2M5 5l-2-2M21 5l2-2" />,
+    key: <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75} d="M15 7a4 4 0 11-3.9 4.9L4 19v2h3v-2h2v-2h2l1.9-1.9A4 4 0 0115 7zm1.5 2.5h.01" />,
     trash: <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.75} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />,
 };
 
@@ -76,6 +77,7 @@ export const ADMIN_NAV: AdminNavEntry[] = [
     { label: 'Plugins',              pathTemplate: '/admin/plugins',          section: 'Server',  icon: 'plugins',    keywords: ['extensions'] },
     { label: 'Users & Access',       pathTemplate: '/admin/users',            section: 'Server',  icon: 'users',      keywords: ['accounts', 'profiles', 'invite'] },
     { label: 'Email Invitations',    pathTemplate: '/admin/invitations',      section: 'Server',  icon: 'inbox',      keywords: ['invite', 'invites', 'invitation', 'email', 'register'] },
+    { label: 'Sign-in Providers',    pathTemplate: '/admin/sign-in-providers', section: 'Server', icon: 'key',        keywords: ['sso', 'oidc', 'openid', 'ldap', 'login', 'authentik', 'keycloak', 'google', 'microsoft', 'single sign-on', 'password'] },
     { label: 'Authorized Devices',   pathTemplate: '/admin/devices',          section: 'Server',  icon: 'devices',    keywords: ['clients', 'block'] },
     { label: 'Watch History',        pathTemplate: '/admin/history',          section: 'Server',  icon: 'history',    keywords: ['playback', 'sessions'] },
     { label: 'Music History',        pathTemplate: '/admin/music-history',    section: 'Server',  icon: 'music-note', keywords: ['listening', 'plays'] },

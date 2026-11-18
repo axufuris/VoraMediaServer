@@ -18,12 +18,12 @@ import { ContentStep, PlaybackStep, ServerStep, WelcomeStep } from './steps/Basi
 import { ArtworkStep, DetectionStep, DiscoverStep, MetadataStep, RatingsStep, RequestsStep, SubtitlesStep, ThumbnailsStep } from './steps/VideoSteps';
 import { LiveTvStep, PodcastsStep, RadioStep } from './steps/LiveSteps';
 import { AiStep, DoneStep, LastFmStep, LyricsStep } from './steps/MusicAndFinishSteps';
-import { EmailStep, RemoteAccessStep, SignUpStep } from './steps/AccessSteps';
+import { EmailStep, RemoteAccessStep, SignInStep, SignUpStep } from './steps/AccessSteps';
 import { BackupsStep } from './steps/BackupsStep';
 
 const STEP_COMPONENTS: Record<SetupStepId, ComponentType<SetupStepProps>> = {
     welcome: WelcomeStep, server: ServerStep, playback: PlaybackStep, content: ContentStep,
-    remote: RemoteAccessStep, signup: SignUpStep, email: EmailStep,
+    remote: RemoteAccessStep, signup: SignUpStep, signin: SignInStep, email: EmailStep,
     metadata: MetadataStep, artwork: ArtworkStep, ratings: RatingsStep, detection: DetectionStep, thumbnails: ThumbnailsStep,
     requests: RequestsStep, subtitles: SubtitlesStep, discover: DiscoverStep,
     livetv: LiveTvStep, radio: RadioStep, podcasts: PodcastsStep,

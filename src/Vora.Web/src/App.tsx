@@ -19,6 +19,7 @@ import RegisterPage from './pages/Auth/RegisterPage';
 import ForgotPasswordPage from './pages/Auth/ForgotPasswordPage';
 import ResetPasswordPage from './pages/Auth/ResetPasswordPage';
 import ConfirmEmailPage from './pages/Auth/ConfirmEmailPage';
+import ExternalSignInPage from './pages/Auth/ExternalSignInPage';
 import ProfileSelectionPage from './pages/Profile/ProfileSelectionPage';
 
 const ClientLibraryPage = lazyPage(() => import('./pages/Client/LibraryPage'));
@@ -36,6 +37,7 @@ const CreateLibrary = lazyPage(() => import('./pages/Admin/Libraries/CreateLibra
 const AccountSettingsPage = lazyPage(() => import('./pages/Profile/AccountSettingsPage'));
 const AdminUserManagementPage = lazyPage(() => import('./pages/Admin/UserManagementPage'));
 const AdminInvitationsPage = lazyPage(() => import('./pages/Admin/InvitationsPage'));
+const AdminSignInProvidersPage = lazyPage(() => import('./pages/Admin/SignInProvidersPage'));
 const AuthorizedDevicesPage = lazyPage(() => import('./pages/Admin/AuthorizedDevicesPage'));
 const AdminDashboardPage = lazyPage(() => import('./pages/Admin/DashboardPage'));
 const AdminAppearancePage = lazyPage(() => import('./pages/Admin/AppearancePage'));
@@ -160,6 +162,7 @@ export default function App() {
                         <Routes>
                     <Route path="/setup" element={<SetupPage />} />
                     <Route path="/login" element={<LoginPage />} />
+                    <Route path="/login/external" element={<ExternalSignInPage />} />
                     <Route path="/register" element={<RegisterPage />} />
                     <Route path="/forgot-password" element={<ForgotPasswordPage />} />
                     <Route path="/reset-password" element={<ResetPasswordPage />} />
@@ -226,6 +229,7 @@ export default function App() {
                         <Route path="devices" element={<AuthorizedDevicesPage />} />
                         <Route path="users" element={<AdminUserManagementPage />} />
                         <Route path="invitations" element={<AdminInvitationsPage />} />
+                        <Route path="sign-in-providers" element={<AdminSignInProvidersPage />} />
                         <Route path="libraries/:id/manage" element={<ManageLibrary />} />
                         <Route path="libraries/new" element={<CreateLibrary />} />
                         <Route path="tasks" element={<TaskDashboard />} />
@@ -259,6 +263,7 @@ export default function App() {
                             <Route path="devices" element={<AuthorizedDevicesPage />} />
                             <Route path="users" element={<AdminUserManagementPage />} />
                             <Route path="invitations" element={<AdminInvitationsPage />} />
+                            <Route path="sign-in-providers" element={<AdminSignInProvidersPage />} />
                             <Route path="libraries/:id/manage" element={<ManageLibrary />} />
                             <Route path="libraries/new" element={<CreateLibrary />} />
                             <Route path="tasks" element={<TaskDashboard />} />

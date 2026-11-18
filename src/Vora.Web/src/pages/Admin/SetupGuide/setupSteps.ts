@@ -2,7 +2,7 @@ import type { SetupGuideVM } from '../../../api/System/setupGuideService';
 
 export type SetupStepId =
     | 'welcome' | 'server' | 'playback' | 'content'
-    | 'remote' | 'signup' | 'email'
+    | 'remote' | 'signup' | 'signin' | 'email'
     | 'metadata' | 'artwork' | 'ratings' | 'detection' | 'thumbnails' | 'requests' | 'subtitles' | 'discover'
     | 'livetv' | 'radio' | 'podcasts'
     | 'lastfm' | 'lyrics'
@@ -24,7 +24,7 @@ export interface SetupStepOptions {
 }
 
 const ALL_IDS: readonly SetupStepId[] = [
-    'welcome', 'server', 'playback', 'content', 'remote', 'signup', 'email', 'metadata', 'artwork', 'ratings', 'detection', 'thumbnails', 'requests',
+    'welcome', 'server', 'playback', 'content', 'remote', 'signup', 'signin', 'email', 'metadata', 'artwork', 'ratings', 'detection', 'thumbnails', 'requests',
     'subtitles', 'discover', 'livetv', 'radio', 'podcasts', 'lastfm', 'lyrics', 'ai', 'backups', 'done',
 ];
 
@@ -39,6 +39,7 @@ export function buildSetupSteps(content: SetupContent, options: SetupStepOptions
         { id: 'content', group: 'Basics', title: "What you'll add" },
         { id: 'remote', group: 'Access', title: 'Remote access' },
         { id: 'signup', group: 'Access', title: 'Sign-ups' },
+        { id: 'signin', group: 'Access', title: 'Sign-in' },
     ];
     if (options.email) steps.push({ id: 'email', group: 'Access', title: 'Email' });
     if (content.moviesAndShows) {
@@ -78,7 +79,7 @@ export function nearestStep(steps: SetupStep[], wanted: SetupStepId): SetupStepI
 }
 
 export const SKIPPABLE_STEPS: readonly SetupStepId[] = [
-    'remote', 'signup', 'email',
+    'remote', 'signup', 'signin', 'email',
     'metadata', 'artwork', 'ratings', 'detection', 'thumbnails', 'requests', 'subtitles', 'discover',
     'livetv', 'radio', 'podcasts', 'lastfm', 'lyrics', 'ai', 'backups',
 ];

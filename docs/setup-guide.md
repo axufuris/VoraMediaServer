@@ -32,7 +32,7 @@ Re-running a finished or skipped guide keeps its status: every step is open from
 | Group | Steps | Saves to |
 | --- | --- | --- |
 | Basics | Welcome, Your server, Playback, What you'll add | `PUT /settings/server` (name, `metadataLanguage`, `scheduleTimeZone`, `streamingProfile`, hardware acceleration + encoding, device); content answers go to the guide and switch Live TV / radio / podcasts on or off in `PUT /settings/features` |
-| Access | Remote access, Sign-ups, Email | `PUT /remote-access` (`isEnabled`, `externalUrl`, manual port); `PUT /settings/registration-mode`; `PUT /email/settings` |
+| Access | Remote access, Sign-ups, Sign-in, Email | `PUT /remote-access` (`isEnabled`, `externalUrl`, manual port); `PUT /settings/registration-mode`; `PUT /email/settings` |
 | Movies & TV | Metadata, Artwork, Ratings, Skip intro & credits, Preview thumbnails, Requests, Subtitles, Discover | plugin settings; `runDetections`, `detectionScheduleTime`, `analyzeUseHardwareDecode`, `videoThumbnail*`, `preExtractSubtitlesOnScan`; request servers; `PUT /discovery/config` + the Discover flag |
 | Live TV & radio | Live TV, Internet radio | feature flags, `POST /iptv/admin/playlists` (kind Tv / Radio), `POST /iptv/admin/epg-sources`, the DVR flag |
 | Podcasts | Podcasts | feature flag, `GET /podcasts/search`, `POST /podcasts/admin/catalog` |
@@ -42,6 +42,7 @@ Re-running a finished or skipped guide keeps its status: every step is open from
 
 - **Remote access** offers Only at home, Reverse proxy or tunnel, and Open a port. A proxy or tunnel address is normalized by `publicUrl.ts` (trimmed, `https://` assumed, a dotted host required) and saved as `externalUrl`, which makes the server check that address and skip UPnP. **Save and check** saves it straight away and reports whether the server could reach it.
 - **Sign-ups** saves through `PUT /settings/registration-mode`, because the full settings PUT leaves `RegistrationMode` alone. Picking **Email invitation** (mode 3, `EMAIL_INVITATION_MODE`) adds the Email step; any other mode offers **Set up email too**, which starts on when email is already enabled.
+- **Sign-in** lists the sign-in providers that are turned on (`GET /api/admin/auth-providers`) and opens **Sign-in Providers** in a new tab, so the guide keeps its place. It saves nothing and is skippable; `docs/sso.md`.
 - **Email** reuses System Settings' `EmailProviderGuide` and `SmtpConnectionFields` (see `docs/email.md`). It turns email on by default when no server is saved, prefills **Public base URL** from the remote access address when that is blank, and refuses to continue while email is on without an SMTP server or From address. **Save and send test** saves before sending.
 - **Backups** exists because scheduled backups are off by default. It shows where backups are written so the admin can check that folder is on a mounted volume.
 - **Discover** appears only when `GET /discovery/config` returns rows, i.e. once a Discover provider has a key: TMDB (`tmdb_discovery`, using the TMDB key) or MyAnimeList (`mal_discovery`, using the `mal_artwork` client id, offered on the Artwork step). Rows are re-read after any plugin save.

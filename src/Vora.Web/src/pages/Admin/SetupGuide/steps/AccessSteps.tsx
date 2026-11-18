@@ -10,6 +10,8 @@ import type { SetupStepProps } from '../setupContext';
 import { StepValidationError, useStepSaver } from '../setupSaver';
 import { EMAIL_INVITATION_MODE } from '../setupSteps';
 import { normalizePublicUrl } from '../publicUrl';
+import { resolveAdminPath } from '../../../../components/Admin/Shell/adminNavData';
+import { signInProvidersAdminService } from '../../../../api/Auth/signInProvidersAdminService';
 import { CardHeading, CheckRow, ChoiceCard, FieldLabel, Hint, RecommendedBadge, SetupCard, StatusMessage, StepHeading, SwitchRow, WhyNote } from '../SetupParts';
 
 type RemoteChoice = 'home' | 'proxy' | 'port';
@@ -197,6 +199,38 @@ export function SignUpStep({ serverId, settings, onSettings, emailWanted, onEmai
                     </SetupCard>
                 )}
             <Hint>You can change this any time under Users & Access.</Hint>
+        </>
+    );
+}
+
+export function SignInStep({ serverId }: SetupStepProps) {
+    const [names, setNames] = useState<string[] | null>(null);
+
+    useEffect(() => {
+        let cancelled = false;
+        signInProvidersAdminService.list(serverId)
+            .then(list => { if (!cancelled) setNames(list.filter(p => p.enabled).map(p => p.displayName)); })
+            .catch(() => { if (!cancelled) setNames(null); });
+        return () => { cancelled = true; };
+    }, [serverId]);
+
+    return (
+        <>
+            <StepHeading
+                eyebrow="Access"
+                title="Sign-in"
+                lead="Let people sign in with an identity provider you already run or trust, such as Authentik, Keycloak, Google or Microsoft. Everyone can still use an email and password unless you turn that off."
+            />
+            <SetupCard>
+                <CardHeading title="Sign-in providers" subtitle={names === null ? undefined : names.length > 0 ? `Turned on: ${names.join(', ')}` : 'None set up yet'} />
+                <p className="text-sm text-[var(--vora-text-secondary)]">
+                    Providers are set up on their own page, because each one needs a few values from the provider. It opens in a new tab so you keep your place here.
+                </p>
+                <div>
+                    <a href={resolveAdminPath('/admin/sign-in-providers', serverId)} target="_blank" rel="noreferrer" className="vora-button-secondary inline-block">Set up a provider</a>
+                </div>
+            </SetupCard>
+            <Hint>Skip this if everyone signs in with a password. You can add a provider any time under Sign-in providers.</Hint>
         </>
     );
 }

@@ -7,13 +7,16 @@ import SignUpCard from './SignUpCard';
 
 const mocks = vi.hoisted(() => ({
     createUser: vi.fn(),
+    createSsoOnlyUser: vi.fn(),
+    getProvidersFor: vi.fn(),
     getServerSettings: vi.fn(),
     updateRegistrationMode: vi.fn(),
     generateInviteCode: vi.fn(),
     createInvitation: vi.fn(),
 }));
 
-vi.mock('../../../api/Users/userService', () => ({ userService: { createUser: mocks.createUser } }));
+vi.mock('../../../api/Users/userService', () => ({ userService: { createUser: mocks.createUser, createSsoOnlyUser: mocks.createSsoOnlyUser } }));
+vi.mock('../../../api/Auth/externalSignInService', () => ({ externalSignInService: { getProvidersFor: mocks.getProvidersFor } }));
 vi.mock('../../../api/System/systemSettingsAdminService', () => ({
     systemSettingsAdminService: { getServerSettings: mocks.getServerSettings, updateRegistrationMode: mocks.updateRegistrationMode },
 }));
@@ -24,8 +27,17 @@ const withMode = (registrationMode: number) => mocks.getServerSettings.mockResol
 
 const renderCard = () => render(<MemoryRouter><SignUpCard invitationsPath="/admin/invitations" /></MemoryRouter>);
 
+const withProviders = (passwordSignInEnabled = true) => mocks.getProvidersFor.mockResolvedValue({
+    providers: [{ id: 'p1', slug: 'authentik', displayName: 'Authentik', type: 'Oidc', iconUrl: null }],
+    passwordSignInEnabled,
+    registrationMode: 'Simple',
+});
+
 describe('AddUserModal', () => {
-    beforeEach(() => Object.values(mocks).forEach(m => m.mockReset()));
+    beforeEach(() => {
+        Object.values(mocks).forEach(m => m.mockReset());
+        mocks.getProvidersFor.mockResolvedValue({ providers: [], passwordSignInEnabled: true, registrationMode: 'Simple' });
+    });
 
     it('creates the account and shows the details to pass on', async () => {
         mocks.createUser.mockResolvedValue({ id: 'u1' });
@@ -56,6 +68,63 @@ describe('AddUserModal', () => {
         fireEvent.click(screen.getByRole('button', { name: 'Create account' }));
 
         expect(await screen.findByRole('alert')).toHaveTextContent('An account with that email already exists.');
+    });
+
+    it('offers no sign-in choice on a server without providers', async () => {
+        render(<AddUserModal onClose={vi.fn()} onCreated={vi.fn()} />);
+
+        await waitFor(() => expect(mocks.getProvidersFor).toHaveBeenCalled());
+        expect(screen.queryByRole('radiogroup', { name: 'How they sign in' })).not.toBeInTheDocument();
+        expect(screen.getByLabelText('Starting password')).toBeInTheDocument();
+    });
+
+    it('adds an account with no password that signs in through a provider', async () => {
+        withProviders();
+        mocks.createSsoOnlyUser.mockResolvedValue({ id: 'u2' });
+        const onCreated = vi.fn();
+        render(<AddUserModal onClose={vi.fn()} onCreated={onCreated} />);
+
+        fireEvent.click(await screen.findByRole('radio', { name: /Sign in with a provider/ }));
+        expect(screen.queryByLabelText('Starting password')).not.toBeInTheDocument();
+        fireEvent.change(screen.getByLabelText('Name'), { target: { value: 'Sam' } });
+        fireEvent.change(screen.getByLabelText('Email'), { target: { value: 'Sam@Example.com' } });
+        fireEvent.click(screen.getByRole('button', { name: 'Create account' }));
+
+        expect(await screen.findByText('Account created')).toBeInTheDocument();
+        expect(mocks.createSsoOnlyUser).toHaveBeenCalledWith('Sam@Example.com', 'Sam', undefined);
+        expect(mocks.createUser).not.toHaveBeenCalled();
+        expect(screen.getByText(/sign in with Authentik using this email/)).toBeInTheDocument();
+        expect(screen.queryByText('Password')).not.toBeInTheDocument();
+        expect(onCreated).toHaveBeenCalled();
+    });
+
+    it('still adds an account with a password when a provider exists and that is chosen', async () => {
+        withProviders();
+        mocks.createUser.mockResolvedValue({ id: 'u3' });
+        render(<AddUserModal onClose={vi.fn()} onCreated={vi.fn()} />);
+
+        await screen.findByRole('radiogroup', { name: 'How they sign in' });
+        fireEvent.change(screen.getByLabelText('Name'), { target: { value: 'Sam' } });
+        fireEvent.change(screen.getByLabelText('Email'), { target: { value: 'sam@example.com' } });
+        fireEvent.change(screen.getByLabelText('Starting password'), { target: { value: 'a-long-password' } });
+        fireEvent.click(screen.getByRole('button', { name: 'Create account' }));
+
+        await waitFor(() => expect(mocks.createUser).toHaveBeenCalledWith('sam@example.com', 'Sam', 'a-long-password', undefined));
+        expect(mocks.createSsoOnlyUser).not.toHaveBeenCalled();
+    });
+
+    it('makes the account provider-only when password sign-in is off', async () => {
+        withProviders(false);
+        mocks.createSsoOnlyUser.mockResolvedValue({ id: 'u4' });
+        render(<AddUserModal onClose={vi.fn()} onCreated={vi.fn()} />);
+
+        expect(await screen.findByText(/Password sign-in is off, so this account signs in with Authentik/)).toBeInTheDocument();
+        expect(screen.queryByLabelText('Starting password')).not.toBeInTheDocument();
+        fireEvent.change(screen.getByLabelText('Name'), { target: { value: 'Sam' } });
+        fireEvent.change(screen.getByLabelText('Email'), { target: { value: 'sam@example.com' } });
+        fireEvent.click(screen.getByRole('button', { name: 'Create account' }));
+
+        await waitFor(() => expect(mocks.createSsoOnlyUser).toHaveBeenCalled());
     });
 
     it('starts with a generated password long enough to be accepted', () => {
