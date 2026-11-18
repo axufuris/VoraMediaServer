@@ -100,7 +100,6 @@ Each plugin category has a canonical home:
 | `PodcastDiscovery` | Podcasts (`/admin/podcasts`) |
 | `Artwork`, `Metadata`, `Ratings`, `FolderWatcher`, `LocalScanner`, `Chronology` | Libraries (TBD) |
 | `CollectionSync` | Collections (TBD) |
-| `MediaWebhook` | Libraries (TBD) |
 | `OverlayEngine` | Poster Overlays (TBD) |
 | `Request` | Request Queue (TBD) |
 | `MediaWebhook` | Library Updates (`/admin/library-updates`) |

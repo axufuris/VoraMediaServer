@@ -31,6 +31,8 @@ The built-ins are `radarr_webhook`, `sonarr_webhook` and `lidarr_webhook`, one f
 
 ## Setting it up
 
+**Admin → Library → Library Updates** (`/admin/library-updates`, `docs/frontend-admin.md`) is the place to do it: it shows each provider's address to paste into the app, generates the secret, holds the secret and path mappings (the provider's plugin settings) and lists the recent deliveries. It uses the endpoints below.
+
 Admin endpoints (`AdminOnly`, `/api/admin/webhooks`): `GET /` lists the providers (path, whether a secret is set, whether it is on; never a secret), `GET /deliveries?limit=` the recent deliveries, and `POST /{providerId}/secret` generates a random 256-bit secret, stores it and returns it once.
 
 In the app: Settings → Connect → + → **Webhook**.
