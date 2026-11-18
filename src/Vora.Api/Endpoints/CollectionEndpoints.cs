@@ -49,6 +49,11 @@ public static class CollectionEndpoints
         group.MapPut("/{id:guid}", UpdateCollectionAsync)
             .Produces(StatusCodes.Status204NoContent);
 
+        group.MapPut("/{id:guid}/hidden", SetCollectionHiddenAsync)
+            .RequireAuthorization("AdminOnly")
+            .Produces(StatusCodes.Status204NoContent)
+            .Produces(StatusCodes.Status404NotFound);
+
         group.MapPut("/{id:guid}/items/reorder", ReorderItemsAsync)
             .Produces(StatusCodes.Status204NoContent);
 
@@ -124,6 +129,11 @@ public static class CollectionEndpoints
     {
         await manager.UpdateCollectionAsync(id, request);
         return Results.NoContent();
+    }
+
+    private static async Task<IResult> SetCollectionHiddenAsync(Guid id, [FromBody] SetCollectionHiddenRequest request, ICollectionManager manager)
+    {
+        return await manager.SetHiddenAsync(id, request.Hidden) ? Results.NoContent() : Results.NotFound();
     }
 
     private static async Task<IResult> ReorderItemsAsync(Guid id, [FromBody] ReorderCollectionRequest request, ICollectionManager manager)

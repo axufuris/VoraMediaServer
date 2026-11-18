@@ -21,6 +21,7 @@ public interface ICollectionManager
     Task<IEnumerable<CollectionSummaryVM>> GetGlobalCollectionsAsync(bool hasAllAccess, List<Guid> allowedLibs, bool includeHidden = false);
     Task UpdateCollectionAsync(Guid id, UpdateCollectionRequest request);
     Task SetArtworkAsync(Guid id, ArtworkKind kind, string? url);
+    Task<bool> SetHiddenAsync(Guid id, bool hidden);
     Task SetItemInUniverseYearAsync(Guid collectionId, Guid mediaItemId, double? year, bool locked);
     Task RemoveMediaFromCollectionAsync(Guid collectionId, Guid mediaItemId);
     Task ReorderCollectionItemsAsync(Guid collectionId, List<Guid> orderedMediaItemIds);
@@ -201,6 +202,17 @@ public class CollectionManager : ICollectionManager
 
         await _repository.UpdateCollectionAsync(collection);
         await _notifier.NotifyCollectionUpdatedAsync(id);
+    }
+
+    public async Task<bool> SetHiddenAsync(Guid id, bool hidden)
+    {
+        var collection = await _repository.GetForUpdateAsync(id);
+        if (collection == null) return false;
+
+        collection.Hidden = hidden;
+        await _repository.UpdateCollectionAsync(collection);
+        await _notifier.NotifyCollectionUpdatedAsync(id);
+        return true;
     }
 
     private void TriggerCollectionSyncTasks(Guid collectionId, string title, string? contentProvider, string? sortProvider, string? rulesJson)
