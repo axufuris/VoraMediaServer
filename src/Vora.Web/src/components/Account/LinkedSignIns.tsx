@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { externalSignInService, type LinkedSignIn, type SignInProvider } from '../../api/Auth/externalSignInService';
 import { useDialog } from '../../dialogs';
+import { canOpenInBrowser, openInBrowser } from '../../desktop/desktopBrowser';
 import { resolveReason } from '../../utils/apiError';
 import { linkErrorMessage } from '../../utils/externalSignInMessages';
 
@@ -12,6 +13,9 @@ interface LinkedSignInsProps {
 
 export const LAST_WAY_IN = "This is the only way you can sign in. Set a password or link another sign-in first.";
 
+const LINK_POLL_MS = 3000;
+const LINK_POLL_LIMIT = 60;
+
 export default function LinkedSignIns({ serverId, hasPassword }: LinkedSignInsProps) {
     const dialog = useDialog();
     const [searchParams, setSearchParams] = useSearchParams();
@@ -21,6 +25,8 @@ export default function LinkedSignIns({ serverId, hasPassword }: LinkedSignInsPr
     const [loading, setLoading] = useState(true);
     const [message, setMessage] = useState<{ tone: 'ok' | 'error'; text: string } | null>(null);
     const [busy, setBusy] = useState<string | null>(null);
+    const [waitingFor, setWaitingFor] = useState<SignInProvider | null>(null);
+    const inDesktop = canOpenInBrowser();
 
     const linkedSlug = searchParams.get('linked');
     const linkError = searchParams.get('linkError');
@@ -47,6 +53,28 @@ export default function LinkedSignIns({ serverId, hasPassword }: LinkedSignInsPr
     }, [load]);
 
     useEffect(() => {
+        if (!waitingFor) return;
+        let polls = 0;
+        const refresh = () => { externalSignInService.listLinked(serverId).then(setLinked).catch(() => undefined); };
+        const timer = window.setInterval(() => {
+            polls += 1;
+            refresh();
+            if (polls >= LINK_POLL_LIMIT) window.clearInterval(timer);
+        }, LINK_POLL_MS);
+        window.addEventListener('focus', refresh);
+        return () => {
+            window.clearInterval(timer);
+            window.removeEventListener('focus', refresh);
+        };
+    }, [waitingFor, serverId]);
+
+    useEffect(() => {
+        if (!waitingFor || !linked.some(identity => identity.providerId === waitingFor.id)) return;
+        setWaitingFor(null);
+        setMessage({ tone: 'ok', text: 'Linked. You can now sign in with it.' });
+    }, [waitingFor, linked]);
+
+    useEffect(() => {
         if (!linkedSlug && !linkError) return;
         if (linkError) {
             setMessage({ tone: 'error', text: linkErrorMessage(linkError) });
@@ -70,7 +98,17 @@ export default function LinkedSignIns({ serverId, hasPassword }: LinkedSignInsPr
         setBusy(provider.id);
         setMessage(null);
         try {
-            window.location.assign(await externalSignInService.startLink(provider.slug, serverId));
+            const url = await externalSignInService.startLink(provider.slug, serverId);
+            if (!inDesktop) {
+                window.location.assign(url);
+                return;
+            }
+            if (await openInBrowser(url)) {
+                setWaitingFor(provider);
+            } else {
+                setMessage({ tone: 'error', text: `Vora could not open your browser, so it cannot link ${provider.displayName}. Try again.` });
+            }
+            setBusy(null);
         } catch (err) {
             setMessage({ tone: 'error', text: resolveReason(err) ?? `Could not start linking ${provider.displayName}.` });
             setBusy(null);
@@ -107,6 +145,13 @@ export default function LinkedSignIns({ serverId, hasPassword }: LinkedSignInsPr
                 <p role={message.tone === 'ok' ? 'status' : 'alert'} className={`mb-4 text-sm ${message.tone === 'ok' ? 'text-[var(--vora-success-text)]' : 'text-[var(--vora-danger-text)]'}`}>
                     {message.text}
                 </p>
+            )}
+
+            {waitingFor && (
+                <div role="status" className="mb-4 flex flex-wrap items-center justify-between gap-3 text-sm text-[var(--vora-text-muted)]">
+                    <span>Finish linking {waitingFor.displayName} in your browser. It shows up here when you are done.</span>
+                    <button type="button" onClick={() => setWaitingFor(null)} className="vora-button-secondary text-xs">Cancel</button>
+                </div>
             )}
 
             {linked.length > 0 && (

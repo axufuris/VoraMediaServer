@@ -1,8 +1,9 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import LinkedSignIns, { LAST_WAY_IN } from './LinkedSignIns';
 import type { LinkedSignIn, SignInProviders } from '../../api/Auth/externalSignInService';
+import { fakeDesktopBridge } from '../../test/fakeDesktopBridge';
 
 const mocks = vi.hoisted(() => ({
     listLinked: vi.fn<() => Promise<LinkedSignIn[]>>(),
@@ -10,6 +11,7 @@ const mocks = vi.hoisted(() => ({
     unlink: vi.fn(),
     startLink: vi.fn(),
     confirm: vi.fn(),
+    openExternal: vi.fn<(url: string) => Promise<boolean>>(),
 }));
 
 vi.mock('../../api/Auth/externalSignInService', () => ({
@@ -154,5 +156,152 @@ describe('LinkedSignIns', () => {
         mocks.listLinked.mockResolvedValue([]);
         renderPanel(true, '?linkError=link_conflict');
         expect(await screen.findByRole('alert')).toHaveTextContent(/already linked to a different account/);
+    });
+});
+
+describe('LinkedSignIns inside Vora Desktop', () => {
+    const originalLocation = window.location;
+    const idpUrl = 'https://auth.example.com/authorize?x=1';
+
+    const flush = (ms = 0) => act(async () => { await vi.advanceTimersByTimeAsync(ms); });
+
+    const startLinkingGoogle = async () => {
+        renderPanel(true);
+        const button = await screen.findByRole('button', { name: 'Link Google' });
+        vi.useFakeTimers();
+        await act(async () => {
+            fireEvent.click(button);
+            await vi.advanceTimersByTimeAsync(0);
+        });
+    };
+
+    beforeEach(() => {
+        Object.values(mocks).forEach(m => m.mockReset());
+        mocks.listLinked.mockResolvedValue([]);
+        mocks.getProvidersFor.mockResolvedValue({ providers: [authentik, google], passwordSignInEnabled: true, directorySignInEnabled: false, registrationMode: 'Simple' });
+        mocks.startLink.mockResolvedValue(idpUrl);
+        mocks.openExternal.mockResolvedValue(true);
+        window.voraDesktop = fakeDesktopBridge({ openExternal: mocks.openExternal }).bridge;
+        Object.defineProperty(window, 'location', { configurable: true, value: { ...originalLocation, assign: vi.fn() } });
+    });
+
+    afterEach(() => {
+        vi.useRealTimers();
+        cleanup();
+        delete window.voraDesktop;
+        Object.defineProperty(window, 'location', { configurable: true, value: originalLocation });
+    });
+
+    it("opens the provider's link address in the system browser and leaves the window where it is", async () => {
+        await startLinkingGoogle();
+
+        expect(mocks.startLink).toHaveBeenCalledWith('google', undefined);
+        expect(mocks.openExternal).toHaveBeenCalledWith(idpUrl);
+        expect(window.location.assign).not.toHaveBeenCalled();
+    });
+
+    it('says to finish in the browser, with a way to give up', async () => {
+        await startLinkingGoogle();
+
+        expect(screen.getByRole('status')).toHaveTextContent('Finish linking Google in your browser');
+        expect(screen.getByRole('button', { name: 'Link Google' })).toBeEnabled();
+        expect(screen.getByRole('button', { name: 'Cancel' })).toBeInTheDocument();
+    });
+
+    it('shows the new link when the window gets focus back', async () => {
+        await startLinkingGoogle();
+        mocks.listLinked.mockResolvedValue([identity('i2', 'p2', 'Google')]);
+
+        await act(async () => {
+            window.dispatchEvent(new Event('focus'));
+            await vi.advanceTimersByTimeAsync(0);
+        });
+
+        expect(screen.getByRole('status')).toHaveTextContent('Linked. You can now sign in with it.');
+        expect(screen.getByText('Google')).toBeInTheDocument();
+        expect(screen.queryByRole('button', { name: 'Link Google' })).not.toBeInTheDocument();
+        expect(screen.queryByText(/Finish linking/)).not.toBeInTheDocument();
+    });
+
+    it('also checks every few seconds while it waits', async () => {
+        await startLinkingGoogle();
+        const before = mocks.listLinked.mock.calls.length;
+        mocks.listLinked.mockResolvedValue([identity('i2', 'p2', 'Google')]);
+
+        await flush(3000);
+
+        expect(mocks.listLinked.mock.calls.length).toBeGreaterThan(before);
+        expect(screen.getByRole('status')).toHaveTextContent('Linked. You can now sign in with it.');
+    });
+
+    it('keeps waiting, and keeps the list, when a check fails', async () => {
+        mocks.listLinked.mockResolvedValue([identity('i1', 'p1', 'Authentik')]);
+        await startLinkingGoogle();
+        mocks.listLinked.mockRejectedValue(new Error('offline'));
+
+        await flush(3000);
+
+        expect(screen.getByRole('status')).toHaveTextContent('Finish linking Google in your browser');
+        expect(screen.getByText('Authentik')).toBeInTheDocument();
+    });
+
+    it('stops checking on a timer after a bounded number of tries', async () => {
+        await startLinkingGoogle();
+
+        await flush(60 * 3000);
+        const settled = mocks.listLinked.mock.calls.length;
+        await flush(10 * 3000);
+
+        expect(mocks.listLinked.mock.calls.length).toBe(settled);
+    });
+
+    it('stops checking when the person gives up', async () => {
+        await startLinkingGoogle();
+
+        await act(async () => {
+            fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
+            await vi.advanceTimersByTimeAsync(0);
+        });
+        const settled = mocks.listLinked.mock.calls.length;
+        await flush(9000);
+        await act(async () => {
+            window.dispatchEvent(new Event('focus'));
+            await vi.advanceTimersByTimeAsync(0);
+        });
+
+        expect(screen.queryByText(/Finish linking/)).not.toBeInTheDocument();
+        expect(mocks.listLinked.mock.calls.length).toBe(settled);
+    });
+
+    it('says so, and does not wait, when the browser could not be opened', async () => {
+        mocks.openExternal.mockResolvedValue(false);
+
+        await startLinkingGoogle();
+
+        expect(screen.getByRole('alert')).toHaveTextContent('could not open your browser, so it cannot link Google');
+        expect(screen.queryByText(/Finish linking/)).not.toBeInTheDocument();
+        expect(screen.getByRole('button', { name: 'Link Google' })).toBeEnabled();
+        expect(window.location.assign).not.toHaveBeenCalled();
+    });
+
+    it('shows the failure and does not wait when linking cannot start', async () => {
+        mocks.startLink.mockRejectedValue(new Error('The sign-in provider is not available.'));
+
+        await startLinkingGoogle();
+
+        expect(screen.getByRole('alert')).toHaveTextContent('The sign-in provider is not available.');
+        expect(mocks.openExternal).not.toHaveBeenCalled();
+        expect(screen.queryByText(/Finish linking/)).not.toBeInTheDocument();
+    });
+
+    it('keeps sending the window to the provider when this Desktop cannot open a browser', async () => {
+        window.voraDesktop = fakeDesktopBridge({ openExternal: undefined }).bridge;
+
+        renderPanel(true);
+        fireEvent.click(await screen.findByRole('button', { name: 'Link Google' }));
+
+        await waitFor(() => expect(window.location.assign).toHaveBeenCalledWith(idpUrl));
+        expect(mocks.openExternal).not.toHaveBeenCalled();
+        expect(screen.queryByText(/Finish linking/)).not.toBeInTheDocument();
     });
 });

@@ -1,9 +1,11 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { cleanup, render, screen } from '@testing-library/react';
+import { MemoryRouter } from 'react-router-dom';
 import { SignInStep } from './AccessSteps';
 import type { SetupStepProps } from '../setupContext';
 import { noDirectoryFields } from '../../../../test/signInFixtures';
 import type { AuthProviderAdmin } from '../../../../api/Auth/signInProvidersAdminService';
+import { fakeDesktopBridge } from '../../../../test/fakeDesktopBridge';
 
 const mocks = vi.hoisted(() => ({ list: vi.fn<() => Promise<AuthProviderAdmin[]>>() }));
 
@@ -38,5 +40,29 @@ describe('SignInStep', () => {
 
         expect(await screen.findByText('Turned on: Authentik')).toBeInTheDocument();
         expect(screen.getByRole('link', { name: 'Set up a provider' })).toHaveAttribute('href', '/admin/server/s1/sign-in-providers');
+    });
+});
+
+describe('SignInStep inside Vora Desktop', () => {
+    beforeEach(() => {
+        mocks.list.mockReset();
+        window.voraDesktop = fakeDesktopBridge().bridge;
+    });
+
+    afterEach(() => {
+        cleanup();
+        delete window.voraDesktop;
+    });
+
+    it('opens the providers page in the same window, since Desktop has no new tab and sends one to the browser', async () => {
+        mocks.list.mockResolvedValue([]);
+        render(<MemoryRouter><SignInStep {...props('s1')} /></MemoryRouter>);
+
+        expect(await screen.findByText('None set up yet')).toBeInTheDocument();
+        const link = screen.getByRole('link', { name: 'Set up a provider' });
+        expect(link).toHaveAttribute('href', '/admin/server/s1/sign-in-providers');
+        expect(link).not.toHaveAttribute('target');
+        expect(screen.queryByText(/opens in a new tab/)).not.toBeInTheDocument();
+        expect(screen.getByText(/picks up at this step when you come back/)).toBeInTheDocument();
     });
 });

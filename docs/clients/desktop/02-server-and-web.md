@@ -47,7 +47,8 @@ New folder `src/desktop/`:
   player" on, read from a cache of the app's settings, capabilities and mpv status that
   `loadDesktopPlayback()` fills. `useDesktopPlayback()` is the hook for components.
 - `desktopBrowser.ts` — `canOpenInBrowser()` (the bridge has `openExternal`) and
-  `openInBrowser(url)`; the sign-in page's "Sign in with your browser" feature-detects with it.
+  `openInBrowser(url)`; the sign-in page's "Sign in with your browser", the Register page's provider buttons
+  and Account settings' Link buttons feature-detect with it (`docs/sso.md`, Inside Vora Desktop).
 - `voraDesktop.d.ts` types `window.voraDesktop` without casts.
 
 Respect the existing ESLint boundary rule for `src/api/`: the api layer may import
