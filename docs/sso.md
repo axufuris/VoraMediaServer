@@ -2,7 +2,7 @@
 
 Vora is self-hosted and has no domain of its own, so every server is its own client of whatever identity provider its admin chooses (Authentik, Keycloak, Authelia, Pocket ID, Google, Microsoft Entra, any OpenID Connect server). The admin registers Vora at the provider with a redirect address of their own server, then pastes the issuer, client id and secret into **Users & Access → Sign-in providers**. Vora ships no client id and talks to no central service.
 
-This page is the design and the server rules. The sign-in flow itself (redirects, the callback, the web and TV screens) arrives in later PRs; what is in the server today is the data, the rules, the one-time code and the admin API, and none of it has a screen yet. Nothing changes for a server whose admin adds no provider. How tokens work is in [`docs/auth-tokens.md`](auth-tokens.md); registration modes and invitations are in [`docs/auth-and-devices.md`](auth-and-devices.md).
+This page is the design and the server rules. The server side of the OpenID Connect sign-in is complete (data, rules, the redirect flow, the one-time code, the admin API); the screens for it (web login buttons and admin page, TV pairing, the Android phone return) arrive in later PRs, so today it is driven only through the API. Nothing changes for a server whose admin adds no provider. How tokens work is in [`docs/auth-tokens.md`](auth-tokens.md); registration modes and invitations are in [`docs/auth-and-devices.md`](auth-and-devices.md).
 
 ## What is stored
 
@@ -61,6 +61,23 @@ Admin-only, under `/api/admin/auth-providers` (list, get, create, update, delete
 
 `settings.auth-providers` (the providers; secrets decrypt only with the matching DataProtection keys) and `users.external-identities` (the links; skipped for a user or provider the server lacks). See `docs/backups.md`.
 
+## The redirect flow
+
+Authorization code flow with PKCE (S256), always. The browser, not the app, talks to the provider, so it works with anything that speaks OpenID Connect.
+
+1. `GET /api/auth/oidc/{slug}/start?returnTo=&invite=` (anonymous, `AuthBurst`). Reads the provider's discovery document (cached an hour), keeps a server-side record for ten minutes (a random `state`, a `nonce`, the PKCE verifier, the exact redirect URI, `returnTo`, the invite token), and answers 302 to the authorization endpoint. `returnTo` is kept only when it is a path on this server (starts with one `/`, no `//`, `\`, scheme or control character, 512 characters at most).
+2. `GET /api/auth/oidc/{slug}/callback` takes `code`, `state`, `error`. The state works **once** and only for the provider it was made for. The server trades the code on the back channel (secret in the Basic header, or in the body for a provider that lists only `client_secret_post`; none for a public client), then validates the id token and reads the claims. Then it answers 302 to the web app (the public address):
+   - `/login/external?code=…&returnTo=…`: signed in; trade the code at `POST /auth/external/exchange`.
+   - `/login/external?pending=…`: a step is left (link with a password, the invite PIN, create or link, or a refusal). `GET /auth/external/pending/{handle}` says which (`outcome`, `refusal`, `message`, `canCreateAccount`, `providerName`, `email`), and `POST /auth/external/complete { handle, createAccount?, invitePin?, linkEmail?, linkPassword? }` takes the answer (`AuthStrict`): `SignedIn` with a `code`, or the next step. A handle lives ten minutes and dies after five wrong passwords or PINs.
+   - `/login/external?error=…`: it ended at once. Codes: `provider_unavailable`, `discovery_failed`, `access_denied`, `provider_error`, `state_expired`, `token_exchange_failed`, `id_token_invalid`, `missing_subject`.
+3. **Linking from Account settings**: `POST /api/auth/oidc/{slug}/link { returnTo? }` (signed in) returns `{ url }` for the page to open. The same callback then adds the provider to that account and answers 302 to `/account?linked={slug}` or `/account?linkError=…` (the codes above, plus `link_conflict` when the provider account already belongs to another account here, and `link_refused` for a group or domain limit).
+
+The id token must pass: signature against the provider's published keys (RS, PS and ES algorithms only, never `none` or a shared secret; a key it has not seen triggers one key refresh, at most every 30 seconds), `iss` equal to the issuer entered, `aud` equal to the client id (and `azp` when there are several), expiry (two minutes of skew), and the `nonce` of this sign-in. Email, name and groups come from the claims named on the provider; when the token has no email, or no groups while a group is required, the user-info endpoint is asked (only for the same `sub`). The admin's **Test** button (`POST /api/admin/auth-providers/{id}/test`) fetches the discovery document and the keys and reports the endpoints and what to fix.
+
+## The provider's address is admin-supplied
+
+The issuer is typed by an admin and is often on the LAN, so private addresses are allowed here, unlike the image downloader's guard (`docs/artwork-image-cache.md`). What limits it: http and https only; **redirects are never followed** (a 3xx is an error); 10 seconds in all and 1 MB per answer; the discovery document must name the issuer entered, and none of its endpoints may drop from https to http (a secret would cross the network unprotected); an http issuer is allowed and logged as a warning. Secrets, tokens and codes are never logged, and the saved secret is read only to trade a code.
+
 ## Not built yet
 
-The OIDC redirect and callback (PR 2), the admin page and login buttons (web), the TV pairing code flow, the Android phone return, and LDAP. See issue #294.
+The web admin page and login buttons, the TV pairing code flow, the Android phone return, and LDAP. See issue #294.

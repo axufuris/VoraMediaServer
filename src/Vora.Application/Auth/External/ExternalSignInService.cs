@@ -8,6 +8,7 @@ namespace Vora.Application.Auth.External;
 public interface IExternalSignInService
 {
     Task<ExternalSignInResult> SignInAsync(Guid providerId, ExternalClaims claims, ExternalSignInOptions options, CancellationToken cancellationToken = default);
+    Task<ExternalSignInResult> LinkAccountAsync(Guid providerId, Guid userId, ExternalClaims claims, CancellationToken cancellationToken = default);
 }
 
 public sealed class ExternalSignInService(
@@ -101,6 +102,37 @@ public sealed class ExternalSignInService(
             default:
                 return ExternalSignInResult.Refused(ExternalSignInRefusal.ProviderUnavailable, "This sign-in could not be completed.");
         }
+    }
+
+    public async Task<ExternalSignInResult> LinkAccountAsync(Guid providerId, Guid userId, ExternalClaims claims, CancellationToken cancellationToken = default)
+    {
+        var provider = await providers.GetByIdAsync(providerId);
+        if (provider is null)
+        {
+            return ExternalSignInResult.Refused(ExternalSignInRefusal.ProviderUnavailable, "This sign-in provider is not available.");
+        }
+
+        if (ExternalSignInRules.CheckAccess(provider.Enabled, provider.RequiredGroup, provider.AllowedEmailDomains, claims) is { } refused)
+        {
+            return refused;
+        }
+
+        var existing = await providers.GetIdentityAsync(provider.Id, claims.Subject);
+        if (existing is not null)
+        {
+            return existing.UserId == userId
+                ? ExternalSignInResult.SignedIn(userId, isNewAccount: false)
+                : ExternalSignInResult.Refused(ExternalSignInRefusal.AlreadyLinked, "That provider account is already linked to another account on this server.");
+        }
+
+        if (await users.GetUserByIdAsync(userId) is null)
+        {
+            return ExternalSignInResult.Refused(ExternalSignInRefusal.ProviderUnavailable, "That account no longer exists.");
+        }
+
+        await providers.AddIdentityAsync(NewIdentity(provider, userId, claims));
+        logger.LogInformation("Linked {Provider} to an account the person was signed in to", provider.Slug);
+        return ExternalSignInResult.SignedIn(userId, isNewAccount: false);
     }
 
     private async Task<ExternalSignInResult> SignInLinkedAsync(AuthProvider provider, UserExternalIdentity identity, ExternalClaims claims)

@@ -74,27 +74,9 @@ public static class ExternalSignInRules
         var claims = facts.Claims;
         var email = string.IsNullOrWhiteSpace(claims.Email) ? null : claims.Email.Trim();
 
-        if (!facts.ProviderEnabled)
+        if (CheckAccess(facts.ProviderEnabled, facts.RequiredGroup, facts.AllowedEmailDomains, claims) is { } refused)
         {
-            return Refuse(ExternalSignInRefusal.ProviderUnavailable, "This sign-in provider is not available.");
-        }
-
-        if (!string.IsNullOrWhiteSpace(facts.RequiredGroup) && !ContainsIgnoreCase(claims.Groups, facts.RequiredGroup))
-        {
-            return Refuse(ExternalSignInRefusal.GroupNotAllowed, "Your account is not in the group that may sign in to this server.");
-        }
-
-        if (facts.AllowedEmailDomains.Count > 0)
-        {
-            if (email is null)
-            {
-                return Refuse(ExternalSignInRefusal.EmailMissing, "The sign-in provider did not share an email address, which this server requires.");
-            }
-
-            if (!facts.AllowedEmailDomains.Any(domain => string.Equals(domain.Trim().TrimStart('@'), DomainOf(email), StringComparison.OrdinalIgnoreCase)))
-            {
-                return Refuse(ExternalSignInRefusal.EmailDomainNotAllowed, "Your email address is not from a domain that may sign in to this server.");
-            }
+            return ExternalDecision.Reply(refused);
         }
 
         if (facts.HasLinkedIdentity)
@@ -115,6 +97,36 @@ public static class ExternalSignInRules
         }
 
         return DecideForNewAccount(facts, email, credentialsRejected);
+    }
+
+    public static ExternalSignInResult? CheckAccess(bool providerEnabled, string? requiredGroup, IReadOnlyCollection<string> allowedEmailDomains, ExternalClaims claims)
+    {
+        var email = string.IsNullOrWhiteSpace(claims.Email) ? null : claims.Email.Trim();
+
+        if (!providerEnabled)
+        {
+            return ExternalSignInResult.Refused(ExternalSignInRefusal.ProviderUnavailable, "This sign-in provider is not available.");
+        }
+
+        if (!string.IsNullOrWhiteSpace(requiredGroup) && !ContainsIgnoreCase(claims.Groups, requiredGroup))
+        {
+            return ExternalSignInResult.Refused(ExternalSignInRefusal.GroupNotAllowed, "Your account is not in the group that may sign in to this server.");
+        }
+
+        if (allowedEmailDomains.Count > 0)
+        {
+            if (email is null)
+            {
+                return ExternalSignInResult.Refused(ExternalSignInRefusal.EmailMissing, "The sign-in provider did not share an email address, which this server requires.");
+            }
+
+            if (!allowedEmailDomains.Any(domain => string.Equals(domain.Trim().TrimStart('@'), DomainOf(email), StringComparison.OrdinalIgnoreCase)))
+            {
+                return ExternalSignInResult.Refused(ExternalSignInRefusal.EmailDomainNotAllowed, "Your email address is not from a domain that may sign in to this server.");
+            }
+        }
+
+        return null;
     }
 
     public static bool GrantsAdmin(string? adminGroup, IReadOnlyCollection<string> groups) =>
