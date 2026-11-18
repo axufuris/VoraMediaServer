@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { remoteAccessService, type RemoteAccessStatus, type UpdateRemoteAccessRequest } from '../../../../api/System/remoteAccessService';
 import { systemSettingsAdminService } from '../../../../api/System/systemSettingsAdminService';
 import { emailAdminService, type EmailSettings } from '../../../../api/System/emailAdminService';
@@ -11,6 +12,7 @@ import { StepValidationError, useStepSaver } from '../setupSaver';
 import { EMAIL_INVITATION_MODE } from '../setupSteps';
 import { normalizePublicUrl } from '../publicUrl';
 import { resolveAdminPath } from '../../../../components/Admin/Shell/adminNavData';
+import { getDesktopBridge } from '../../../../desktop/desktopPlayback';
 import { signInProvidersAdminService } from '../../../../api/Auth/signInProvidersAdminService';
 import { CardHeading, CheckRow, ChoiceCard, FieldLabel, Hint, RecommendedBadge, SetupCard, StatusMessage, StepHeading, SwitchRow, WhyNote } from '../SetupParts';
 
@@ -205,6 +207,8 @@ export function SignUpStep({ serverId, settings, onSettings, emailWanted, onEmai
 
 export function SignInStep({ serverId }: SetupStepProps) {
     const [names, setNames] = useState<string[] | null>(null);
+    const inDesktop = getDesktopBridge() !== null;
+    const providersPath = resolveAdminPath('/admin/sign-in-providers', serverId);
 
     useEffect(() => {
         let cancelled = false;
@@ -224,10 +228,14 @@ export function SignInStep({ serverId }: SetupStepProps) {
             <SetupCard>
                 <CardHeading title="Sign-in providers" subtitle={names === null ? undefined : names.length > 0 ? `Turned on: ${names.join(', ')}` : 'None set up yet'} />
                 <p className="text-sm text-[var(--vora-text-secondary)]">
-                    Providers are set up on their own page, because each one needs a few values from the provider. It opens in a new tab so you keep your place here.
+                    {inDesktop
+                        ? 'Providers are set up on their own page, because each one needs a few values from the provider. The setup guide picks up at this step when you come back.'
+                        : 'Providers are set up on their own page, because each one needs a few values from the provider. It opens in a new tab so you keep your place here.'}
                 </p>
                 <div>
-                    <a href={resolveAdminPath('/admin/sign-in-providers', serverId)} target="_blank" rel="noreferrer" className="vora-button-secondary inline-block">Set up a provider</a>
+                    {inDesktop
+                        ? <Link to={providersPath} className="vora-button-secondary inline-block">Set up a provider</Link>
+                        : <a href={providersPath} target="_blank" rel="noreferrer" className="vora-button-secondary inline-block">Set up a provider</a>}
                 </div>
             </SetupCard>
             <Hint>Skip this if everyone signs in with a password. You can add a provider any time under Sign-in providers.</Hint>

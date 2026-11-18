@@ -1,9 +1,12 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useNavigate, Link, useSearchParams } from 'react-router-dom';
 import { isAxiosError } from 'axios';
-import { authService } from '../../api/Auth/authService';
+import { authService, type AuthResponse } from '../../api/Auth/authService';
 import { externalSignInService, type SignInProvider, type SignInProviders } from '../../api/Auth/externalSignInService';
 import SignInProviderButtons, { OrDivider } from '../../components/Auth/SignInProviderButtons';
+import BrowserSignIn from '../../components/Auth/BrowserSignIn';
+import { canOpenInBrowser, openInBrowser } from '../../desktop/desktopBrowser';
+import { storeAccountSession } from '../../utils/signInSession';
 import { StorageKeys, SessionKeys } from '../../utils/storageKeys';
 import AuthLayout from '../../layouts/AuthLayout';
 
@@ -25,6 +28,8 @@ export default function RegisterPage() {
     const [isProbing, setIsProbing] = useState(true);
     const [probeError, setProbeError] = useState('');
     const [providers, setProviders] = useState<SignInProviders | null>(null);
+    const [serverName, setServerName] = useState<string | null>(null);
+    const [browserProvider, setBrowserProvider] = useState<SignInProvider | null>(null);
 
     const [invitedEmail, setInvitedEmail] = useState<string | null>(null);
     const [inviteError, setInviteError] = useState<string | null>(null);
@@ -41,6 +46,7 @@ export default function RegisterPage() {
             try {
                 const status = await authService.probeServer(serverUrl);
                 setRegistrationMode(status.registrationMode);
+                setServerName(status.serverName || 'Vora Server');
                 sessionStorage.setItem(SessionKeys.pendingServerUrl, serverUrl);
                 externalSignInService.getProviders(serverUrl).then(setProviders).catch(() => setProviders(null));
 
@@ -158,9 +164,40 @@ export default function RegisterPage() {
     const directory = providers?.directorySignInEnabled === true;
     const passwordRegistration = !(hasProviders || directory) || providers?.passwordSignInEnabled !== false;
 
-    const chooseProvider = (provider: SignInProvider) => {
-        window.location.assign(externalSignInService.startUrl(serverUrl, provider.slug, inviteToken || undefined));
+    const inDesktop = canOpenInBrowser();
+
+    const chooseProvider = async (provider: SignInProvider) => {
+        const startUrl = externalSignInService.startUrl(serverUrl, provider.slug, inviteToken || undefined);
+        if (!inDesktop) {
+            window.location.assign(startUrl);
+            return;
+        }
+        setError('');
+        if (await openInBrowser(startUrl)) {
+            setBrowserProvider(provider);
+        } else {
+            setError(`Vora could not open your browser, so it cannot continue with ${provider.displayName}. Try again.`);
+        }
     };
+
+    const signedInInBrowser = (auth: AuthResponse) => {
+        storeAccountSession(serverUrl, serverName ?? undefined, auth);
+        navigate('/profiles');
+    };
+
+    if (browserProvider) {
+        return (
+            <AuthLayout title="Create Account" subtitle="Finish in your browser.">
+                <div className="space-y-5">
+                    <p className="text-sm" style={{ color: 'var(--vora-text-secondary)' }}>
+                        Finish creating your account with {browserProvider.displayName} in your browser, then come back and sign in.
+                    </p>
+                    <BrowserSignIn serverUrl={serverUrl} onApproved={signedInInBrowser} />
+                    <button type="button" onClick={() => setBrowserProvider(null)} className="vora-button-secondary w-full cursor-pointer">Back</button>
+                </div>
+            </AuthLayout>
+        );
+    }
 
     return (
         <AuthLayout title="Create Account" subtitle={isInvited ? 'You were invited.' : 'Join the Vora server.'}>
@@ -251,7 +288,7 @@ export default function RegisterPage() {
             {hasProviders && (
                 <>
                     {passwordRegistration && <OrDivider />}
-                    <SignInProviderButtons providers={providerList} serverUrl={serverUrl} onChoose={chooseProvider} />
+                    <SignInProviderButtons providers={providerList} serverUrl={serverUrl} onChoose={provider => void chooseProvider(provider)} />
                     {showSecretCode && (
                         <p className="mt-3 text-xs" style={{ color: 'var(--vora-text-muted)' }}>
                             You'll be asked for the invite PIN after you sign in with a provider.

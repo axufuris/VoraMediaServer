@@ -85,10 +85,16 @@ The renderer runs code served by a network server, so lock it down:
   the user's browser via `shell.openExternal` (https only); block the rest.
 - `setWindowOpenHandler`: same rule; never create new Electron windows from content.
 - `bridge.openExternal(url)` (bridge v3, optional so a web build can detect an older shell): the
-  server's page may ask for one `http(s)` address **on the connected server's own origin** to be
-  opened in the user's default browser (`shell.openExternal`); anything else resolves `false`.
-  It exists for "Sign in with your browser" (`docs/device-pairing.md`): an identity-provider
-  redirect cannot complete inside the app, so the person approves a pairing code in their browser.
+  server's page may ask for one address to be opened in the user's default browser
+  (`shell.openExternal`): `http(s)` **on the connected server's own origin** (the pairing page, the
+  start address of a provider sign-in), or an `https` address anywhere (the provider's own sign-in
+  address, which Account settings' Link opens). That is no wider than the window-open rule above,
+  which already sends any `https` address to the browser; anything else (another scheme, `http` off
+  the server, a user name or password in the address, an address over 4096 characters) resolves
+  `false`. It exists for the browser hand-offs in `docs/sso.md` (Inside Vora Desktop) and
+  `docs/device-pairing.md`: an identity-provider redirect cannot complete inside the app, so the
+  person signs in, registers or links in their browser. Opening an `https` address off the server
+  needs Desktop 1.1.0 or later.
 - Every `ipcMain.handle` validates its payload shape and checks `event.senderFrame.url`
   is the server origin (a bundled page, for the connect and error pages' calls). Treat
   renderer input as untrusted (URLs passed to mpv must be
