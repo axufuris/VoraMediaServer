@@ -59,8 +59,11 @@ public sealed class AiConnection
     public string? ChatModel(string? featureKey = null)
     {
         var chosen = string.IsNullOrWhiteSpace(featureKey) ? null : Value(featureKey);
-        return chosen ?? Value(ChatModelKey) ?? (IsOpenAi ? OpenAiChatModel : null);
+        return chosen ?? FeatureDefault(featureKey) ?? Value(ChatModelKey) ?? (IsOpenAi ? OpenAiChatModel : null);
     }
+
+    private string? FeatureDefault(string? featureKey) =>
+        IsOpenAi && string.Equals(featureKey, CollectionsModelKey, StringComparison.Ordinal) ? OpenAiCollectionsModel : null;
 
     public Uri Endpoint(string path)
     {

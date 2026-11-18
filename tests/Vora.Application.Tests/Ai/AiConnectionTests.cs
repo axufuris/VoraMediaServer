@@ -5,7 +5,7 @@ namespace Vora.Application.Tests.Ai;
 public class AiConnectionTests
 {
     [Fact]
-    public void A_server_that_never_saved_these_settings_talks_to_OpenAI_with_the_models_it_always_used()
+    public void A_server_that_never_saved_these_settings_talks_to_OpenAI_with_gpt_5_for_collections_and_the_models_it_always_used_elsewhere()
     {
         var connection = StubAiServer.Connection((AiConnection.ApiKeyKey, " sk-example "));
 
@@ -13,7 +13,7 @@ public class AiConnectionTests
         connection.IsOpenAi.Should().BeTrue();
         connection.ApiKey.Should().Be("sk-example");
         connection.ChatModel().Should().Be("gpt-4o-mini");
-        connection.ChatModel(AiConnection.CollectionsModelKey).Should().Be("gpt-4o-mini");
+        connection.ChatModel(AiConnection.CollectionsModelKey).Should().Be("gpt-5");
         connection.ChatModel(AiConnection.PlaylistsModelKey).Should().Be("gpt-4o-mini");
         connection.EmbeddingModel.Should().Be("text-embedding-3-small");
         connection.EmbeddingStamp.Should().Be("text-embedding-3-small");
@@ -32,6 +32,15 @@ public class AiConnectionTests
         connection.IsUsable.Should().BeFalse();
         connection.CanChat.Should().BeFalse();
         connection.CanEmbed.Should().BeFalse();
+    }
+
+    [Fact]
+    public void An_unset_collections_model_is_gpt_5_on_OpenAI_whatever_the_chat_model_is()
+    {
+        var connection = StubAiServer.OpenAi((AiConnection.ChatModelKey, "gpt-4.1-mini"), (AiConnection.CollectionsModelKey, "  "));
+
+        connection.ChatModel(AiConnection.CollectionsModelKey).Should().Be("gpt-5");
+        connection.ChatModel().Should().Be("gpt-4.1-mini");
     }
 
     [Fact]
