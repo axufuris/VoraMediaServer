@@ -117,10 +117,15 @@ public sealed class DevicePairingManager(
             return DevicePairingDecideOutcome.NotFound;
         }
 
+        var user = await users.GetUserByIdAsync(accountId);
+        if (user is null)
+        {
+            return DevicePairingDecideOutcome.AccountNotAllowed;
+        }
+
         if (approve)
         {
-            var user = await users.GetUserByIdAsync(accountId);
-            if (user is null || !(await SessionAsync(user)).Allowed)
+            if (!(await SessionAsync(user)).Allowed)
             {
                 return DevicePairingDecideOutcome.AccountNotAllowed;
             }
@@ -143,7 +148,7 @@ public sealed class DevicePairingManager(
         }
 
         store.ClearWrongCodes(accountId);
-        logger.LogInformation("Account {AccountId} {Decision} a device sign-in", accountId, approve ? "approved" : "denied");
+        logger.LogInformation("User {UserId} {Decision} a device sign-in", user.Id, approve ? "approved" : "denied");
         return approve ? DevicePairingDecideOutcome.Approved : DevicePairingDecideOutcome.Denied;
     }
 
@@ -176,10 +181,10 @@ public sealed class DevicePairingManager(
 
         auth.RefreshToken = await authManager.IssueRefreshTokenAsync(accountId, deviceId, session.Method);
         logger.LogInformation(
-            "Signed in {ClientName} on {DeviceName} for account {AccountId} through device pairing",
+            "Signed in {ClientName} on {DeviceName} for user {UserId} through device pairing",
             LogValue.SingleLine(polled.Device?.ClientName),
             LogValue.SingleLine(polled.Device?.DeviceName),
-            accountId);
+            user.Id);
         return new DevicePairingPollVM { Status = "approved", Auth = auth };
     }
 
