@@ -13,6 +13,7 @@ const mocks = vi.hoisted(() => ({
     getGlobalCollections: vi.fn(),
     getLibraryCollections: vi.fn(),
     createCollection: vi.fn(),
+    setHidden: vi.fn(),
 }));
 
 vi.mock('../../../api/Media/libraryService', () => ({
@@ -24,7 +25,7 @@ vi.mock('../../../api/Collections/collectionService', () => ({
 }));
 
 vi.mock('../../../api/Collections/collectionAdminService', () => ({
-    collectionAdminService: { createCollection: mocks.createCollection },
+    collectionAdminService: { createCollection: mocks.createCollection, setHidden: mocks.setHidden },
 }));
 
 vi.mock('../../../api/System/pluginAdminService', () => ({
@@ -188,5 +189,26 @@ describe('CollectionsPage hidden collections', () => {
         expect(screen.getByText('John Wick')).toBeInTheDocument();
         expect(screen.getByText('Hidden')).toBeInTheDocument();
         expect(screen.getByText('Out of season')).toBeInTheDocument();
+    });
+
+    it('takes a collection an admin hides from its tile out of the list at once, then asks the server again', async () => {
+        localStorage.setItem(StorageKeys.isServerAdmin, 'true');
+        mocks.setHidden.mockResolvedValue(undefined);
+        mocks.getGlobalCollections
+            .mockResolvedValueOnce([
+                { id: 'marvel', title: 'Marvel', itemCount: 65, systemGenerated: false },
+                { id: 'pixar', title: 'Pixar', itemCount: 27, systemGenerated: false },
+            ])
+            .mockReturnValue(new Promise(() => {}));
+        renderPage(pinnedEverywhere);
+
+        fireEvent.contextMenu(await screen.findByText('Marvel'), { clientX: 30, clientY: 40 });
+        fireEvent.click(screen.getByRole('menuitem', { name: 'Hide from viewers' }));
+
+        await waitFor(() => expect(screen.queryByText('Marvel')).toBeNull());
+        expect(mocks.setHidden).toHaveBeenCalledWith('marvel', true, undefined);
+        expect(screen.getByText('Pixar')).toBeInTheDocument();
+        expect(screen.getByRole('switch', { name: 'Show hidden (1)' })).toBeInTheDocument();
+        expect(mocks.getGlobalCollections).toHaveBeenCalledTimes(2);
     });
 });

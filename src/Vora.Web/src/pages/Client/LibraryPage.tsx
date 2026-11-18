@@ -17,6 +17,7 @@ import { recentlyAddedTime } from '../../utils/recentlyAdded';
 import { yearOf } from '../../utils/serverTime';
 import { errorDetail, isMissingOrForbidden } from '../../utils/apiError';
 import LibraryCollectionGrid from '../../components/Collections/LibraryCollectionGrid';
+import { withHiddenByAdmin } from '../../components/Collections/hiddenByAdmin';
 import { mediaMenuTarget } from '../../components/Media/ItemMenu/mediaItemMenu';
 import { profileService, type LibrarySortVM } from '../../api/Users/profileService';
 import {
@@ -812,7 +813,12 @@ export default function LibraryPage() {
                     <LibraryCollectionGrid
                         collections={collections}
                         isAdmin={isAdmin}
+                        serverId={serverId}
                         onOpen={collection => navigate(serverId ? `/server/${serverId}/collection/${collection.id}` : `/collection/${collection.id}`)}
+                        onHiddenChanged={(collection, hidden) => {
+                            setCollections(prev => withHiddenByAdmin(prev, collection.id, hidden));
+                            if (id) collectionService.getLibraryCollections(id, serverId, isAdmin).then(setCollections).catch(console.error);
+                        }}
                         empty={(
                             <EmptyState
                                 title="No collections in this library yet"

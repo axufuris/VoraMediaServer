@@ -7,6 +7,7 @@ import EmptyState from '../../../components/Client/Primitives/EmptyState';
 import MediaGrid from '../../../components/Client/Primitives/MediaGrid';
 import { StorageKeys } from '../../../utils/storageKeys';
 import LibraryCollectionGrid from '../../../components/Collections/LibraryCollectionGrid';
+import { withHiddenByAdmin } from '../../../components/Collections/hiddenByAdmin';
 import { isLibraryUnpinned, useSidebarItems } from '../../../layouts/sidebarItems';
 
 export default function CollectionsPage() {
@@ -156,7 +157,12 @@ export default function CollectionsPage() {
                     <LibraryCollectionGrid
                         collections={collections}
                         isAdmin={isAdmin}
+                        serverId={serverId}
                         onOpen={collection => navigate(serverId ? `/server/${serverId}/collection/${collection.id}` : `/collection/${collection.id}`)}
+                        onHiddenChanged={(collection, hidden) => {
+                            setCollections(prev => withHiddenByAdmin(prev, collection.id, hidden));
+                            void fetchCollections();
+                        }}
                         empty={(
                     <EmptyState
                         title="No collections in this section"

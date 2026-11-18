@@ -284,23 +284,28 @@ export default function EditCollectionModal({
                                 <input type="text" value={sortTitle} onChange={e => setSortTitle(e.target.value)} className="w-full bg-[var(--vora-bg-raised)] border border-[var(--vora-border-subtle)] rounded-md p-2 text-[var(--vora-text-primary)] focus:border-[var(--vora-accent-500)] outline-none" />
                             </div>
 
-                            <div className="p-4 bg-[var(--vora-bg-raised)]/50 border border-[var(--vora-border-subtle)] rounded-lg space-y-2">
-                                <div className="flex items-center gap-3">
-                                    <input
-                                        type="checkbox"
-                                        id="edit-collection-hidden"
-                                        checked={hidden}
-                                        onChange={e => setHidden(e.target.checked)}
-                                        className="w-4 h-4 accent-[var(--vora-accent-500)]"
-                                    />
-                                    <label htmlFor="edit-collection-hidden" className="text-sm text-[var(--vora-text-secondary)] font-medium cursor-pointer">
+                            <button
+                                type="button"
+                                id="edit-collection-hidden"
+                                role="switch"
+                                aria-checked={hidden}
+                                aria-labelledby="edit-collection-hidden-label"
+                                aria-describedby="edit-collection-hidden-help"
+                                onClick={() => setHidden(h => !h)}
+                                className="group flex w-full cursor-pointer items-start justify-between gap-4 p-4 text-left bg-[var(--vora-bg-raised)]/50 border border-[var(--vora-border-subtle)] rounded-lg focus-visible:outline-none! focus-visible:bg-[var(--vora-accent-500)] focus-visible:border-[var(--vora-accent-500)]"
+                            >
+                                <span className="min-w-0 space-y-2">
+                                    <span id="edit-collection-hidden-label" className="block text-sm text-[var(--vora-text-secondary)] font-medium group-focus-visible:text-[var(--vora-accent-contrast)]">
                                         Hide from viewers
-                                    </label>
-                                </div>
-                                <p className="text-xs text-[var(--vora-text-muted)] leading-relaxed">
-                                    Takes it out of {collection.libraryId ? 'its library' : 'the Global tab and every library'}, search and its Home row, whatever its season. Admins can still find it with Show hidden.
-                                </p>
-                            </div>
+                                    </span>
+                                    <span id="edit-collection-hidden-help" className="block text-xs text-[var(--vora-text-muted)] leading-relaxed group-focus-visible:text-[var(--vora-accent-contrast)]">
+                                        Takes it out of {collection.libraryId ? 'its library' : 'the Global tab and every library'}, search and its Home row, whatever its season. Admins can still find it with Show hidden.
+                                    </span>
+                                </span>
+                                <span aria-hidden="true" className={`relative h-7 w-12 shrink-0 rounded-full transition-colors ${hidden ? 'bg-[var(--vora-accent-500)] group-focus-visible:bg-[var(--vora-accent-contrast)]' : 'bg-[var(--vora-border-strong)]'}`}>
+                                    <span className={`absolute top-1 left-1 h-5 w-5 rounded-full transition-transform ${hidden ? 'translate-x-5 bg-[var(--vora-text-primary)] group-focus-visible:bg-[var(--vora-accent-500)]' : 'bg-[var(--vora-text-primary)]'}`} />
+                                </span>
+                            </button>
 
                             <div className="p-4 bg-[var(--vora-bg-raised)]/50 border border-[var(--vora-border-subtle)] rounded-lg space-y-4">
                                 <h3 className="text-[var(--vora-text-secondary)] font-bold text-sm tracking-wide uppercase">Seasonal Visibility (Optional)</h3>
