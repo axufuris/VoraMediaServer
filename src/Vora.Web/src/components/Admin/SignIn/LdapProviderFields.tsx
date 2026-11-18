@@ -233,7 +233,7 @@ export default function LdapProviderFields({ draft, provider, set }: LdapProvide
                             <input id="provider-ldap-groups" value={draft.ldapGroupAttribute} onChange={e => set('ldapGroupAttribute', e.target.value)} className="vora-input w-full font-mono" />
                         </div>
                         <p className="text-xs text-[var(--vora-text-muted)] md:col-span-4">
-                            The unique id ties a sign-in to a person for good, so renaming them in the directory keeps their account. Use entryUUID for OpenLDAP, uuid for LLDAP and objectGUID for Active Directory. If an entry has none, its distinguished name is used.
+                            The unique id ties a sign-in to a person for good, so renaming them in the directory keeps their account. Use entryUUID for OpenLDAP, uuid for LLDAP, uid for Authentik, ipaUniqueID for FreeIPA and objectGUID for Active Directory. If an entry has none, its distinguished name is used.
                         </p>
                     </div>
                 )}
