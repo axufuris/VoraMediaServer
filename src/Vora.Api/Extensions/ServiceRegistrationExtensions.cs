@@ -171,6 +171,17 @@ public static class ServiceRegistrationExtensions
                         AutoReplenishment = true
                     }));
 
+            options.AddPolicy(VoraRateLimitPolicies.WebhookReceive, httpContext =>
+                RateLimitPartition.GetFixedWindowLimiter(
+                    partitionKey: GetClientPartitionKey(httpContext),
+                    factory: _ => new FixedWindowRateLimiterOptions
+                    {
+                        PermitLimit = 600,
+                        Window = TimeSpan.FromMinutes(1),
+                        QueueLimit = 0,
+                        AutoReplenishment = true
+                    }));
+
             options.AddPolicy(VoraRateLimitPolicies.AuthPoll, httpContext =>
                 RateLimitPartition.GetFixedWindowLimiter(
                     partitionKey: GetClientPartitionKey(httpContext),
@@ -493,6 +504,12 @@ public static class ServiceRegistrationExtensions
         services.AddScoped<IRequestManager, RequestManager>();
         services.AddScoped<ISearchManager, SearchManager>();
         services.AddScoped<ISmartListManager, SmartListManager>();
+        services.AddScoped<Vora.Application.Webhooks.IMediaWebhookManager, Vora.Application.Webhooks.MediaWebhookManager>();
+        services.AddSingleton<Vora.Application.Webhooks.IMediaWebhookLog, Vora.Application.Webhooks.MediaWebhookLog>();
+        services.AddSingleton(Vora.Application.Webhooks.MediaWebhookTimings.Default);
+        services.AddSingleton<Vora.Application.Webhooks.MediaWebhookProcessor>();
+        services.AddSingleton<Vora.Application.Webhooks.IMediaWebhookQueue>(sp => sp.GetRequiredService<Vora.Application.Webhooks.MediaWebhookProcessor>());
+        services.AddHostedService(sp => sp.GetRequiredService<Vora.Application.Webhooks.MediaWebhookProcessor>());
         services.AddScoped<ISmartListSourceResolver, SmartListSourceResolver>();
         services.AddScoped<IStreamManager, StreamManager>();
         services.AddScoped<IPlaybackStatsManager, PlaybackStatsManager>();

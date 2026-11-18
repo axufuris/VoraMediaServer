@@ -1427,6 +1427,37 @@ public partial class MediaRepository : IMediaRepository
         }
     }
 
+    public async Task<bool> AnyMediaUnderPathAsync(string folderPath)
+    {
+        var prefix = FolderPrefix(folderPath);
+        return await _context.MediaParts.AsNoTracking().AnyAsync(p => p.FilePath.StartsWith(prefix));
+    }
+
+    public async Task<int> MarkMediaMissingUnderPathAsync(string folderPath)
+    {
+        var prefix = FolderPrefix(folderPath);
+        var paths = await _context.MediaParts
+            .AsNoTracking()
+            .Where(p => p.FilePath.StartsWith(prefix))
+            .Select(p => p.FilePath)
+            .ToListAsync();
+
+        var missing = 0;
+        foreach (var path in paths)
+        {
+            if (System.IO.File.Exists(path)) continue;
+
+            await MarkMediaMissingByFilePathAsync(path);
+            _context.ChangeTracker.Clear();
+            missing++;
+        }
+
+        return missing;
+    }
+
+    private static string FolderPrefix(string folderPath) =>
+        folderPath.TrimEnd('/', '\\') + System.IO.Path.DirectorySeparatorChar;
+
     public async Task MarkMediaMissingByFilePathAsync(string filePath)
     {
         // The folder watcher fires this from a "file deleted" event, but on a

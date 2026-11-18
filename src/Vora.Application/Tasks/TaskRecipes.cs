@@ -75,6 +75,9 @@ public static class TaskRecipes
             case nameof(ITaskQueueManager.QueueRemoveOrphanedMedia):
                 queue.QueueRemoveOrphanedMedia(r.Text("filePath") ?? string.Empty);
                 return true;
+            case nameof(ITaskQueueManager.QueueRemoveMissingMediaUnder):
+                queue.QueueRemoveMissingMediaUnder(r.Text("folderPath") ?? string.Empty);
+                return true;
             case nameof(ITaskQueueManager.QueueCollectionChronologySync):
                 queue.QueueCollectionChronologySync(r.Guid("collectionId"), r.Text("title") ?? string.Empty, r.Flag("force"));
                 return true;

@@ -28,7 +28,8 @@ public static class PluginLoaderExtensions
         typeof(IListeningDataProvider),
         typeof(IMusicContentRatingProvider),
         typeof(ILibrarySyncProvider),
-        typeof(ISubtitleSearchProvider)
+        typeof(ISubtitleSearchProvider),
+        typeof(IMediaWebhookProvider)
     };
 
     public static IServiceCollection AddVoraPlugins(this IServiceCollection services, string pluginsFolderPath, ILogger logger)
