@@ -49,7 +49,7 @@ public class TaskRecipeRoundTripTests
         new(nameof(ITaskQueueManager.QueueResolveTvdbIds), q => q.QueueResolveTvdbIds()),
         new(nameof(ITaskQueueManager.QueueMergeDuplicateShows), q => q.QueueMergeDuplicateShows()),
         new(nameof(ITaskQueueManager.QueueRemoveOrphanedMedia), q => q.QueueRemoveOrphanedMedia("/media/movies/gone.mkv")),
-        new(nameof(ITaskQueueManager.QueueCollectionChronologySync), q => q.QueueCollectionChronologySync(Other, "Marvel")),
+        new(nameof(ITaskQueueManager.QueueCollectionChronologySync), q => q.QueueCollectionChronologySync(Other, "Marvel", true)),
         new(nameof(ITaskQueueManager.QueueCollectionContentSync), q => q.QueueCollectionContentSync(Other, "Marvel")),
         new(nameof(ITaskQueueManager.QueueGeneratePosterOverlays), q => q.QueueGeneratePosterOverlays(Item)),
         new(nameof(ITaskQueueManager.QueueFullCollectionSync), q => q.QueueFullCollectionSync(Other, "Marvel", true, false)),

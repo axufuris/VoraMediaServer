@@ -22,6 +22,7 @@ public interface ICollectionManager
     Task UpdateCollectionAsync(Guid id, UpdateCollectionRequest request);
     Task SetArtworkAsync(Guid id, ArtworkKind kind, string? url);
     Task SetItemInUniverseYearAsync(Guid collectionId, Guid mediaItemId, double? year, bool locked);
+    Task<string?> QueueChronologySyncAsync(Guid id);
     Task RemoveMediaFromCollectionAsync(Guid collectionId, Guid mediaItemId);
     Task ReorderCollectionItemsAsync(Guid collectionId, List<Guid> orderedMediaItemIds);
     Task DeleteCollectionAsync(Guid id);
@@ -273,6 +274,18 @@ public class CollectionManager : ICollectionManager
         collections
             .OrderBy(c => string.IsNullOrWhiteSpace(c.SortTitle) ? c.Title : c.SortTitle, StringComparer.OrdinalIgnoreCase)
             .ThenBy(c => c.Title, StringComparer.OrdinalIgnoreCase);
+
+    public async Task<string?> QueueChronologySyncAsync(Guid id)
+    {
+        var config = await _repository.GetChronologyConfigAsync(id);
+        if (config == null || string.IsNullOrEmpty(config.SortProviderId))
+        {
+            return "This collection has no story-order provider set.";
+        }
+
+        _taskQueueManager.QueueCollectionChronologySync(id, config.Title, force: true);
+        return null;
+    }
 
     public async Task RemoveMediaFromCollectionAsync(Guid collectionId, Guid mediaItemId)
     {
