@@ -406,6 +406,22 @@ public static class ServiceRegistrationExtensions
         services.AddScoped<Vora.Application.Auth.External.IExternalSignInService, Vora.Application.Auth.External.ExternalSignInService>();
         services.AddScoped<Vora.Application.Auth.External.IExternalIdentityManager, Vora.Application.Auth.External.ExternalIdentityManager>();
         services.AddSingleton<Vora.Application.Auth.External.IExternalSignInCodeStore, Vora.Application.Auth.External.ExternalSignInCodeStore>();
+        services.AddSingleton<Vora.Application.Auth.External.Oidc.IOidcLoginStateStore, Vora.Application.Auth.External.Oidc.OidcLoginStateStore>();
+        services.AddSingleton<Vora.Application.Auth.External.Oidc.IExternalPendingStore, Vora.Application.Auth.External.Oidc.ExternalPendingStore>();
+        services.AddScoped<Vora.Application.Auth.External.Oidc.IOidcProviderClient, Vora.Application.Auth.External.Oidc.OidcProviderClient>();
+        services.AddScoped<Vora.Application.Auth.External.Oidc.IOidcIdTokenValidator, Vora.Application.Auth.External.Oidc.OidcIdTokenValidator>();
+        services.AddScoped<Vora.Application.Auth.External.Oidc.IOidcSignInManager, Vora.Application.Auth.External.Oidc.OidcSignInManager>();
+        services.AddHttpClient(Vora.Application.Auth.External.Oidc.OidcProviderClient.HttpClientName, client =>
+        {
+            client.Timeout = TimeSpan.FromSeconds(10);
+            client.MaxResponseContentBufferSize = 1_048_576;
+        })
+            .ConfigurePrimaryHttpMessageHandler(() => new SocketsHttpHandler
+            {
+                AllowAutoRedirect = false,
+                ConnectTimeout = TimeSpan.FromSeconds(5),
+                PooledConnectionLifetime = TimeSpan.FromMinutes(5)
+            });
         services.AddScoped<IJwtSecurityStampValidator, JwtSecurityStampValidator>();
         services.AddScoped<IBestPathDecisionManager, BestPathDecisionManager>();
         services.AddScoped<ICalendarManager, CalendarManager>();

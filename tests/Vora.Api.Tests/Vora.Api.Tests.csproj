@@ -10,6 +10,10 @@
   </ItemGroup>
 
   <ItemGroup>
+    <Compile Include="..\Vora.Application.Tests\Auth\Oidc\MockOidcProvider.cs" Link="Infra\MockOidcProvider.cs" />
+  </ItemGroup>
+
+  <ItemGroup>
     <ProjectReference Include="..\..\src\Vora.Api\Vora.Api.csproj" />
     <ProjectReference Include="..\..\src\Vora.Application\Vora.Application.csproj" />
     <ProjectReference Include="..\..\src\Vora.Domain\Vora.Domain.csproj" />

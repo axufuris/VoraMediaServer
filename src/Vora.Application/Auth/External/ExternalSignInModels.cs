@@ -32,7 +32,8 @@ public enum ExternalSignInRefusal
     RegistrationClosed,
     InvitationRequired,
     InvitationMismatch,
-    EmailInUse
+    EmailInUse,
+    AlreadyLinked
 }
 
 public sealed record ExternalSignInResult(

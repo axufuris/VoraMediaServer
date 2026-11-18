@@ -120,6 +120,7 @@ public static class WebApplicationExtensions
         app.MapArtworkEndpoints();
         app.MapAuthEndpoints();
         app.MapExternalAuthEndpoints();
+        app.MapOidcEndpoints();
         app.MapCalendarEndpoints();
         app.MapCollectionEndpoints();
         app.MapCollectionArtworkEndpoints();

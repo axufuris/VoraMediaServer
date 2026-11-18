@@ -42,6 +42,7 @@ All under `/api/auth/*`, anonymous unless noted. See `Vora.Api/Endpoints/AuthEnd
 | `POST /confirm-email-change` | Body: `{ token }`. Applies an email change asked for in account settings: 204, 409 if the address was taken meanwhile, 400 for a bad or expired (60 minutes) link. |
 | `POST /invitations/validate` | Body: `{ token }`. Returns `{ email, expiresAt }` for a valid invite, 404 otherwise. |
 | `GET /providers` | The sign-in providers that are turned on, `passwordSignInEnabled` and `registrationMode` (a string), for the login page. `docs/sso.md`. |
+| `GET /oidc/{slug}/start`, `GET /oidc/{slug}/callback` | The OpenID Connect redirect flow; both answer 302 to the web app. `POST /oidc/{slug}/link` (needs a token) starts a link from Account settings. `GET /external/pending/{handle}`, `POST /external/complete` finish a sign-in that needs a step. `docs/sso.md`. |
 | `POST /external/exchange` | Body: `{ code }`. Trades a one-time sign-in code for the tokens of a login (`AuthStrict`); 401 for a used, expired or unknown code. |
 | `GET /identities`, `DELETE /identities/{id}` | **Needs a token.** The caller's linked sign-in providers; unlinking the last way in is 409. |
 
