@@ -102,6 +102,7 @@ interface VoraDesktopBridge {
   mpv: { available: boolean; version: string | null; reason: string | null };
   onMpvChanged(handler: (status: MpvStatus) => void): () => void;
   capabilities(): Promise<DesktopCapabilities>;
+  openExternal?(url: string): Promise<boolean>;  // bridge v3: open an address on the connected server in the user's browser
   player: {
     open(req: OpenRequest): Promise<void>;  // spawns/reuses mpv, loads url at start
     command(cmd: PlayerCommand): void;      // play | pause | seek | tracks | load-next

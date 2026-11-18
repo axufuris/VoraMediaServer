@@ -84,6 +84,11 @@ The renderer runs code served by a network server, so lock it down:
 - `will-navigate` / `will-redirect`: allow the server origin; open anything else in
   the user's browser via `shell.openExternal` (https only); block the rest.
 - `setWindowOpenHandler`: same rule; never create new Electron windows from content.
+- `bridge.openExternal(url)` (bridge v3, optional so a web build can detect an older shell): the
+  server's page may ask for one `http(s)` address **on the connected server's own origin** to be
+  opened in the user's default browser (`shell.openExternal`); anything else resolves `false`.
+  It exists for "Sign in with your browser" (`docs/device-pairing.md`): an identity-provider
+  redirect cannot complete inside the app, so the person approves a pairing code in their browser.
 - Every `ipcMain.handle` validates its payload shape and checks `event.senderFrame.url`
   is the server origin (a bundled page, for the connect and error pages' calls). Treat
   renderer input as untrusted (URLs passed to mpv must be

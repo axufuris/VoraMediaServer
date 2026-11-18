@@ -1,4 +1,4 @@
-export const DESKTOP_BRIDGE_VERSION = 2;
+export const DESKTOP_BRIDGE_VERSION = 3;
 
 export type DesktopChannel = 'qa' | 'prod';
 
@@ -140,6 +140,7 @@ export interface VoraDesktopBridge {
     mpv: MpvStatus;
     onMpvChanged(handler: (status: MpvStatus) => void): () => void;
     capabilities(): Promise<DesktopCapabilities>;
+    openExternal?(url: string): Promise<boolean>;
     player: {
         open(request: OpenRequest): Promise<void>;
         command(command: PlayerCommand): void;

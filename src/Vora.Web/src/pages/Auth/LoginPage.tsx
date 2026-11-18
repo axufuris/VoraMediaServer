@@ -2,9 +2,12 @@ import { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { isAxiosError } from 'axios';
 import { serverVault } from '../../utils/serverVault';
-import { authService } from '../../api/Auth/authService';
+import { authService, type AuthResponse } from '../../api/Auth/authService';
 import { externalSignInService, type SignInProvider, type SignInProviders } from '../../api/Auth/externalSignInService';
 import SignInProviderButtons, { OrDivider } from '../../components/Auth/SignInProviderButtons';
+import BrowserSignIn from '../../components/Auth/BrowserSignIn';
+import { canOpenInBrowser } from '../../desktop/desktopBrowser';
+import { storeAccountSession } from '../../utils/signInSession';
 import { StorageKeys, SessionKeys } from '../../utils/storageKeys';
 import AuthLayout from '../../layouts/AuthLayout';
 
@@ -137,9 +140,16 @@ export default function LoginPage() {
         window.location.assign(externalSignInService.startUrl(serverUrl, provider.slug));
     };
 
-    const providerButtons = hasProviders && (
-        <SignInProviderButtons providers={providerList} serverUrl={serverUrl} onChoose={chooseProvider} />
-    );
+    const inDesktop = canOpenInBrowser();
+
+    const signedInInBrowser = (auth: AuthResponse) => {
+        storeAccountSession(serverUrl, serverName ?? undefined, auth);
+        navigate('/profiles');
+    };
+
+    const providerButtons = inDesktop
+        ? <BrowserSignIn serverUrl={serverUrl} onApproved={signedInInBrowser} />
+        : hasProviders && <SignInProviderButtons providers={providerList} serverUrl={serverUrl} onChoose={chooseProvider} />;
 
     const unreachable = reachable === false && (
         <div
@@ -224,7 +234,7 @@ export default function LoginPage() {
             </form>
             )}
 
-            {passwordAllowed && hasProviders && (
+            {passwordAllowed && (hasProviders || inDesktop) && (
                 <>
                     <OrDivider />
                     {providerButtons}
