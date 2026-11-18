@@ -1,7 +1,9 @@
+import HistoryBackButton from '../../components/Layout/HistoryBackButton';
 import SearchBar from '../../components/Layout/SearchBar';
 
 interface MainLayoutUserMenuProps {
     profileName: string;
+    homePath: string;
     isProfileMenuOpen: boolean;
     isServerAdmin: boolean;
     isPhoneNavOpen: boolean;
@@ -19,6 +21,7 @@ interface MainLayoutUserMenuProps {
 
 export default function MainLayoutUserMenu({
     profileName,
+    homePath,
     isProfileMenuOpen,
     isServerAdmin,
     isPhoneNavOpen,
@@ -40,6 +43,8 @@ export default function MainLayoutUserMenu({
             className="relative z-[100] flex h-16 w-full shrink-0 items-center justify-between px-8 max-md:gap-2 max-md:px-3"
             style={{ background: 'var(--vora-bg-sunken)', borderBottom: '1px solid var(--vora-border-subtle)' }}
         >
+            <HistoryBackButton homePath={homePath} />
+
             <button
                 type="button"
                 onClick={onOpenPhoneNav}

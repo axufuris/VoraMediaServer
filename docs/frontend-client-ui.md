@@ -282,3 +282,13 @@ The client scrolls inside `MainLayout`'s `<main>`, not the window, so the browse
 - **Only the query string changing** (a tab or filter in the URL) keeps the position.
 
 Positions live in memory, so a reload forgets them. Sort and filter come back on their own: the sort as described under Library sort, the filter per library (`vora_library_filter_*`).
+
+## Back in an installed app
+
+A browser tab has a Back button; an installed web app and Vora Desktop's window have none, so the client top bar draws one (`HistoryBackButton`, first in `MainLayoutUserMenu`, before the phone's navigation button). Issue #302.
+
+- **Where it shows:** only where there is no browser around the page (`useIsInstalledApp`): `display-mode: standalone` (the manifest asks for it), iOS's `navigator.standalone`, or `window.voraDesktop` (Vora Desktop). Never in a browser tab, where it would be a second Back button beside the browser's.
+- **Where it doesn't:** Home, for the default server (`/`) and a chosen one (`/server/<id>`), which is what `MainLayout` passes as `homePath`. Every other client page has it. The Home tabs (For You, Collections and the rest) are not routes, so they share Home's rule.
+- **What it does:** a step back in the history (`navigate(-1)`), so `useScrollRestoration` puts the page back where it was left, the same as the browser's Back (Scroll position, above). A page opened straight from a link has no entry behind it (`location.key === 'default'`), so Back replaces it with Home.
+- **Focus:** it fills with `--vora-accent-500` and turns its icon `--vora-accent-contrast`, with no ring, like the other buttons (A switch row fills on focus, above). The `!` modifiers are needed because `tokens.css` sits outside Tailwind's layers.
+- **Not covered:** the admin shell (`TopAppBar`) has no Back button; it has the breadcrumb and its own sidebar.
