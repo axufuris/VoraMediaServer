@@ -12,15 +12,15 @@ All on plugin `openai_recommendations` (`AiConnection.PluginId`). The keys are c
 |---|---|---|
 | `base_url` | `https://api.openai.com/v1` | Where the API starts. |
 | `api_key` | empty | Required for OpenAI. Optional anywhere else. |
-| `chat_model` | `gpt-4o-mini` | Model for the "For You" rows, and the fallback for the next two. |
-| `collections_model` | `gpt-5` (shown in the form) | Model for AI lists, AI themes and story order. |
+| `chat_model` | `gpt-4o-mini` | Model for the "For You" rows, and the fallback for the playlists model (and for the collections model on a server other than OpenAI). |
+| `collections_model` | `gpt-5` on OpenAI | Model for AI lists, AI themes and story order. |
 | `music_playlists_model` | empty | Model for song profiles and playlist requests. |
 | `embedding_model` | `text-embedding-3-small` | Model that makes the vectors. |
 | `schedule_time`, `monthly_token_limit`, `guardrails` | `02:00`, `0`, empty | Nightly run, token ceiling, house rules. |
 
-**A server that never saved these behaves exactly as before.** `AiConnection` reads an unset `base_url` as OpenAI's, an unset `chat_model` as `gpt-4o-mini`, and an unset `embedding_model` as `text-embedding-3-small`. The form shows those same values, so opening and saving it changes nothing.
+**A server that never saved these behaves as the form shows.** `AiConnection` reads an unset `base_url` as OpenAI's, an unset `chat_model` as `gpt-4o-mini`, an unset `embedding_model` as `text-embedding-3-small`, and an unset `collections_model` as `gpt-5` when the server is OpenAI. The form shows those same values, so opening and saving it changes nothing.
 
-**Model fallback.** A feature model that is empty uses `chat_model`. That includes `collections_model`: the form shows `gpt-5` as its default, but a server that never saved the form has no value stored, so its collections run on `chat_model`. This was already true before the address became configurable and is left as it was.
+**Model fallback.** A feature model that is empty uses `chat_model`, except `collections_model` on OpenAI, which uses `gpt-5` (`AiConnection.OpenAiCollectionsModel`) so the form and the server agree. Until this was changed a server that never saved the form ran its collections on `chat_model` (`gpt-4o-mini`) while the form showed `gpt-5`, and a story order came out wrong: `gpt-4o-mini` ignored the rule that years before an in-universe event are negative and misjudged some years outright. An account without access to `gpt-5` gets the provider's model-not-found error on the next AI list, theme or story-order run; pick another model in AI Settings. On a server other than OpenAI nothing is assumed and an empty `collections_model` still uses `chat_model`.
 
 **On a server other than OpenAI nothing is assumed.** There is no default model: `chat_model` must be chosen before AI counts as set up (`AiConnection.CanChat`), and an empty `embedding_model` means no embeddings (`CanEmbed` false). Collections then still work; recommendations and AI playlists are off.
 
