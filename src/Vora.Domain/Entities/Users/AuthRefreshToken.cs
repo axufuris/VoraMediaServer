@@ -1,3 +1,5 @@
+using Vora.Domain.Enums;
+
 namespace Vora.Domain.Entities.Users;
 
 public class AuthRefreshToken
@@ -8,6 +10,7 @@ public class AuthRefreshToken
     public required string TokenHash { get; set; }
     public required string SecurityStamp { get; set; }
     public string? DeviceId { get; set; }
+    public AuthSignInMethod SignInMethod { get; set; } = AuthSignInMethod.Password;
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
     public DateTime ExpiresAt { get; set; }
     public DateTime? RevokedAt { get; set; }

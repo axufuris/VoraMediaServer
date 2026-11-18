@@ -143,6 +143,7 @@ public class UserManager(
         if (!string.IsNullOrWhiteSpace(newPassword))
         {
             user.PasswordHash = BCrypt.Net.BCrypt.HashPassword(newPassword);
+            user.HasPassword = true;
             user.SecurityStamp = Guid.NewGuid().ToString("N");
         }
         if (emailNotifyOnRequestAvailable.HasValue)

@@ -160,7 +160,16 @@ public static class AuthEndpoints
 
     private static async Task<IResult> LoginAsync([FromBody] LoginRequestDto request, IAuthManager manager, HttpContext httpContext)
     {
-        var result = await manager.LoginAsync(request.Email, request.Password);
+        Vora.Application.Auth.Dtos.AuthResponseDto? result;
+        try
+        {
+            result = await manager.LoginAsync(request.Email, request.Password);
+        }
+        catch (PasswordSignInDisabledException ex)
+        {
+            return Results.Problem(statusCode: StatusCodes.Status403Forbidden, title: "Password sign-in is turned off", detail: ex.Message);
+        }
+
         if (result == null)
         {
             return Results.Unauthorized();

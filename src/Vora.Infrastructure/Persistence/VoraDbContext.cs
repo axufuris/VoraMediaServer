@@ -90,6 +90,8 @@ public class VoraDbContext : DbContext
     public DbSet<EmailChangeTicket> EmailChangeTickets { get; set; }
     public DbSet<InvitationTicket> InvitationTickets { get; set; }
     public DbSet<AuthRefreshToken> AuthRefreshTokens { get; set; }
+    public DbSet<AuthProvider> AuthProviders { get; set; }
+    public DbSet<UserExternalIdentity> UserExternalIdentities { get; set; }
     public DbSet<ClientDevice> ClientDevices { get; set; }
 
     public DbSet<Playlist> Playlists { get; set; }
@@ -188,6 +190,7 @@ public class VoraDbContext : DbContext
         ConfigureEmailChangeTickets(modelBuilder);
         ConfigureInvitationTickets(modelBuilder);
         ConfigureAuthRefreshTokens(modelBuilder);
+        ConfigureAuthProviders(modelBuilder, converters);
         ConfigureClientDevices(modelBuilder, converters);
 
         ConfigurePlaylists(modelBuilder);
@@ -780,6 +783,7 @@ public class VoraDbContext : DbContext
             entity.Property(e => e.PasswordHash).HasMaxLength(256);
             entity.Property(e => e.SecurityStamp).IsRequired().HasMaxLength(32);
             entity.Property(e => e.EmailNotifyOnRequestAvailable).HasDefaultValue(true);
+            entity.Property(e => e.HasPassword).HasDefaultValue(true);
 
             entity.HasIndex(u => u.Email).IsUnique();
             entity.HasIndex(u => u.SecurityStamp);
@@ -1034,6 +1038,7 @@ public class VoraDbContext : DbContext
             entity.Property(e => e.TokenHash).IsRequired().HasMaxLength(128);
             entity.Property(e => e.SecurityStamp).IsRequired().HasMaxLength(64);
             entity.Property(e => e.DeviceId).HasMaxLength(128);
+            entity.Property(e => e.SignInMethod).HasConversion<string>().HasMaxLength(16).HasDefaultValue(AuthSignInMethod.Password);
             entity.HasIndex(e => e.TokenHash).IsUnique();
             entity.HasIndex(e => e.UserId);
             entity.HasIndex(e => e.FamilyId);
@@ -1041,6 +1046,52 @@ public class VoraDbContext : DbContext
             entity.HasOne(e => e.User)
                   .WithMany()
                   .HasForeignKey(e => e.UserId)
+                  .OnDelete(DeleteBehavior.Cascade);
+        });
+    }
+
+    private static void ConfigureAuthProviders(ModelBuilder modelBuilder, ListValueConverters converters)
+    {
+        modelBuilder.Entity<AuthProvider>(entity =>
+        {
+            entity.HasKey(e => e.Id);
+            entity.Property(e => e.Type).HasConversion<string>().HasMaxLength(16);
+            entity.Property(e => e.Slug).IsRequired().HasMaxLength(64);
+            entity.Property(e => e.DisplayName).IsRequired().HasMaxLength(64);
+            entity.Property(e => e.IconUrl).HasMaxLength(1024);
+            entity.Property(e => e.Issuer).HasMaxLength(256);
+            entity.Property(e => e.ClientId).HasMaxLength(256);
+            entity.Property(e => e.ClientSecretCiphertext).HasMaxLength(2048);
+            entity.Property(e => e.Scopes).IsRequired().HasMaxLength(512);
+            entity.Property(e => e.EmailClaim).IsRequired().HasMaxLength(64);
+            entity.Property(e => e.NameClaim).IsRequired().HasMaxLength(64);
+            entity.Property(e => e.GroupsClaim).IsRequired().HasMaxLength(64);
+            entity.Property(e => e.NewUserPolicy).HasConversion<string>().HasMaxLength(32);
+            entity.Property(e => e.LinkByEmail).HasConversion<string>().HasMaxLength(32);
+            entity.Property(e => e.RequiredGroup).HasMaxLength(256);
+            entity.Property(e => e.AdminGroup).HasMaxLength(256);
+            entity.Property(e => e.AllowedEmailDomains)
+                  .HasConversion(converters.StringList)
+                  .Metadata.SetValueComparer(converters.StringListComparer);
+            entity.HasIndex(e => e.Slug).IsUnique();
+        });
+
+        modelBuilder.Entity<UserExternalIdentity>(entity =>
+        {
+            entity.HasKey(e => e.Id);
+            entity.Property(e => e.Subject).IsRequired().HasMaxLength(512);
+            entity.Property(e => e.Email).HasMaxLength(256);
+            entity.HasIndex(e => new { e.ProviderId, e.Subject }).IsUnique();
+            entity.HasIndex(e => e.UserId);
+
+            entity.HasOne(e => e.User)
+                  .WithMany(u => u.ExternalIdentities)
+                  .HasForeignKey(e => e.UserId)
+                  .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasOne(e => e.Provider)
+                  .WithMany(p => p.Identities)
+                  .HasForeignKey(e => e.ProviderId)
                   .OnDelete(DeleteBehavior.Cascade);
         });
     }
@@ -1398,6 +1449,8 @@ public class VoraDbContext : DbContext
                   .Metadata.SetValueComparer(converters.StringListComparer);
             entity.Property(e => e.Id).HasMaxLength(64);
             entity.Property(e => e.ServerName).HasMaxLength(128);
+            entity.Property(e => e.PasswordSignInEnabled).HasDefaultValue(true);
+            entity.Property(e => e.PublicBaseUrl).HasMaxLength(256);
             entity.Property(e => e.FolderWatcherProviderId).HasMaxLength(64);
             entity.Property(e => e.LocalMediaScannerProviderId).HasMaxLength(64);
             entity.Property(e => e.TranscoderTempDirectory).HasMaxLength(1024);

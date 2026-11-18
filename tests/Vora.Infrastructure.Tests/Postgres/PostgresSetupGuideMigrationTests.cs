@@ -16,6 +16,7 @@ public class PostgresSetupGuideMigrationTests(PostgresDatabase database) : IClas
         await legacy.BuildQaStateAsync(withSetupGuide: false, cancellationToken);
         await using (var before = legacy.NewContext())
         {
+            await before.Database.ExecuteSqlRawAsync(LegacyDatabase.SignInColumns, cancellationToken);
             before.Set<User>().Add(new User { Email = "admin@example.com", DisplayName = "Admin", IsAdmin = true });
             await before.SaveChangesAsync(cancellationToken);
         }

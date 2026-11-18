@@ -33,7 +33,7 @@ All under `/api/auth/*`, anonymous unless noted. See `Vora.Api/Endpoints/AuthEnd
 | --- | --- |
 | `GET /setup-status` | Returns `{ isClaimed, registrationMode, serverName, emailEnabled }`; `registrationMode` is the number below. The frontend uses `emailEnabled` to decide whether to render Forgot Password / Email Invitations UI. |
 | `POST /setup` | First-run claim: creates the admin account and its first profile; body also takes `serverName`. 400 once the server is claimed. |
-| `POST /login` | Email + password, returns `accessToken` and `refreshToken`. A failure is a bare 401; the server log says why (warning: no account with that email, wrong password with the account's id and the password's length, or locked out). It never holds the email that was typed or the password: no log message carries an email address (CodeQL `cs/exposure-of-sensitive-information`). |
+| `POST /login` | Email + password, returns `accessToken` and `refreshToken`. 403 "Password sign-in is turned off" for a non-admin when an admin has turned password sign-in off (`docs/sso.md`); an account without a password never signs in here. A failure is a bare 401; the server log says why (warning: no account with that email, wrong password with the account's id and the password's length, or locked out). It never holds the email that was typed or the password: no log message carries an email address (CodeQL `cs/exposure-of-sensitive-information`). |
 | `POST /register` | Body: `{ email, password, displayName, secretCode?, inviteToken? }`. If `inviteToken` is present, validates it via `InvitationManager`, forces the email to match the ticket, and bypasses every `RegistrationMode`. Otherwise enforces `RegistrationMode` (Disabled and Invitation are refused; SecretWord needs `secretCode`). 400 with a message on any refusal. |
 | `POST /refresh`, `POST /logout` | Trade or revoke a refresh token. The web client never calls them. See `docs/auth-tokens.md`. |
 | `POST /exchange-profile-token` | **Needs a token** (any valid one of the account). Query `accountId` must be the caller's, plus `profileId`; optional body `{ pin }`. Returns `{ token }`, the profile token. |
@@ -41,6 +41,9 @@ All under `/api/auth/*`, anonymous unless noted. See `Vora.Api/Endpoints/AuthEnd
 | `POST /reset-password` | Body: `{ token, newPassword }`. 204 on success; 400 "Password must be at least 8 characters." or a generic "Invalid or expired" message. Rotates the account's security stamp. |
 | `POST /confirm-email-change` | Body: `{ token }`. Applies an email change asked for in account settings: 204, 409 if the address was taken meanwhile, 400 for a bad or expired (60 minutes) link. |
 | `POST /invitations/validate` | Body: `{ token }`. Returns `{ email, expiresAt }` for a valid invite, 404 otherwise. |
+| `GET /providers` | The sign-in providers that are turned on, `passwordSignInEnabled` and `registrationMode` (a string), for the login page. `docs/sso.md`. |
+| `POST /external/exchange` | Body: `{ code }`. Trades a one-time sign-in code for the tokens of a login (`AuthStrict`); 401 for a used, expired or unknown code. |
+| `GET /identities`, `DELETE /identities/{id}` | **Needs a token.** The caller's linked sign-in providers; unlinking the last way in is 409. |
 
 Admin-only endpoints (`AdminOnly` policy):
 
@@ -61,7 +64,7 @@ There are two parallel invitation systems and they coexist:
 
 - **`RegistrationTicket` (Invite PIN)**. Used when `RegistrationMode == SecretWord`. A 4-digit PIN shared by whoever gets it, valid 30 minutes, deleted when one person registers with it. `AuthManager.GenerateInviteCodeAsync` creates it; **Generate PIN** on the **Users & Access** page shows it.
 - **Per-email `InvitationTicket`** (email invitations). Independent of `RegistrationMode` — works regardless of the mode setting, including `Disabled`. Each invite is tied to one email address, requires the recipient's email to match at registration, and is consumed on use. Surfaced on the **Email Invitations** admin page and as the mode-3 action on Users & Access. Needs email enabled. See `docs/email.md`.
-- **Admin-created accounts**: `POST /api/users` (AdminOnly, `AuthManager.CreateUserAsAdminAsync`) adds an account with a starting password (8 characters or more), regardless of `RegistrationMode`. Same defaults and first profile as a registration; 409 for an email in use, 400 with a `detail` for bad input. Surfaced as **Add user** on **Users & Access**, which also shows the mode selector and the action that fits it (open → sign-up link, PIN → generate, invitation → send email).
+- **Admin-created accounts**: `POST /api/users` (AdminOnly, `AuthManager.CreateUserAsAdminAsync`) adds an account with a starting password (8 characters or more), regardless of `RegistrationMode`. With `ssoOnly: true` it adds the account without a password (`CreatePasswordlessUserAsAdminAsync`), which links on the person's first verified provider sign-in (`docs/sso.md`). Same defaults and first profile as a registration; 409 for an email in use, 400 with a `detail` for bad input. Surfaced as **Add user** on **Users & Access**, which also shows the mode selector and the action that fits it (open → sign-up link, PIN → generate, invitation → send email).
 
 Every new account gets a first profile named after it, flagged `UserProfile.IsAdmin` (the web keeps it as `is_profile_admin` and offers account management only to that profile; the server does not check it). Only the first-run claim makes an account a server admin; nothing promotes one afterwards.
 

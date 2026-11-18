@@ -46,6 +46,7 @@ public sealed class FullRestoreTests
         new AiPlaylistsBackupSection(db, references),
         new MediaRequestsBackupSection(db),
         new ExternalConnectionsBackupSection(db),
+        new ExternalIdentitiesBackupSection(db),
         new ChannelFavoritesBackupSection(db),
         new PodcastShowsBackupSection(db),
         new PodcastListeningBackupSection(db)

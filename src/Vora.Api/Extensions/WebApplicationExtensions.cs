@@ -119,6 +119,7 @@ public static class WebApplicationExtensions
         app.MapAdminNotificationEndpoints();
         app.MapArtworkEndpoints();
         app.MapAuthEndpoints();
+        app.MapExternalAuthEndpoints();
         app.MapCalendarEndpoints();
         app.MapCollectionEndpoints();
         app.MapCollectionArtworkEndpoints();

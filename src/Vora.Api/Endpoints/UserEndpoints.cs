@@ -75,7 +75,9 @@ public static class UserEndpoints
 
     private static async Task<IResult> CreateUserAsync([FromBody] AdminCreateUserRequest request, IAuthManager authManager)
     {
-        var result = await authManager.CreateUserAsAdminAsync(request.Email, request.Password, request.DisplayName);
+        var result = request.SsoOnly
+            ? await authManager.CreatePasswordlessUserAsAdminAsync(request.Email, request.DisplayName)
+            : await authManager.CreateUserAsAdminAsync(request.Email, request.Password, request.DisplayName);
         return result.Outcome switch
         {
             AdminCreateUserOutcome.Created when result.UserId is Guid id => Results.Ok(new AdminCreateUserResponse { Id = id }),

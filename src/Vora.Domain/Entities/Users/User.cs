@@ -8,6 +8,7 @@ public class User
     public string? Nickname { get; set; }
 
     public string PasswordHash { get; set; } = string.Empty;
+    public bool HasPassword { get; set; } = true;
 
     public string SecurityStamp { get; set; } = Guid.NewGuid().ToString("N");
 
@@ -33,4 +34,5 @@ public class User
 
     public virtual ICollection<UserProfile> Profiles { get; set; } = new List<UserProfile>();
     public virtual ICollection<UserProviderConnection> ProviderConnections { get; set; } = new List<UserProviderConnection>();
+    public virtual ICollection<UserExternalIdentity> ExternalIdentities { get; set; } = new List<UserExternalIdentity>();
 }

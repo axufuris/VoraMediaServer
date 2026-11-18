@@ -13,6 +13,9 @@ public class ServerSetting
 
     public RegistrationMode RegistrationMode { get; set; } = RegistrationMode.SecretWord;
 
+    public bool PasswordSignInEnabled { get; set; } = true;
+    public string? PublicBaseUrl { get; set; }
+
     // Which clock every scheduled time on this server is read against, as an
     // IANA id ("America/Chicago"). Empty means the container's own clock, which
     // is UTC unless a TZ environment variable says otherwise — so a server left
