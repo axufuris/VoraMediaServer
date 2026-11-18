@@ -260,4 +260,31 @@ public class SmartListManagerTests
         SmartListDefaults.All.Select(d => d.Id).Should().OnlyHaveUniqueItems();
         SmartListDefaults.All.Select(d => d.Source).Distinct().Should().HaveCount(Enum.GetValues<SmartListSource>().Length);
     }
+
+    [Fact]
+    public void The_defaults_are_numbered_from_the_top_without_a_gap_or_a_repeat()
+    {
+        SmartListDefaults.All.Select(d => d.DisplayOrder).Should().Equal(Enumerable.Range(0, SmartListDefaults.All.Count));
+    }
+
+    [Fact]
+    public void Popular_movies_and_shows_is_the_third_default()
+    {
+        var third = SmartListDefaults.All.Single(d => d.DisplayOrder == 2);
+
+        third.Key.Should().Be("popular-movies-shows");
+        third.Title.Should().Be("Popular Movies & Shows");
+        third.Source.Should().Be(SmartListSource.Library);
+        third.SortBy.Should().Be(SmartListSortBy.Popular);
+        third.FilterRulesJson.Should().Be("{\"mediaTypes\":[\"Movie\",\"TvShow\"]}");
+        third.ToEntity().ShowToFriends.Should().BeTrue();
+    }
+
+    [Fact]
+    public void Popular_is_added_after_every_sort_already_saved_so_stored_numbers_keep_their_meaning()
+    {
+        ((int)SmartListSortBy.MostWatched).Should().Be(5);
+        ((int)SmartListSortBy.TitleAsc).Should().Be(6);
+        ((int)SmartListSortBy.Popular).Should().Be(7);
+    }
 }

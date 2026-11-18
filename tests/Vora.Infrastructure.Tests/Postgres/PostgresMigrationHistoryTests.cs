@@ -1436,4 +1436,92 @@ public class PostgresMigrationHistoryTests(PostgresDatabase database) : IClassFi
         await using var again = legacy.NewContext();
         (await again.AuthProviders.AsNoTracking().SingleAsync(p => p.Id == provider.Id, cancellationToken)).LdapMailAttribute.Should().Be("mail");
     }
+
+    private static async Task<List<(string? Key, int Order, string Title)>> HomeRowsAsync(VoraDbContext db, CancellationToken cancellationToken) =>
+        (await db.Set<SmartList>().AsNoTracking().ToListAsync(cancellationToken))
+            .OrderBy(l => l.DisplayOrder)
+            .Select(l => (l.DefaultKey, l.DisplayOrder, l.Title))
+            .ToList();
+
+    [Fact]
+    public async Task A_database_on_the_ldap_migration_gains_the_popular_row_third_and_keeps_its_order()
+    {
+        Assert.SkipUnless(PostgresDatabase.IsConfigured, PostgresDatabase.SkipReason);
+        var cancellationToken = TestContext.Current.CancellationToken;
+        await using var legacy = new LegacyDatabase();
+        const string noRules = "{}";
+        var holidayId = Guid.NewGuid();
+
+        await legacy.BuildLdapProvidersStateAsync(async db =>
+        {
+            await db.Database.ExecuteSqlAsync(
+                $"DELETE FROM \"SmartLists\" WHERE \"DefaultKey\" = 'recent-recordings'",
+                cancellationToken);
+            await db.Database.ExecuteSqlAsync(
+                $"INSERT INTO \"SmartLists\" (\"Id\", \"Title\", \"FilterRulesJson\", \"SortBy\", \"MaxItems\", \"DisplayOrder\", \"ShowOnHomepage\", \"ShowToFriends\") VALUES ({holidayId}, 'Holiday Movies', {noRules}, 0, 20, 11, true, true)",
+                cancellationToken);
+        }, cancellationToken);
+
+        await using (var before = legacy.NewContext())
+        {
+            (await before.Database.GetPendingMigrationsAsync(cancellationToken)).Should().Equal(MigrationHistoryTests.ChangesSinceInitial);
+            (await HomeRowsAsync(before, cancellationToken)).Should().NotContain(r => r.Key == "popular-movies-shows");
+        }
+
+        await legacy.MigrateAsync(cancellationToken);
+
+        List<(string? Key, int Order, string Title)> rows;
+        await using (var after = legacy.NewContext())
+        {
+            (await after.Database.GetPendingMigrationsAsync(cancellationToken)).Should().BeEmpty();
+            rows = await HomeRowsAsync(after, cancellationToken);
+            rows.Select(r => r.Key).Should().Equal(
+                "recently-released-movies-episodes", "recently-added-movies-shows", "popular-movies-shows", "recently-released-movies",
+                "recently-added-movies", "recently-released-episodes", "recently-added-shows", "favorite-channels",
+                "recently-added-music", "new-podcast-episodes", "favorite-stations", null);
+            rows.Select(r => r.Order).Should().Equal(0, 1, 2, 3, 4, 5, 6, 7, 9, 10, 11, 12);
+            rows.Single(r => r.Key == "popular-movies-shows").Title.Should().Be("Popular Movies & Shows");
+            rows.Single(r => r.Key == null).Title.Should().Be("Holiday Movies");
+
+            var popular = await after.Set<SmartList>().AsNoTracking().SingleAsync(l => l.DefaultKey == "popular-movies-shows", cancellationToken);
+            popular.Id.Should().Be(SmartListDefaults.All.Single(d => d.Key == "popular-movies-shows").Id);
+            popular.Source.Should().Be(SmartListSource.Library);
+            popular.SortBy.Should().Be(SmartListSortBy.Popular);
+            popular.MaxItems.Should().Be(20);
+            popular.FilterRulesJson.Should().Be("{\"mediaTypes\":[\"Movie\",\"TvShow\"]}");
+            popular.ShowOnHomepage.Should().BeTrue();
+            popular.ShowToFriends.Should().BeTrue();
+
+            await after.Database.ExecuteSqlAsync($"DELETE FROM \"__EFMigrationsHistory\" WHERE \"MigrationId\" = {MigrationHistoryTests.ChangesSinceInitial}", cancellationToken);
+        }
+
+        await legacy.MigrateAsync(cancellationToken);
+
+        await using var again = legacy.NewContext();
+        (await HomeRowsAsync(again, cancellationToken)).Should().Equal(rows);
+    }
+
+    [Fact]
+    public async Task A_database_whose_history_already_holds_a_later_fold_in_is_not_given_the_popular_row_again()
+    {
+        Assert.SkipUnless(PostgresDatabase.IsConfigured, PostgresDatabase.SkipReason);
+        var cancellationToken = TestContext.Current.CancellationToken;
+        await using var legacy = new LegacyDatabase();
+        const string laterFoldIn = "20261201000000_ChangesSinceInitial";
+
+        await legacy.BuildLdapProvidersStateAsync(_ => Task.CompletedTask, cancellationToken);
+        await using (var before = legacy.NewContext())
+        {
+            await before.Database.ExecuteSqlAsync(
+                $"UPDATE \"__EFMigrationsHistory\" SET \"MigrationId\" = {laterFoldIn} WHERE \"MigrationId\" = {LegacyDatabase.LdapProvidersMigration}",
+                cancellationToken);
+        }
+
+        await legacy.MigrateAsync(cancellationToken);
+
+        await using var after = legacy.NewContext();
+        var rows = await HomeRowsAsync(after, cancellationToken);
+        rows.Should().NotContain(r => r.Key == "popular-movies-shows");
+        rows.Select(r => r.Order).Should().Equal(Enumerable.Range(0, 11));
+    }
 }
