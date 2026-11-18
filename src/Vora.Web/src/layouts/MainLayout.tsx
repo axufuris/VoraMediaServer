@@ -129,7 +129,6 @@ export default function MainLayout() {
     const [navItems, setNavItems] = useState<NavItem[]>([]);
     const [navLoaded, setNavLoaded] = useState(false);
     const [isEditingNav, setIsEditingNav] = useState(false);
-    const [showUnpinned, setShowUnpinned] = useState(false);
 
     const [isServerManagerOpen, setIsServerManagerOpen] = useState(false);
     const [isPhoneNavOpen, setIsPhoneNavOpen] = useState(false);
@@ -375,7 +374,6 @@ export default function MainLayout() {
 
     const gatedNavItems = navItems.filter(i => isNavItemEnabled(i, flags));
     const pinnedItems = gatedNavItems.filter(i => i.isPinned);
-    const unpinnedItems = gatedNavItems.filter(i => !i.isPinned);
 
     return (
         <div
@@ -395,11 +393,8 @@ export default function MainLayout() {
                 <MainLayoutSidebar
                     navItems={gatedNavItems}
                     pinnedItems={pinnedItems}
-                    unpinnedItems={unpinnedItems}
                     isEditingNav={isEditingNav}
-                    showUnpinned={showUnpinned}
                     onToggleEditNav={setIsEditingNav}
-                    onToggleShowUnpinned={() => setShowUnpinned(!showUnpinned)}
                     onMoveItem={moveItem}
                     onTogglePin={togglePin}
                     collapsed={isSidebarCollapsed}
