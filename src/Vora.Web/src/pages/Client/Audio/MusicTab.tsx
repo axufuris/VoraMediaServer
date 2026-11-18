@@ -15,6 +15,8 @@ import PageHeader from '../../../components/Client/Primitives/PageHeader';
 import Tabs from '../../../components/Client/Primitives/Tabs';
 import MusicSearchToggle from '../../../components/Audio/MusicSearchToggle';
 import PlaylistsPage from '../Playlists/PlaylistsPage';
+import PlaylistDetailsPage from '../Playlists/PlaylistDetailsPage';
+import SmartPlaylistDetailsPage from '../Playlists/SmartPlaylistDetailsPage';
 
 import { type MusicNavState, parseMusicNavState } from './Music/musicNavState';
 import { MUSIC_SUB_TABS, musicSubTabLabel, readMusicSubTab, saveMusicSubTab, type MusicSubTab } from './Music/musicSubTab';
@@ -152,6 +154,38 @@ export default function MusicTab() {
     const navRef = useRef(nav);
     navRef.current = nav;
     const syncedHistoryKey = useRef<string | null>(null);
+
+    const [openedPlaylist, setOpenedPlaylist] = useState<{ id: string; name: string } | null>(null);
+    const [playlistsRefresh, setPlaylistsRefresh] = useState(0);
+    const reloadAiPlaylists = aiPlaylists.reload;
+
+    // A playlist opens inside the tab the way a mix does, whichever list it was
+    // picked from (Playlists, For You, a new one just made, a saved copy).
+    const openPlaylist = useCallback((kind: 'Playlist' | 'SmartPlaylist', id: string, savedCopy = false) => {
+        updateNav({ view: kind === 'Playlist' ? 'playlist' : 'smartPlaylist', playlistId: id, savedCopy });
+    }, [updateNav]);
+
+    const handlePlaylistLoaded = useCallback((name: string) => {
+        const id = navRef.current.playlistId;
+        if (!id) return;
+        setOpenedPlaylist(prev => (prev && prev.id === id && prev.name === name ? prev : { id, name }));
+    }, []);
+
+    // The Playlists list stays mounted behind an open playlist, so what was made,
+    // renamed, shared or deleted there is read again on the way back.
+    const previousView = useRef(nav.view);
+    useEffect(() => {
+        const was = previousView.current;
+        previousView.current = nav.view;
+        const wasPlaylist = was === 'playlist' || was === 'smartPlaylist';
+        const isPlaylist = nav.view === 'playlist' || nav.view === 'smartPlaylist';
+        if (wasPlaylist && !isPlaylist) {
+            queueMicrotask(() => {
+                setPlaylistsRefresh(n => n + 1);
+                reloadAiPlaylists();
+            });
+        }
+    }, [nav.view, reloadAiPlaylists]);
 
     useEffect(() => {
         if (syncedHistoryKey.current === location.key) return;
@@ -696,6 +730,12 @@ export default function MusicTab() {
                     <span className="text-[var(--vora-accent-text)] font-bold truncate max-w-xs" title={currentMix.name}>{currentMix.name}</span>
                 </>
             )}
+            {(nav.view === 'playlist' || nav.view === 'smartPlaylist') && openedPlaylist && openedPlaylist.id === nav.playlistId && (
+                <>
+                    <span className="text-[var(--vora-text-disabled)]">/</span>
+                    <span className="text-[var(--vora-accent-text)] font-bold truncate max-w-xs" title={openedPlaylist.name}>{openedPlaylist.name}</span>
+                </>
+            )}
             {nav.view === 'recap' && (
                 <>
                     <span className="text-[var(--vora-text-disabled)]">/</span>
@@ -859,10 +899,7 @@ export default function MusicTab() {
                         aiPlaylists={aiPlaylists.data}
                         moods={moods}
                         updateNav={updateNav}
-                        openPlaylist={(kind, id) => {
-                            const path = kind === 'Playlist' ? `playlist/${id}` : `smart-playlist/${id}`;
-                            navigate(serverId ? `/server/${serverId}/${path}` : `/${path}`);
-                        }}
+                        openPlaylist={openPlaylist}
                         playArtistTrackList={playArtistTrackList}
                         startStationRadio={startStationRadio}
                         deleteStation={deleteStation}
@@ -885,7 +922,7 @@ export default function MusicTab() {
                         onOpenAlbum={(album) => updateNav({ view: 'album', albumId: album.id, artistId: album.artistId })}
                     />
                 )}
-                {subTab === 'playlists' && <PlaylistsPage embedded lockedType="music" />}
+                {subTab === 'playlists' && <PlaylistsPage embedded lockedType="music" onOpenPlaylist={openPlaylist} refreshKey={playlistsRefresh} />}
             </div>
 
             {!searchActive && nav.view !== 'root' && (
@@ -970,6 +1007,7 @@ export default function MusicTab() {
             {nav.view === 'mix' && (
                 <MusicMixView
                     serverId={serverId}
+                    onOpenSaved={id => openPlaylist('Playlist', id, true)}
                     onRegenerated={() => {
                         aiPlaylists.reload();
                         setRefreshSeq(n => n + 1);
@@ -984,6 +1022,34 @@ export default function MusicTab() {
                     toggleShuffle={toggleShuffle}
                     playMixFromIndex={playMixFromIndex}
                     formatDuration={formatDuration}
+                />
+            )}
+
+            {nav.view === 'playlist' && nav.playlistId && (
+                <PlaylistDetailsPage
+                    key={nav.playlistId}
+                    host={{
+                        playlistId: nav.playlistId,
+                        savedCopy: nav.savedCopy ?? false,
+                        onLoaded: handlePlaylistLoaded,
+                        onDeleted: () => updateNav({ view: 'root' }),
+                        onOpenCopy: copyId => openPlaylist('Playlist', copyId, true),
+                        onMissing: () => updateNav({ view: 'root' }),
+                    }}
+                />
+            )}
+
+            {nav.view === 'smartPlaylist' && nav.playlistId && (
+                <SmartPlaylistDetailsPage
+                    key={nav.playlistId}
+                    host={{
+                        playlistId: nav.playlistId,
+                        savedCopy: nav.savedCopy ?? false,
+                        onLoaded: handlePlaylistLoaded,
+                        onDeleted: () => updateNav({ view: 'root' }),
+                        onOpenCopy: copyId => openPlaylist('SmartPlaylist', copyId, true),
+                        onMissing: () => updateNav({ view: 'root' }),
+                    }}
                 />
             )}
 

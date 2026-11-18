@@ -1,4 +1,4 @@
-export type MusicView = 'root' | 'artist' | 'album' | 'likes' | 'top' | 'mix' | 'recap' | 'genres' | 'genre' | 'mood';
+export type MusicView = 'root' | 'artist' | 'album' | 'likes' | 'top' | 'mix' | 'recap' | 'genres' | 'genre' | 'mood' | 'playlist' | 'smartPlaylist';
 
 export interface MusicNavState {
     view: MusicView;
@@ -8,9 +8,11 @@ export interface MusicNavState {
     year?: number;
     genre?: string;
     mood?: string;
+    playlistId?: string;
+    savedCopy?: boolean;
 }
 
-const MUSIC_VIEWS: readonly MusicView[] = ['root', 'artist', 'album', 'likes', 'top', 'mix', 'recap', 'genres', 'genre', 'mood'];
+const MUSIC_VIEWS: readonly MusicView[] = ['root', 'artist', 'album', 'likes', 'top', 'mix', 'recap', 'genres', 'genre', 'mood', 'playlist', 'smartPlaylist'];
 
 // Stored state can predate a rename (the hub used to be the 'artists' view), so
 // anything unrecognised lands back on the sub-tab root instead of a blank page.
@@ -18,6 +20,8 @@ export function parseMusicNavState(raw: string): MusicNavState {
     try {
         const parsed = JSON.parse(raw) as Partial<MusicNavState>;
         if (parsed && typeof parsed.view === 'string' && MUSIC_VIEWS.includes(parsed.view)) {
+            const isPlaylistView = parsed.view === 'playlist' || parsed.view === 'smartPlaylist';
+            if (isPlaylistView && !parsed.playlistId) return { view: 'root' };
             return parsed as MusicNavState;
         }
     } catch {

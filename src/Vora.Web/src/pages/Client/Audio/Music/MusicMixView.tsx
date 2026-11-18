@@ -37,6 +37,7 @@ const mixKicker = (kind?: string): string => {
 
 interface MusicMixViewProps {
     serverId?: string;
+    onOpenSaved?: (playlistId: string) => void;
     onRegenerated: () => void;
     onDeleted: () => void;
     isLoading: boolean;
@@ -49,6 +50,7 @@ interface MusicMixViewProps {
 
 export default function MusicMixView({
     serverId,
+    onOpenSaved,
     onRegenerated,
     onDeleted,
     isLoading,
@@ -138,7 +140,7 @@ export default function MusicMixView({
                                 <ShuffleIcon size={16} />
                                 Shuffle
                             </button>
-                            <SaveMixButton mixId={currentMix.id} />
+                            <SaveMixButton mixId={currentMix.id} onSaved={onOpenSaved} />
                             {canRegenerate && (
                                 <button
                                     type="button"

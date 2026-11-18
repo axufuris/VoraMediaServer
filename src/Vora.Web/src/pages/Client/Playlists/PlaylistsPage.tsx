@@ -34,12 +34,27 @@ interface PlaylistsPageProps {
     // Pins the list to one media type and hides the type filter, for hosts that
     // are already scoped (the Music page shows only music playlists).
     lockedType?: TypeFilter;
+    // Where a playlist opens. Left out, it goes to its own page; the Music tab
+    // passes this so a music playlist opens inside the tab, the way a mix does.
+    onOpenPlaylist?: (kind: 'Playlist' | 'SmartPlaylist', id: string) => void;
+    // Bumped by a host that keeps this list mounted while a playlist is open in
+    // front of it, so one made, renamed or deleted there shows on the way back.
+    refreshKey?: number;
 }
 
-export default function PlaylistsPage({ embedded = false, lockedType }: PlaylistsPageProps) {
+export default function PlaylistsPage({ embedded = false, lockedType, onOpenPlaylist, refreshKey = 0 }: PlaylistsPageProps) {
     const dialog = useDialog();
     const { serverId } = useParams<{ serverId?: string }>();
     const navigate = useNavigate();
+
+    const open = (kind: 'Playlist' | 'SmartPlaylist', id: string) => {
+        if (onOpenPlaylist) {
+            onOpenPlaylist(kind, id);
+            return;
+        }
+        const path = kind === 'Playlist' ? 'playlist' : 'smart-playlist';
+        navigate(serverId ? `/server/${serverId}/${path}/${id}` : `/${path}/${id}`);
+    };
     const [playlists, setPlaylists] = useState<PlaylistSummaryVM[]>([]);
     const [smartPlaylists, setSmartPlaylists] = useState<SmartPlaylistSummaryVM[]>([]);
     const [shared, setShared] = useState<SharedPlaylistsVM>({ manual: [], smart: [] });
@@ -67,6 +82,7 @@ export default function PlaylistsPage({ embedded = false, lockedType }: Playlist
     };
 
     useEffect(() => {
+        let cancelled = false;
         Promise.all([
             playlistService.getPlaylists(serverId),
             smartPlaylistService.list(serverId).catch(() => [] as SmartPlaylistSummaryVM[]),
@@ -74,11 +90,13 @@ export default function PlaylistsPage({ embedded = false, lockedType }: Playlist
             // still shows the profile its own.
             playlistService.getShared(serverId).catch((): SharedPlaylistsVM => ({ manual: [], smart: [] }))
         ]).then(([pls, smarts, sharedByOthers]) => {
+            if (cancelled) return;
             setPlaylists(pls);
             setSmartPlaylists(smarts);
             setShared(sharedByOthers);
-        }).finally(() => setLoading(false));
-    }, [serverId]);
+        }).finally(() => { if (!cancelled) setLoading(false); });
+        return () => { cancelled = true; };
+    }, [serverId, refreshKey]);
 
     const handleManualCreate = async (e: React.SyntheticEvent) => {
         e.preventDefault();
@@ -87,7 +105,7 @@ export default function PlaylistsPage({ embedded = false, lockedType }: Playlist
         setIsSubmitting(true);
         try {
             const { id } = await playlistService.createPlaylist(newName, newDescription, manualCreatorType, serverId);
-            navigate(serverId ? `/server/${serverId}/playlist/${id}` : `/playlist/${id}`);
+            open('Playlist', id);
         } catch (error) {
             console.error('Failed to create playlist:', error);
             await dialog.alert('Failed to create playlist. Check console for details.');
@@ -199,8 +217,8 @@ export default function PlaylistsPage({ embedded = false, lockedType }: Playlist
                     <SharedPlaylists
                         manual={visibleSharedManual}
                         smart={visibleSharedSmart}
-                        openManual={id => navigate(serverId ? `/server/${serverId}/playlist/${id}` : `/playlist/${id}`)}
-                        openSmart={id => navigate(serverId ? `/server/${serverId}/smart-playlist/${id}` : `/smart-playlist/${id}`)}
+                        openManual={id => open('Playlist', id)}
+                        openSmart={id => open('SmartPlaylist', id)}
                     />
                 ) : (
                 <>
@@ -214,7 +232,7 @@ export default function PlaylistsPage({ embedded = false, lockedType }: Playlist
                                 <SmartPlaylistTile
                                     key={sp.id}
                                     playlist={sp}
-                                    onOpen={() => navigate(serverId ? `/server/${serverId}/smart-playlist/${sp.id}` : `/smart-playlist/${sp.id}`)}
+                                    onOpen={() => open('SmartPlaylist', sp.id)}
                                 />
                             ))}
                         </div>
@@ -247,7 +265,7 @@ export default function PlaylistsPage({ embedded = false, lockedType }: Playlist
                                     item={{ type: 'Playlist', title: p.name, itemCount: p.itemCount, mediaTypeLabel: p.mediaType !== 'Mixed' ? p.mediaType : null, sharedByYou: p.isShared }}
                                     shape="square"
                                     {...playlistTileArt(p)}
-                                    onClick={() => navigate(serverId ? `/server/${serverId}/playlist/${p.id}` : `/playlist/${p.id}`)}
+                                    onClick={() => open('Playlist', p.id)}
                                     onDelete={(e) => handleDelete(e, p.id, p.name)}
                                     fill
                                 />
@@ -313,7 +331,7 @@ export default function PlaylistsPage({ embedded = false, lockedType }: Playlist
                     onSaved={(summary) => {
                         setSmartEditorType(null);
                         loadSmart();
-                        navigate(serverId ? `/server/${serverId}/smart-playlist/${summary.id}` : `/smart-playlist/${summary.id}`);
+                        open('SmartPlaylist', summary.id);
                     }}
                 />
             )}

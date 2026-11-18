@@ -105,7 +105,7 @@ Field-kind metadata in `SmartPlaylistEditorModal.tsx` controls which operators a
   episodes?: SmartPlaylistEpisodeVM[] }
 ```
 
-The frontend detail page renders three different views depending on `mediaType`: a track table (with the music player flow), a poster grid for movies, or an episode list. Clicking a movie/episode navigates to the media detail page (existing playback path); clicking a track queues the whole list via the music player.
+The frontend detail page renders three different views depending on `mediaType`: a track table (with the music player flow), a poster grid for movies, or an episode list. Clicking a movie/episode navigates to the media detail page (existing playback path); clicking a track queues the whole list via the music player. In the Music tab these pages are hosted in place and a music playlist never leaves `/music` (`docs/music-and-audio.md`, Music page).
 
 ## Playlists page UX
 
