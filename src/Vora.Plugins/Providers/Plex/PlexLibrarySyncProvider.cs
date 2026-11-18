@@ -344,11 +344,33 @@ public class PlexLibrarySyncProvider : ILibrarySyncProvider
         cancellationToken.ThrowIfCancellationRequested();
         var summary = string.Join("; ", tried);
         _logger.LogWarning("Could not reach the Plex server {ServerName}. Tried {Addresses}.", server.Name, summary);
-        var refusedHint = tried.Any(t => t.Contains("Plex refused this account", StringComparison.Ordinal))
-            ? " The server did answer but refused this Plex account, so check that the account can see this server (the server's owner has to share it with them)."
-            : string.Empty;
+        var refusedHint = string.Empty;
+        if (tried.Any(t => t.Contains("Plex refused this account", StringComparison.Ordinal)))
+        {
+            var who = await NameTheSignedInAccountAsync(accessToken, clientIdentifier, cancellationToken);
+            _logger.LogWarning(
+                "The Plex server {ServerName} ({Ownership}) answered but refused the Plex account {Account}; Vora sent {TokenKind}.",
+                server.Name,
+                server.IsOwned ? "owned by this account" : $"shared by {server.OwnerName ?? "another account"}",
+                who ?? "(unknown)",
+                string.IsNullOrWhiteSpace(server.AccessToken) ? "the account's sign-in token (plex.tv listed no server token)" : "the server's own access token");
+            refusedHint = $" The server did answer but refused the Plex account {(who is null ? "you signed in with" : $"\"{who}\"")}, so check that this account can see this server (the server's owner has to share it with them).";
+        }
         throw new RemoteServerUnreachableException(
             $"Vora couldn't reach the Plex server \"{server.Name}\". Tried {summary}. The Vora server has to be able to open one of these addresses; if Vora runs in Docker, try them from inside the container.{refusedHint}");
+    }
+
+    private async Task<string?> NameTheSignedInAccountAsync(string accessToken, string clientIdentifier, CancellationToken cancellationToken)
+    {
+        try
+        {
+            var account = await TryFetchOwnerAccountAsync(_httpClientFactory.CreateClient(HttpClientName), accessToken, clientIdentifier, cancellationToken);
+            return account?.DisplayName;
+        }
+        catch (Exception) when (!cancellationToken.IsCancellationRequested)
+        {
+            return null;
+        }
     }
 
     private static async Task<string?> WhyUnreachableAsync(HttpClient client, string baseUri, string accessToken, string clientIdentifier, CancellationToken cancellationToken)

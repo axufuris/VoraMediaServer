@@ -31,7 +31,10 @@ public class PlexSharedServerTests
         protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
         {
             var host = request.RequestUri?.Host ?? string.Empty;
-            if (host == "plex.tv") return Task.FromResult(Json(resources));
+            if (host == "plex.tv")
+            {
+                return Task.FromResult(Json(request.RequestUri?.AbsolutePath.EndsWith("/user", StringComparison.Ordinal) == true ? """{"uuid":"friend-uuid","title":"Friend"}""" : resources));
+            }
             if (host != LocalIp)
             {
                 return Task.FromException<HttpResponseMessage>(new HttpRequestException(HttpRequestError.ConnectionError, "Connection refused"));
@@ -84,7 +87,7 @@ public class PlexSharedServerTests
 
         var error = (await find.Should().ThrowAsync<RemoteServerUnreachableException>()).Which;
         error.Message.Should().Contain("Plex refused this account, status 401")
-            .And.Contain("The server did answer but refused this Plex account")
+            .And.Contain("The server did answer but refused the Plex account \"Friend\"")
             .And.Contain("has to share it with them");
     }
 
