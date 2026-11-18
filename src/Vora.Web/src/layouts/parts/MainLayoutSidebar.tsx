@@ -8,11 +8,8 @@ import { reorderListProps, reorderRowProps, useTouchReorder } from '../../hooks/
 interface MainLayoutSidebarProps {
     navItems: NavItem[];
     pinnedItems: NavItem[];
-    unpinnedItems: NavItem[];
     isEditingNav: boolean;
-    showUnpinned: boolean;
     onToggleEditNav: (editing: boolean) => void;
-    onToggleShowUnpinned: () => void;
     onMoveItem: (from: number, to: number) => void;
     onTogglePin: (id: string, itemServerId?: string) => void;
     collapsed: boolean;
@@ -27,11 +24,8 @@ const navItemStyle = (isActive: boolean): React.CSSProperties => ({
 export default function MainLayoutSidebar({
     navItems,
     pinnedItems,
-    unpinnedItems,
     isEditingNav,
-    showUnpinned,
     onToggleEditNav,
-    onToggleShowUnpinned,
     onMoveItem,
     onTogglePin,
     collapsed,
@@ -152,46 +146,6 @@ export default function MainLayoutSidebar({
                                     </NavLink>
                                 );
                             })}
-
-                            {unpinnedItems.length > 0 && (
-                                <div className="mt-4">
-                                    <button
-                                        type="button"
-                                        onClick={onToggleShowUnpinned}
-                                        aria-expanded={showUnpinned}
-                                        title={folded ? 'More' : undefined}
-                                        className={`flex w-full cursor-pointer items-center gap-2 rounded-md px-3 py-2 text-sm font-medium transition-colors vora-row-interactive hover:text-[var(--vora-text-primary)] ${foldedLink}`}
-                                        style={{ color: 'var(--vora-text-muted)' }}
-                                    >
-                                        <svg className={`h-4 w-4 transition-transform ${showUnpinned ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
-                                            <polyline points="6 9 12 15 18 9" />
-                                        </svg>
-                                        <span className={foldedLabel}>More</span>
-                                    </button>
-
-                                    {showUnpinned && (
-                                        <div className={`ml-4 mt-1 space-y-1 border-l-2 border-[var(--vora-border-subtle)] pl-4 ${folded ? 'md:ml-0 md:border-l-0 md:pl-0' : ''}`}>
-                                            {unpinnedItems.map(item => {
-                                                const icon = renderNavIconOrDefault(item.type === 'library' ? item.mediaType : item.id, 'w-5 h-5');
-                                                return (
-                                                    <NavLink
-                                                        key={`${item.serverId || 'local'}-${item.id}`}
-                                                        to={item.path}
-                                                        title={folded ? item.title : undefined}
-                                                        className={({ isActive }) => `flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors ${foldedLink} ${isActive ? '' : 'hover:text-[var(--vora-text-secondary)]'}`}
-                                                        style={({ isActive }) => ({
-                                                            color: isActive ? 'var(--vora-accent-text)' : 'var(--vora-text-disabled)',
-                                                        })}
-                                                    >
-                                                        {icon}
-                                                        <span className={foldedLabel}>{item.title}</span>
-                                                    </NavLink>
-                                                );
-                                            })}
-                                        </div>
-                                    )}
-                                </div>
-                            )}
                         </div>
                     </div>
 

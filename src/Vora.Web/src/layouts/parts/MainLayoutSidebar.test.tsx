@@ -13,11 +13,8 @@ const renderEditor = (onMoveItem = vi.fn()) => {
             <MainLayoutSidebar
                 navItems={items}
                 pinnedItems={items}
-                unpinnedItems={[]}
                 isEditingNav
-                showUnpinned={false}
                 onToggleEditNav={vi.fn()}
-                onToggleShowUnpinned={vi.fn()}
                 onMoveItem={onMoveItem}
                 onTogglePin={vi.fn()}
                 collapsed={false}
@@ -35,11 +32,8 @@ const renderSidebar = ({ collapsed, editing = false, onToggleCollapsed = vi.fn()
             <MainLayoutSidebar
                 navItems={[...items, unpinned]}
                 pinnedItems={items}
-                unpinnedItems={[unpinned]}
                 isEditingNav={editing}
-                showUnpinned
                 onToggleEditNav={vi.fn()}
-                onToggleShowUnpinned={vi.fn()}
                 onMoveItem={vi.fn()}
                 onTogglePin={vi.fn()}
                 collapsed={collapsed}
@@ -115,12 +109,29 @@ describe('Edit Navigation', () => {
     });
 });
 
+describe('Unpinned entries', () => {
+    it('are not drawn in the sidebar, and there is no More section to open', () => {
+        renderSidebar({ collapsed: false });
+
+        expect(screen.queryByRole('link', { name: 'Podcasts' })).toBeNull();
+        expect(screen.queryByRole('button', { name: 'More' })).toBeNull();
+        expect(screen.getByRole('link', { name: 'Shows' })).toBeInTheDocument();
+    });
+
+    it('are still listed in Edit Navigation so they can be pinned again', () => {
+        renderSidebar({ collapsed: false, editing: true });
+
+        expect(screen.getByTestId('nav-row-podcasts')).toBeInTheDocument();
+        expect(screen.getByRole('button', { name: 'Pin' })).toBeInTheDocument();
+    });
+});
+
 describe('Collapsing the sidebar', () => {
     it('folds to its icons from tablet width up, keeping every link named and titled', () => {
         const { panel } = renderSidebar({ collapsed: true });
 
         expect(panel.className).toContain('md:w-[4.5rem]');
-        for (const name of ['Home', 'Music', 'Movies', 'Podcasts']) {
+        for (const name of ['Home', 'Music', 'Movies', 'Shows']) {
             const link = screen.getByRole('link', { name });
             expect(link).toHaveAttribute('title', name);
             expect(link.querySelector('.md\\:sr-only')).not.toBeNull();
