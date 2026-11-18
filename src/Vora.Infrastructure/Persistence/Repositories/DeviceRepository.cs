@@ -17,6 +17,9 @@ public class DeviceRepository(VoraDbContext context) : IDeviceRepository
     public Task<ClientDevice?> GetDeviceByIdAsync(Guid id) =>
         context.ClientDevices.FindAsync(id).AsTask();
 
+    public Task<bool> IsDeviceIdBlockedAsync(string deviceId) =>
+        context.ClientDevices.AsNoTracking().AnyAsync(d => d.DeviceId == deviceId && d.IsBlocked);
+
     public async Task UpdateDeviceAsync(ClientDevice device)
     {
         context.ClientDevices.Update(device);

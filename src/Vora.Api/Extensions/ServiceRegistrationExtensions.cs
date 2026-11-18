@@ -170,6 +170,17 @@ public static class ServiceRegistrationExtensions
                         QueueLimit = 0,
                         AutoReplenishment = true
                     }));
+
+            options.AddPolicy(VoraRateLimitPolicies.AuthPoll, httpContext =>
+                RateLimitPartition.GetFixedWindowLimiter(
+                    partitionKey: GetClientPartitionKey(httpContext),
+                    factory: _ => new FixedWindowRateLimiterOptions
+                    {
+                        PermitLimit = 90,
+                        Window = TimeSpan.FromMinutes(1),
+                        QueueLimit = 0,
+                        AutoReplenishment = true
+                    }));
         });
 
         return services;
@@ -406,6 +417,8 @@ public static class ServiceRegistrationExtensions
         services.AddScoped<Vora.Application.Auth.External.IExternalSignInService, Vora.Application.Auth.External.ExternalSignInService>();
         services.AddScoped<Vora.Application.Auth.External.IExternalIdentityManager, Vora.Application.Auth.External.ExternalIdentityManager>();
         services.AddSingleton<Vora.Application.Auth.External.IExternalSignInCodeStore, Vora.Application.Auth.External.ExternalSignInCodeStore>();
+        services.AddSingleton<Vora.Application.Auth.Pairing.IDevicePairingStore, Vora.Application.Auth.Pairing.DevicePairingStore>();
+        services.AddScoped<Vora.Application.Auth.Pairing.IDevicePairingManager, Vora.Application.Auth.Pairing.DevicePairingManager>();
         services.AddSingleton<Vora.Application.Auth.External.Oidc.IOidcLoginStateStore, Vora.Application.Auth.External.Oidc.OidcLoginStateStore>();
         services.AddSingleton<Vora.Application.Auth.External.Oidc.IExternalPendingStore, Vora.Application.Auth.External.Oidc.ExternalPendingStore>();
         services.AddScoped<Vora.Application.Auth.External.Oidc.IOidcProviderClient, Vora.Application.Auth.External.Oidc.OidcProviderClient>();

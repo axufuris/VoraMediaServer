@@ -27,6 +27,7 @@ export const SessionKeys = {
     freshServerSetup: 'fresh_server_setup',
     setupGuidePrompted: (serverKey: string) => `setup_guide_prompted_${serverKey}`,
     newBuildReloadAt: 'new_build_reload_at',
+    postSignInRedirect: 'post_sign_in_redirect',
 } as const;
 
 export interface JwtPayload {

@@ -2,6 +2,7 @@ import { BrowserRouter, Routes, Route, Navigate, useParams, Outlet, useLocation 
 import { useEffect, Suspense, type ReactElement, type ReactNode } from 'react';
 import { serverVault } from './utils/serverVault';
 import { lazyPage } from './utils/newBuild';
+import { peekPostSignIn } from './utils/postSignInRedirect';
 import PageErrorBoundary from './components/Common/PageErrorBoundary';
 import { StorageKeys, getProfileIdFromToken } from './utils/storageKeys';
 import { getOrCreateDeviceId } from './utils/deviceId';
@@ -35,6 +36,7 @@ const AdminPluginsPage = lazyPage(() => import('./pages/Admin/PluginsPage'));
 const AdminSettingsPage = lazyPage(() => import('./pages/Admin/SettingsPage'));
 const CreateLibrary = lazyPage(() => import('./pages/Admin/Libraries/CreateLibrary'));
 const AccountSettingsPage = lazyPage(() => import('./pages/Profile/AccountSettingsPage'));
+const LinkDevicePage = lazyPage(() => import('./pages/Auth/LinkDevicePage'));
 const AdminUserManagementPage = lazyPage(() => import('./pages/Admin/UserManagementPage'));
 const AdminInvitationsPage = lazyPage(() => import('./pages/Admin/InvitationsPage'));
 const AdminSignInProvidersPage = lazyPage(() => import('./pages/Admin/SignInProvidersPage'));
@@ -116,6 +118,7 @@ const ServerContextWrapper = () => {
 };
 
 const RequireAuth = ({ children }: { children: ReactElement }) => {
+    const location = useLocation();
     const servers = serverVault.getServers();
     const activeServer = serverVault.getActiveServer();
 
@@ -132,6 +135,11 @@ const RequireAuth = ({ children }: { children: ReactElement }) => {
     const profileToken = localStorage.getItem(StorageKeys.profileToken);
     if (!profileToken) {
         return <Navigate to="/profiles" replace />;
+    }
+
+    const resumeAt = location.pathname === '/' ? peekPostSignIn() : null;
+    if (resumeAt) {
+        return <Navigate to={resumeAt} replace />;
     }
 
     return children;
@@ -168,6 +176,7 @@ export default function App() {
                     <Route path="/reset-password" element={<ResetPasswordPage />} />
                     <Route path="/confirm-email" element={<ConfirmEmailPage />} />
                     <Route path="/profiles" element={<ProfileSelectionPage />} />
+                    <Route path="/link" element={<LinkDevicePage />} />
 
                     {/* CLIENT ROUTES */}
                     <Route path="/" element={<RequireAuth><MainLayout /></RequireAuth>}>

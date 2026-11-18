@@ -45,6 +45,7 @@ All under `/api/auth/*`, anonymous unless noted. See `Vora.Api/Endpoints/AuthEnd
 | `GET /providers` | The sign-in providers that are turned on, `passwordSignInEnabled` and `registrationMode` (a string), for the login page. `docs/sso.md`. |
 | `GET /oidc/{slug}/start`, `GET /oidc/{slug}/callback` | The OpenID Connect redirect flow; both answer 302 to the web app. `POST /oidc/{slug}/link` (needs a token) starts a link from Account settings. `GET /external/pending/{handle}`, `POST /external/complete` finish a sign-in that needs a step. `docs/sso.md`. |
 | `POST /external/exchange` | Body: `{ code }`. Trades a one-time sign-in code for the tokens of a login (`AuthStrict`); 401 for a used, expired or unknown code. |
+| `POST /device/start`, `POST /device/poll`, `GET /device/lookup`, `POST /device/approve`, `POST /device/deny` | Device pairing: a TV or app shows a code and the person approves it on `/link`. `start` and `poll` are anonymous; the rest need a token. `docs/device-pairing.md`. |
 | `GET /identities`, `DELETE /identities/{id}` | **Needs a token.** The caller's linked sign-in providers; unlinking the last way in is 409. |
 
 Admin-only endpoints (`AdminOnly` policy):
@@ -101,7 +102,7 @@ These are the canonical keys. Don't invent new ones in a vacuum.
 
 **`is_admin` is dead.** It is never written by any current code. If you find code reading `is_admin`, replace it with `is_server_admin`.
 
-`sessionStorage` is used for **pending pre-vault** state during the login/setup flow (`pending_server_url`, `pending_user_token`, `pending_user_id`, `pending_server_name`), for `fresh_server_setup` (set by the first-run claim so the first admin lands on the Setup Guide), and for `setup_guide_prompted_<serverId|local>`, which stops the Setup Guide pop-up asking twice in one browser session (see `docs/setup-guide.md`), and for `new_build_reload_at`, the time a tab last reloaded to pick up a new build, so a page that keeps failing to load reloads once rather than forever (see `docs/frontend-conventions.md`).
+`sessionStorage` is used for **pending pre-vault** state during the login/setup flow (`pending_server_url`, `pending_user_token`, `pending_user_id`, `pending_server_name`), for `fresh_server_setup` (set by the first-run claim so the first admin lands on the Setup Guide), and for `setup_guide_prompted_<serverId|local>`, which stops the Setup Guide pop-up asking twice in one browser session (see `docs/setup-guide.md`), for `post_sign_in_redirect`, the page a signed-out visitor was sent away from (the `/link` code page; ten minutes, `docs/device-pairing.md`), and for `new_build_reload_at`, the time a tab last reloaded to pick up a new build, so a page that keeps failing to load reloads once rather than forever (see `docs/frontend-conventions.md`).
 
 ## Times on the wire
 
