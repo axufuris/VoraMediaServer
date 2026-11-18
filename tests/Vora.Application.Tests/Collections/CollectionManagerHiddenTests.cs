@@ -80,6 +80,35 @@ public class CollectionManagerHiddenTests
     }
 
     [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public async Task Hiding_or_showing_a_collection_saves_only_that_and_tells_open_pages(bool hidden)
+    {
+        var collection = new Collection { Title = "John Wick Collection", Hidden = !hidden };
+        var notifier = Substitute.For<IClientNotifier>();
+        _repo.GetForUpdateAsync(collection.Id).Returns(collection);
+        var manager = new CollectionManager(_repo, Substitute.For<ITaskQueueManager>(), notifier, _calendar);
+
+        var found = await manager.SetHiddenAsync(collection.Id, hidden);
+
+        found.Should().BeTrue();
+        collection.Hidden.Should().Be(hidden);
+        await _repo.Received(1).UpdateCollectionAsync(collection);
+        await notifier.Received(1).NotifyCollectionUpdatedAsync(collection.Id);
+    }
+
+    [Fact]
+    public async Task Hiding_a_collection_that_is_gone_saves_nothing()
+    {
+        var id = Guid.NewGuid();
+        _repo.GetForUpdateAsync(id).Returns((Collection?)null);
+
+        (await Manager().SetHiddenAsync(id, true)).Should().BeFalse();
+
+        await _repo.DidNotReceive().UpdateCollectionAsync(Arg.Any<Collection>());
+    }
+
+    [Theory]
     [InlineData(null, false, false)]
     [InlineData(null, true, true)]
     [InlineData(true, false, true)]
