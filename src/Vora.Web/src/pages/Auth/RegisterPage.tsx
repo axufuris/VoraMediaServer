@@ -2,6 +2,8 @@ import { useState, useEffect, useMemo } from 'react';
 import { useNavigate, Link, useSearchParams } from 'react-router-dom';
 import { isAxiosError } from 'axios';
 import { authService } from '../../api/Auth/authService';
+import { externalSignInService, type SignInProvider, type SignInProviders } from '../../api/Auth/externalSignInService';
+import SignInProviderButtons, { OrDivider } from '../../components/Auth/SignInProviderButtons';
 import { StorageKeys, SessionKeys } from '../../utils/storageKeys';
 import AuthLayout from '../../layouts/AuthLayout';
 
@@ -22,6 +24,7 @@ export default function RegisterPage() {
     const [registrationMode, setRegistrationMode] = useState<number | null>(null);
     const [isProbing, setIsProbing] = useState(true);
     const [probeError, setProbeError] = useState('');
+    const [providers, setProviders] = useState<SignInProviders | null>(null);
 
     const [invitedEmail, setInvitedEmail] = useState<string | null>(null);
     const [inviteError, setInviteError] = useState<string | null>(null);
@@ -39,6 +42,7 @@ export default function RegisterPage() {
                 const status = await authService.probeServer(serverUrl);
                 setRegistrationMode(status.registrationMode);
                 sessionStorage.setItem(SessionKeys.pendingServerUrl, serverUrl);
+                externalSignInService.getProviders(serverUrl).then(setProviders).catch(() => setProviders(null));
 
                 if (inviteToken) {
                     try {
@@ -149,6 +153,13 @@ export default function RegisterPage() {
 
     const isInvited = invitedEmail !== null;
     const showSecretCode = !isInvited && registrationMode === 2;
+    const providerList = providers?.providers ?? [];
+    const hasProviders = providerList.length > 0;
+    const passwordRegistration = !hasProviders || providers?.passwordSignInEnabled !== false;
+
+    const chooseProvider = (provider: SignInProvider) => {
+        window.location.assign(externalSignInService.startUrl(serverUrl, provider.slug, inviteToken || undefined));
+    };
 
     return (
         <AuthLayout title="Create Account" subtitle={isInvited ? 'You were invited.' : 'Join the Vora server.'}>
@@ -165,6 +176,7 @@ export default function RegisterPage() {
                 </div>
             )}
 
+            {passwordRegistration && (
             <form onSubmit={handleRegister} className="space-y-5">
                 {isInvited && (
                     <div
@@ -233,6 +245,24 @@ export default function RegisterPage() {
                     {isSubmitting ? 'Creating account…' : 'Register'}
                 </button>
             </form>
+            )}
+
+            {hasProviders && (
+                <>
+                    {passwordRegistration && <OrDivider />}
+                    <SignInProviderButtons providers={providerList} serverUrl={serverUrl} onChoose={chooseProvider} />
+                    {showSecretCode && (
+                        <p className="mt-3 text-xs" style={{ color: 'var(--vora-text-muted)' }}>
+                            You'll be asked for the invite PIN after you sign in with a provider.
+                        </p>
+                    )}
+                    {isInvited && (
+                        <p className="mt-3 text-xs" style={{ color: 'var(--vora-text-muted)' }}>
+                            Sign in with the account that uses <span className="font-mono">{invitedEmail}</span> to accept your invitation.
+                        </p>
+                    )}
+                </>
+            )}
 
             <div className="mt-6 text-center text-sm" style={{ color: 'var(--vora-text-muted)' }}>
                 Already have an account? <Link to="/login" className="font-medium transition-colors hover:opacity-80" style={{ color: 'var(--vora-accent-text)' }}>Sign in</Link>

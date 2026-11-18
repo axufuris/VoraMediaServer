@@ -21,6 +21,8 @@ public class UserVM
     public long DvrStorageQuotaBytes { get; set; }
     public bool CanTimeshiftIptv { get; set; }
     public bool CanAddCustomPodcastFeeds { get; set; }
+    public bool HasPassword { get; set; } = true;
+    public List<string> SignInProviders { get; set; } = new();
 
     public IEnumerable<UserProfileVM> Profiles { get; set; } = new List<UserProfileVM>();
 
@@ -43,6 +45,11 @@ public class UserVM
             DvrStorageQuotaBytes = u.DvrStorageQuotaBytes,
             CanTimeshiftIptv = u.CanTimeshiftIptv,
             CanAddCustomPodcastFeeds = u.CanAddCustomPodcastFeeds,
+            HasPassword = u.HasPassword,
+            SignInProviders = u.ExternalIdentities
+                .Select(i => i.Provider == null ? string.Empty : i.Provider.DisplayName)
+                .OrderBy(name => name)
+                .ToList(),
             Profiles = u.Profiles.AsQueryable().Select(UserProfileVM.Projection).ToList()
         };
 }

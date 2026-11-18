@@ -15,6 +15,7 @@ import { musicService } from '../../api/Music/musicService';
 import ProviderAccessList from '../../components/Common/ProviderAccessList';
 import Spinner from '../../components/Common/Spinner';
 import PlexImportPanel from '../../components/LibraryMigration/PlexImportPanel';
+import LinkedSignIns from '../../components/Account/LinkedSignIns';
 import { errorDetail } from '../../utils/apiError';
 export default function AccountSettingsPage() {
     const { serverId } = useParams<{ serverId?: string }>();
@@ -208,6 +209,8 @@ export default function AccountSettingsPage() {
                     <button type="submit" className="bg-[var(--vora-bg-raised)] hover:bg-[var(--vora-bg-raised)] px-6 py-2 rounded-md font-bold transition-colors">Save Account Changes</button>
                 </form>
             </div>
+
+            <LinkedSignIns serverId={serverId} hasPassword={user.hasPassword ?? true} />
 
             <div className="bg-[var(--vora-bg-surface)] rounded-lg p-6 border border-[var(--vora-border-subtle)] shadow-[var(--vora-shadow-lg)]">
                 <h2 className="text-xl font-bold mb-4 border-b border-[var(--vora-border-subtle)] pb-2">Managed Profiles</h2>

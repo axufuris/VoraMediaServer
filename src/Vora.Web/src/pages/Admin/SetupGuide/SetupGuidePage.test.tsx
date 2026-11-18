@@ -53,6 +53,7 @@ vi.mock('../../../api/System/systemSettingsAdminService', () => ({
 vi.mock('../../../api/System/aiSettingsService', () => ({ aiSettingsService: { getStatus: mocks.getAiStatus, listModels: mocks.listAiModels } }));
 vi.mock('../../../api/System/emailAdminService', () => ({ emailAdminService: { getSettings: mocks.getEmailSettings, updateSettings: mocks.updateEmailSettings, sendTest: mocks.sendTestEmail } }));
 vi.mock('../../../api/System/remoteAccessService', () => ({ remoteAccessService: { getRemoteAccessStatus: mocks.getRemoteStatus, updateRemoteAccess: mocks.updateRemote } }));
+vi.mock('../../../api/Auth/signInProvidersAdminService', () => ({ signInProvidersAdminService: { list: () => Promise.resolve([]) } }));
 vi.mock('../../../api/System/backupsService', () => ({ backupsService: { getSettings: mocks.getBackupSettings, updateSettings: mocks.updateBackupSettings } }));
 vi.mock('../../../api/System/featureFlagsService', async importOriginal => ({
     ...(await importOriginal<typeof import('../../../api/System/featureFlagsService')>()),
@@ -267,6 +268,8 @@ describe('SetupGuidePage', () => {
         fireEvent.click(screen.getByRole('button', { name: 'Save and continue →' }));
 
         await waitFor(() => expect(mocks.updateRegistrationMode).toHaveBeenCalledWith(3, undefined));
+        expect(await screen.findByRole('heading', { name: 'Sign-in' })).toBeInTheDocument();
+        fireEvent.click(screen.getByRole('button', { name: 'Save and continue →' }));
         expect(await screen.findByRole('heading', { name: 'Email' })).toBeInTheDocument();
     });
 
@@ -277,6 +280,8 @@ describe('SetupGuidePage', () => {
         fireEvent.click(await screen.findByRole('switch', { name: 'Set up email too' }));
 
         expect(screen.getByRole('complementary', { name: 'Setup steps' })).toHaveTextContent('Email');
+        fireEvent.click(screen.getByRole('button', { name: 'Save and continue →' }));
+        expect(await screen.findByRole('heading', { name: 'Sign-in' })).toBeInTheDocument();
         fireEvent.click(screen.getByRole('button', { name: 'Save and continue →' }));
         expect(await screen.findByRole('heading', { name: 'Email' })).toBeInTheDocument();
         expect(mocks.updateRegistrationMode).not.toHaveBeenCalled();

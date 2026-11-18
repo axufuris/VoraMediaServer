@@ -18,6 +18,8 @@ export interface UserVM {
     dvrStorageQuotaBytes: number;
     canTimeshiftIptv: boolean;
     canAddCustomPodcastFeeds: boolean;
+    hasPassword?: boolean;
+    signInProviders?: string[];
     profiles: UserProfileVM[];
 }
 
@@ -49,6 +51,13 @@ export const userService = {
     // account gets a first profile named after it. 409 when the email is taken.
     createUser: async (email: string, displayName: string, password: string, serverId?: string): Promise<{ id: string }> => {
         const response = await apiClient.post<{ id: string }>('/users', { email, displayName, password }, { serverId });
+        return response.data;
+    },
+
+    // Admin only. An account with no password: the person signs in through a provider,
+    // and it links on their first verified sign-in with the same email.
+    createSsoOnlyUser: async (email: string, displayName: string, serverId?: string): Promise<{ id: string }> => {
+        const response = await apiClient.post<{ id: string }>('/users', { email, displayName, ssoOnly: true }, { serverId });
         return response.data;
     },
 

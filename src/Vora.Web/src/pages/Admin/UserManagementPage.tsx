@@ -1,5 +1,5 @@
 import { useEffect, useState, useCallback } from 'react';
-import { useParams } from 'react-router-dom';
+import { Link, useParams } from 'react-router-dom';
 import { libraryService, type LibrarySummary } from '../../api/Media/libraryService';
 import { iptvAdminService, type IptvPlaylistVM } from '../../api/Iptv/iptvAdminService';
 import UserAccessModal from '../../components/Admin/UserAccessModal';
@@ -11,6 +11,8 @@ import HealthBadge from '../../components/Admin/Primitives/HealthBadge';
 import AddUserModal from '../../components/Admin/Users/AddUserModal';
 import ClearViewingHistoryModal from '../../components/Admin/Users/ClearViewingHistoryModal';
 import SignUpCard from '../../components/Admin/Users/SignUpCard';
+import { resolveAdminPath } from '../../components/Admin/Shell/adminNavData';
+import { signInMethodsLine } from '../../components/Admin/Users/signInMethods';
 
 export default function UserManagementPage() {
     const dialog = useDialog();
@@ -75,9 +77,12 @@ export default function UserManagementPage() {
                 title="Users & Access"
                 description="Manage accounts, profiles, library permissions, and how new people sign up."
                 actions={
-                    <button type="button" onClick={() => setAddingUser(true)} className="vora-button-primary">
-                        Add user
-                    </button>
+                    <>
+                        <Link to={resolveAdminPath('/admin/sign-in-providers', serverId)} className="vora-button-secondary">Sign-in providers</Link>
+                        <button type="button" onClick={() => setAddingUser(true)} className="vora-button-primary">
+                            Add user
+                        </button>
+                    </>
                 }
             />
 
@@ -106,6 +111,9 @@ export default function UserManagementPage() {
                                                 {user.isAdmin && <HealthBadge tone="warn" showDot={false}>Admin</HealthBadge>}
                                             </div>
                                             <p className="text-xs text-[var(--vora-text-muted)] truncate">{user.email}</p>
+                                            <p className="text-[11px] text-[var(--vora-text-muted)] truncate" data-testid="sign-in-methods">
+                                                {signInMethodsLine(user)}
+                                            </p>
                                         </div>
                                     </div>
 

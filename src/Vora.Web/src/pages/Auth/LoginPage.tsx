@@ -3,6 +3,8 @@ import { useNavigate, Link } from 'react-router-dom';
 import { isAxiosError } from 'axios';
 import { serverVault } from '../../utils/serverVault';
 import { authService } from '../../api/Auth/authService';
+import { externalSignInService, type SignInProvider, type SignInProviders } from '../../api/Auth/externalSignInService';
+import SignInProviderButtons, { OrDivider } from '../../components/Auth/SignInProviderButtons';
 import { StorageKeys, SessionKeys } from '../../utils/storageKeys';
 import AuthLayout from '../../layouts/AuthLayout';
 
@@ -26,6 +28,8 @@ export default function LoginPage() {
     const [serverName, setServerName] = useState<string | null>(null);
     const [reachable, setReachable] = useState<boolean | null>(null);
     const [emailEnabled, setEmailEnabled] = useState(false);
+    const [providers, setProviders] = useState<SignInProviders | null>(null);
+    const [adminSignIn, setAdminSignIn] = useState(false);
 
     // Already signed in? Don't show the login form — send them where
     // RequireAuth would: home if a profile is active, else profile selection.
@@ -47,6 +51,7 @@ export default function LoginPage() {
                 setReachable(true);
                 setServerName(status.serverName || 'Vora Server');
                 setEmailEnabled(status.emailEnabled ?? false);
+                externalSignInService.getProviders(serverUrl).then(setProviders).catch(() => setProviders(null));
 
                 if (!status.isClaimed) {
                     sessionStorage.setItem(SessionKeys.pendingServerUrl, serverUrl);
@@ -123,36 +128,76 @@ export default function LoginPage() {
         }
     };
 
+    const providerList = providers?.providers ?? [];
+    const hasProviders = providerList.length > 0;
+    const passwordAllowed = !hasProviders || providers?.passwordSignInEnabled !== false;
+    const showPasswordForm = passwordAllowed || adminSignIn;
+
+    const chooseProvider = (provider: SignInProvider) => {
+        window.location.assign(externalSignInService.startUrl(serverUrl, provider.slug));
+    };
+
+    const providerButtons = hasProviders && (
+        <SignInProviderButtons providers={providerList} serverUrl={serverUrl} onChoose={chooseProvider} />
+    );
+
+    const unreachable = reachable === false && (
+        <div
+            className="text-sm font-medium p-3 rounded"
+            style={{
+                color: 'var(--vora-warning-text)',
+                background: 'var(--vora-warning-soft)',
+                border: '1px solid var(--vora-warning-500)',
+            }}
+        >
+            Could not reach the server at <span className="font-mono">{serverUrl}</span>. Make sure the Vora backend is running.
+        </div>
+    );
+
     return (
         <AuthLayout title="Vora" subtitle={serverName || 'Sign in'}>
-            <form onSubmit={handleLogin} className="space-y-5">
-                <h2 className="text-xl font-bold mb-2" style={{ color: 'var(--vora-text-primary)' }}>Sign In</h2>
+            {!passwordAllowed && (
+                <div className="space-y-5">
+                    <h2 className="text-xl font-bold mb-2" style={{ color: 'var(--vora-text-primary)' }}>Sign In</h2>
+                    {unreachable}
+                    {providerButtons}
+                    {!adminSignIn && (
+                        <button
+                            type="button"
+                            aria-expanded={false}
+                            onClick={() => setAdminSignIn(true)}
+                            className="block w-full cursor-pointer text-center text-xs font-medium transition-colors hover:opacity-80"
+                            style={{ color: 'var(--vora-text-muted)' }}
+                        >
+                            Admin sign-in
+                        </button>
+                    )}
+                </div>
+            )}
 
-                {reachable === false && (
-                    <div
-                        className="text-sm font-medium p-3 rounded"
-                        style={{
-                            color: 'var(--vora-warning-text)',
-                            background: 'var(--vora-warning-soft)',
-                            border: '1px solid var(--vora-warning-500)',
-                        }}
-                    >
-                        Could not reach the server at <span className="font-mono">{serverUrl}</span>. Make sure the Vora backend is running.
-                    </div>
+            {showPasswordForm && (
+            <form onSubmit={handleLogin} className={`space-y-5 ${passwordAllowed ? '' : 'mt-6'}`}>
+                {passwordAllowed && <h2 className="text-xl font-bold mb-2" style={{ color: 'var(--vora-text-primary)' }}>Sign In</h2>}
+                {!passwordAllowed && (
+                    <p className="text-xs" style={{ color: 'var(--vora-text-muted)' }}>
+                        Password sign-in is turned off for everyone except admins.
+                    </p>
                 )}
 
+                {passwordAllowed && unreachable}
+
                 <div>
-                    <label className="block text-sm font-medium mb-1" style={{ color: 'var(--vora-text-muted)' }}>Email</label>
-                    <input autoFocus type="email" required value={email} onChange={e => setEmail(e.target.value)} className="vora-input w-full" />
+                    <label htmlFor="login-email" className="block text-sm font-medium mb-1" style={{ color: 'var(--vora-text-muted)' }}>Email</label>
+                    <input id="login-email" autoFocus type="email" required value={email} onChange={e => setEmail(e.target.value)} className="vora-input w-full" />
                 </div>
                 <div>
                     <div className="flex items-baseline justify-between mb-1">
-                        <label className="block text-sm font-medium" style={{ color: 'var(--vora-text-muted)' }}>Password</label>
+                        <label htmlFor="login-password" className="block text-sm font-medium" style={{ color: 'var(--vora-text-muted)' }}>Password</label>
                         {emailEnabled && (
                             <Link to="/forgot-password" className="text-xs font-medium transition-colors hover:opacity-80" style={{ color: 'var(--vora-accent-text)' }}>Forgot password?</Link>
                         )}
                     </div>
-                    <input type="password" required value={password} onChange={e => setPassword(e.target.value)} className="vora-input w-full" />
+                    <input id="login-password" type="password" required value={password} onChange={e => setPassword(e.target.value)} className="vora-input w-full" />
                 </div>
 
                 {error && (
@@ -177,6 +222,14 @@ export default function LoginPage() {
                     </button>
                 </div>
             </form>
+            )}
+
+            {passwordAllowed && hasProviders && (
+                <>
+                    <OrDivider />
+                    {providerButtons}
+                </>
+            )}
 
             <div className="mt-6 text-center text-sm" style={{ color: 'var(--vora-text-muted)' }}>
                 Need an account on this server? <Link to="/register" className="font-medium transition-colors hover:opacity-80" style={{ color: 'var(--vora-accent-text)' }}>Register</Link>
