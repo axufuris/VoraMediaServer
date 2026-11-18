@@ -11,6 +11,7 @@ using Vora.Application.Libraries;
 using Vora.Application.Maintenance;
 using Vora.Application.Media;
 using Vora.Application.Metadata;
+using Vora.Application.Notifications;
 using Vora.Application.Posters;
 using Vora.Application.Recommendations;
 using Vora.Application.Tasks.Dtos;
@@ -48,7 +49,7 @@ public interface ITaskQueueManager
     void QueueResolveTvdbIds();
     void QueueMergeDuplicateShows();
     void QueueRemoveOrphanedMedia(string filePath);
-    void QueueCollectionChronologySync(Guid collectionId, string title);
+    void QueueCollectionChronologySync(Guid collectionId, string title, bool force = false);
     void QueueCollectionContentSync(Guid collectionId, string title);
     void QueueGeneratePosterOverlays(Guid mediaItemId);
     void QueueFullCollectionSync(Guid collectionId, string title, bool hasContentSync, bool hasChronologySort);
@@ -547,13 +548,24 @@ public class TaskQueueManager : ITaskQueueManager
         }, recipe: TaskRecipe.Of(nameof(QueueRemoveOrphanedMedia), new { filePath }));
     }
 
-    public void QueueCollectionChronologySync(Guid collectionId, string title)
+    public void QueueCollectionChronologySync(Guid collectionId, string title, bool force = false)
     {
         Enqueue($"Chronological Collection Sync: {title}", async (ct, sp) =>
         {
             var orderingService = sp.GetRequiredService<CollectionOrderingService>();
-            await orderingService.ApplyChronologicalOrderAsync(collectionId, cancellationToken: ct);
-        }, resourceKey: CollectionKey(collectionId), recipe: TaskRecipe.Of(nameof(QueueCollectionChronologySync), new { collectionId, title }));
+            try
+            {
+                await orderingService.ApplyChronologicalOrderAsync(collectionId, force, ct);
+            }
+            catch (Exception ex) when (force && ex is not OperationCanceledException)
+            {
+                await sp.GetRequiredService<IAdminNotificationManager>().RaiseAsync(AdminNotificationSeverity.Warning,
+                    $"'{title}' could not be put in story order",
+                    $"The timeline sync failed: {ex.Message}");
+                await sp.GetRequiredService<IClientNotifier>().NotifyCollectionUpdatedAsync(collectionId);
+                throw;
+            }
+        }, resourceKey: CollectionKey(collectionId), recipe: TaskRecipe.Of(nameof(QueueCollectionChronologySync), new { collectionId, title, force }));
     }
 
     public void QueueCollectionContentSync(Guid collectionId, string title)

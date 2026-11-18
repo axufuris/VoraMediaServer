@@ -43,7 +43,7 @@ public static class CollectionEndpoints
             .Produces(StatusCodes.Status404NotFound);
 
         group.MapPost("/{id:guid}/sync-chronology", ApplyChronologyAsync)
-            .Produces(StatusCodes.Status204NoContent)
+            .Produces(StatusCodes.Status202Accepted)
             .Produces(StatusCodes.Status400BadRequest);
 
         group.MapPut("/{id:guid}", UpdateCollectionAsync)
@@ -112,17 +112,10 @@ public static class CollectionEndpoints
         return Results.NoContent();
     }
 
-    private static async Task<IResult> ApplyChronologyAsync(Guid id, CollectionOrderingService orderingService)
+    private static async Task<IResult> ApplyChronologyAsync(Guid id, ICollectionManager manager)
     {
-        try
-        {
-            await orderingService.ApplyChronologicalOrderAsync(id, force: true);
-            return Results.NoContent();
-        }
-        catch (Exception ex)
-        {
-            return Results.BadRequest(new { Error = ex.Message });
-        }
+        var refusal = await manager.QueueChronologySyncAsync(id);
+        return refusal == null ? Results.Accepted() : Results.BadRequest(new { Error = refusal });
     }
 
     private static async Task<IResult> UpdateCollectionAsync(Guid id, [FromBody] UpdateCollectionRequest request, ICollectionManager manager)

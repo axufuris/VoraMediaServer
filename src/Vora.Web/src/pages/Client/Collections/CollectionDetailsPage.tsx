@@ -25,6 +25,8 @@ const SORT_LABELS: Record<CollectionSortOrder, string> = {
 
 const USER_SORT_OPTIONS: CollectionSortOrder[] = ['ReleaseDateAsc', 'ReleaseDateDesc', 'DateAddedDesc', 'Alphabetical'];
 
+const SYNC_WAIT_MS = 15 * 60 * 1000;
+
 function getSortOptions(defaultSort: CollectionSortOrder, hasChronological: boolean): CollectionSortOrder[] {
     const order: CollectionSortOrder[] = ['Chronological', 'ReleaseDateAsc', 'ReleaseDateDesc', 'DateAddedDesc', 'Alphabetical'];
     return order.filter(s =>
@@ -44,6 +46,7 @@ export default function CollectionDetailsPage() {
     const sortRef = useRef<CollectionSortOrder | null>(null);
 
     const [isSyncing, setIsSyncing] = useState(false);
+    const syncTimer = useRef<number | undefined>(undefined);
     const [isEditModalOpen, setIsEditModalOpen] = useState(false);
     const [isReorderModalOpen, setIsReorderModalOpen] = useState(false);
     const [isCloneChoiceOpen, setIsCloneChoiceOpen] = useState(false);
@@ -83,12 +86,20 @@ export default function CollectionDetailsPage() {
         fetchCollection(true);
     };
 
+    const stopSyncing = useCallback(() => {
+        window.clearTimeout(syncTimer.current);
+        setIsSyncing(false);
+    }, []);
+
+    useEffect(() => () => window.clearTimeout(syncTimer.current), []);
+
     useSignalREvent("CollectionUpdated", useCallback((updatedId: string) => {
         if (id && updatedId.toLowerCase() === id.toLowerCase()) {
             console.log("Collection background task finished! Silently reloading data...");
             fetchCollection(true);
+            stopSyncing();
         }
-    }, [id, fetchCollection]));
+    }, [id, fetchCollection, stopSyncing]));
 
     const handleSyncTimeline = async () => {
         if (!collection || !collection.sortProviderId) return;
@@ -107,10 +118,14 @@ export default function CollectionDetailsPage() {
         });
         if (!ok) return;
 
+        window.clearTimeout(syncTimer.current);
         setIsSyncing(true);
+        let queued = false;
         try {
             await collectionAdminService.syncChronology(collection.id);
-            fetchCollection();
+            queued = true;
+            window.clearTimeout(syncTimer.current);
+            syncTimer.current = window.setTimeout(() => setIsSyncing(false), SYNC_WAIT_MS);
         } catch (err) {
             let message = 'Failed to sync timeline. Check the provider settings and try again.';
             if (isAxiosError(err)) {
@@ -120,7 +135,7 @@ export default function CollectionDetailsPage() {
             }
             await dialog.alert(message);
         } finally {
-            setIsSyncing(false);
+            if (!queued) stopSyncing();
         }
     };
 

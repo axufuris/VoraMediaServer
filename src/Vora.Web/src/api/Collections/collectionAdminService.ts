@@ -73,6 +73,7 @@ export const collectionAdminService = {
         await apiClient.delete(`/collections/${collectionId}/items/${mediaId}`, { serverId });
     },
 
+    // Answers at once: the server queues the re-order and raises CollectionUpdated when it ends.
     syncChronology: async (collectionId: string, serverId?: string): Promise<void> => {
         await apiClient.post(`/collections/${collectionId}/sync-chronology`, null, { serverId });
     },

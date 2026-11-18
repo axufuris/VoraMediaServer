@@ -76,8 +76,14 @@ it is another release year and the aired year already follows.
 Collections ordered before these changes keep their stored years until
 **Sync timeline** re-derives them.
 
-**"Sync timeline" is a full re-derivation, not a top-up.** The endpoint passes
-`force: true`, which discards the cached `InUniverseYear` of every *unlocked*
+**"Sync timeline" is a full re-derivation, not a top-up.** The endpoint queues a
+task (`QueueCollectionChronologySync` with `force: true`) and answers `202 Accepted` at
+once, because scoring and auditing a big collection with a reasoning model takes
+minutes, longer than a browser or proxy will wait on one request (the page used
+to show "Failed to sync" while the server was still working). The page shows
+"Syncing…" until the task raises `CollectionUpdated`; a task that fails raises an
+admin notification ("could not be put in story order") and the same event, so the
+page never waits forever. `force: true` discards the cached `InUniverseYear` of every *unlocked*
 item so the whole collection is scored and audited again. Locked items keep their
 year and are excluded from the audit — locking is how you pin a placement you have
 checked yourself. Scheduled/background runs pass `force: false` and skip entirely
