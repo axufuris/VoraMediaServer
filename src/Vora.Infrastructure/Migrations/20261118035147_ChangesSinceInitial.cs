@@ -441,7 +441,8 @@ WHERE ""ReleaseDate"" IS NULL AND ""Type"" = 'Movie' AND ""ExpectedReleaseDate""
             // Sign-in providers (docs/sso.md): the providers an admin sets up, the
             // provider accounts linked to users, whether an account has a password,
             // whether password sign-in is on, the public address, and how a refresh
-            // token's session began. Every account that exists keeps its password
+            // token's session began, and the LDAP directory settings of a provider that
+            // is a directory (docs/sso.md). Every account that exists keeps its password
             // and the setting starts on, so nothing changes until an admin acts.
             // Running it again changes nothing.
             migrationBuilder.Sql(@"
@@ -470,6 +471,20 @@ CREATE TABLE IF NOT EXISTS ""AuthProviders"" (
     ""AllowedEmailDomains"" text NOT NULL,
     ""RequiredGroup"" character varying(256),
     ""AdminGroup"" character varying(256),
+    ""LdapHost"" character varying(256),
+    ""LdapPort"" integer,
+    ""LdapSecurity"" character varying(16) NOT NULL DEFAULT 'Ldaps',
+    ""LdapCaCertificatePem"" character varying(32768),
+    ""LdapBindDn"" character varying(512),
+    ""LdapBindPasswordCiphertext"" character varying(2048),
+    ""LdapUserBaseDn"" character varying(512),
+    ""LdapUserFilter"" character varying(1024),
+    ""LdapMailAttribute"" character varying(64) NOT NULL DEFAULT 'mail',
+    ""LdapDisplayNameAttribute"" character varying(64) NOT NULL DEFAULT 'displayName',
+    ""LdapUniqueIdAttribute"" character varying(64) NOT NULL DEFAULT 'entryUUID',
+    ""LdapGroupAttribute"" character varying(64) NOT NULL DEFAULT 'memberOf',
+    ""LdapGroupBaseDn"" character varying(512),
+    ""LdapGroupFilter"" character varying(1024),
     ""CreatedAt"" timestamp with time zone NOT NULL,
     ""UpdatedAt"" timestamp with time zone NOT NULL,
     CONSTRAINT ""PK_AuthProviders"" PRIMARY KEY (""Id"")
@@ -490,7 +505,22 @@ CREATE TABLE IF NOT EXISTS ""UserExternalIdentities"" (
 
 CREATE UNIQUE INDEX IF NOT EXISTS ""IX_AuthProviders_Slug"" ON ""AuthProviders"" (""Slug"");
 CREATE UNIQUE INDEX IF NOT EXISTS ""IX_UserExternalIdentities_ProviderId_Subject"" ON ""UserExternalIdentities"" (""ProviderId"", ""Subject"");
-CREATE INDEX IF NOT EXISTS ""IX_UserExternalIdentities_UserId"" ON ""UserExternalIdentities"" (""UserId"");");
+CREATE INDEX IF NOT EXISTS ""IX_UserExternalIdentities_UserId"" ON ""UserExternalIdentities"" (""UserId"");
+
+ALTER TABLE ""AuthProviders"" ADD COLUMN IF NOT EXISTS ""LdapHost"" character varying(256);
+ALTER TABLE ""AuthProviders"" ADD COLUMN IF NOT EXISTS ""LdapPort"" integer;
+ALTER TABLE ""AuthProviders"" ADD COLUMN IF NOT EXISTS ""LdapSecurity"" character varying(16) NOT NULL DEFAULT 'Ldaps';
+ALTER TABLE ""AuthProviders"" ADD COLUMN IF NOT EXISTS ""LdapCaCertificatePem"" character varying(32768);
+ALTER TABLE ""AuthProviders"" ADD COLUMN IF NOT EXISTS ""LdapBindDn"" character varying(512);
+ALTER TABLE ""AuthProviders"" ADD COLUMN IF NOT EXISTS ""LdapBindPasswordCiphertext"" character varying(2048);
+ALTER TABLE ""AuthProviders"" ADD COLUMN IF NOT EXISTS ""LdapUserBaseDn"" character varying(512);
+ALTER TABLE ""AuthProviders"" ADD COLUMN IF NOT EXISTS ""LdapUserFilter"" character varying(1024);
+ALTER TABLE ""AuthProviders"" ADD COLUMN IF NOT EXISTS ""LdapMailAttribute"" character varying(64) NOT NULL DEFAULT 'mail';
+ALTER TABLE ""AuthProviders"" ADD COLUMN IF NOT EXISTS ""LdapDisplayNameAttribute"" character varying(64) NOT NULL DEFAULT 'displayName';
+ALTER TABLE ""AuthProviders"" ADD COLUMN IF NOT EXISTS ""LdapUniqueIdAttribute"" character varying(64) NOT NULL DEFAULT 'entryUUID';
+ALTER TABLE ""AuthProviders"" ADD COLUMN IF NOT EXISTS ""LdapGroupAttribute"" character varying(64) NOT NULL DEFAULT 'memberOf';
+ALTER TABLE ""AuthProviders"" ADD COLUMN IF NOT EXISTS ""LdapGroupBaseDn"" character varying(512);
+ALTER TABLE ""AuthProviders"" ADD COLUMN IF NOT EXISTS ""LdapGroupFilter"" character varying(1024);");
         }
 
         /// <inheritdoc />

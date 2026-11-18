@@ -24,6 +24,7 @@ const authentik = { id: 'p1', slug: 'authentik', displayName: 'Authentik', type:
 const providers = (overrides: Partial<SignInProviders> = {}): SignInProviders => ({
     providers: [authentik],
     passwordSignInEnabled: true,
+    directorySignInEnabled: false,
     registrationMode: 'Simple',
     ...overrides,
 });
@@ -93,5 +94,41 @@ describe('RegisterPage with sign-in providers', () => {
         expect(await screen.findByRole('button', { name: 'Continue with Authentik' })).toBeInTheDocument();
         expect(screen.queryByRole('button', { name: 'Register' })).not.toBeInTheDocument();
         expect(screen.queryByLabelText('Display Name')).not.toBeInTheDocument();
+    });
+});
+
+describe('RegisterPage with a directory', () => {
+    afterEach(cleanup);
+
+    beforeEach(() => {
+        localStorage.clear();
+        sessionStorage.clear();
+        Object.values(mocks).forEach(m => m.mockReset());
+        mocks.probeServer.mockResolvedValue({ isClaimed: true, registrationMode: 1, serverName: 'Home', emailEnabled: false });
+    });
+
+    it('points directory people to the sign-in page and keeps the password form while sign-up is open', async () => {
+        mocks.getProviders.mockResolvedValue(providers({ providers: [], directorySignInEnabled: true }));
+        renderAt();
+
+        expect(await screen.findByText(/You do not need to register: sign in with your directory username/)).toBeInTheDocument();
+        expect(screen.getByRole('button', { name: 'Register' })).toBeInTheDocument();
+    });
+
+    it('with password sign-in off and only a directory, shows no form and says where to sign in', async () => {
+        mocks.getProviders.mockResolvedValue(providers({ providers: [], directorySignInEnabled: true, passwordSignInEnabled: false }));
+        renderAt();
+
+        expect(await screen.findByText(/does not take new password accounts/)).toBeInTheDocument();
+        expect(screen.queryByRole('button', { name: 'Register' })).not.toBeInTheDocument();
+        expect(screen.queryByLabelText('Display Name')).not.toBeInTheDocument();
+    });
+
+    it('says nothing about a directory when there is none', async () => {
+        mocks.getProviders.mockResolvedValue(providers({ providers: [] }));
+        renderAt();
+
+        expect(await screen.findByRole('button', { name: 'Register' })).toBeInTheDocument();
+        expect(screen.queryByText(/directory username/)).not.toBeInTheDocument();
     });
 });

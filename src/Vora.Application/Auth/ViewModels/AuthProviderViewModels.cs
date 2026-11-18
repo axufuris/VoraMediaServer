@@ -24,6 +24,20 @@ public class AuthProviderAdminVM
     public string? RequiredGroup { get; set; }
     public string? AdminGroup { get; set; }
     public string RedirectUri { get; set; } = string.Empty;
+    public string? LdapHost { get; set; }
+    public int? LdapPort { get; set; }
+    public LdapSecurityMode LdapSecurity { get; set; }
+    public string? LdapCaCertificatePem { get; set; }
+    public string? LdapBindDn { get; set; }
+    public bool HasBindPassword { get; set; }
+    public string? LdapUserBaseDn { get; set; }
+    public string? LdapUserFilter { get; set; }
+    public string LdapMailAttribute { get; set; } = string.Empty;
+    public string LdapDisplayNameAttribute { get; set; } = string.Empty;
+    public string LdapUniqueIdAttribute { get; set; } = string.Empty;
+    public string LdapGroupAttribute { get; set; } = string.Empty;
+    public string? LdapGroupBaseDn { get; set; }
+    public string? LdapGroupFilter { get; set; }
     public DateTime CreatedAt { get; set; }
     public DateTime UpdatedAt { get; set; }
 }
@@ -49,6 +63,21 @@ public class SaveAuthProviderRequest
     public List<string>? AllowedEmailDomains { get; set; }
     public string? RequiredGroup { get; set; }
     public string? AdminGroup { get; set; }
+    public string? LdapHost { get; set; }
+    public int? LdapPort { get; set; }
+    public LdapSecurityMode LdapSecurity { get; set; } = LdapSecurityMode.Ldaps;
+    public string? LdapCaCertificatePem { get; set; }
+    public string? LdapBindDn { get; set; }
+    public string? LdapBindPassword { get; set; }
+    public bool ClearLdapBindPassword { get; set; }
+    public string? LdapUserBaseDn { get; set; }
+    public string? LdapUserFilter { get; set; }
+    public string? LdapMailAttribute { get; set; }
+    public string? LdapDisplayNameAttribute { get; set; }
+    public string? LdapUniqueIdAttribute { get; set; }
+    public string? LdapGroupAttribute { get; set; }
+    public string? LdapGroupBaseDn { get; set; }
+    public string? LdapGroupFilter { get; set; }
 }
 
 public class AuthProviderPublicVM
@@ -64,6 +93,7 @@ public class AuthProvidersVM
 {
     public List<AuthProviderPublicVM> Providers { get; set; } = new();
     public bool PasswordSignInEnabled { get; set; }
+    public bool DirectorySignInEnabled { get; set; }
     public RegistrationMode RegistrationMode { get; set; }
 }
 

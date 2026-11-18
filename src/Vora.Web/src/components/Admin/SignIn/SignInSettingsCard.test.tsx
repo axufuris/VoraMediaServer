@@ -105,3 +105,35 @@ describe('SignInSettingsCard', () => {
         expect(mocks.confirm).not.toHaveBeenCalled();
     });
 });
+
+describe('SignInSettingsCard with a directory', () => {
+    beforeEach(() => {
+        Object.values(mocks).forEach(m => m.mockReset());
+        mocks.confirm.mockResolvedValue(true);
+    });
+
+    afterEach(cleanup);
+
+    it('says directory sign-in keeps working when passwords kept here are turned off', () => {
+        render(<SignInSettingsCard settings={settings({ passwordSignInEnabled: false })} enabledProviderCount={1} directoryEnabled onChanged={vi.fn()} />);
+
+        expect(screen.getByText(/Directory \(LDAP\) passwords stay in the directory, so directory sign-in keeps working/)).toBeInTheDocument();
+    });
+
+    it('does not mention a directory when none is on', () => {
+        render(<SignInSettingsCard settings={settings({ passwordSignInEnabled: false })} enabledProviderCount={1} onChanged={vi.fn()} />);
+
+        expect(screen.queryByText(/Directory \(LDAP\)/)).not.toBeInTheDocument();
+    });
+
+    it('names the directory account in the question before turning password sign-in off', async () => {
+        mocks.updateSettings.mockResolvedValue(settings({ passwordSignInEnabled: false }));
+        render(<SignInSettingsCard settings={settings()} enabledProviderCount={1} directoryEnabled onChanged={vi.fn()} />);
+
+        fireEvent.click(screen.getByRole('switch', { name: 'Allow password sign-in' }));
+
+        await waitFor(() => expect(mocks.confirm).toHaveBeenCalled());
+        expect(mocks.confirm.mock.calls[0][0]).toMatchObject({ message: expect.stringContaining('their directory account or a sign-in provider') });
+        await waitFor(() => expect(mocks.updateSettings).toHaveBeenCalledWith({ passwordSignInEnabled: false, publicBaseUrl: null }, undefined));
+    });
+});

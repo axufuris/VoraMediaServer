@@ -424,6 +424,9 @@ public static class ServiceRegistrationExtensions
         services.AddScoped<Vora.Application.Auth.External.Oidc.IOidcProviderClient, Vora.Application.Auth.External.Oidc.OidcProviderClient>();
         services.AddScoped<Vora.Application.Auth.External.Oidc.IOidcIdTokenValidator, Vora.Application.Auth.External.Oidc.OidcIdTokenValidator>();
         services.AddScoped<Vora.Application.Auth.External.Oidc.IOidcSignInManager, Vora.Application.Auth.External.Oidc.OidcSignInManager>();
+        services.AddSingleton<Vora.Application.Auth.External.Ldap.ILdapDirectory, Vora.Infrastructure.Auth.NovellLdapDirectory>();
+        services.AddScoped<Vora.Application.Auth.External.Ldap.ILdapSignInManager, Vora.Application.Auth.External.Ldap.LdapSignInManager>();
+        services.AddScoped<IPasswordSignInService, PasswordSignInService>();
         services.AddHttpClient(Vora.Application.Auth.External.Oidc.OidcProviderClient.HttpClientName, client =>
         {
             client.Timeout = TimeSpan.FromSeconds(10);

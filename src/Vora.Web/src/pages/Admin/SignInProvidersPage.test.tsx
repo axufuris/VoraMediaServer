@@ -3,7 +3,8 @@ import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-li
 import { MemoryRouter } from 'react-router-dom';
 import { AxiosError, AxiosHeaders } from 'axios';
 import SignInProvidersPage from './SignInProvidersPage';
-import type { AuthProviderAdmin, AuthSettings, OidcTestResult } from '../../api/Auth/signInProvidersAdminService';
+import { noDirectoryFields, savedDirectory } from '../../test/signInFixtures';
+import type { AuthProviderAdmin, AuthSettings, LdapTestResult, OidcTestResult, ProviderTestResult } from '../../api/Auth/signInProvidersAdminService';
 
 const mocks = vi.hoisted(() => ({
     list: vi.fn<() => Promise<AuthProviderAdmin[]>>(),
@@ -11,7 +12,7 @@ const mocks = vi.hoisted(() => ({
     create: vi.fn(),
     update: vi.fn(),
     remove: vi.fn(),
-    test: vi.fn<() => Promise<OidcTestResult>>(),
+    test: vi.fn<() => Promise<ProviderTestResult>>(),
     confirm: vi.fn(),
     alert: vi.fn(),
 }));
@@ -26,6 +27,7 @@ vi.mock('../../dialogs', () => ({
 }));
 
 const authentik: AuthProviderAdmin = {
+    ...noDirectoryFields,
     id: 'p1', type: 'Oidc', slug: 'authentik', displayName: 'Authentik', enabled: true, iconUrl: null, sortOrder: 0,
     issuer: 'https://auth.example.com/application/o/vora/', clientId: 'client-1', hasSecret: true, scopes: 'openid email profile',
     emailClaim: 'email', nameClaim: 'name', groupsClaim: 'groups', newUserPolicy: 'FollowRegistrationMode', linkByEmail: 'ConfirmWithPassword',
@@ -144,5 +146,126 @@ describe('SignInProvidersPage', () => {
         expect(mocks.remove).toHaveBeenNthCalledWith(1, 'p1', false, undefined);
         expect(mocks.remove).toHaveBeenNthCalledWith(2, 'p1', true, undefined);
         expect(mocks.confirm).toHaveBeenLastCalledWith(expect.objectContaining({ title: 'Some accounts would be locked out', confirmText: 'Remove anyway' }));
+    });
+});
+
+describe('SignInProvidersPage directories', () => {
+    beforeEach(() => {
+        Object.values(mocks).forEach(m => m.mockReset());
+        mocks.getSettings.mockResolvedValue({ passwordSignInEnabled: true, publicBaseUrl: null, effectiveBaseUrl: 'https://vora.example.com' });
+        mocks.list.mockResolvedValue([authentik, savedDirectory]);
+        mocks.confirm.mockResolvedValue(true);
+    });
+
+    afterEach(cleanup);
+
+    const directoryOk: LdapTestResult = {
+        ok: true, message: 'The directory answered and the user search found 5 entries.', connected: true, serviceBound: true, entriesFound: 5, searchLimited: false,
+        entriesWithMail: 4, entriesWithoutMail: 1, entriesWithUniqueId: 5, sampleDns: ['uid=alice,ou=people,dc=example,dc=com'],
+        warnings: ['1 of the 5 entries checked have no value in the mail attribute (mail). They cannot sign in.'],
+    };
+
+    it('offers the directory presets next to the provider ones', async () => {
+        mocks.list.mockResolvedValue([]);
+        renderPage();
+
+        const directories = await screen.findByRole('group', { name: 'Sign in with a directory (LDAP)' });
+        expect(within(directories).getByRole('button', { name: /LDAP directory/ })).toBeInTheDocument();
+        expect(within(directories).getByRole('button', { name: /Active Directory/ })).toBeInTheDocument();
+        expect(within(directories).getByRole('button', { name: /OpenLDAP, LLDAP, Authentik/ })).toBeInTheDocument();
+        const providers = screen.getByRole('group', { name: 'Sign in with a provider' });
+        expect(within(providers).getAllByRole('button')).toHaveLength(3);
+    });
+
+    it('lists a directory with its host, service account and search base and no redirect address', async () => {
+        renderPage();
+
+        const card = await screen.findByRole('article', { name: 'Company directory' });
+        expect(within(card).getByText('LDAP')).toBeInTheDocument();
+        expect(within(card).getByText('ldap.example.com')).toBeInTheDocument();
+        expect(within(card).getByText('LDAPS')).toBeInTheDocument();
+        expect(within(card).getByText('cn=vora,ou=service,dc=example,dc=com')).toBeInTheDocument();
+        expect(within(card).getByText('ou=people,dc=example,dc=com')).toBeInTheDocument();
+        expect(within(card).queryByText('Redirect address')).not.toBeInTheDocument();
+        expect(within(card).queryByText(/api\/auth\/oidc/)).not.toBeInTheDocument();
+    });
+
+    it('tests a directory and reports what was found and what to fix', async () => {
+        mocks.test.mockResolvedValue(directoryOk);
+        renderPage();
+
+        const card = await screen.findByRole('article', { name: 'Company directory' });
+        fireEvent.click(within(card).getByRole('button', { name: 'Test connection' }));
+
+        const status = await within(card).findByRole('status');
+        expect(status).toHaveTextContent('Connected');
+        expect(status).toHaveTextContent('Reached the directory and signed in with the service account');
+        expect(status).toHaveTextContent('5 people found: 4 with an email, 1 without');
+        expect(status).toHaveTextContent('uid=alice,ou=people,dc=example,dc=com');
+        expect(status).toHaveTextContent('They cannot sign in.');
+        expect(mocks.test).toHaveBeenCalledWith('d1', undefined);
+    });
+
+    it('says when the service account was refused', async () => {
+        mocks.test.mockResolvedValue({ ...directoryOk, ok: false, serviceBound: false, entriesFound: 0, sampleDns: [], warnings: [], message: 'The directory refused the bind account.' });
+        renderPage();
+
+        const card = await screen.findByRole('article', { name: 'Company directory' });
+        fireEvent.click(within(card).getByRole('button', { name: 'Test connection' }));
+
+        const alert = await within(card).findByRole('alert');
+        expect(alert).toHaveTextContent('The test did not pass');
+        expect(alert).toHaveTextContent('refused the bind account');
+        expect(alert).not.toHaveTextContent('people found');
+    });
+
+    it('shows a failed test run as a directory result', async () => {
+        mocks.test.mockRejectedValue(new Error('network down'));
+        renderPage();
+
+        const card = await screen.findByRole('article', { name: 'Company directory' });
+        fireEvent.click(within(card).getByRole('button', { name: 'Test connection' }));
+
+        expect(await within(card).findByRole('alert')).toHaveTextContent('The test did not pass');
+    });
+
+    it('creates a directory from a preset and tests it straight away', async () => {
+        mocks.list.mockResolvedValue([]);
+        mocks.create.mockResolvedValue(savedDirectory);
+        mocks.test.mockResolvedValue(directoryOk);
+        renderPage();
+
+        fireEvent.click(await screen.findByRole('button', { name: /LDAP directory/ }));
+        fireEvent.change(screen.getByLabelText('Host'), { target: { value: 'ldap.example.com' } });
+        fireEvent.change(screen.getByLabelText('User search base'), { target: { value: 'ou=people,dc=example,dc=com' } });
+        fireEvent.click(screen.getByRole('button', { name: 'Save provider' }));
+
+        await waitFor(() => expect(mocks.create).toHaveBeenCalled());
+        expect(mocks.create.mock.calls[0][0]).toMatchObject({ type: 'Ldap', slug: 'ldap', ldapHost: 'ldap.example.com', ldapUserBaseDn: 'ou=people,dc=example,dc=com', enabled: false });
+        await waitFor(() => expect(mocks.test).toHaveBeenCalledWith('d1', undefined));
+    });
+
+    it('does not run the test for a directory that has no host yet', async () => {
+        mocks.list.mockResolvedValue([]);
+        mocks.create.mockResolvedValue({ ...savedDirectory, ldapHost: null });
+        renderPage();
+
+        fireEvent.click(await screen.findByRole('button', { name: /LDAP directory/ }));
+        fireEvent.click(screen.getByRole('button', { name: 'Save provider' }));
+
+        await waitFor(() => expect(mocks.create).toHaveBeenCalled());
+        await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
+        expect(mocks.test).not.toHaveBeenCalled();
+    });
+
+    it('edits a saved directory with its fields filled in', async () => {
+        renderPage();
+
+        const card = await screen.findByRole('article', { name: 'Company directory' });
+        fireEvent.click(within(card).getByRole('button', { name: 'Edit' }));
+
+        expect(await screen.findByLabelText('Host')).toHaveValue('ldap.example.com');
+        expect(screen.getByLabelText('User filter')).toHaveValue('(&(objectClass=person)(uid={username}))');
+        expect(screen.getByLabelText('Bind password')).toHaveValue('');
     });
 });

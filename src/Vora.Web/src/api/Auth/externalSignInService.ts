@@ -15,6 +15,7 @@ export interface SignInProvider {
 export interface SignInProviders {
     providers: SignInProvider[];
     passwordSignInEnabled: boolean;
+    directorySignInEnabled: boolean;
     registrationMode: RegistrationModeName;
 }
 

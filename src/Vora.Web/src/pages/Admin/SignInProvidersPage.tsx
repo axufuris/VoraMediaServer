@@ -6,19 +6,40 @@ import EmptyState from '../../components/Admin/Primitives/EmptyState';
 import ProviderCard from '../../components/Admin/SignIn/ProviderCard';
 import ProviderEditorModal from '../../components/Admin/SignIn/ProviderEditorModal';
 import SignInSettingsCard from '../../components/Admin/SignIn/SignInSettingsCard';
-import { PROVIDER_PRESETS, type ProviderPreset } from '../../components/Admin/SignIn/providerPresets';
+import { LDAP_PRESETS, OIDC_PRESETS, type ProviderPreset } from '../../components/Admin/SignIn/providerPresets';
 import { resolveAdminPath } from '../../components/Admin/Shell/adminNavData';
 import {
     signInProvidersAdminService,
     type AuthProviderAdmin,
     type AuthSettings,
-    type OidcTestResult,
+    type ProviderTestResult,
     type SaveAuthProvider,
 } from '../../api/Auth/signInProvidersAdminService';
 import { useDialog } from '../../dialogs';
 import { resolveReason } from '../../utils/apiError';
 
 type Editing = { provider: AuthProviderAdmin | null; preset: ProviderPreset | null };
+
+function PresetGrid({ heading, presets, onChoose }: { heading: string; presets: ProviderPreset[]; onChoose: (preset: ProviderPreset) => void }) {
+    return (
+        <div className="space-y-2" role="group" aria-label={heading}>
+            <h3 className="text-xs font-bold uppercase tracking-widest text-[var(--vora-text-muted)]">{heading}</h3>
+            <div className="grid gap-3 md:grid-cols-3">
+                {presets.map(preset => (
+                    <button
+                        key={preset.id}
+                        type="button"
+                        onClick={() => onChoose(preset)}
+                        className="vora-card cursor-pointer p-4 text-left transition-colors hover:border-[var(--vora-accent-500)]"
+                    >
+                        <span className="block font-semibold text-[var(--vora-text-primary)]">{preset.label}</span>
+                        <span className="mt-1 block text-sm text-[var(--vora-text-muted)]">{preset.description}</span>
+                    </button>
+                ))}
+            </div>
+        </div>
+    );
+}
 
 export default function SignInProvidersPage() {
     const dialog = useDialog();
@@ -28,7 +49,7 @@ export default function SignInProvidersPage() {
     const [loading, setLoading] = useState(true);
     const [loadError, setLoadError] = useState<string | null>(null);
     const [editing, setEditing] = useState<Editing | null>(null);
-    const [tests, setTests] = useState<Record<string, OidcTestResult | 'testing'>>({});
+    const [tests, setTests] = useState<Record<string, ProviderTestResult | 'testing'>>({});
 
     const load = useCallback(async () => {
         try {
@@ -56,12 +77,18 @@ export default function SignInProvidersPage() {
             const result = await signInProvidersAdminService.test(provider.id, serverId);
             setTests(current => ({ ...current, [provider.id]: result }));
         } catch (err) {
+            const message = resolveReason(err) ?? 'The test could not run.';
             setTests(current => ({
                 ...current,
-                [provider.id]: {
-                    ok: false, message: resolveReason(err) ?? 'The test could not run.', issuer: null, authorizationEndpoint: null, tokenEndpoint: null,
-                    jwksUri: null, userInfoEndpoint: null, signingKeyCount: 0, advertisesPkceS256: false, warnings: [],
-                },
+                [provider.id]: provider.type === 'Ldap'
+                    ? {
+                        ok: false, message, connected: false, serviceBound: false, entriesFound: 0, searchLimited: false,
+                        entriesWithMail: 0, entriesWithoutMail: 0, entriesWithUniqueId: 0, sampleDns: [], warnings: [],
+                    }
+                    : {
+                        ok: false, message, issuer: null, authorizationEndpoint: null, tokenEndpoint: null,
+                        jwksUri: null, userInfoEndpoint: null, signingKeyCount: 0, advertisesPkceS256: false, warnings: [],
+                    },
             }));
         }
     }, [serverId]);
@@ -73,7 +100,7 @@ export default function SignInProvidersPage() {
             : await signInProvidersAdminService.create(request, serverId);
         setEditing(null);
         await load();
-        if (saved.issuer && saved.clientId) void runTest(saved);
+        if (saved.type === 'Ldap' ? saved.ldapHost && saved.ldapUserBaseDn : saved.issuer && saved.clientId) void runTest(saved);
     };
 
     const remove = async (provider: AuthProviderAdmin) => {
@@ -128,7 +155,7 @@ export default function SignInProvidersPage() {
         <div data-vora-page="">
             <PageHeader
                 title="Sign-in providers"
-                description="Let people sign in with an identity provider you run or trust, such as Authentik, Keycloak, Google or Microsoft. Accounts, profiles and permissions stay in Vora."
+                description="Let people sign in with an identity provider or a directory you run or trust, such as Authentik, Keycloak, Google, Microsoft, Active Directory or LLDAP. Accounts, profiles and permissions stay in Vora."
                 actions={<Link to={usersPath} className="vora-button-secondary">Users & Access</Link>}
             />
 
@@ -144,6 +171,7 @@ export default function SignInProvidersPage() {
                     <SignInSettingsCard
                         settings={settings}
                         enabledProviderCount={providers.filter(p => p.enabled).length}
+                        directoryEnabled={providers.some(p => p.enabled && p.type === 'Ldap')}
                         serverId={serverId}
                         onChanged={next => { setSettings(next); }}
                     />
@@ -152,21 +180,10 @@ export default function SignInProvidersPage() {
                 <section className="space-y-4" aria-labelledby="add-provider-heading">
                     <div>
                         <h2 id="add-provider-heading" className="text-base font-semibold text-[var(--vora-text-primary)]">Add a provider</h2>
-                        <p className="text-sm text-[var(--vora-text-muted)]">Vora ships no client id of its own: you register this server at the provider, with the redirect address Vora shows you, and paste what the provider gives you.</p>
+                        <p className="text-sm text-[var(--vora-text-muted)]">Vora ships no client id of its own: you register this server at the provider, with the redirect address Vora shows you, and paste what the provider gives you. A directory needs no registration, only a read-only account to search with.</p>
                     </div>
-                    <div className="grid gap-3 md:grid-cols-3">
-                        {PROVIDER_PRESETS.map(preset => (
-                            <button
-                                key={preset.id}
-                                type="button"
-                                onClick={() => setEditing({ provider: null, preset })}
-                                className="vora-card cursor-pointer p-4 text-left transition-colors hover:border-[var(--vora-accent-500)]"
-                            >
-                                <span className="block font-semibold text-[var(--vora-text-primary)]">{preset.label}</span>
-                                <span className="mt-1 block text-sm text-[var(--vora-text-muted)]">{preset.description}</span>
-                            </button>
-                        ))}
-                    </div>
+                    <PresetGrid heading="Sign in with a provider" presets={OIDC_PRESETS} onChoose={preset => setEditing({ provider: null, preset })} />
+                    <PresetGrid heading="Sign in with a directory (LDAP)" presets={LDAP_PRESETS} onChoose={preset => setEditing({ provider: null, preset })} />
                 </section>
 
                 <section className="space-y-4" aria-labelledby="providers-heading">

@@ -27,6 +27,21 @@ public class AuthProvider
     public string? RequiredGroup { get; set; }
     public string? AdminGroup { get; set; }
 
+    public string? LdapHost { get; set; }
+    public int? LdapPort { get; set; }
+    public LdapSecurityMode LdapSecurity { get; set; } = LdapSecurityMode.Ldaps;
+    public string? LdapCaCertificatePem { get; set; }
+    public string? LdapBindDn { get; set; }
+    public string? LdapBindPasswordCiphertext { get; set; }
+    public string? LdapUserBaseDn { get; set; }
+    public string? LdapUserFilter { get; set; }
+    public string LdapMailAttribute { get; set; } = "mail";
+    public string LdapDisplayNameAttribute { get; set; } = "displayName";
+    public string LdapUniqueIdAttribute { get; set; } = "entryUUID";
+    public string LdapGroupAttribute { get; set; } = "memberOf";
+    public string? LdapGroupBaseDn { get; set; }
+    public string? LdapGroupFilter { get; set; }
+
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
     public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;
 

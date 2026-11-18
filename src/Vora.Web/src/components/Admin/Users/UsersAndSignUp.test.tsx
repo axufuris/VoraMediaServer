@@ -30,13 +30,14 @@ const renderCard = () => render(<MemoryRouter><SignUpCard invitationsPath="/admi
 const withProviders = (passwordSignInEnabled = true) => mocks.getProvidersFor.mockResolvedValue({
     providers: [{ id: 'p1', slug: 'authentik', displayName: 'Authentik', type: 'Oidc', iconUrl: null }],
     passwordSignInEnabled,
+    directorySignInEnabled: false,
     registrationMode: 'Simple',
 });
 
 describe('AddUserModal', () => {
     beforeEach(() => {
         Object.values(mocks).forEach(m => m.mockReset());
-        mocks.getProvidersFor.mockResolvedValue({ providers: [], passwordSignInEnabled: true, registrationMode: 'Simple' });
+        mocks.getProvidersFor.mockResolvedValue({ providers: [], passwordSignInEnabled: true, directorySignInEnabled: false, registrationMode: 'Simple' });
     });
 
     it('creates the account and shows the details to pass on', async () => {
@@ -188,5 +189,34 @@ describe('SignUpCard', () => {
 
         await waitFor(() => expect(mocks.updateRegistrationMode).toHaveBeenCalledWith(3, undefined));
         expect(await screen.findByRole('button', { name: 'Send invitation' })).toBeInTheDocument();
+    });
+});
+
+describe('AddUserModal with a directory', () => {
+    beforeEach(() => {
+        Object.values(mocks).forEach(m => m.mockReset());
+    });
+
+    it('offers an account that signs in through the directory and says so on the confirmation', async () => {
+        mocks.getProvidersFor.mockResolvedValue({ providers: [], passwordSignInEnabled: true, directorySignInEnabled: true, registrationMode: 'Simple' });
+        mocks.createSsoOnlyUser.mockResolvedValue({ id: 'u3' });
+        render(<AddUserModal onClose={vi.fn()} onCreated={vi.fn()} />);
+
+        fireEvent.click(await screen.findByRole('radio', { name: /Sign in with a provider/ }));
+        fireEvent.change(screen.getByLabelText('Name'), { target: { value: 'Sam' } });
+        fireEvent.change(screen.getByLabelText('Email'), { target: { value: 'sam@example.com' } });
+        fireEvent.click(screen.getByRole('button', { name: 'Create account' }));
+
+        expect(await screen.findByText('Account created')).toBeInTheDocument();
+        expect(mocks.createSsoOnlyUser).toHaveBeenCalledWith('sam@example.com', 'Sam', undefined);
+        expect(screen.getByText(/sign in with their directory account using this email/)).toBeInTheDocument();
+    });
+
+    it('makes the account passwordless when passwords kept here are off and only a directory is on', async () => {
+        mocks.getProvidersFor.mockResolvedValue({ providers: [], passwordSignInEnabled: false, directorySignInEnabled: true, registrationMode: 'Simple' });
+        render(<AddUserModal onClose={vi.fn()} onCreated={vi.fn()} />);
+
+        expect(await screen.findByText(/Password sign-in is off, so this account signs in with their directory account/)).toBeInTheDocument();
+        expect(screen.queryByLabelText('Starting password')).not.toBeInTheDocument();
     });
 });

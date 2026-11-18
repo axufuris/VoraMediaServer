@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { cleanup, render, screen } from '@testing-library/react';
 import { SignInStep } from './AccessSteps';
 import type { SetupStepProps } from '../setupContext';
+import { noDirectoryFields } from '../../../../test/signInFixtures';
 import type { AuthProviderAdmin } from '../../../../api/Auth/signInProvidersAdminService';
 
 const mocks = vi.hoisted(() => ({ list: vi.fn<() => Promise<AuthProviderAdmin[]>>() }));
@@ -9,6 +10,7 @@ const mocks = vi.hoisted(() => ({ list: vi.fn<() => Promise<AuthProviderAdmin[]>
 vi.mock('../../../../api/Auth/signInProvidersAdminService', () => ({ signInProvidersAdminService: { list: mocks.list } }));
 
 const provider = (displayName: string, enabled: boolean): AuthProviderAdmin => ({
+    ...noDirectoryFields,
     id: displayName, type: 'Oidc', slug: displayName.toLowerCase(), displayName, enabled, iconUrl: null, sortOrder: 0, issuer: 'https://x.example', clientId: 'c',
     hasSecret: true, scopes: 'openid', emailClaim: 'email', nameClaim: 'name', groupsClaim: 'groups', newUserPolicy: 'FollowRegistrationMode',
     linkByEmail: 'ConfirmWithPassword', allowedEmailDomains: [], requiredGroup: null, adminGroup: null, redirectUri: 'https://vora.example/cb',

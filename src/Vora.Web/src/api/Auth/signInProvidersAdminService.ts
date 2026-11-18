@@ -3,6 +3,7 @@ import type { AuthProviderType } from './externalSignInService';
 
 export type NewUserPolicy = 'FollowRegistrationMode' | 'IdpDecides' | 'ExistingOnly';
 export type LinkByEmailPolicy = 'ConfirmWithPassword' | 'Automatic' | 'Never';
+export type LdapSecurity = 'Ldaps' | 'StartTls' | 'None';
 
 export interface AuthProviderAdmin {
     id: string;
@@ -25,6 +26,20 @@ export interface AuthProviderAdmin {
     requiredGroup: string | null;
     adminGroup: string | null;
     redirectUri: string;
+    ldapHost: string | null;
+    ldapPort: number | null;
+    ldapSecurity: LdapSecurity;
+    ldapCaCertificatePem: string | null;
+    ldapBindDn: string | null;
+    hasBindPassword: boolean;
+    ldapUserBaseDn: string | null;
+    ldapUserFilter: string | null;
+    ldapMailAttribute: string;
+    ldapDisplayNameAttribute: string;
+    ldapUniqueIdAttribute: string;
+    ldapGroupAttribute: string;
+    ldapGroupBaseDn: string | null;
+    ldapGroupFilter: string | null;
 }
 
 export interface SaveAuthProvider {
@@ -34,19 +49,34 @@ export interface SaveAuthProvider {
     enabled: boolean;
     iconUrl: string | null;
     sortOrder: number;
-    issuer: string | null;
-    clientId: string | null;
+    issuer?: string | null;
+    clientId?: string | null;
     clientSecret?: string;
     clearClientSecret?: boolean;
-    scopes: string;
-    emailClaim: string;
-    nameClaim: string;
-    groupsClaim: string;
+    scopes?: string;
+    emailClaim?: string;
+    nameClaim?: string;
+    groupsClaim?: string;
     newUserPolicy: NewUserPolicy;
     linkByEmail: LinkByEmailPolicy;
     allowedEmailDomains: string[];
     requiredGroup: string | null;
     adminGroup: string | null;
+    ldapHost?: string | null;
+    ldapPort?: number | null;
+    ldapSecurity?: LdapSecurity;
+    ldapCaCertificatePem?: string | null;
+    ldapBindDn?: string | null;
+    ldapBindPassword?: string;
+    clearLdapBindPassword?: boolean;
+    ldapUserBaseDn?: string | null;
+    ldapUserFilter?: string | null;
+    ldapMailAttribute?: string;
+    ldapDisplayNameAttribute?: string;
+    ldapUniqueIdAttribute?: string;
+    ldapGroupAttribute?: string;
+    ldapGroupBaseDn?: string | null;
+    ldapGroupFilter?: string | null;
 }
 
 export interface AuthSettings {
@@ -68,6 +98,22 @@ export interface OidcTestResult {
     warnings: string[];
 }
 
+export interface LdapTestResult {
+    ok: boolean;
+    message: string | null;
+    connected: boolean;
+    serviceBound: boolean;
+    entriesFound: number;
+    searchLimited: boolean;
+    entriesWithMail: number;
+    entriesWithoutMail: number;
+    entriesWithUniqueId: number;
+    sampleDns: string[];
+    warnings: string[];
+}
+
+export type ProviderTestResult = OidcTestResult | LdapTestResult;
+
 export const signInProvidersAdminService = {
     list: async (serverId?: string): Promise<AuthProviderAdmin[]> => {
         const response = await apiClient.get<AuthProviderAdmin[]>('/admin/auth-providers', { serverId });
@@ -88,8 +134,8 @@ export const signInProvidersAdminService = {
         await apiClient.delete(`/admin/auth-providers/${id}`, { serverId, params: force ? { force: true } : undefined });
     },
 
-    test: async (id: string, serverId?: string): Promise<OidcTestResult> => {
-        const response = await apiClient.post<OidcTestResult>(`/admin/auth-providers/${id}/test`, undefined, { serverId });
+    test: async (id: string, serverId?: string): Promise<ProviderTestResult> => {
+        const response = await apiClient.post<ProviderTestResult>(`/admin/auth-providers/${id}/test`, undefined, { serverId });
         return response.data;
     },
 

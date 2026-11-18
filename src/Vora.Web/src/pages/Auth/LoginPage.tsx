@@ -10,6 +10,7 @@ import { canOpenInBrowser } from '../../desktop/desktopBrowser';
 import { storeAccountSession } from '../../utils/signInSession';
 import { StorageKeys, SessionKeys } from '../../utils/storageKeys';
 import AuthLayout from '../../layouts/AuthLayout';
+import { pendingSignInHandle } from '../../utils/externalSignInMessages';
 
 function resolveServerUrl(): string {
     const envUrl = import.meta.env.VITE_API_BASE_URL;
@@ -84,7 +85,7 @@ export default function LoginPage() {
                 return;
             }
 
-            const auth = await authService.loginToServer(serverUrl, email, password);
+            const auth = await authService.loginToServer(serverUrl, email.trim(), password);
             const { accessToken, userId } = auth;
 
             if (!accessToken || !userId) {
@@ -103,11 +104,22 @@ export default function LoginPage() {
             sessionStorage.removeItem(SessionKeys.pendingUserToken);
             sessionStorage.removeItem('pending_user_id');
 
+            const pending = pendingSignInHandle(err);
+            if (pending) {
+                // The directory accepted the password but the sign-in needs one more
+                // step (create the account, link it, an invite PIN). The same page
+                // the provider buttons use finishes it.
+                navigate(`/login/external?pending=${encodeURIComponent(pending)}`);
+                return;
+            }
+
             if (isAxiosError(err)) {
                 if (err.response?.status === 401) {
-                    // Covers wrong credentials and the temporary lockout after
-                    // repeated failures — both return 401.
-                    setError("Invalid email or password. If you've tried several times, wait a few minutes and try again.");
+                    // Covers wrong credentials, a directory that is down and the temporary
+                    // lockout after repeated failures — all return 401.
+                    setError(directory
+                        ? "Invalid email, username or password. If you've tried several times, wait a few minutes and try again."
+                        : "Invalid email or password. If you've tried several times, wait a few minutes and try again.");
                 } else {
                     // Never hand setError a non-string (e.g. a ProblemDetails object),
                     // or rendering it crashes the page.
@@ -133,7 +145,12 @@ export default function LoginPage() {
 
     const providerList = providers?.providers ?? [];
     const hasProviders = providerList.length > 0;
-    const passwordAllowed = !hasProviders || providers?.passwordSignInEnabled !== false;
+    // A directory signs people in on this same form, so it stays even when
+    // passwords kept on this server are turned off for everyone but admins.
+    const directory = providers?.directorySignInEnabled === true;
+    const passwordOff = (hasProviders || directory) && providers?.passwordSignInEnabled === false;
+    const passwordAllowed = !passwordOff || directory;
+    const localPasswordsOff = passwordOff && directory;
     const showPasswordForm = passwordAllowed || adminSignIn;
 
     const chooseProvider = (provider: SignInProvider) => {
@@ -194,11 +211,26 @@ export default function LoginPage() {
                     </p>
                 )}
 
+                {localPasswordsOff && (
+                    <p className="text-xs" style={{ color: 'var(--vora-text-muted)' }}>
+                        Passwords kept on this server only work for admins. Sign in with your directory account.
+                    </p>
+                )}
+
                 {passwordAllowed && unreachable}
 
                 <div>
-                    <label htmlFor="login-email" className="block text-sm font-medium mb-1" style={{ color: 'var(--vora-text-muted)' }}>Email</label>
-                    <input id="login-email" autoFocus type="email" required value={email} onChange={e => setEmail(e.target.value)} className="vora-input w-full" />
+                    <label htmlFor="login-email" className="block text-sm font-medium mb-1" style={{ color: 'var(--vora-text-muted)' }}>{directory ? 'Email or username' : 'Email'}</label>
+                    <input
+                        id="login-email"
+                        autoFocus
+                        type={directory ? 'text' : 'email'}
+                        {...(directory ? { autoComplete: 'username', autoCapitalize: 'none', autoCorrect: 'off', spellCheck: false } : {})}
+                        required
+                        value={email}
+                        onChange={e => setEmail(e.target.value)}
+                        className="vora-input w-full"
+                    />
                 </div>
                 <div>
                     <div className="flex items-baseline justify-between mb-1">

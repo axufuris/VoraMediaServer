@@ -219,7 +219,7 @@ export function SignInStep({ serverId }: SetupStepProps) {
             <StepHeading
                 eyebrow="Access"
                 title="Sign-in"
-                lead="Let people sign in with an identity provider you already run or trust, such as Authentik, Keycloak, Google or Microsoft. Everyone can still use an email and password unless you turn that off."
+                lead="Let people sign in with an identity provider or a directory you already run or trust, such as Authentik, Keycloak, Google, Microsoft, Active Directory or LLDAP. Everyone can still use an email and password unless you turn that off."
             />
             <SetupCard>
                 <CardHeading title="Sign-in providers" subtitle={names === null ? undefined : names.length > 0 ? `Turned on: ${names.join(', ')}` : 'None set up yet'} />
