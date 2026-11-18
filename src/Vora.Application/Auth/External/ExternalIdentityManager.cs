@@ -62,7 +62,7 @@ public sealed class ExternalIdentityManager(
         }
 
         await providers.DeleteIdentityAsync(identityId);
-        logger.LogInformation("Account {UserId} unlinked a sign-in provider", userId);
+        logger.LogInformation("An account unlinked its {Provider} sign-in", target.Provider?.Slug);
         return UnlinkOutcome.Unlinked;
     }
 }
