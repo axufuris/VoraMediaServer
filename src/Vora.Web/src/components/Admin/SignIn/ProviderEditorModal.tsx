@@ -6,6 +6,7 @@ import { resolveReason } from '../../../utils/apiError';
 import { copyText } from '../../../utils/copyText';
 import { blankDraft, draftFromProvider, redirectUriFor, toSaveRequest, validateDraft, type ProviderDraft } from './providerDraft';
 import type { ProviderPreset } from './providerPresets';
+import LdapProviderFields from './LdapProviderFields';
 
 interface ProviderEditorModalProps {
     provider: AuthProviderAdmin | null;
@@ -36,6 +37,14 @@ const NEW_USER_CHOICES: { value: NewUserPolicy; title: string; description: stri
     },
 ];
 
+const DIRECTORY_NEW_USER_DESCRIPTIONS: Record<NewUserPolicy, string> = {
+    FollowRegistrationMode: 'New people can make an account only the way your sign-up setting allows: open sign-up, an invite PIN or an emailed invitation. When sign-ups are disabled, only people who already have an account can sign in.',
+    IdpDecides: 'Anyone the directory accepts gets an account, whatever the registration mode. Use it only when the directory already controls who has access, and narrow it below with an email domain or a group.',
+    ExistingOnly: 'The directory never creates accounts. People who already have one are matched to it by their email address.',
+};
+
+const DIRECTORY_AUTOMATIC_LINK = 'Link to the account with the same email address without asking. Only for a directory you run and trust: anyone who can set the mail attribute there could reach that account.';
+
 const LINK_CHOICES: { value: LinkByEmailPolicy; title: string; description: string; badge?: string }[] = [
     {
         value: 'ConfirmWithPassword',
@@ -63,6 +72,7 @@ export default function ProviderEditorModal({ provider, preset, effectiveBaseUrl
     const [showClaims, setShowClaims] = useState(false);
 
     const set = <K extends keyof ProviderDraft>(key: K, value: ProviderDraft[K]) => setDraft(current => ({ ...current, [key]: value }));
+    const isLdap = draft.type === 'Ldap';
     const redirectUri = provider ? provider.redirectUri : redirectUriFor(effectiveBaseUrl, draft.slug);
 
     const submit = async (e: React.SyntheticEvent) => {
@@ -96,6 +106,7 @@ export default function ProviderEditorModal({ provider, preset, effectiveBaseUrl
                         <p className="rounded-[var(--vora-radius-md)] border border-[var(--vora-border-subtle)] bg-[var(--vora-bg-sunken)] p-3 text-sm text-[var(--vora-text-secondary)]">{preset.steps}</p>
                     )}
 
+                    {!isLdap && (
                     <section className="space-y-2">
                         <FieldLabel htmlFor="provider-redirect">Redirect address to register at the provider</FieldLabel>
                         <div className="flex gap-2">
@@ -104,18 +115,25 @@ export default function ProviderEditorModal({ provider, preset, effectiveBaseUrl
                         </div>
                         <Hint>It has to match what the provider has character for character. If Vora sits behind a reverse proxy, set the public address on the previous page first.</Hint>
                     </section>
+                    )}
 
                     <section className="grid gap-4 md:grid-cols-2">
                         <div>
-                            <FieldLabel htmlFor="provider-name">Button name</FieldLabel>
-                            <input id="provider-name" value={draft.displayName} onChange={e => set('displayName', e.target.value)} maxLength={64} className="vora-input w-full" placeholder="e.g. Authentik" />
-                            <Hint>Shown on the sign-in page as "Continue with …".</Hint>
+                            <FieldLabel htmlFor="provider-name">{isLdap ? 'Name' : 'Button name'}</FieldLabel>
+                            <input id="provider-name" value={draft.displayName} onChange={e => set('displayName', e.target.value)} maxLength={64} className="vora-input w-full" placeholder={isLdap ? 'e.g. Company directory' : 'e.g. Authentik'} />
+                            <Hint>{isLdap ? 'Shown when someone is asked to link their account, such as "Link Company directory". Directory sign-in has no button: people use the email or username box.' : 'Shown on the sign-in page as "Continue with …".'}</Hint>
                         </div>
                         <div>
                             <FieldLabel htmlFor="provider-slug">Address name</FieldLabel>
-                            <input id="provider-slug" value={draft.slug} onChange={e => set('slug', e.target.value.toLowerCase())} maxLength={64} className="vora-input w-full font-mono" placeholder="authentik" />
-                            <Hint>Part of the redirect address. Lower-case letters, digits and hyphens. Changing it changes the address you registered.</Hint>
+                            <input id="provider-slug" value={draft.slug} onChange={e => set('slug', e.target.value.toLowerCase())} maxLength={64} className="vora-input w-full font-mono" placeholder={isLdap ? 'directory' : 'authentik'} />
+                            <Hint>{isLdap ? 'A short id for this directory. Lower-case letters, digits and hyphens.' : 'Part of the redirect address. Lower-case letters, digits and hyphens. Changing it changes the address you registered.'}</Hint>
                         </div>
+                    </section>
+
+                    {isLdap && <LdapProviderFields draft={draft} provider={provider} set={set} />}
+
+                    {!isLdap && (
+                    <section className="grid gap-4 md:grid-cols-2">
                         <div className="md:col-span-2">
                             <FieldLabel htmlFor="provider-issuer">Issuer address</FieldLabel>
                             <input id="provider-issuer" value={draft.issuer} onChange={e => set('issuer', e.target.value)} className="vora-input w-full font-mono" placeholder="https://auth.example.com/application/o/vora/" />
@@ -151,6 +169,7 @@ export default function ProviderEditorModal({ provider, preset, effectiveBaseUrl
                             <Hint>Must include <code>openid</code>. Add <code>groups</code> if you limit sign-in by group.</Hint>
                         </div>
                     </section>
+                    )}
 
                     <section className="space-y-3">
                         <h3 className="text-sm font-semibold text-[var(--vora-text-primary)]">New people</h3>
@@ -161,14 +180,14 @@ export default function ProviderEditorModal({ provider, preset, effectiveBaseUrl
                                     selected={draft.newUserPolicy === choice.value}
                                     onSelect={() => set('newUserPolicy', choice.value)}
                                     title={choice.title}
-                                    description={choice.description}
+                                    description={isLdap ? DIRECTORY_NEW_USER_DESCRIPTIONS[choice.value] : choice.description}
                                     badge={choice.badge ? <RecommendedBadge>{choice.badge}</RecommendedBadge> : undefined}
                                 />
                             ))}
                         </div>
                         {draft.newUserPolicy === 'IdpDecides' && (
                             <p role="note" className="rounded-[var(--vora-radius-md)] border border-[var(--vora-warning-500)] bg-[var(--vora-warning-soft)] p-3 text-sm text-[var(--vora-warning-text)]">
-                                With this choice anyone the provider signs in can create an account on this server, even when sign-ups are closed. Limit it with an email domain or a required group below.
+                                With this choice anyone the {isLdap ? 'directory accepts' : 'provider signs in'} can create an account on this server, even when sign-ups are closed. Limit it with an email domain or a required group below.
                             </p>
                         )}
                     </section>
@@ -182,12 +201,14 @@ export default function ProviderEditorModal({ provider, preset, effectiveBaseUrl
                                     selected={draft.linkByEmail === choice.value}
                                     onSelect={() => set('linkByEmail', choice.value)}
                                     title={choice.title}
-                                    description={choice.description}
+                                    description={isLdap && choice.value === 'Automatic' ? DIRECTORY_AUTOMATIC_LINK : choice.description}
                                     badge={choice.badge ? <RecommendedBadge>{choice.badge}</RecommendedBadge> : undefined}
                                 />
                             ))}
                         </div>
-                        <Hint>An email the provider has not verified is never used to link, whatever you pick.</Hint>
+                        <Hint>{isLdap
+                            ? 'The directory is the authority on its email addresses, so they count as verified. Someone who can set their own mail attribute there could claim an address that is not theirs, so only link automatically for a directory you control.'
+                            : 'An email the provider has not verified is never used to link, whatever you pick.'}</Hint>
                     </section>
 
                     <section className="grid gap-4 md:grid-cols-2">
@@ -199,7 +220,9 @@ export default function ProviderEditorModal({ provider, preset, effectiveBaseUrl
                         <div>
                             <FieldLabel htmlFor="provider-required-group">Required group (optional)</FieldLabel>
                             <input id="provider-required-group" value={draft.requiredGroup} onChange={e => set('requiredGroup', e.target.value)} className="vora-input w-full" placeholder="vora-users" />
-                            <Hint>When set, only members of this group can sign in. The provider has to send groups in the token.</Hint>
+                            <Hint>{isLdap
+                                ? 'When set, only members of this group can sign in. Give the group\'s name or its full distinguished name.'
+                                : 'When set, only members of this group can sign in. The provider has to send groups in the token.'}</Hint>
                         </div>
                         <div className="md:col-span-2 space-y-2">
                             <CheckRow
@@ -218,6 +241,7 @@ export default function ProviderEditorModal({ provider, preset, effectiveBaseUrl
                         </div>
                     </section>
 
+                    {!isLdap && (
                     <section className="space-y-3">
                         <button type="button" onClick={() => setShowClaims(v => !v)} aria-expanded={showClaims} className="cursor-pointer text-sm font-semibold text-[var(--vora-accent-text)] hover:underline">
                             {showClaims ? 'Hide advanced settings' : 'Show advanced settings'}
@@ -243,12 +267,15 @@ export default function ProviderEditorModal({ provider, preset, effectiveBaseUrl
                             </div>
                         )}
                     </section>
+                    )}
 
                     <section>
                         <SwitchRow
                             id="provider-enabled"
                             label="Turned on"
-                            description="Shows the button on the sign-in page. It needs an issuer and a client id."
+                            description={isLdap
+                                ? 'People can sign in with their directory username or email on the sign-in page. It needs the host, the user search base and the user filter.'
+                                : 'Shows the button on the sign-in page. It needs an issuer and a client id.'}
                             checked={draft.enabled}
                             onChange={v => set('enabled', v)}
                         />

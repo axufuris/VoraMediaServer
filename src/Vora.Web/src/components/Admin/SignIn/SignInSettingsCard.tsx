@@ -7,11 +7,12 @@ import { resolveReason } from '../../../utils/apiError';
 interface SignInSettingsCardProps {
     settings: AuthSettings;
     enabledProviderCount: number;
+    directoryEnabled?: boolean;
     serverId?: string;
     onChanged: (settings: AuthSettings) => void;
 }
 
-export default function SignInSettingsCard({ settings, enabledProviderCount, serverId, onChanged }: SignInSettingsCardProps) {
+export default function SignInSettingsCard({ settings, enabledProviderCount, directoryEnabled = false, serverId, onChanged }: SignInSettingsCardProps) {
     const dialog = useDialog();
     const [address, setAddress] = useState(settings.publicBaseUrl ?? '');
     const [savingAddress, setSavingAddress] = useState(false);
@@ -41,7 +42,7 @@ export default function SignInSettingsCard({ settings, enabledProviderCount, ser
         if (!allow && enabledProviderCount > 0) {
             const confirmed = await dialog.confirm({
                 title: 'Require SSO for everyone except admins?',
-                message: 'People who are not administrators will no longer be able to sign in or register with an email and password. They will have to use a sign-in provider. Administrator accounts keep their passwords, so you cannot lock yourself out. Sessions that began with a password stop refreshing for non-admins.',
+                message: `People who are not administrators will no longer be able to sign in or register with a password stored on this server. They will have to use ${directoryEnabled ? 'their directory account or a sign-in provider' : 'a sign-in provider'}. Administrator accounts keep their passwords, so you cannot lock yourself out. Sessions that began with a password stop refreshing for non-admins.`,
                 confirmText: 'Turn password sign-in off',
                 tone: 'danger',
             });
@@ -93,7 +94,7 @@ export default function SignInSettingsCard({ settings, enabledProviderCount, ser
                     label="Allow password sign-in"
                     description={settings.passwordSignInEnabled
                         ? 'Everyone can sign in with an email and password as well as through a provider.'
-                        : 'Require SSO for everyone except admins. Only administrator accounts can still sign in or register with a password.'}
+                        : `Require SSO for everyone except admins. Only administrator accounts can still sign in or register with a password stored on this server.${directoryEnabled ? ' Directory (LDAP) passwords stay in the directory, so directory sign-in keeps working.' : ''}`}
                     checked={settings.passwordSignInEnabled}
                     onChange={allow => void changePasswordSignIn(allow)}
                 />

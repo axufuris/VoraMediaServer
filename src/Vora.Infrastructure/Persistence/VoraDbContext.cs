@@ -1070,6 +1070,19 @@ public class VoraDbContext : DbContext
             entity.Property(e => e.LinkByEmail).HasConversion<string>().HasMaxLength(32);
             entity.Property(e => e.RequiredGroup).HasMaxLength(256);
             entity.Property(e => e.AdminGroup).HasMaxLength(256);
+            entity.Property(e => e.LdapHost).HasMaxLength(256);
+            entity.Property(e => e.LdapSecurity).HasConversion<string>().HasMaxLength(16);
+            entity.Property(e => e.LdapCaCertificatePem).HasMaxLength(32768);
+            entity.Property(e => e.LdapBindDn).HasMaxLength(512);
+            entity.Property(e => e.LdapBindPasswordCiphertext).HasMaxLength(2048);
+            entity.Property(e => e.LdapUserBaseDn).HasMaxLength(512);
+            entity.Property(e => e.LdapUserFilter).HasMaxLength(1024);
+            entity.Property(e => e.LdapMailAttribute).IsRequired().HasMaxLength(64);
+            entity.Property(e => e.LdapDisplayNameAttribute).IsRequired().HasMaxLength(64);
+            entity.Property(e => e.LdapUniqueIdAttribute).IsRequired().HasMaxLength(64);
+            entity.Property(e => e.LdapGroupAttribute).IsRequired().HasMaxLength(64);
+            entity.Property(e => e.LdapGroupBaseDn).HasMaxLength(512);
+            entity.Property(e => e.LdapGroupFilter).HasMaxLength(1024);
             entity.Property(e => e.AllowedEmailDomains)
                   .HasConversion(converters.StringList)
                   .Metadata.SetValueComparer(converters.StringListComparer);

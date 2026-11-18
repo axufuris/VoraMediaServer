@@ -1,8 +1,11 @@
 using Microsoft.AspNetCore.Mvc;
 using System.Security.Claims;
 using Vora.Api.Extensions;
+using Vora.Application.Auth.External;
+using Vora.Application.Auth.External.Ldap;
 using Vora.Application.Auth.External.Oidc;
 using Vora.Application.Auth.ViewModels;
+using Vora.Domain.Enums;
 
 namespace Vora.Api.Endpoints;
 
@@ -40,7 +43,8 @@ public static class OidcEndpoints
         routes.MapGroup("/api/admin/auth-providers").WithTags("Sign-in providers").RequireAuthorization("AdminOnly")
             .MapPost("/{id:guid}/test", TestAsync)
             .WithName("TestAuthProvider")
-            .Produces<OidcTestResultVM>(StatusCodes.Status200OK);
+            .Produces<OidcTestResultVM>(StatusCodes.Status200OK)
+            .Produces<LdapTestResultVM>(StatusCodes.Status200OK);
 
         return group;
     }
@@ -80,9 +84,21 @@ public static class OidcEndpoints
     private static async Task<IResult> CompleteAsync([FromBody] ExternalCompleteRequest request, IOidcSignInManager manager, CancellationToken cancellationToken) =>
         Results.Ok(await manager.ResumeAsync(request, cancellationToken));
 
-    private static async Task<IResult> TestAsync(Guid id, IOidcSignInManager manager, CancellationToken cancellationToken)
+    private static async Task<IResult> TestAsync(Guid id, IAuthProviderManager providers, IOidcSignInManager oidc, ILdapSignInManager ldap, CancellationToken cancellationToken)
     {
-        var result = await manager.TestAsync(id, cancellationToken);
+        var type = await providers.GetTypeAsync(id);
+        if (type is null)
+        {
+            return Results.NotFound();
+        }
+
+        if (type == AuthProviderType.Ldap)
+        {
+            var directory = await ldap.TestAsync(id, cancellationToken);
+            return directory is null ? Results.NotFound() : Results.Ok(directory);
+        }
+
+        var result = await oidc.TestAsync(id, cancellationToken);
         return result is null ? Results.NotFound() : Results.Ok(result);
     }
 

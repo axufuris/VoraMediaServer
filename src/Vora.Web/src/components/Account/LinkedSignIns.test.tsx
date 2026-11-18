@@ -42,7 +42,7 @@ describe('LinkedSignIns', () => {
 
     beforeEach(() => {
         Object.values(mocks).forEach(m => m.mockReset());
-        mocks.getProvidersFor.mockResolvedValue({ providers: [authentik, google], passwordSignInEnabled: true, registrationMode: 'Simple' });
+        mocks.getProvidersFor.mockResolvedValue({ providers: [authentik, google], passwordSignInEnabled: true, directorySignInEnabled: false, registrationMode: 'Simple' });
         mocks.confirm.mockResolvedValue(true);
         Object.defineProperty(window, 'location', { configurable: true, value: { ...originalLocation, assign: vi.fn() } });
     });
@@ -54,7 +54,7 @@ describe('LinkedSignIns', () => {
 
     it('shows nothing on a server with no provider and no link', async () => {
         mocks.listLinked.mockResolvedValue([]);
-        mocks.getProvidersFor.mockResolvedValue({ providers: [], passwordSignInEnabled: true, registrationMode: 'Simple' });
+        mocks.getProvidersFor.mockResolvedValue({ providers: [], passwordSignInEnabled: true, directorySignInEnabled: false, registrationMode: 'Simple' });
         const { container } = renderPanel(true);
 
         await waitFor(() => expect(mocks.listLinked).toHaveBeenCalled());
@@ -91,7 +91,7 @@ describe('LinkedSignIns', () => {
 
     it('counts a password that cannot be used while password sign-in is off as no way in', async () => {
         mocks.listLinked.mockResolvedValue([identity('i1', 'p1', 'Authentik')]);
-        mocks.getProvidersFor.mockResolvedValue({ providers: [authentik], passwordSignInEnabled: false, registrationMode: 'Simple' });
+        mocks.getProvidersFor.mockResolvedValue({ providers: [authentik], passwordSignInEnabled: false, directorySignInEnabled: false, registrationMode: 'Simple' });
         renderPanel(true);
 
         expect(await screen.findByRole('button', { name: 'Unlink' })).toBeDisabled();

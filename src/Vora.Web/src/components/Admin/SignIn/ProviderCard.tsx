@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import HealthBadge from '../Primitives/HealthBadge';
-import type { AuthProviderAdmin, LinkByEmailPolicy, NewUserPolicy, OidcTestResult } from '../../../api/Auth/signInProvidersAdminService';
+import type { AuthProviderAdmin, LdapSecurity, LinkByEmailPolicy, NewUserPolicy, ProviderTestResult } from '../../../api/Auth/signInProvidersAdminService';
+import { isLdapTestResult } from './testResult';
 import { copyText } from '../../../utils/copyText';
 
 const NEW_USERS: Record<NewUserPolicy, string> = {
@@ -15,9 +16,17 @@ const LINKING: Record<LinkByEmailPolicy, string> = {
     Never: 'Never by email',
 };
 
+const SECURITY_LABELS: Record<LdapSecurity, string> = {
+    Ldaps: 'LDAPS',
+    StartTls: 'StartTLS',
+    None: 'No encryption',
+};
+
+const DT = 'text-[10px] font-bold uppercase tracking-widest text-[var(--vora-text-muted)]';
+
 interface ProviderCardProps {
     provider: AuthProviderAdmin;
-    test: OidcTestResult | 'testing' | null;
+    test: ProviderTestResult | 'testing' | null;
     onEdit: () => void;
     onTest: () => void;
     onDelete: () => void;
@@ -25,6 +34,7 @@ interface ProviderCardProps {
 
 export default function ProviderCard({ provider, test, onEdit, onTest, onDelete }: ProviderCardProps) {
     const [copied, setCopied] = useState(false);
+    const isLdap = provider.type === 'Ldap';
 
     const copyRedirect = async () => {
         setCopied(await copyText(provider.redirectUri));
@@ -36,9 +46,12 @@ export default function ProviderCard({ provider, test, onEdit, onTest, onDelete 
                 <div className="min-w-0">
                     <div className="flex items-center gap-2">
                         <h3 className="truncate text-sm font-semibold text-[var(--vora-text-primary)]">{provider.displayName}</h3>
+                        <HealthBadge tone="neutral" showDot={false}>{isLdap ? 'LDAP' : 'OpenID Connect'}</HealthBadge>
                         <HealthBadge tone={provider.enabled ? 'ok' : 'neutral'} showDot={false}>{provider.enabled ? 'On' : 'Off'}</HealthBadge>
                     </div>
-                    <p className="truncate font-mono text-xs text-[var(--vora-text-muted)]">{provider.issuer ?? 'No issuer yet'}</p>
+                    <p className="truncate font-mono text-xs text-[var(--vora-text-muted)]">
+                        {isLdap ? (provider.ldapHost ? `${provider.ldapHost}${provider.ldapPort ? `:${provider.ldapPort}` : ''}` : 'No host yet') : (provider.issuer ?? 'No issuer yet')}
+                    </p>
                 </div>
                 <div className="flex shrink-0 flex-wrap items-center gap-2">
                     <button type="button" onClick={onTest} disabled={test === 'testing'} className="vora-button-secondary text-xs disabled:opacity-50">
@@ -50,13 +63,30 @@ export default function ProviderCard({ provider, test, onEdit, onTest, onDelete 
             </div>
 
             <dl className="grid gap-x-6 gap-y-2 px-5 py-4 text-sm max-md:px-4 md:grid-cols-2">
-                <div className="min-w-0 md:col-span-2">
-                    <dt className="text-[10px] font-bold uppercase tracking-widest text-[var(--vora-text-muted)]">Redirect address</dt>
-                    <dd className="flex items-center gap-2">
-                        <code className="min-w-0 flex-1 truncate rounded bg-[var(--vora-bg-sunken)] px-2 py-1 text-xs text-[var(--vora-text-primary)]">{provider.redirectUri}</code>
-                        <button type="button" onClick={copyRedirect} className="vora-button-secondary shrink-0 text-xs">{copied ? 'Copied' : 'Copy'}</button>
-                    </dd>
-                </div>
+                {isLdap ? (
+                    <>
+                        <div className="min-w-0">
+                            <dt className={DT}>Connection</dt>
+                            <dd className="text-[var(--vora-text-secondary)]">{SECURITY_LABELS[provider.ldapSecurity]}{provider.ldapCaCertificatePem ? ', own certificate authority' : ''}</dd>
+                        </div>
+                        <div className="min-w-0">
+                            <dt className={DT}>Service account</dt>
+                            <dd className="truncate font-mono text-xs text-[var(--vora-text-secondary)]">{provider.ldapBindDn ?? 'None (anonymous search)'}{provider.ldapBindDn && !provider.hasBindPassword ? ' (no password saved)' : ''}</dd>
+                        </div>
+                        <div className="min-w-0 md:col-span-2">
+                            <dt className={DT}>People</dt>
+                            <dd className="truncate font-mono text-xs text-[var(--vora-text-secondary)]">{provider.ldapUserBaseDn ?? 'No search base yet'}</dd>
+                        </div>
+                    </>
+                ) : (
+                    <div className="min-w-0 md:col-span-2">
+                        <dt className={DT}>Redirect address</dt>
+                        <dd className="flex items-center gap-2">
+                            <code className="min-w-0 flex-1 truncate rounded bg-[var(--vora-bg-sunken)] px-2 py-1 text-xs text-[var(--vora-text-primary)]">{provider.redirectUri}</code>
+                            <button type="button" onClick={copyRedirect} className="vora-button-secondary shrink-0 text-xs">{copied ? 'Copied' : 'Copy'}</button>
+                        </dd>
+                    </div>
+                )}
                 <div>
                     <dt className="text-[10px] font-bold uppercase tracking-widest text-[var(--vora-text-muted)]">New people</dt>
                     <dd className="text-[var(--vora-text-secondary)]">{NEW_USERS[provider.newUserPolicy]}</dd>
@@ -81,9 +111,23 @@ export default function ProviderCard({ provider, test, onEdit, onTest, onDelete 
                         ? 'border-[var(--vora-success-500)] bg-[var(--vora-success-soft)] text-[var(--vora-success-text)]'
                         : 'border-[var(--vora-danger-500)] bg-[var(--vora-danger-soft)] text-[var(--vora-danger-text)]'}`}
                 >
-                    <p className="font-semibold">{test.ok ? 'Connected' : 'Could not connect'}</p>
+                    <p className="font-semibold">{test.ok ? 'Connected' : isLdapTestResult(test) ? 'The test did not pass' : 'Could not connect'}</p>
                     {test.message && <p className="mt-0.5">{test.message}</p>}
-                    {test.ok && (
+                    {isLdapTestResult(test) && (test.connected || test.sampleDns.length > 0) && (
+                        <ul className="mt-1.5 space-y-0.5 text-xs">
+                            <li>Reached the directory{test.serviceBound ? ' and signed in with the service account' : ''}</li>
+                            {test.serviceBound && (
+                                <li>
+                                    {test.entriesFound} {test.searchLimited ? 'or more ' : ''}{test.entriesFound === 1 ? 'person' : 'people'} found
+                                    {test.entriesFound > 0 ? `: ${test.entriesWithMail} with an email, ${test.entriesWithoutMail} without` : ''}
+                                </li>
+                            )}
+                            {test.sampleDns.length > 0 && (
+                                <li>Examples: <span className="break-all font-mono">{test.sampleDns.join('; ')}</span></li>
+                            )}
+                        </ul>
+                    )}
+                    {!isLdapTestResult(test) && test.ok && (
                         <ul className="mt-1.5 space-y-0.5 text-xs">
                             {test.authorizationEndpoint && <li>Sign-in page: <span className="font-mono">{test.authorizationEndpoint}</span></li>}
                             {test.tokenEndpoint && <li>Token address: <span className="font-mono">{test.tokenEndpoint}</span></li>}

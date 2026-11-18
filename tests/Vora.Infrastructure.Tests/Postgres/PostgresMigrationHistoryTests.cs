@@ -1391,4 +1391,49 @@ public class PostgresMigrationHistoryTests(PostgresDatabase database) : IClassFi
         (await again.Users.AsNoTracking().SingleAsync(u => u.Id == user.Id, cancellationToken)).HasPassword.Should().BeTrue();
         (await again.AuthRefreshTokens.AsNoTracking().SingleAsync(t => t.Id == session.Id, cancellationToken)).SignInMethod.Should().Be(AuthSignInMethod.Password);
     }
+
+    [Fact]
+    public async Task A_database_on_the_sign_in_providers_migration_gains_the_ldap_columns_and_keeps_its_providers()
+    {
+        Assert.SkipUnless(PostgresDatabase.IsConfigured, PostgresDatabase.SkipReason);
+        var cancellationToken = TestContext.Current.CancellationToken;
+        await using var legacy = new LegacyDatabase();
+        var provider = new AuthProvider { Slug = "authentik", DisplayName = "Authentik", Enabled = true, Issuer = "https://auth.example.com/application/o/vora/", ClientId = "vora", ClientSecretCiphertext = "sealed" };
+
+        await legacy.BuildSignInProvidersStateAsync(async db =>
+        {
+            db.Add(provider);
+            await db.SaveChangesAsync(cancellationToken);
+        }, cancellationToken);
+
+        await using (var before = legacy.NewContext())
+        {
+            (await before.Database.GetPendingMigrationsAsync(cancellationToken)).Should().Equal(MigrationHistoryTests.ChangesSinceInitial);
+            (await ColumnsAsync(before, "AuthProviders", cancellationToken)).Should().NotContain("LdapHost").And.NotContain("LdapBindPasswordCiphertext").And.NotContain("LdapMailAttribute");
+        }
+
+        await legacy.MigrateAsync(cancellationToken);
+
+        await using (var after = legacy.NewContext())
+        {
+            (await after.Database.GetPendingMigrationsAsync(cancellationToken)).Should().BeEmpty();
+            var kept = await after.AuthProviders.AsNoTracking().SingleAsync(p => p.Id == provider.Id, cancellationToken);
+            kept.Issuer.Should().Be("https://auth.example.com/application/o/vora/");
+            kept.ClientSecretCiphertext.Should().Be("sealed");
+            kept.Type.Should().Be(AuthProviderType.Oidc);
+            kept.LdapHost.Should().BeNull();
+            kept.LdapSecurity.Should().Be(LdapSecurityMode.Ldaps);
+            kept.LdapMailAttribute.Should().Be("mail");
+            kept.LdapDisplayNameAttribute.Should().Be("displayName");
+            kept.LdapUniqueIdAttribute.Should().Be("entryUUID");
+            kept.LdapGroupAttribute.Should().Be("memberOf");
+
+            await after.Database.ExecuteSqlAsync($"DELETE FROM \"__EFMigrationsHistory\" WHERE \"MigrationId\" = {MigrationHistoryTests.ChangesSinceInitial}", cancellationToken);
+        }
+
+        await legacy.MigrateAsync(cancellationToken);
+
+        await using var again = legacy.NewContext();
+        (await again.AuthProviders.AsNoTracking().SingleAsync(p => p.Id == provider.Id, cancellationToken)).LdapMailAttribute.Should().Be("mail");
+    }
 }

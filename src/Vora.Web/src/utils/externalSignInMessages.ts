@@ -1,3 +1,4 @@
+import { isAxiosError } from 'axios';
 import type { ExternalRefusal } from '../api/Auth/externalSignInService';
 
 const PROVIDER_ERRORS: Record<string, string> = {
@@ -42,4 +43,19 @@ const REFUSALS: Record<ExternalRefusal, string> = {
 
 export function refusalMessage(refusal: ExternalRefusal, serverMessage: string | null): string {
     return serverMessage || REFUSALS[refusal] || FALLBACK;
+}
+
+/**
+ * The handle of a sign-in the server wants finished on the sign-in page, or null.
+ * The password login answers 409 with a "pending" extension when a directory accepted the
+ * password but the account still has to be created, linked or unlocked with an invite PIN.
+ */
+export function pendingSignInHandle(err: unknown): string | null {
+    if (!isAxiosError(err) || err.response?.status !== 409) return null;
+    const data: unknown = err.response.data;
+    if (data && typeof data === 'object' && 'pending' in data) {
+        const { pending } = data as { pending?: unknown };
+        if (typeof pending === 'string' && pending) return pending;
+    }
+    return null;
 }

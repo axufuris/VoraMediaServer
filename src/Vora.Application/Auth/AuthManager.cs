@@ -47,6 +47,8 @@ public interface IAuthManager
     Task<AuthResponseDto> ClaimServerAsync(string email, string password, string displayName, string? serverName = null);
     Task<AuthResponseDto?> LoginAsync(string email, string password);
     Task<Guid?> VerifyCredentialsAsync(string email, string password);
+    bool IsSignInLocked(string identifier);
+    void ClearSignInFailures(string identifier);
     Task<AuthResponseDto?> SignInExternalAsync(Guid userId);
     Task<User> CreateExternalUserAsync(string email, string displayName, bool isAdmin);
     Task<AdminCreateUserResult> CreatePasswordlessUserAsAdminAsync(string email, string displayName);
@@ -327,6 +329,12 @@ public class AuthManager(
 
     public async Task<Guid?> VerifyCredentialsAsync(string email, string password) =>
         (await AuthenticateAsync(email, password))?.Id;
+
+    public bool IsSignInLocked(string identifier) =>
+        memoryCache.TryGetValue(LoginLockPrefix + identifier.Trim().ToLowerInvariant(), out _);
+
+    public void ClearSignInFailures(string identifier) =>
+        memoryCache.Remove(LoginFailPrefix + identifier.Trim().ToLowerInvariant());
 
     private async Task<bool> IsPasswordSignInEnabledAsync()
     {

@@ -155,7 +155,8 @@ export default function RegisterPage() {
     const showSecretCode = !isInvited && registrationMode === 2;
     const providerList = providers?.providers ?? [];
     const hasProviders = providerList.length > 0;
-    const passwordRegistration = !hasProviders || providers?.passwordSignInEnabled !== false;
+    const directory = providers?.directorySignInEnabled === true;
+    const passwordRegistration = !(hasProviders || directory) || providers?.passwordSignInEnabled !== false;
 
     const chooseProvider = (provider: SignInProvider) => {
         window.location.assign(externalSignInService.startUrl(serverUrl, provider.slug, inviteToken || undefined));
@@ -262,6 +263,14 @@ export default function RegisterPage() {
                         </p>
                     )}
                 </>
+            )}
+
+            {directory && (
+                <p className="mt-4 text-xs" style={{ color: 'var(--vora-text-muted)' }}>
+                    {passwordRegistration
+                        ? 'Have an account in a directory at your organisation? You do not need to register: sign in with your directory username and your account is made the first time.'
+                        : 'This server does not take new password accounts. Sign in with your directory username and your account is made the first time.'}
+                </p>
             )}
 
             <div className="mt-6 text-center text-sm" style={{ color: 'var(--vora-text-muted)' }}>

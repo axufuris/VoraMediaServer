@@ -43,7 +43,9 @@ export default function AddUserModal({ serverId, onClose, onCreated }: AddUserMo
     }, [serverId]);
 
     const providerNames = providers?.providers.map(p => p.displayName) ?? [];
-    const hasProviders = providerNames.length > 0;
+    const directory = providers?.directorySignInEnabled === true;
+    const signInNames = directory ? [...providerNames, 'their directory account'] : providerNames;
+    const hasProviders = signInNames.length > 0;
     const passwordAllowed = !hasProviders || providers?.passwordSignInEnabled !== false;
     const ssoOnly = hasProviders && (ssoChoice || !passwordAllowed);
 
@@ -78,7 +80,7 @@ export default function AddUserModal({ serverId, onClose, onCreated }: AddUserMo
                 <div className="space-y-4">
                     <p className="text-sm text-[var(--vora-text-secondary)]">
                         {created.password === null
-                            ? `Tell them to sign in with ${providerNames.join(' or ')} using this email. Their first sign-in links to this account.`
+                            ? `Tell them to sign in with ${signInNames.join(' or ')} using this email. Their first sign-in links to this account.`
                             : 'Give these to them. They can change the password from their account settings after signing in.'}
                     </p>
                     <dl className="space-y-2 rounded-[var(--vora-radius-md)] border border-[var(--vora-border-subtle)] bg-[var(--vora-bg-sunken)] p-4 text-sm">
@@ -112,7 +114,7 @@ export default function AddUserModal({ serverId, onClose, onCreated }: AddUserMo
                         </div>
                     )}
                     {hasProviders && !passwordAllowed && (
-                        <p className="text-xs text-[var(--vora-text-muted)]">Password sign-in is off, so this account signs in with {providerNames.join(' or ')}.</p>
+                        <p className="text-xs text-[var(--vora-text-muted)]">Password sign-in is off, so this account signs in with {signInNames.join(' or ')}.</p>
                     )}
                     {!ssoOnly && (
                     <div>

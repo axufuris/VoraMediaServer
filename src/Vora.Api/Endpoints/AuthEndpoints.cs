@@ -73,6 +73,8 @@ public static class AuthEndpoints
         group.MapPost("/login", LoginAsync)
             .WithName("Login")
             .Produces<Vora.Application.Auth.Dtos.AuthResponseDto>(StatusCodes.Status200OK)
+            .ProducesProblem(StatusCodes.Status403Forbidden)
+            .ProducesProblem(StatusCodes.Status409Conflict)
             .RequireRateLimiting(VoraRateLimitPolicies.AuthStrict);
         group.MapPost("/register", RegisterAsync)
             .WithName("Register")
@@ -158,25 +160,32 @@ public static class AuthEndpoints
         }
     }
 
-    private static async Task<IResult> LoginAsync([FromBody] LoginRequestDto request, IAuthManager manager, HttpContext httpContext)
+    private static async Task<IResult> LoginAsync([FromBody] LoginRequestDto request, IPasswordSignInService signIn, IAuthManager manager, HttpContext httpContext, CancellationToken cancellationToken)
     {
-        Vora.Application.Auth.Dtos.AuthResponseDto? result;
-        try
-        {
-            result = await manager.LoginAsync(request.Email, request.Password);
-        }
-        catch (PasswordSignInDisabledException ex)
-        {
-            return Results.Problem(statusCode: StatusCodes.Status403Forbidden, title: "Password sign-in is turned off", detail: ex.Message);
-        }
+        var result = await signIn.SignInAsync(request.Email, request.Password, cancellationToken);
 
-        if (result == null)
+        switch (result.Outcome)
         {
-            return Results.Unauthorized();
-        }
+            case PasswordSignInOutcome.SignedIn when result.Auth is not null:
+                result.Auth.RefreshToken = await manager.IssueRefreshTokenAsync(result.Auth.UserId, ReadDeviceId(httpContext), result.Method);
+                return Results.Ok(result.Auth);
 
-        result.RefreshToken = await manager.IssueRefreshTokenAsync(result.UserId, ReadDeviceId(httpContext));
-        return Results.Ok(result);
+            case PasswordSignInOutcome.PasswordSignInDisabled:
+                return Results.Problem(statusCode: StatusCodes.Status403Forbidden, title: "Password sign-in is turned off", detail: new PasswordSignInDisabledException().Message);
+
+            case PasswordSignInOutcome.Refused:
+                return Results.Problem(statusCode: StatusCodes.Status403Forbidden, title: "Sign-in refused", detail: result.Message);
+
+            case PasswordSignInOutcome.NeedsMore when result.PendingHandle is not null:
+                return Results.Problem(
+                    statusCode: StatusCodes.Status409Conflict,
+                    title: "More is needed to finish signing in",
+                    detail: "Finish signing in on the sign-in page.",
+                    extensions: new Dictionary<string, object?> { ["pending"] = result.PendingHandle, ["outcome"] = result.PendingKind?.ToString() });
+
+            default:
+                return Results.Unauthorized();
+        }
     }
 
     private static async Task<IResult> RegisterAsync([FromBody] RegisterRequestDto request, IAuthManager manager, HttpContext httpContext)

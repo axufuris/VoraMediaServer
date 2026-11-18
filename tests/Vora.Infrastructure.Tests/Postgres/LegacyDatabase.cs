@@ -246,11 +246,30 @@ public sealed class LegacyDatabase : IAsyncDisposable
 
     public const string WatchlistReleaseDateMigration = "20261117005048_ChangesSinceInitial";
 
+    public const string SignInProvidersMigration = "20261118014724_ChangesSinceInitial";
+
     public const string SignInColumns = """
         ALTER TABLE "Users" ADD COLUMN IF NOT EXISTS "HasPassword" boolean NOT NULL DEFAULT TRUE;
         ALTER TABLE "ServerSettings" ADD COLUMN IF NOT EXISTS "PasswordSignInEnabled" boolean NOT NULL DEFAULT TRUE;
         ALTER TABLE "ServerSettings" ADD COLUMN IF NOT EXISTS "PublicBaseUrl" character varying(256);
         ALTER TABLE "AuthRefreshTokens" ADD COLUMN IF NOT EXISTS "SignInMethod" character varying(16) NOT NULL DEFAULT 'Password';
+        """;
+
+    private const string ColumnsSinceSignInProviders = """
+        ALTER TABLE "AuthProviders" DROP COLUMN IF EXISTS "LdapGroupFilter";
+        ALTER TABLE "AuthProviders" DROP COLUMN IF EXISTS "LdapGroupBaseDn";
+        ALTER TABLE "AuthProviders" DROP COLUMN IF EXISTS "LdapGroupAttribute";
+        ALTER TABLE "AuthProviders" DROP COLUMN IF EXISTS "LdapUniqueIdAttribute";
+        ALTER TABLE "AuthProviders" DROP COLUMN IF EXISTS "LdapDisplayNameAttribute";
+        ALTER TABLE "AuthProviders" DROP COLUMN IF EXISTS "LdapMailAttribute";
+        ALTER TABLE "AuthProviders" DROP COLUMN IF EXISTS "LdapUserFilter";
+        ALTER TABLE "AuthProviders" DROP COLUMN IF EXISTS "LdapUserBaseDn";
+        ALTER TABLE "AuthProviders" DROP COLUMN IF EXISTS "LdapBindPasswordCiphertext";
+        ALTER TABLE "AuthProviders" DROP COLUMN IF EXISTS "LdapBindDn";
+        ALTER TABLE "AuthProviders" DROP COLUMN IF EXISTS "LdapCaCertificatePem";
+        ALTER TABLE "AuthProviders" DROP COLUMN IF EXISTS "LdapSecurity";
+        ALTER TABLE "AuthProviders" DROP COLUMN IF EXISTS "LdapPort";
+        ALTER TABLE "AuthProviders" DROP COLUMN IF EXISTS "LdapHost";
         """;
 
     private const string ColumnsSinceWatchlistReleaseDate = """
@@ -618,6 +637,15 @@ public sealed class LegacyDatabase : IAsyncDisposable
         await seed(db);
         await db.Database.ExecuteSqlRawAsync(ColumnsSinceWatchlistReleaseDate, cancellationToken);
         await ReplaceCombinedMigrationAsync(db, WatchlistReleaseDateMigration, "10.0.9", cancellationToken);
+    }
+
+    public async Task BuildSignInProvidersStateAsync(Func<VoraDbContext, Task> seed, CancellationToken cancellationToken)
+    {
+        await using var db = NewContext();
+        await db.Database.MigrateAsync(cancellationToken);
+        await seed(db);
+        await db.Database.ExecuteSqlRawAsync(ColumnsSinceSignInProviders, cancellationToken);
+        await ReplaceCombinedMigrationAsync(db, SignInProvidersMigration, "10.0.9", cancellationToken);
     }
 
     private static async Task ReplaceCombinedMigrationAsync(VoraDbContext db, string migrationId, string productVersion, CancellationToken cancellationToken)
