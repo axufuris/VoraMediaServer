@@ -14,6 +14,7 @@ interface MainLayoutSidebarProps {
     onTogglePin: (id: string, itemServerId?: string) => void;
     collapsed: boolean;
     onToggleCollapsed: () => void;
+    pin?: { pinned: boolean; onToggle: () => void };
 }
 
 const navItemStyle = (isActive: boolean): React.CSSProperties => ({
@@ -30,6 +31,7 @@ export default function MainLayoutSidebar({
     onTogglePin,
     collapsed,
     onToggleCollapsed,
+    pin,
 }: MainLayoutSidebarProps) {
     const [dragIndex, setDragIndex] = useState<number | null>(null);
     const [drop, setDrop] = useState<{ over: number; after: boolean } | null>(null);
@@ -41,7 +43,11 @@ export default function MainLayoutSidebar({
     const activeDrop = touch.drag ? { over: touch.drag.over, after: touch.drag.after } : drop;
 
     const keyOf = (item: NavItem) => `${item.serverId || 'local'}-${item.id}`;
-    const folded = collapsed && !isEditingNav;
+    const autoCollapse = pin !== undefined && !pin.pinned;
+    const [peek, setPeek] = useState({ hovered: false, focused: false });
+    const rail = collapsed && !isEditingNav;
+    const peeking = autoCollapse && rail && (peek.hovered || peek.focused);
+    const folded = rail && !peeking;
     const foldedLink = folded ? 'md:justify-center md:px-0' : '';
     const foldedLabel = folded ? 'md:sr-only' : undefined;
 
@@ -64,9 +70,21 @@ export default function MainLayoutSidebar({
         onMoveItem(index, to);
     };
 
-    return (
+    const peekHandlers = pin === undefined ? {} : {
+        onPointerEnter: (e: React.PointerEvent) => {
+            if (e.pointerType !== 'touch') setPeek(was => ({ ...was, hovered: true }));
+        },
+        onPointerLeave: () => setPeek(was => ({ ...was, hovered: false })),
+        onFocus: (e: React.FocusEvent) => setPeek(was => ({ ...was, focused: isKeyboardFocus(e.target) })),
+        onBlur: (e: React.FocusEvent) => {
+            if (!e.currentTarget.contains(e.relatedTarget)) setPeek(was => ({ ...was, focused: false }));
+        },
+    };
+
+    const panel = (
         <div
-            className={`z-20 flex w-64 flex-col transition-all duration-300 ${folded ? 'md:w-[4.5rem]' : ''}`}
+            data-testid="sidebar-panel"
+            className={`z-20 flex w-64 flex-col transition-all duration-300 ${folded ? 'md:w-[4.5rem]' : ''}${autoCollapse ? ' md:absolute md:inset-y-0 md:left-0' : ''}${peeking ? ' md:shadow-[var(--vora-shadow-overlay)]' : ''}`}
             style={{ background: 'var(--vora-bg-sunken)', borderRight: '1px solid var(--vora-border-subtle)' }}
         >
             <div className={`flex items-center justify-between p-6 ${folded ? 'md:flex-col md:gap-4 md:px-0 md:py-5' : ''}`}>
@@ -89,22 +107,48 @@ export default function MainLayoutSidebar({
                     </h1>
                 </div>
                 {!isEditingNav && (
-                    <button
-                        type="button"
-                        onClick={onToggleCollapsed}
-                        aria-label={folded ? 'Expand sidebar' : 'Collapse sidebar'}
-                        aria-expanded={!folded}
-                        title={folded ? 'Expand sidebar' : 'Collapse sidebar'}
-                        className="vora-icon-button flex h-8 w-8 shrink-0 cursor-pointer items-center justify-center rounded-md max-md:hidden"
-                        style={{ color: 'var(--vora-text-muted)' }}
-                    >
-                        <svg className={`h-5 w-5 transition-transform ${folded ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" strokeWidth={1.75} strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24" aria-hidden="true">
-                            <polyline points="7 7 2 12 7 17" />
-                            <line x1="10" y1="6" x2="21" y2="6" />
-                            <line x1="13" y1="12" x2="21" y2="12" />
-                            <line x1="10" y1="18" x2="21" y2="18" />
-                        </svg>
-                    </button>
+                    <div className={`flex items-center gap-1 ${folded ? 'md:flex-col' : ''}`}>
+                        {pin && (
+                            <button
+                                type="button"
+                                onClick={() => {
+                                    setPeek({ hovered: false, focused: false });
+                                    pin.onToggle();
+                                }}
+                                aria-label="Pin sidebar"
+                                aria-pressed={pin.pinned}
+                                title={pin.pinned ? 'Unpin the sidebar so it folds away on its own' : 'Pin the sidebar so it stays as it is'}
+                                className="vora-icon-button flex h-8 w-8 shrink-0 cursor-pointer items-center justify-center rounded-md max-md:hidden focus-visible:bg-[var(--vora-accent-500)]! focus-visible:text-[var(--vora-accent-contrast)]! focus-visible:outline-none!"
+                                style={{
+                                    color: pin.pinned ? 'var(--vora-accent-text)' : 'var(--vora-text-muted)',
+                                    background: pin.pinned ? 'var(--vora-accent-soft)' : undefined,
+                                }}
+                            >
+                                <svg className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth={1.75} strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24" aria-hidden="true">
+                                    <path d="M12 17v5" />
+                                    <path d="M9 10.76a2 2 0 0 1-1.11 1.79l-1.78.9A2 2 0 0 0 5 15.24V16a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-.76a2 2 0 0 0-1.11-1.79l-1.78-.9A2 2 0 0 1 15 10.76V7a1 1 0 0 1 1-1 2 2 0 0 0 0-4H8a2 2 0 0 0 0 4 1 1 0 0 1 1 1z" />
+                                </svg>
+                            </button>
+                        )}
+                        {!autoCollapse && (
+                            <button
+                                type="button"
+                                onClick={onToggleCollapsed}
+                                aria-label={folded ? 'Expand sidebar' : 'Collapse sidebar'}
+                                aria-expanded={!folded}
+                                title={folded ? 'Expand sidebar' : 'Collapse sidebar'}
+                                className="vora-icon-button flex h-8 w-8 shrink-0 cursor-pointer items-center justify-center rounded-md max-md:hidden"
+                                style={{ color: 'var(--vora-text-muted)' }}
+                            >
+                                <svg className={`h-5 w-5 transition-transform ${folded ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" strokeWidth={1.75} strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24" aria-hidden="true">
+                                    <polyline points="7 7 2 12 7 17" />
+                                    <line x1="10" y1="6" x2="21" y2="6" />
+                                    <line x1="13" y1="12" x2="21" y2="12" />
+                                    <line x1="10" y1="18" x2="21" y2="18" />
+                                </svg>
+                            </button>
+                        )}
+                    </div>
                 )}
             </div>
 
@@ -288,4 +332,23 @@ export default function MainLayoutSidebar({
             )}
         </div>
     );
+
+    return (
+        <div
+            className={autoCollapse
+                ? `shrink-0 transition-all duration-300 max-md:contents md:relative ${peeking ? 'md:z-[101]' : 'md:z-20'} ${rail ? 'md:w-[4.5rem]' : 'md:w-64'}`
+                : 'contents'}
+            {...peekHandlers}
+        >
+            {panel}
+        </div>
+    );
+}
+
+function isKeyboardFocus(target: EventTarget): boolean {
+    try {
+        return (target as Element).matches(':focus-visible');
+    } catch {
+        return true;
+    }
 }

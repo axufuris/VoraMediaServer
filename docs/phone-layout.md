@@ -31,6 +31,14 @@ Both shells use `max-md:h-dvh`, so a phone's browser bar doesn't hide the bottom
 
 **Folding the client sidebar (tablet and up).** The button beside the logo in `MainLayoutSidebar` folds the sidebar to a 4.5rem rail of icons, and back. Every folded style is an `md:` variant and the button is `max-md:hidden`, so on a phone the drawer always opens the full menu. Folded, each label is `md:sr-only` (links keep their names) and the link gets a `title` tooltip; the list icons come from `renderNavIconOrDefault`, so an item without an icon of its own still shows one. Edit Navigation always opens at full width. The choice is remembered per browser (`useSidebarCollapsed`, `sidebar_collapsed` in `docs/auth-and-devices.md`).
 
+**Folding on its own (installed app and Vora Desktop, tablet and up).** Where there is no browser around the page (`useIsInstalledApp`, `docs/frontend-client-ui.md`, Back in an installed app) the sidebar folds itself, so a page keeps its room. Issue #302. A browser tab keeps the fold button alone, as above.
+
+- **The rule:** open on Home (`/`, or `/server/<id>`), a rail on every other page. `MainLayout` works it out (`isAtHome`, `utils/homePath.ts`) and passes the sidebar the result as `collapsed`, so the sidebar draws a rail the way it does for the fold button.
+- **The pin is the switch.** A pin button sits beside the logo (`aria-pressed`, `max-md:hidden`). Unpinned, the default, is the rule above, and the fold button is not drawn. Pinned, the sidebar stays as the viewer set it, open or a rail, and the fold button comes back. Pinning from a rail opens the sidebar and keeps it open (it clears `sidebar_collapsed`), since that is what pinning something open means. The pin is remembered per browser (`useSidebarPinned`, `sidebar_pinned` in `docs/auth-and-devices.md`).
+- **Peeking:** under a mouse, or when the keyboard moves into it, the rail opens over the page and folds back when the pointer or focus leaves. A touch never opens it (the rail's icons just work, and a tap would leave it stuck open); a mouse click's focus doesn't either (`:focus-visible` only), or a link just clicked would hold it open. The sidebar keeps the rail's 4.5rem in the layout and the full panel is `md:absolute` over the page with `--vora-shadow-overlay`, `md:z-[101]` while open so it sits over the top bar (`z-[100]`) and under the menus (`z-[105]` and up). That is why the sidebar is always wrapped: a `contents` element when it isn't folding itself, so pinning and unpinning don't remount it and drop the focus on the pin.
+- **Edit Navigation** opens at full width and holds that room in the layout until Done.
+- The pin fills with `--vora-accent-500` on focus, with no ring (`docs/frontend-client-ui.md`, A switch row fills on focus).
+
 ## Tokens
 
 On phones, the `@media (width < 48rem)` block in `styles/tokens.css` shrinks the card sizes and the gutter:

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState, useCallback } from 'react';
-import { Outlet, useNavigate, useParams } from 'react-router-dom';
+import { Outlet, useLocation, useNavigate, useParams } from 'react-router-dom';
 import { libraryService } from '../api/Media/libraryService';
 import { authService } from '../api/Auth/authService';
 import { profileIdForServer, tokenClaimsForServer, userIdForServer } from '../api/client';
@@ -26,6 +26,9 @@ import { profileDeviceSettingsService } from '../api/Users/profileDeviceSettings
 import MainLayoutSidebar from './parts/MainLayoutSidebar';
 import MainLayoutUserMenu from './parts/MainLayoutUserMenu';
 import { useSidebarCollapsed } from './parts/useSidebarCollapsed';
+import { useSidebarPinned } from './parts/useSidebarPinned';
+import { useIsInstalledApp } from '../hooks/useIsInstalledApp';
+import { homePathFor, isAtHome } from '../utils/homePath';
 import { useFeatureFlags } from '../hooks/useFeatureFlags';
 import { useScrollRestoration } from '../hooks/useScrollRestoration';
 import type { FeatureFlagsVM } from '../api/System/featureFlagsService';
@@ -133,6 +136,16 @@ export default function MainLayout() {
     const [isServerManagerOpen, setIsServerManagerOpen] = useState(false);
     const [isPhoneNavOpen, setIsPhoneNavOpen] = useState(false);
     const [isSidebarCollapsed, toggleSidebarCollapsed] = useSidebarCollapsed();
+    const [isSidebarPinned, toggleSidebarPinned] = useSidebarPinned();
+    const installedApp = useIsInstalledApp();
+    const { pathname } = useLocation();
+    const homePath = homePathFor(serverId);
+    const foldsItself = installedApp && !isSidebarPinned;
+    const sidebarCollapsed = foldsItself ? !isAtHome(pathname, homePath) : isSidebarCollapsed;
+    const pinSidebar = () => {
+        if (!isSidebarPinned && isSidebarCollapsed) toggleSidebarCollapsed();
+        toggleSidebarPinned();
+    };
     const closePhoneNav = useCallback(() => setIsPhoneNavOpen(false), []);
 
     const flags = useFeatureFlags();
@@ -397,15 +410,16 @@ export default function MainLayout() {
                     onToggleEditNav={setIsEditingNav}
                     onMoveItem={moveItem}
                     onTogglePin={togglePin}
-                    collapsed={isSidebarCollapsed}
+                    collapsed={sidebarCollapsed}
                     onToggleCollapsed={toggleSidebarCollapsed}
+                    pin={installedApp ? { pinned: isSidebarPinned, onToggle: pinSidebar } : undefined}
                 />
             </PhoneNavDrawer>
 
             <div className="flex-1 flex flex-col h-full overflow-hidden relative">
                 <MainLayoutUserMenu
                     profileName={profileName}
-                    homePath={serverId ? `/server/${serverId}` : '/'}
+                    homePath={homePath}
                     isProfileMenuOpen={isProfileMenuOpen}
                     isServerAdmin={isServerAdmin}
                     isPhoneNavOpen={isPhoneNavOpen}
