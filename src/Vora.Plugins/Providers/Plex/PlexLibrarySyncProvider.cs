@@ -322,9 +322,10 @@ public class PlexLibrarySyncProvider : ILibrarySyncProvider
 
         var clientIdentifier = await GetOrCreateClientIdentifierAsync();
         var client = _httpClientFactory.CreateClient(ProbeHttpClientName);
+        var serverToken = string.IsNullOrWhiteSpace(server.AccessToken) ? accessToken : server.AccessToken;
         using var stopProbes = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
         var probes = addresses
-            .Select(address => (Address: address, WhyUnreachable: WhyUnreachableAsync(client, address.Uri, accessToken, clientIdentifier, stopProbes.Token)))
+            .Select(address => (Address: address, WhyUnreachable: WhyUnreachableAsync(client, address.Uri, serverToken, clientIdentifier, stopProbes.Token)))
             .ToList();
 
         var tried = new List<string>();
@@ -343,8 +344,11 @@ public class PlexLibrarySyncProvider : ILibrarySyncProvider
         cancellationToken.ThrowIfCancellationRequested();
         var summary = string.Join("; ", tried);
         _logger.LogWarning("Could not reach the Plex server {ServerName}. Tried {Addresses}.", server.Name, summary);
+        var refusedHint = tried.Any(t => t.Contains("Plex refused this account", StringComparison.Ordinal))
+            ? " The server did answer but refused this Plex account, so check that the account can see this server (the server's owner has to share it with them)."
+            : string.Empty;
         throw new RemoteServerUnreachableException(
-            $"Vora couldn't reach the Plex server \"{server.Name}\". Tried {summary}. The Vora server has to be able to open one of these addresses; if Vora runs in Docker, try them from inside the container.");
+            $"Vora couldn't reach the Plex server \"{server.Name}\". Tried {summary}. The Vora server has to be able to open one of these addresses; if Vora runs in Docker, try them from inside the container.{refusedHint}");
     }
 
     private static async Task<string?> WhyUnreachableAsync(HttpClient client, string baseUri, string accessToken, string clientIdentifier, CancellationToken cancellationToken)
@@ -924,6 +928,7 @@ public class PlexLibrarySyncProvider : ILibrarySyncProvider
             Platform = platform,
             ProductVersion = productVersion,
             IsOnline = isOnline,
+            AccessToken = ReadStringProperty(element, "accessToken"),
             Connections = connections
         };
     }
