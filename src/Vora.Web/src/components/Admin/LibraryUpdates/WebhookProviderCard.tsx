@@ -19,7 +19,7 @@ export default function WebhookProviderCard({ provider, serverId, showModal, onC
     const dialog = useDialog();
     const title = providerTitle(provider.name);
     const status = providerStatus(provider);
-    const url = receiveUrl(provider.receivePath);
+    const url = receiveUrl(provider.receivePath, serverId);
     const [urlCopied, setUrlCopied] = useState(false);
     const [secretCopied, setSecretCopied] = useState(false);
     const [newSecret, setNewSecret] = useState<string | null>(null);

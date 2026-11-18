@@ -1,4 +1,5 @@
 import type { WebhookProviderVM } from '../../../api/System/webhookAdminService';
+import { serverVault } from '../../../utils/serverVault';
 
 export const FOCUS_FILL = 'focus-visible:bg-[var(--vora-accent-500)]! focus-visible:text-[var(--vora-accent-contrast)]! focus-visible:outline-none!';
 
@@ -18,6 +19,7 @@ export function providerStatus(provider: Pick<WebhookProviderVM, 'isEnabled' | '
     return { label: 'Ready', tone: 'ok' };
 }
 
-export function receiveUrl(receivePath: string): string {
-    return `${window.location.origin}${receivePath}`;
+export function receiveUrl(receivePath: string, serverId?: string): string {
+    const base = (serverId ? serverVault.getServer(serverId)?.url : undefined) || window.location.origin;
+    return `${base.replace(/\/+$/, '')}${receivePath}`;
 }

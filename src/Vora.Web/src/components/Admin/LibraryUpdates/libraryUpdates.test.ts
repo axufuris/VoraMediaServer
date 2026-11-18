@@ -1,5 +1,6 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, afterEach } from 'vitest';
 import { providerStatus, providerTitle, receiveUrl } from './libraryUpdates';
+import { serverVault } from '../../../utils/serverVault';
 
 describe('providerTitle', () => {
     it('drops the word Webhook from a provider name', () => {
@@ -29,7 +30,19 @@ describe('providerStatus', () => {
 });
 
 describe('receiveUrl', () => {
+    afterEach(() => localStorage.clear());
+
     it('puts the page\'s origin in front of the receive path', () => {
         expect(receiveUrl('/api/webhooks/radarr_webhook')).toBe(`${window.location.origin}/api/webhooks/radarr_webhook`);
+    });
+
+    it('uses the address of the server being managed when it is not the one serving the page', () => {
+        serverVault.addOrUpdateServer({ id: 'second', name: 'Second', url: 'http://second:8080/', token: 't', profileId: 'p', isAdmin: true });
+
+        expect(receiveUrl('/api/webhooks/radarr_webhook', 'second')).toBe('http://second:8080/api/webhooks/radarr_webhook');
+    });
+
+    it('falls back to the origin for a server it has no address for', () => {
+        expect(receiveUrl('/api/webhooks/radarr_webhook', 'unknown')).toBe(`${window.location.origin}/api/webhooks/radarr_webhook`);
     });
 });
