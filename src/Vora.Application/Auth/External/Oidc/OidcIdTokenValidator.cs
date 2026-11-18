@@ -65,12 +65,12 @@ public sealed class OidcIdTokenValidator(IOidcProviderClient client, TimeProvide
     private bool ValidateLifetime(DateTime? notBefore, DateTime? expires, SecurityToken token, TokenValidationParameters parameters)
     {
         var now = clock.GetUtcNow().UtcDateTime;
-        if (expires is null || expires.Value.ToUniversalTime() + ClockSkew <= now)
+        if (expires is null || expires.Value.ToUniversalTime() <= now - ClockSkew)
         {
             throw new SecurityTokenExpiredException("The id token has expired.");
         }
 
-        if (notBefore is not null && notBefore.Value.ToUniversalTime() - ClockSkew > now)
+        if (notBefore is not null && notBefore.Value.ToUniversalTime() > now + ClockSkew)
         {
             throw new SecurityTokenNotYetValidException("The id token is not valid yet.");
         }

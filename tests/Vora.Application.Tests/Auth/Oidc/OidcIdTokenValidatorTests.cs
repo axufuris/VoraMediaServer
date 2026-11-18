@@ -169,6 +169,24 @@ public class OidcIdTokenValidatorTests
     }
 
     [Fact]
+    public async Task A_token_signed_with_a_key_the_provider_does_not_publish_is_refused_as_a_bad_signature()
+    {
+        await ValidateAsync(_idp.IssueIdToken(Nonce));
+
+        var message = await RefusedAsync(_idp.IssueIdToken(Nonce, signWith: MockOidcProvider.AnotherKey("unknown-key")));
+
+        message.Should().Contain("key");
+    }
+
+    [Fact]
+    public async Task A_token_that_never_expires_is_accepted_without_overflowing_the_clock_arithmetic()
+    {
+        var token = _idp.IssueIdToken(Nonce, expires: DateTime.MaxValue.AddDays(-1));
+
+        (await ValidateAsync(token)).Should().ContainKey("sub");
+    }
+
+    [Fact]
     public async Task Garbage_instead_of_a_token_is_refused()
     {
         await RefusedAsync("not.a.token");
