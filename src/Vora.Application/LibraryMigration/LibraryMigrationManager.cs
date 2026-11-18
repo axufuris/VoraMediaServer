@@ -128,7 +128,8 @@ public class LibraryMigrationManager(
     {
         var provider = ResolveProvider(providerId);
         var connectionUri = await provider.FindReachableConnectionAsync(serverClientIdentifier, accessToken, cancellationToken);
-        var libraries = await provider.ListLibrariesAsync(connectionUri, accessToken, cancellationToken);
+        var serverToken = await provider.ResolveServerTokenAsync(accessToken, null, null, serverClientIdentifier, cancellationToken);
+        var libraries = await provider.ListLibrariesAsync(connectionUri, serverToken, cancellationToken);
 
         logger.LogInformation("Fetched {Count} library section(s) from {ProviderId}.", libraries.Count, providerId);
 

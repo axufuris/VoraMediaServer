@@ -9,5 +9,6 @@ public class RemoteServerDto
     public string? Platform { get; set; }
     public string? ProductVersion { get; set; }
     public bool IsOnline { get; set; }
+    public string? AccessToken { get; set; }
     public required IReadOnlyList<RemoteConnectionDto> Connections { get; set; }
 }
