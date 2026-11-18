@@ -263,10 +263,12 @@ describe('EditCollectionModal hiding', () => {
     it('hides a system collection from viewers', async () => {
         renderModal(collection({ title: 'John Wick Collection', systemGenerated: true, libraryId: 'movies' }));
 
-        const hide = screen.getByRole('checkbox', { name: 'Hide from viewers' });
+        const hide = screen.getByRole('switch', { name: 'Hide from viewers' });
         expect(hide).not.toBeChecked();
-        expect(screen.getByText(/Takes it out of its library, search and its Home row/)).toBeInTheDocument();
+        expect(hide).toHaveAccessibleDescription(/Takes it out of its library, search and its Home row/);
         fireEvent.click(hide);
+        expect(hide).toBeChecked();
+        expect(mocks.updateCollection).not.toHaveBeenCalled();
         save();
 
         await waitFor(() => expect(mocks.updateCollection).toHaveBeenCalled());
@@ -276,13 +278,28 @@ describe('EditCollectionModal hiding', () => {
     it('opens a hidden global collection ticked and can show it again', async () => {
         renderModal(collection({ title: 'John Wick', hidden: true }));
 
-        const hide = screen.getByRole('checkbox', { name: 'Hide from viewers' });
+        const hide = screen.getByRole('switch', { name: 'Hide from viewers' });
         expect(hide).toBeChecked();
-        expect(screen.getByText(/Takes it out of the Global tab and every library/)).toBeInTheDocument();
+        expect(hide).toHaveAccessibleDescription(/Takes it out of the Global tab and every library/);
         fireEvent.click(hide);
         save();
 
         await waitFor(() => expect(mocks.updateCollection).toHaveBeenCalled());
         expect(mocks.updateCollection.mock.calls[0][1]).toMatchObject({ hidden: false });
+    });
+
+    it('sends nothing when the switch is flipped and the dialog cancelled', () => {
+        const onClose = vi.fn();
+        render(
+            <MemoryRouter>
+                <EditCollectionModal isOpen onClose={onClose} onSaved={() => {}} collection={collection({ title: 'John Wick' })} />
+            </MemoryRouter>,
+        );
+
+        fireEvent.click(screen.getByRole('switch', { name: 'Hide from viewers' }));
+        fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
+
+        expect(onClose).toHaveBeenCalled();
+        expect(mocks.updateCollection).not.toHaveBeenCalled();
     });
 });

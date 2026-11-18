@@ -61,6 +61,10 @@ export const collectionAdminService = {
         await apiClient.put(`/collections/${id}`, request, { serverId });
     },
 
+    setHidden: async (id: string, hidden: boolean, serverId?: string): Promise<void> => {
+        await apiClient.put(`/collections/${id}/hidden`, { hidden }, { serverId });
+    },
+
     addToCollection: async (collectionId: string, mediaId: string, serverId?: string): Promise<void> => {
         await apiClient.post(`/collections/${collectionId}/items/${mediaId}`, null, { serverId });
     },
