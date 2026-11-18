@@ -20,6 +20,7 @@ vi.mock('./theme/ClientTemplateProvider', () => ({ ClientTemplateProvider: ({ ch
 vi.mock('./pages/Client/HomePage', () => ({ default: () => <h1>Home page</h1> }));
 vi.mock('./pages/Client/SearchPage', () => ({ default: () => <h1>Search page</h1> }));
 vi.mock('./pages/Auth/LinkDevicePage', () => ({ default: () => <h1>Link page</h1> }));
+vi.mock('./pages/Admin/LibraryUpdatesPage', () => ({ default: () => <h1>Library Updates page</h1> }));
 
 describe('client routes for a server', () => {
     beforeEach(() => {
@@ -64,5 +65,30 @@ describe('client routes for a server', () => {
 
         expect(await screen.findByRole('heading', { name: 'Search page' })).toBeInTheDocument();
         sessionStorage.clear();
+    });
+});
+
+describe('admin routes', () => {
+    beforeEach(() => {
+        localStorage.clear();
+        serverVault.addOrUpdateServer({ id: 'home', name: 'Home', url: 'https://vora.example.com', token: 'profile-token', profileId: 'profile', isAdmin: true });
+        localStorage.setItem(StorageKeys.profileToken, 'profile-token');
+        localStorage.setItem(StorageKeys.isServerAdmin, 'true');
+    });
+
+    it('opens Library Updates', async () => {
+        window.history.pushState({}, '', '/admin/library-updates');
+
+        render(<App />);
+
+        expect(await screen.findByRole('heading', { name: 'Library Updates page' })).toBeInTheDocument();
+    });
+
+    it('opens Library Updates on a server', async () => {
+        window.history.pushState({}, '', '/admin/server/home/library-updates');
+
+        render(<App />);
+
+        expect(await screen.findByRole('heading', { name: 'Library Updates page' })).toBeInTheDocument();
     });
 });

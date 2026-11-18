@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, within } from '@testing-library/react';
-import { MemoryRouter } from 'react-router-dom';
+import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import SidebarV2 from './SidebarV2';
 
 const pending = vi.hoisted(() => ({ value: 0 }));
@@ -40,6 +40,27 @@ describe('the admin sidebar', () => {
         const link = await screen.findByRole('link', { name: /Request Queue/ });
 
         expect(within(link).getByLabelText('150 pending')).toHaveTextContent('99+');
+    });
+
+    it('lists Library Updates under Library', async () => {
+        renderSidebar();
+
+        const heading = await screen.findByRole('heading', { name: 'Library' });
+        const link = within(heading.parentElement as HTMLElement).getByRole('link', { name: /Library Updates/ });
+
+        expect(link).toHaveAttribute('href', '/admin/library-updates');
+    });
+
+    it('opens Library Updates under the server on the multi-server form', async () => {
+        render(
+            <MemoryRouter initialEntries={['/admin/server/s1']}>
+                <Routes>
+                    <Route path="/admin/server/:serverId" element={<SidebarV2 />} />
+                </Routes>
+            </MemoryRouter>
+        );
+
+        expect(await screen.findByRole('link', { name: /Library Updates/ })).toHaveAttribute('href', '/admin/server/s1/library-updates');
     });
 
     it('counts on no other entry', async () => {

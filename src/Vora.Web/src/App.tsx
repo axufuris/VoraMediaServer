@@ -59,6 +59,7 @@ const AdminAiStatsPage = lazyPage(() => import('./pages/Admin/AiStatsPage'));
 const AdminAiSettingsPage = lazyPage(() => import('./pages/Admin/AiSettingsPage'));
 const AdminDedupePage = lazyPage(() => import('./pages/Admin/DedupePage'));
 const AdminMediaTrashPage = lazyPage(() => import('./pages/Admin/MediaTrashPage'));
+const AdminLibraryUpdatesPage = lazyPage(() => import('./pages/Admin/LibraryUpdatesPage'));
 const OverlayEditor = lazyPage(() => import('./pages/Admin/Overlay/OverlayEditor'));
 const AdminIptvPage = lazyPage(() => import('./pages/Admin/Iptv/IptvPage'));
 const AdminForYouPage = lazyPage(() => import('./pages/Admin/Features/ForYouPage'));
@@ -235,6 +236,7 @@ export default function App() {
                         <Route path="libraries" element={<LibraryDashboard />} />
                         <Route path="dedupe" element={<AdminDedupePage />} />
                         <Route path="media-trash" element={<AdminMediaTrashPage />} />
+                        <Route path="library-updates" element={<AdminLibraryUpdatesPage />} />
                         <Route path="devices" element={<AuthorizedDevicesPage />} />
                         <Route path="users" element={<AdminUserManagementPage />} />
                         <Route path="invitations" element={<AdminInvitationsPage />} />
@@ -269,6 +271,7 @@ export default function App() {
                             <Route path="libraries" element={<LibraryDashboard />} />
                             <Route path="dedupe" element={<AdminDedupePage />} />
                             <Route path="media-trash" element={<AdminMediaTrashPage />} />
+                            <Route path="library-updates" element={<AdminLibraryUpdatesPage />} />
                             <Route path="devices" element={<AuthorizedDevicesPage />} />
                             <Route path="users" element={<AdminUserManagementPage />} />
                             <Route path="invitations" element={<AdminInvitationsPage />} />

@@ -103,6 +103,7 @@ Each plugin category has a canonical home:
 | `MediaWebhook` | Libraries (TBD) |
 | `OverlayEngine` | Poster Overlays (TBD) |
 | `Request` | Request Queue (TBD) |
+| `MediaWebhook` | Library Updates (`/admin/library-updates`) |
 | `Lyrics`, `ListeningData` | Music (TBD) |
 
 Categories marked TBD don't have a dedicated admin page yet, so their plugin settings are still reachable via the System Settings → Plugins sub-sidebar. That sub-sidebar filters out the homed categories automatically — when every category has a home, the section disappears entirely.

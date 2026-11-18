@@ -94,6 +94,7 @@ export const ADMIN_NAV: AdminNavEntry[] = [
     { label: 'Media Deduplication',  pathTemplate: '/admin/dedupe',           section: 'Library', icon: 'copy',       keywords: ['duplicates', 'duplicate', 'cleanup'] },
     { label: 'Media Trash',          pathTemplate: '/admin/media-trash',      section: 'Library', icon: 'trash',      keywords: ['missing', 'trash', 'deleted', 'removed', 'restore', 'retention'] },
     { label: 'Smart Lists',          pathTemplate: '/admin/smart-lists',      section: 'Library', icon: 'list',       keywords: ['home screen', 'rows'] },
+    { label: 'Library Updates',      pathTemplate: '/admin/library-updates',  section: 'Library', icon: 'inbox',      keywords: ['webhook', 'radarr', 'sonarr', 'lidarr', 'import', 'notify', 'connect'] },
     { label: 'Request Queue',        pathTemplate: '/admin/requests',         section: 'Library', icon: 'inbox',      keywords: ['radarr', 'sonarr', 'approve'] },
 
     // === Features ===
