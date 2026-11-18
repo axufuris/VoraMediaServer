@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest';
-import { createEvent, fireEvent, render, screen } from '@testing-library/react';
+import { act, createEvent, fireEvent, render, screen } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import MainLayoutSidebar from './MainLayoutSidebar';
 import type { NavItem } from '../MainLayout';
@@ -27,7 +27,7 @@ const renderEditor = (onMoveItem = vi.fn()) => {
 
 const renderSidebar = ({ collapsed, editing = false, onToggleCollapsed = vi.fn() }: { collapsed: boolean; editing?: boolean; onToggleCollapsed?: () => void }) => {
     const unpinned: NavItem = { ...nav('podcasts', 3), isPinned: false };
-    const view = render(
+    render(
         <MemoryRouter>
             <MainLayoutSidebar
                 navItems={[...items, unpinned]}
@@ -41,9 +41,27 @@ const renderSidebar = ({ collapsed, editing = false, onToggleCollapsed = vi.fn()
             />
         </MemoryRouter>,
     );
-    const panel = view.container.firstElementChild;
-    if (!(panel instanceof HTMLElement)) throw new Error('No sidebar rendered');
-    return { panel, onToggleCollapsed };
+    return { panel: screen.getByTestId('sidebar-panel'), onToggleCollapsed };
+};
+
+const renderInstalled = ({ collapsed, pinned = false, editing = false, onToggle = vi.fn() }: { collapsed: boolean; pinned?: boolean; editing?: boolean; onToggle?: () => void }) => {
+    render(
+        <MemoryRouter>
+            <MainLayoutSidebar
+                navItems={items}
+                pinnedItems={items}
+                isEditingNav={editing}
+                onToggleEditNav={vi.fn()}
+                onMoveItem={vi.fn()}
+                onTogglePin={vi.fn()}
+                collapsed={collapsed}
+                onToggleCollapsed={vi.fn()}
+                pin={{ pinned, onToggle }}
+            />
+        </MemoryRouter>,
+    );
+    const panel = screen.getByTestId('sidebar-panel');
+    return { panel, slot: panel.parentElement as HTMLElement, onToggle };
 };
 
 const dataTransfer = () => ({ setData: vi.fn(), effectAllowed: '', dropEffect: '' });
@@ -164,5 +182,118 @@ describe('Collapsing the sidebar', () => {
         expect(panel.className).not.toContain('md:w-[4.5rem]');
         expect(screen.queryByRole('button', { name: 'Expand sidebar' })).toBeNull();
         expect(screen.getByText('Manage sidebar')).toBeInTheDocument();
+    });
+});
+
+describe('Folding away on its own, in an installed app', () => {
+    it('draws no pin in a browser tab, where only the fold button is offered', () => {
+        renderSidebar({ collapsed: false });
+
+        expect(screen.queryByRole('button', { name: 'Pin sidebar' })).toBeNull();
+        expect(screen.getByRole('button', { name: 'Collapse sidebar' })).toBeInTheDocument();
+    });
+
+    it('offers the pin instead of the fold button while it folds itself', () => {
+        const { onToggle } = renderInstalled({ collapsed: false });
+
+        const pin = screen.getByRole('button', { name: 'Pin sidebar' });
+        expect(pin).toHaveAttribute('aria-pressed', 'false');
+        expect(pin.className).toContain('max-md:hidden');
+        expect(screen.queryByRole('button', { name: 'Collapse sidebar' })).toBeNull();
+        expect(screen.queryByRole('button', { name: 'Expand sidebar' })).toBeNull();
+
+        fireEvent.click(pin);
+
+        expect(onToggle).toHaveBeenCalledTimes(1);
+    });
+
+    it('brings the fold button back once pinned, and the pin shows as pressed', () => {
+        const { panel, slot } = renderInstalled({ collapsed: false, pinned: true });
+
+        expect(screen.getByRole('button', { name: 'Pin sidebar' })).toHaveAttribute('aria-pressed', 'true');
+        expect(screen.getByRole('button', { name: 'Collapse sidebar' })).toBeInTheDocument();
+        expect(slot.className).toBe('contents');
+        expect(panel.className).not.toContain('md:absolute');
+    });
+
+    it('stays as the viewer folded it while pinned', () => {
+        const { panel } = renderInstalled({ collapsed: true, pinned: true });
+
+        fireEvent.pointerEnter(panel.parentElement as HTMLElement);
+
+        expect(panel.className).toContain('md:w-[4.5rem]');
+        expect(screen.getByRole('link', { name: 'Home' })).toHaveAttribute('title', 'Home');
+    });
+
+    it('is a rail that holds only its icons, keeping the room of the rail beside the page', () => {
+        const { panel, slot } = renderInstalled({ collapsed: true });
+
+        expect(slot.className).toContain('md:w-[4.5rem]');
+        expect(panel.className).toContain('md:w-[4.5rem]');
+        expect(panel.className).toContain('md:absolute');
+        expect(screen.getByRole('link', { name: 'Music' })).toHaveAttribute('title', 'Music');
+    });
+
+    it('opens over the page under a mouse and folds back when it leaves', () => {
+        const { panel, slot } = renderInstalled({ collapsed: true });
+
+        fireEvent.pointerEnter(slot);
+
+        expect(panel.className).not.toContain('md:w-[4.5rem]');
+        expect(panel.className).toContain('md:shadow-[var(--vora-shadow-overlay)]');
+        expect(slot.className).toContain('md:w-[4.5rem]');
+        expect(slot.className).toContain('md:z-[101]');
+        expect(screen.getByRole('link', { name: 'Music' })).not.toHaveAttribute('title');
+
+        fireEvent.pointerLeave(slot);
+
+        expect(panel.className).toContain('md:w-[4.5rem]');
+        expect(panel.className).not.toContain('md:shadow-');
+    });
+
+    it('does not open for a touch, which would leave it stuck open', () => {
+        const { panel, slot } = renderInstalled({ collapsed: true });
+
+        fireEvent(slot, createEvent.pointerEnter(slot, { pointerType: 'touch' }));
+
+        expect(panel.className).toContain('md:w-[4.5rem]');
+    });
+
+    it('opens for a keyboard moving into it and folds back when focus leaves', () => {
+        const { panel } = renderInstalled({ collapsed: true });
+        const music = screen.getByRole('link', { name: 'Music' });
+
+        act(() => music.focus());
+
+        expect(panel.className).not.toContain('md:w-[4.5rem]');
+
+        act(() => music.blur());
+
+        expect(panel.className).toContain('md:w-[4.5rem]');
+    });
+
+    it('is full width on Home, with the room of the full sidebar', () => {
+        const { panel, slot } = renderInstalled({ collapsed: false });
+
+        expect(slot.className).toContain('md:w-64');
+        expect(panel.className).not.toContain('md:w-[4.5rem]');
+    });
+
+    it('opens Edit Navigation at full width, and holds the room for it', () => {
+        const { panel, slot } = renderInstalled({ collapsed: true, editing: true });
+
+        expect(panel.className).not.toContain('md:w-[4.5rem]');
+        expect(slot.className).toContain('md:w-64');
+        expect(screen.queryByRole('button', { name: 'Pin sidebar' })).toBeNull();
+    });
+
+    it('fills with the accent on focus instead of drawing a ring', () => {
+        renderInstalled({ collapsed: false });
+
+        const classes = screen.getByRole('button', { name: 'Pin sidebar' }).className;
+
+        expect(classes).toContain('focus-visible:bg-[var(--vora-accent-500)]!');
+        expect(classes).toContain('focus-visible:text-[var(--vora-accent-contrast)]!');
+        expect(classes).toContain('focus-visible:outline-none!');
     });
 });

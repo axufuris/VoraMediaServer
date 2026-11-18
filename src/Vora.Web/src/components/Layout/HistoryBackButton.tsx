@@ -1,11 +1,10 @@
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useIsInstalledApp } from '../../hooks/useIsInstalledApp';
+import { isAtHome } from '../../utils/homePath';
 
 interface HistoryBackButtonProps {
     homePath: string;
 }
-
-const withoutTrailingSlash = (path: string) => (path.length > 1 ? path.replace(/\/+$/, '') : path);
 
 // The top bar's Back, for where there is no browser Back to use (an installed
 // web app, Vora Desktop). It steps back through the history, so the page comes
@@ -17,7 +16,7 @@ export default function HistoryBackButton({ homePath }: HistoryBackButtonProps) 
     const location = useLocation();
     const navigate = useNavigate();
 
-    if (!installed || withoutTrailingSlash(location.pathname) === homePath) return null;
+    if (!installed || isAtHome(location.pathname, homePath)) return null;
 
     const goBack = () => {
         if (location.key === 'default') navigate(homePath, { replace: true });

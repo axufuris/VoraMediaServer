@@ -44,8 +44,11 @@ vi.mock('../components/Layout/PhoneNavDrawer', () => ({ default: ({ children }: 
 vi.mock('../components/Media/ItemMenu/MediaItemMenuProvider', () => ({ default: ({ children }: { children: ReactNode }) => <>{children}</> }));
 vi.mock('./parts/MainLayoutUserMenu', () => ({ default: () => null }));
 vi.mock('./parts/MainLayoutSidebar', () => ({
-    default: ({ navItems, onTogglePin }: { navItems: NavItem[]; onTogglePin: (id: string, serverId?: string) => void }) => (
-        <nav>{navItems.map(item => <button key={`${item.serverId ?? ''}-${item.id}`} type="button" onClick={() => onTogglePin(item.id, item.serverId)}>{item.title}</button>)}</nav>
+    default: ({ navItems, onTogglePin, collapsed, pin }: { navItems: NavItem[]; onTogglePin: (id: string, serverId?: string) => void; collapsed: boolean; pin?: { pinned: boolean; onToggle: () => void } }) => (
+        <nav data-collapsed={String(collapsed)}>
+            {navItems.map(item => <button key={`${item.serverId ?? ''}-${item.id}`} type="button" onClick={() => onTogglePin(item.id, item.serverId)}>{item.title}</button>)}
+            {pin && <button type="button" aria-pressed={pin.pinned} onClick={pin.onToggle}>Pin sidebar</button>}
+        </nav>
     ),
 }));
 
@@ -57,6 +60,7 @@ const renderAt = (path: string) => render(
             <Route path="/" element={<MainLayout />}>
                 <Route index element={<div />} />
                 <Route path="server/:serverId" element={<div />} />
+                <Route path="media/:id" element={<div />} />
             </Route>
         </Routes>
     </MemoryRouter>,
@@ -139,5 +143,87 @@ describe('MainLayout identity on a second server', () => {
         renderAt('/server/second');
 
         await waitFor(() => expect(mocks.playbackCapabilities).toHaveBeenCalledWith('second'));
+    });
+});
+
+describe('MainLayout sidebar folding', () => {
+    const installedApp = () => vi.stubGlobal('matchMedia', (query: string) => ({
+        matches: query.includes('display-mode'),
+        addEventListener: () => { },
+        removeEventListener: () => { },
+    }));
+
+    const sidebar = () => screen.getByRole('navigation');
+
+    afterEach(() => vi.unstubAllGlobals());
+
+    it('leaves the fold to the viewer in a browser tab, on every page', async () => {
+        renderAt('/media/1');
+
+        await screen.findByRole('button', { name: 'Music' });
+        expect(sidebar()).toHaveAttribute('data-collapsed', 'false');
+        expect(screen.queryByRole('button', { name: 'Pin sidebar' })).toBeNull();
+        cleanup();
+
+        localStorage.setItem(StorageKeys.sidebarCollapsed, 'true');
+        renderAt('/');
+
+        await screen.findByRole('button', { name: 'Music' });
+        expect(sidebar()).toHaveAttribute('data-collapsed', 'true');
+    });
+
+    it('is open on Home and folded on every other page in an installed app', async () => {
+        installedApp();
+
+        renderAt('/');
+        await screen.findByRole('button', { name: 'Music' });
+        expect(sidebar()).toHaveAttribute('data-collapsed', 'false');
+        cleanup();
+
+        renderAt('/media/1');
+        await screen.findByRole('button', { name: 'Music' });
+        expect(sidebar()).toHaveAttribute('data-collapsed', 'true');
+        cleanup();
+
+        renderAt('/server/second');
+        await screen.findByRole('button', { name: 'Music' });
+        expect(sidebar()).toHaveAttribute('data-collapsed', 'false');
+    });
+
+    it('keeps the viewer\'s own fold while pinned', async () => {
+        installedApp();
+        localStorage.setItem(StorageKeys.sidebarPinned, 'true');
+
+        renderAt('/media/1');
+
+        await screen.findByRole('button', { name: 'Music' });
+        expect(sidebar()).toHaveAttribute('data-collapsed', 'false');
+        expect(screen.getByRole('button', { name: 'Pin sidebar' })).toHaveAttribute('aria-pressed', 'true');
+    });
+
+    it('opens the sidebar when pinned from its rail, and remembers the pin', async () => {
+        installedApp();
+        localStorage.setItem(StorageKeys.sidebarCollapsed, 'true');
+        renderAt('/media/1');
+        await screen.findByRole('button', { name: 'Music' });
+        expect(sidebar()).toHaveAttribute('data-collapsed', 'true');
+
+        fireEvent.click(screen.getByRole('button', { name: 'Pin sidebar' }));
+
+        expect(sidebar()).toHaveAttribute('data-collapsed', 'false');
+        expect(localStorage.getItem(StorageKeys.sidebarPinned)).toBe('true');
+        expect(localStorage.getItem(StorageKeys.sidebarCollapsed)).toBe('false');
+    });
+
+    it('folds away again when unpinned away from Home', async () => {
+        installedApp();
+        localStorage.setItem(StorageKeys.sidebarPinned, 'true');
+        renderAt('/media/1');
+        await screen.findByRole('button', { name: 'Music' });
+
+        fireEvent.click(screen.getByRole('button', { name: 'Pin sidebar' }));
+
+        expect(sidebar()).toHaveAttribute('data-collapsed', 'true');
+        expect(localStorage.getItem(StorageKeys.sidebarPinned)).toBe('false');
     });
 });
