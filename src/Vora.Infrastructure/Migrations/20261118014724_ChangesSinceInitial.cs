@@ -437,11 +437,87 @@ ALTER TABLE ""UserWatchlistItems"" ADD COLUMN IF NOT EXISTS ""ReleaseDate"" date
 UPDATE ""UserWatchlistItems""
 SET ""ReleaseDate"" = ""ExpectedReleaseDate""
 WHERE ""ReleaseDate"" IS NULL AND ""Type"" = 'Movie' AND ""ExpectedReleaseDate"" IS NOT NULL;");
+
+            // Sign-in providers (docs/sso.md): the providers an admin sets up, the
+            // provider accounts linked to users, whether an account has a password,
+            // whether password sign-in is on, the public address, and how a refresh
+            // token's session began. Every account that exists keeps its password
+            // and the setting starts on, so nothing changes until an admin acts.
+            // Running it again changes nothing.
+            migrationBuilder.Sql(@"
+ALTER TABLE ""Users"" ADD COLUMN IF NOT EXISTS ""HasPassword"" boolean NOT NULL DEFAULT TRUE;
+ALTER TABLE ""ServerSettings"" ADD COLUMN IF NOT EXISTS ""PasswordSignInEnabled"" boolean NOT NULL DEFAULT TRUE;
+ALTER TABLE ""ServerSettings"" ADD COLUMN IF NOT EXISTS ""PublicBaseUrl"" character varying(256);
+ALTER TABLE ""AuthRefreshTokens"" ADD COLUMN IF NOT EXISTS ""SignInMethod"" character varying(16) NOT NULL DEFAULT 'Password';
+
+CREATE TABLE IF NOT EXISTS ""AuthProviders"" (
+    ""Id"" uuid NOT NULL,
+    ""Type"" character varying(16) NOT NULL,
+    ""Slug"" character varying(64) NOT NULL,
+    ""DisplayName"" character varying(64) NOT NULL,
+    ""Enabled"" boolean NOT NULL,
+    ""IconUrl"" character varying(1024),
+    ""SortOrder"" integer NOT NULL,
+    ""Issuer"" character varying(256),
+    ""ClientId"" character varying(256),
+    ""ClientSecretCiphertext"" character varying(2048),
+    ""Scopes"" character varying(512) NOT NULL,
+    ""EmailClaim"" character varying(64) NOT NULL,
+    ""NameClaim"" character varying(64) NOT NULL,
+    ""GroupsClaim"" character varying(64) NOT NULL,
+    ""NewUserPolicy"" character varying(32) NOT NULL,
+    ""LinkByEmail"" character varying(32) NOT NULL,
+    ""AllowedEmailDomains"" text NOT NULL,
+    ""RequiredGroup"" character varying(256),
+    ""AdminGroup"" character varying(256),
+    ""CreatedAt"" timestamp with time zone NOT NULL,
+    ""UpdatedAt"" timestamp with time zone NOT NULL,
+    CONSTRAINT ""PK_AuthProviders"" PRIMARY KEY (""Id"")
+);
+
+CREATE TABLE IF NOT EXISTS ""UserExternalIdentities"" (
+    ""Id"" uuid NOT NULL,
+    ""UserId"" uuid NOT NULL,
+    ""ProviderId"" uuid NOT NULL,
+    ""Subject"" character varying(512) NOT NULL,
+    ""Email"" character varying(256),
+    ""LinkedAt"" timestamp with time zone NOT NULL,
+    ""LastSignInAt"" timestamp with time zone,
+    CONSTRAINT ""PK_UserExternalIdentities"" PRIMARY KEY (""Id""),
+    CONSTRAINT ""FK_UserExternalIdentities_AuthProviders_ProviderId"" FOREIGN KEY (""ProviderId"") REFERENCES ""AuthProviders"" (""Id"") ON DELETE CASCADE,
+    CONSTRAINT ""FK_UserExternalIdentities_Users_UserId"" FOREIGN KEY (""UserId"") REFERENCES ""Users"" (""Id"") ON DELETE CASCADE
+);
+
+CREATE UNIQUE INDEX IF NOT EXISTS ""IX_AuthProviders_Slug"" ON ""AuthProviders"" (""Slug"");
+CREATE UNIQUE INDEX IF NOT EXISTS ""IX_UserExternalIdentities_ProviderId_Subject"" ON ""UserExternalIdentities"" (""ProviderId"", ""Subject"");
+CREATE INDEX IF NOT EXISTS ""IX_UserExternalIdentities_UserId"" ON ""UserExternalIdentities"" (""UserId"");");
         }
 
         /// <inheritdoc />
         protected override void Down(MigrationBuilder migrationBuilder)
         {
+            migrationBuilder.DropTable(
+                name: "UserExternalIdentities");
+
+            migrationBuilder.DropTable(
+                name: "AuthProviders");
+
+            migrationBuilder.DropColumn(
+                name: "SignInMethod",
+                table: "AuthRefreshTokens");
+
+            migrationBuilder.DropColumn(
+                name: "PublicBaseUrl",
+                table: "ServerSettings");
+
+            migrationBuilder.DropColumn(
+                name: "PasswordSignInEnabled",
+                table: "ServerSettings");
+
+            migrationBuilder.DropColumn(
+                name: "HasPassword",
+                table: "Users");
+
             migrationBuilder.DropColumn(
                 name: "ReleaseDate",
                 table: "UserWatchlistItems");

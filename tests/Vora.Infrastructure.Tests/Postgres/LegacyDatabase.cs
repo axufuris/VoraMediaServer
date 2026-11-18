@@ -244,9 +244,27 @@ public sealed class LegacyDatabase : IAsyncDisposable
 
     public const string WatchlistShowsMigration = "20261117002611_ChangesSinceInitial";
 
+    public const string WatchlistReleaseDateMigration = "20261117005048_ChangesSinceInitial";
+
+    public const string SignInColumns = """
+        ALTER TABLE "Users" ADD COLUMN IF NOT EXISTS "HasPassword" boolean NOT NULL DEFAULT TRUE;
+        ALTER TABLE "ServerSettings" ADD COLUMN IF NOT EXISTS "PasswordSignInEnabled" boolean NOT NULL DEFAULT TRUE;
+        ALTER TABLE "ServerSettings" ADD COLUMN IF NOT EXISTS "PublicBaseUrl" character varying(256);
+        ALTER TABLE "AuthRefreshTokens" ADD COLUMN IF NOT EXISTS "SignInMethod" character varying(16) NOT NULL DEFAULT 'Password';
+        """;
+
+    private const string ColumnsSinceWatchlistReleaseDate = """
+        DROP TABLE IF EXISTS "UserExternalIdentities";
+        DROP TABLE IF EXISTS "AuthProviders";
+        ALTER TABLE "AuthRefreshTokens" DROP COLUMN IF EXISTS "SignInMethod";
+        ALTER TABLE "ServerSettings" DROP COLUMN IF EXISTS "PublicBaseUrl";
+        ALTER TABLE "ServerSettings" DROP COLUMN IF EXISTS "PasswordSignInEnabled";
+        ALTER TABLE "Users" DROP COLUMN IF EXISTS "HasPassword";
+        """;
+
     private const string ColumnsSinceWatchlistShows = """
         ALTER TABLE "UserWatchlistItems" DROP COLUMN IF EXISTS "ReleaseDate";
-        """;
+        """ + ColumnsSinceWatchlistReleaseDate;
 
     private const string CollectionHiddenColumns = """
         ALTER TABLE "Collections" ADD COLUMN IF NOT EXISTS "Hidden" boolean NOT NULL DEFAULT FALSE;
@@ -399,7 +417,7 @@ public sealed class LegacyDatabase : IAsyncDisposable
     public async Task SeedAsync(Func<VoraDbContext, Task> seed, CancellationToken cancellationToken)
     {
         await using var db = NewContext();
-        await db.Database.ExecuteSqlRawAsync(RememberedChoicesProfileColumns + LibrarySortProfileColumns + KeepHdrSettingColumns + AutoPlayProfileColumns + UpNextProfileColumns + ImageSubtitleDeviceColumns + LiveVideoChannelColumns + ThemeCollectionColumns + PlaySourceColumns + IptvProviderColumns + CollectionHiddenColumns, cancellationToken);
+        await db.Database.ExecuteSqlRawAsync(RememberedChoicesProfileColumns + LibrarySortProfileColumns + KeepHdrSettingColumns + AutoPlayProfileColumns + UpNextProfileColumns + ImageSubtitleDeviceColumns + LiveVideoChannelColumns + ThemeCollectionColumns + PlaySourceColumns + IptvProviderColumns + CollectionHiddenColumns + SignInColumns, cancellationToken);
         await seed(db);
         await db.Database.ExecuteSqlRawAsync(ColumnsSinceRememberedChoices + ColumnsSinceVideoDimensions, cancellationToken);
     }
@@ -591,6 +609,15 @@ public sealed class LegacyDatabase : IAsyncDisposable
         await seed(db);
         await db.Database.ExecuteSqlRawAsync(ColumnsSinceWatchlistShows, cancellationToken);
         await ReplaceCombinedMigrationAsync(db, WatchlistShowsMigration, "10.0.9", cancellationToken);
+    }
+
+    public async Task BuildWatchlistReleaseDateStateAsync(Func<VoraDbContext, Task> seed, CancellationToken cancellationToken)
+    {
+        await using var db = NewContext();
+        await db.Database.MigrateAsync(cancellationToken);
+        await seed(db);
+        await db.Database.ExecuteSqlRawAsync(ColumnsSinceWatchlistReleaseDate, cancellationToken);
+        await ReplaceCombinedMigrationAsync(db, WatchlistReleaseDateMigration, "10.0.9", cancellationToken);
     }
 
     private static async Task ReplaceCombinedMigrationAsync(VoraDbContext db, string migrationId, string productVersion, CancellationToken cancellationToken)

@@ -15,6 +15,7 @@ public enum BackupSkipReason
     MissingPodcast,
     MissingRecordingSchedule,
     MissingFile,
+    MissingAuthProvider,
     Duplicate
 }
 
@@ -80,6 +81,8 @@ public sealed class BackupSkipTally
                 $"{subject} {was} skipped because {its} recording schedule isn't on this server. Restore IPTV Recording Schedules once the playlist's channels have loaded, then restore this section again.",
             BackupSkipReason.MissingFile =>
                 $"{subject} {was} skipped because {its} file isn't on this server. Copy the recordings folder over, then restore this section again.",
+            BackupSkipReason.MissingAuthProvider =>
+                $"{subject} {was} skipped because {its} sign-in provider isn't on this server. Restore Sign-in Providers too.",
             BackupSkipReason.Duplicate =>
                 $"{subject} {was} dropped because {(one ? "it" : "they")} matched the same item as another row on this server.",
             _ => $"{subject} {was} skipped."

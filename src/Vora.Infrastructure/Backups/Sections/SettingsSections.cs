@@ -3,6 +3,7 @@ using Microsoft.EntityFrameworkCore;
 using Vora.Application.Backups;
 using Vora.Domain.Entities.Notifications;
 using Vora.Domain.Entities.Settings;
+using Vora.Domain.Entities.Users;
 using Vora.Infrastructure.Persistence;
 
 namespace Vora.Infrastructure.Backups.Sections;
@@ -14,6 +15,18 @@ public sealed class ServerSettingsBackupSection : EntityTableBackupSection<Serve
     public override string DisplayName => "Server Settings";
     public override BackupSectionGroup Group => BackupSectionGroup.Settings;
     protected override DbSet<ServerSetting> Set(VoraDbContext db) => db.ServerSettings;
+}
+
+public sealed class AuthProvidersBackupSection : EntityTableBackupSection<AuthProvider>
+{
+    public AuthProvidersBackupSection(VoraDbContext db) : base(db) { }
+    public override string Key => "settings.auth-providers";
+    public override string DisplayName => "Sign-in Providers";
+    public override BackupSectionGroup Group => BackupSectionGroup.Settings;
+    public override bool RequiresExplicitConfirm => true;
+    public override string? DestructiveWarning =>
+        "Replaces the sign-in providers. Providers that are not in the backup are removed along with the links people made to them. The saved client secrets only decrypt with the matching DataProtection keys.";
+    protected override DbSet<AuthProvider> Set(VoraDbContext db) => db.AuthProviders;
 }
 
 public sealed class PluginSettingsBackupSection : EntityTableBackupSection<PluginSettingValue>

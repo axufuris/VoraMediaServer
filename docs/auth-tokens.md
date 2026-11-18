@@ -33,7 +33,7 @@ Permissions are therefore fixed when a token is issued, and an admin edit makes 
 
 `POST /auth/refresh { refreshToken, profileId? }` is anonymous and reads `X-Vora-Device-Id`. It returns a new account token and a **new** refresh token in the same family with another 90 days; the presented one is revoked. With a `profileId` it also returns `profileToken`, left empty for a PIN-protected profile (the client asks for the PIN and exchanges). It answers 401 for an unknown or expired token. Presenting a token that was already revoked (a replay, or one logged out) revokes the whole family, and so does a refresh whose stored stamp no longer matches the account.
 
-`POST /auth/logout { refreshToken }` revokes the family and always answers 204. A new login from a device revokes that device's earlier refresh tokens first. Rows are kept, revoked or not.
+`POST /auth/logout { refreshToken }` revokes the family and always answers 204. A new login from a device revokes that device's earlier refresh tokens first. Rows are kept, revoked or not. Each row records how the session began (`SignInMethod`: `Password` or `External`): when an admin turns password sign-in off, a refresh of a `Password` session by a non-admin revokes its family, and `External` sessions go on (`docs/sso.md`).
 
 Android, Roku and tvOS refresh once on a 401, retry the request, and only then treat the session as expired. The web client (and Vora Desktop, which loads it) never calls `/auth/refresh` or `/auth/logout`: it ignores `refreshToken`, so its session is the 7-day profile token, and any 401 clears the tokens and goes to `/login`.
 

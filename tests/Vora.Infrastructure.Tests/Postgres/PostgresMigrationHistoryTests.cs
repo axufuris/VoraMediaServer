@@ -1158,6 +1158,7 @@ public class PostgresMigrationHistoryTests(PostgresDatabase database) : IClassFi
         await legacy.BuildQaStateAsync(withSetupGuide: true, cancellationToken);
         await using (var before = legacy.NewContext())
         {
+            await before.Database.ExecuteSqlRawAsync(LegacyDatabase.SignInColumns, cancellationToken);
             before.Set<User>().Add(new User { Email = "admin@example.com", DisplayName = "Admin", IsAdmin = true });
             await before.SaveChangesAsync(cancellationToken);
             await before.Database.ExecuteSqlRawAsync("UPDATE \"ServerSettings\" SET \"SetupGuideStatus\" = 3, \"SetupGuideContent\" = 5", cancellationToken);
@@ -1344,5 +1345,50 @@ public class PostgresMigrationHistoryTests(PostgresDatabase database) : IClassFi
 
         await using var again = legacy.NewContext();
         (await again.UserWatchlistItems.AsNoTracking().OrderBy(w => w.AddedAt).ToListAsync(cancellationToken)).Should().BeEquivalentTo(afterFirstRun);
+    }
+
+    [Fact]
+    public async Task A_database_on_the_watchlist_release_date_migration_gains_the_sign_in_provider_tables_and_every_account_keeps_its_password()
+    {
+        Assert.SkipUnless(PostgresDatabase.IsConfigured, PostgresDatabase.SkipReason);
+        var cancellationToken = TestContext.Current.CancellationToken;
+        await using var legacy = new LegacyDatabase();
+        var user = new User { Email = $"{Guid.NewGuid():N}@example.com", DisplayName = "Sam", PasswordHash = "hash" };
+        var session = new AuthRefreshToken { FamilyId = Guid.NewGuid(), UserId = user.Id, TokenHash = Guid.NewGuid().ToString("N"), SecurityStamp = "stamp", ExpiresAt = DateTime.UtcNow.AddDays(30) };
+
+        await legacy.BuildWatchlistReleaseDateStateAsync(async db =>
+        {
+            db.AddRange(user, session);
+            await db.SaveChangesAsync(cancellationToken);
+        }, cancellationToken);
+
+        await using (var before = legacy.NewContext())
+        {
+            (await before.Database.GetPendingMigrationsAsync(cancellationToken)).Should().Equal(MigrationHistoryTests.ChangesSinceInitial);
+            (await ColumnsAsync(before, "Users", cancellationToken)).Should().NotContain("HasPassword");
+            (await ColumnsAsync(before, "AuthRefreshTokens", cancellationToken)).Should().NotContain("SignInMethod");
+            (await ColumnsAsync(before, "ServerSettings", cancellationToken)).Should().NotContain("PasswordSignInEnabled").And.NotContain("PublicBaseUrl");
+            (await ColumnsAsync(before, "AuthProviders", cancellationToken)).Should().BeEmpty();
+        }
+
+        await legacy.MigrateAsync(cancellationToken);
+
+        await using (var after = legacy.NewContext())
+        {
+            (await after.Database.GetPendingMigrationsAsync(cancellationToken)).Should().BeEmpty();
+            (await after.Users.AsNoTracking().SingleAsync(u => u.Id == user.Id, cancellationToken)).HasPassword.Should().BeTrue();
+            (await after.AuthRefreshTokens.AsNoTracking().SingleAsync(t => t.Id == session.Id, cancellationToken)).SignInMethod.Should().Be(AuthSignInMethod.Password);
+            (await after.ServerSettings.AsNoTracking().FirstAsync(cancellationToken)).PasswordSignInEnabled.Should().BeTrue();
+            (await after.AuthProviders.CountAsync(cancellationToken)).Should().Be(0);
+            (await after.UserExternalIdentities.CountAsync(cancellationToken)).Should().Be(0);
+
+            await after.Database.ExecuteSqlAsync($"DELETE FROM \"__EFMigrationsHistory\" WHERE \"MigrationId\" = {MigrationHistoryTests.ChangesSinceInitial}", cancellationToken);
+        }
+
+        await legacy.MigrateAsync(cancellationToken);
+
+        await using var again = legacy.NewContext();
+        (await again.Users.AsNoTracking().SingleAsync(u => u.Id == user.Id, cancellationToken)).HasPassword.Should().BeTrue();
+        (await again.AuthRefreshTokens.AsNoTracking().SingleAsync(t => t.Id == session.Id, cancellationToken)).SignInMethod.Should().Be(AuthSignInMethod.Password);
     }
 }

@@ -39,15 +39,21 @@ public enum EmailChangeConfirmResult
     AlreadyInUse
 }
 
+public class PasswordSignInDisabledException() : Exception("Password sign-in is turned off on this server. Use one of its sign-in providers.");
+
 public interface IAuthManager
 {
     Task<(bool IsClaimed, RegistrationMode Mode)> GetSetupStatusAsync();
     Task<AuthResponseDto> ClaimServerAsync(string email, string password, string displayName, string? serverName = null);
     Task<AuthResponseDto?> LoginAsync(string email, string password);
+    Task<Guid?> VerifyCredentialsAsync(string email, string password);
+    Task<AuthResponseDto?> SignInExternalAsync(Guid userId);
+    Task<User> CreateExternalUserAsync(string email, string displayName, bool isAdmin);
+    Task<AdminCreateUserResult> CreatePasswordlessUserAsAdminAsync(string email, string displayName);
     Task<ProfileTokenResult> GenerateProfileTokenAsync(Guid accountId, Guid profileId, string? pin = null);
     Task<AuthResponseDto> RegisterAsync(string email, string password, string displayName, string? secretCode, string? inviteToken = null);
     Task<AdminCreateUserResult> CreateUserAsAdminAsync(string email, string password, string displayName);
-    Task<string> IssueRefreshTokenAsync(Guid accountId, string? deviceId);
+    Task<string> IssueRefreshTokenAsync(Guid accountId, string? deviceId, AuthSignInMethod method = AuthSignInMethod.Password);
     Task<AuthResponseDto?> RefreshAsync(string refreshToken, Guid? profileId, string? deviceId);
     Task RevokeRefreshTokenAsync(string refreshToken);
     Task<string> GenerateInviteCodeAsync();
@@ -117,6 +123,7 @@ public class AuthManager(
     public async Task<AuthResponseDto> RegisterAsync(string email, string password, string displayName, string? secretCode, string? inviteToken = null)
     {
         EnsurePasswordMeetsPolicy(password);
+        await EnsurePasswordSignInOpenAsync();
         var normalizedEmail = email.Trim().ToLowerInvariant();
 
         if (!string.IsNullOrWhiteSpace(inviteToken))
@@ -221,10 +228,54 @@ public class AuthManager(
             return AdminCreateUserResult.EmailInUse;
         }
 
+        if (!await IsPasswordSignInEnabledAsync())
+        {
+            return AdminCreateUserResult.Invalid("Password sign-in is turned off on this server. Add the person without a password so they sign in with a provider.");
+        }
+
         var user = BuildUser(normalizedEmail, password, name, isAdmin: false);
         await repository.AddUserAsync(user);
         logger.LogInformation("Admin created account {UserId}", user.Id);
         return AdminCreateUserResult.Created(user.Id);
+    }
+
+    public async Task<AdminCreateUserResult> CreatePasswordlessUserAsAdminAsync(string email, string displayName)
+    {
+        var normalizedEmail = (email ?? string.Empty).Trim().ToLowerInvariant();
+        var name = (displayName ?? string.Empty).Trim();
+
+        if (normalizedEmail.Length == 0 || !normalizedEmail.Contains('@')) return AdminCreateUserResult.Invalid("Enter a valid email address.");
+        if (name.Length == 0) return AdminCreateUserResult.Invalid("Enter a name.");
+
+        if (await repository.GetUserWithProfilesByEmailAsync(normalizedEmail) != null)
+        {
+            return AdminCreateUserResult.EmailInUse;
+        }
+
+        var user = BuildUser(normalizedEmail, GenerateUnusablePassword(), name, isAdmin: false, hasPassword: false);
+        await repository.AddUserAsync(user);
+        logger.LogInformation("Admin created account {UserId} without a password", user.Id);
+        return AdminCreateUserResult.Created(user.Id);
+    }
+
+    public async Task<User> CreateExternalUserAsync(string email, string displayName, bool isAdmin)
+    {
+        var normalizedEmail = email.Trim().ToLowerInvariant();
+        var name = string.IsNullOrWhiteSpace(displayName) ? normalizedEmail.Split('@')[0] : displayName.Trim();
+
+        var user = isAdmin
+            ? BuildUser(normalizedEmail, GenerateUnusablePassword(), name, isAdmin: true, canRequestMedia: true, canTimeshiftIptv: true, canAddCustomPodcastFeeds: true, canRecordLiveTv: true, hasPassword: false)
+            : BuildUser(normalizedEmail, GenerateUnusablePassword(), name, isAdmin: false, hasPassword: false);
+
+        await repository.AddUserAsync(user);
+        logger.LogInformation("Created account {UserId} from an external sign-in", user.Id);
+        return user;
+    }
+
+    public async Task<AuthResponseDto?> SignInExternalAsync(Guid userId)
+    {
+        var user = await repository.GetUserByIdAsync(userId);
+        return user is null ? null : BuildAuthResponse(user);
     }
 
     public async Task<AuthResponseDto> ClaimServerAsync(string email, string password, string displayName, string? serverName = null)
@@ -260,6 +311,39 @@ public class AuthManager(
 
     public async Task<AuthResponseDto?> LoginAsync(string email, string password)
     {
+        var user = await AuthenticateAsync(email, password);
+        if (user is null)
+        {
+            return null;
+        }
+
+        if (!user.IsAdmin && !await IsPasswordSignInEnabledAsync())
+        {
+            throw new PasswordSignInDisabledException();
+        }
+
+        return BuildAuthResponse(user);
+    }
+
+    public async Task<Guid?> VerifyCredentialsAsync(string email, string password) =>
+        (await AuthenticateAsync(email, password))?.Id;
+
+    private async Task<bool> IsPasswordSignInEnabledAsync()
+    {
+        var settings = await settingsRepo.GetSettingsAsync();
+        return settings?.PasswordSignInEnabled ?? true;
+    }
+
+    private async Task EnsurePasswordSignInOpenAsync()
+    {
+        if (!await IsPasswordSignInEnabledAsync())
+        {
+            throw new InvalidOperationException("Password sign-in is turned off on this server, so an account with a password cannot be created. Use one of its sign-in providers.");
+        }
+    }
+
+    private async Task<User?> AuthenticateAsync(string email, string password)
+    {
         var key = email.Trim().ToLowerInvariant();
         // A failed sign-in says why in the server log, so an admin can tell a
         // mistyped email from a wrong password: the client only ever gets a
@@ -273,11 +357,15 @@ public class AuthManager(
         }
 
         var user = await repository.GetUserWithProfilesByEmailAsync(email);
-        if (user == null || !VerifyPassword(password, user.PasswordHash))
+        if (user == null || !user.HasPassword || !VerifyPassword(password, user.PasswordHash))
         {
             if (user == null)
             {
                 logger.LogWarning("Sign-in failed: no account has that email");
+            }
+            else if (!user.HasPassword)
+            {
+                logger.LogWarning("Sign-in failed for account {UserId}: the account has no password and signs in with a provider", user.Id);
             }
             else
             {
@@ -288,7 +376,7 @@ public class AuthManager(
         }
 
         memoryCache.Remove(LoginFailPrefix + key);
-        return BuildAuthResponse(user);
+        return user;
     }
 
     private void RegisterFailedLogin(string key)
@@ -364,7 +452,7 @@ public class AuthManager(
         return ProfileTokenResult.Issued(CreateToken(claims, TimeSpan.FromDays(ProfileTokenLifetimeDays)));
     }
 
-    public async Task<string> IssueRefreshTokenAsync(Guid accountId, string? deviceId)
+    public async Task<string> IssueRefreshTokenAsync(Guid accountId, string? deviceId, AuthSignInMethod method = AuthSignInMethod.Password)
     {
         var user = await repository.GetUserByIdAsync(accountId)
             ?? throw new InvalidOperationException("Cannot issue a refresh token for a non-existent account.");
@@ -386,6 +474,7 @@ public class AuthManager(
             TokenHash = HashToken(token),
             SecurityStamp = user.SecurityStamp,
             DeviceId = deviceId,
+            SignInMethod = method,
             CreatedAt = DateTime.UtcNow,
             ExpiresAt = DateTime.UtcNow.AddDays(RefreshTokenLifetimeDays)
         });
@@ -416,6 +505,12 @@ public class AuthManager(
             return null;
         }
 
+        if (stored.SignInMethod == AuthSignInMethod.Password && !user.IsAdmin && !await IsPasswordSignInEnabledAsync())
+        {
+            await repository.RevokeAuthRefreshTokenFamilyAsync(stored.FamilyId);
+            return null;
+        }
+
         var newToken = GenerateRefreshTokenValue();
         await repository.AddAuthRefreshTokenAsync(new AuthRefreshToken
         {
@@ -424,6 +519,7 @@ public class AuthManager(
             TokenHash = HashToken(newToken),
             SecurityStamp = user.SecurityStamp,
             DeviceId = deviceId ?? stored.DeviceId,
+            SignInMethod = stored.SignInMethod,
             CreatedAt = DateTime.UtcNow,
             ExpiresAt = DateTime.UtcNow.AddDays(RefreshTokenLifetimeDays)
         });
@@ -518,13 +614,16 @@ public class AuthManager(
         return user.AllowedLibraryIds.Intersect(profile.AllowedLibraryIds).ToList();
     }
 
-    private static User BuildUser(string email, string password, string displayName, bool isAdmin, bool canRequestMedia = false, bool canTimeshiftIptv = false, bool canAddCustomPodcastFeeds = false, bool canRecordLiveTv = false)
+    private static string GenerateUnusablePassword() => Base64UrlEncode(RandomNumberGenerator.GetBytes(32));
+
+    private static User BuildUser(string email, string password, string displayName, bool isAdmin, bool canRequestMedia = false, bool canTimeshiftIptv = false, bool canAddCustomPodcastFeeds = false, bool canRecordLiveTv = false, bool hasPassword = true)
     {
         var user = new User
         {
             Email = email.ToLower(),
             DisplayName = displayName,
             PasswordHash = HashPassword(password),
+            HasPassword = hasPassword,
             IsAdmin = isAdmin,
             CanRequestMedia = canRequestMedia,
             CanTimeshiftIptv = canTimeshiftIptv,
@@ -630,6 +729,7 @@ public class AuthManager(
         }
 
         user.PasswordHash = HashPassword(newPassword);
+        user.HasPassword = true;
         user.SecurityStamp = Guid.NewGuid().ToString("N");
         await repository.UpdateUserAsync(user);
 

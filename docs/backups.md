@@ -25,6 +25,7 @@ Implementations live in `Vora.Infrastructure/Backups/Sections/`. `EntityTableBac
 | Key | Restores |
 | --- | --- |
 | `settings.server`, `settings.plugins`, `settings.webhooks` | `ServerSettings`, `PluginSettings`, `WebhookConfigs` |
+| `settings.auth-providers` | `AuthProviders`: the sign-in providers. The saved client secrets are DataProtection ciphertext, so they decrypt only with the matching keys (`settings.data-protection`) |
 | `library.definitions` | `MediaLibraries`: name, type, folders and every per-library setting. A library with the same name and type is updated in place (its id stays); one that isn't here is added under its old id when that id is free. Libraries not in the backup are left alone, and nothing is scanned — after the restore `BackupManager` restarts the folder watchers (`IFolderWatcherService.RestartAllWatchersAsync`) and the result tells the admin which libraries to scan |
 | `settings.data-protection` | DataProtection key XML files (filesystem, not DB) |
 | `templates.client-schedules`, `templates.email`, `templates.overlay` | template schedules, email overrides, overlay templates |
@@ -46,6 +47,7 @@ Implementations live in `Vora.Infrastructure/Backups/Sections/`. `EntityTableBac
 | `users.ai-playlists` | AI playlists a profile asked for and Blends (`GeneratedMixes` of kind `Requested` / `Blend`), songs matched by identity; the mixes and weekly AI playlists Vora rebuilds are left alone |
 | `users.requests` | `MediaRequests`, `MediaRequestUsers` |
 | `users.external-connections`, `users.channel-favorites` | `UserProviderConnections`, `ProfileChannelFavorites` |
+| `users.external-identities` | `UserExternalIdentities`: which provider account belongs to which user. A link whose user or provider is not on this server is skipped |
 | `podcasts.shows` | every `PodcastShow` (catalog flag + every show a profile follows) |
 | `podcasts.listening` | `PodcastSubscriptions`, `PodcastEpisodeProfileStates` |
 

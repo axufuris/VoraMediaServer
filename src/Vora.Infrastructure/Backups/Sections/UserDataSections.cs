@@ -400,6 +400,30 @@ public sealed class ExternalConnectionsBackupSection : EntityTableBackupSection<
     }
 }
 
+public sealed class ExternalIdentitiesBackupSection : EntityTableBackupSection<UserExternalIdentity>
+{
+    private static readonly BackupRowNoun Noun = new("sign-in link", "sign-in links");
+
+    public ExternalIdentitiesBackupSection(VoraDbContext db) : base(db) { }
+    public override string Key => "users.external-identities";
+    public override string DisplayName => "Sign-in Provider Links";
+    public override BackupSectionGroup Group => BackupSectionGroup.UserData;
+    public override bool RequiresExplicitConfirm => true;
+    public override string? DestructiveWarning => "Replaces which sign-in provider accounts belong to which user accounts.";
+    protected override DbSet<UserExternalIdentity> Set(VoraDbContext db) => db.UserExternalIdentities;
+
+    protected override async Task<List<UserExternalIdentity>> PrepareRowsAsync(IBackupReader reader, List<UserExternalIdentity> rows, BackupSkipTally tally, CancellationToken ct)
+    {
+        var userIds = await Db.Users.Select(u => u.Id).ToHashSetAsync(ct);
+        var providerIds = await Db.AuthProviders.Select(p => p.Id).ToHashSetAsync(ct);
+        var withUser = rows.Where(r => userIds.Contains(r.UserId)).ToList();
+        tally.Skip(Noun, BackupSkipReason.MissingUser, rows.Count - withUser.Count);
+        var restorable = withUser.Where(r => providerIds.Contains(r.ProviderId)).ToList();
+        tally.Skip(Noun, BackupSkipReason.MissingAuthProvider, withUser.Count - restorable.Count);
+        return restorable;
+    }
+}
+
 public sealed class ChannelFavoritesBackupSection : IBackupSection
 {
     private static readonly BackupRowNoun Noun = new("favorite", "favorites");

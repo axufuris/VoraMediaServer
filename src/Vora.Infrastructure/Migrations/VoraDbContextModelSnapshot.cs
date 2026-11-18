@@ -3217,11 +3217,20 @@ namespace Vora.Infrastructure.Migrations
                     b.Property<TimeSpan>("NightlyScanTime")
                         .HasColumnType("interval");
 
+                    b.Property<bool>("PasswordSignInEnabled")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(true);
+
                     b.Property<bool>("PreExtractSubtitlesOnScan")
                         .HasColumnType("boolean");
 
                     b.Property<bool>("PreserveHdrInTranscodes")
                         .HasColumnType("boolean");
+
+                    b.Property<string>("PublicBaseUrl")
+                        .HasMaxLength(256)
+                        .HasColumnType("character varying(256)");
 
                     b.Property<int>("PublicPort")
                         .HasColumnType("integer");
@@ -3832,6 +3841,105 @@ namespace Vora.Infrastructure.Migrations
                     b.ToTable("SystemMetrics");
                 });
 
+            modelBuilder.Entity("Vora.Domain.Entities.Users.AuthProvider", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("AdminGroup")
+                        .HasMaxLength(256)
+                        .HasColumnType("character varying(256)");
+
+                    b.Property<string>("AllowedEmailDomains")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<string>("ClientId")
+                        .HasMaxLength(256)
+                        .HasColumnType("character varying(256)");
+
+                    b.Property<string>("ClientSecretCiphertext")
+                        .HasMaxLength(2048)
+                        .HasColumnType("character varying(2048)");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("DisplayName")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<string>("EmailClaim")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<bool>("Enabled")
+                        .HasColumnType("boolean");
+
+                    b.Property<string>("GroupsClaim")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<string>("IconUrl")
+                        .HasMaxLength(1024)
+                        .HasColumnType("character varying(1024)");
+
+                    b.Property<string>("Issuer")
+                        .HasMaxLength(256)
+                        .HasColumnType("character varying(256)");
+
+                    b.Property<string>("LinkByEmail")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)");
+
+                    b.Property<string>("NameClaim")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<string>("NewUserPolicy")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)");
+
+                    b.Property<string>("RequiredGroup")
+                        .HasMaxLength(256)
+                        .HasColumnType("character varying(256)");
+
+                    b.Property<string>("Scopes")
+                        .IsRequired()
+                        .HasMaxLength(512)
+                        .HasColumnType("character varying(512)");
+
+                    b.Property<string>("Slug")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<int>("SortOrder")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("Type")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Slug")
+                        .IsUnique();
+
+                    b.ToTable("AuthProviders");
+                });
+
             modelBuilder.Entity("Vora.Domain.Entities.Users.AuthRefreshToken", b =>
                 {
                     b.Property<Guid>("Id")
@@ -3858,6 +3966,13 @@ namespace Vora.Infrastructure.Migrations
                         .IsRequired()
                         .HasMaxLength(64)
                         .HasColumnType("character varying(64)");
+
+                    b.Property<string>("SignInMethod")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)")
+                        .HasDefaultValue("Password");
 
                     b.Property<string>("TokenHash")
                         .IsRequired()
@@ -4358,6 +4473,11 @@ namespace Vora.Infrastructure.Migrations
                     b.Property<bool>("HasAllLibraryAccess")
                         .HasColumnType("boolean");
 
+                    b.Property<bool>("HasPassword")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(true);
+
                     b.Property<bool>("IsAdmin")
                         .HasColumnType("boolean");
 
@@ -4439,6 +4559,43 @@ namespace Vora.Infrastructure.Migrations
                         .IsUnique();
 
                     b.ToTable("UserArtistRatings");
+                });
+
+            modelBuilder.Entity("Vora.Domain.Entities.Users.UserExternalIdentity", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Email")
+                        .HasMaxLength(256)
+                        .HasColumnType("character varying(256)");
+
+                    b.Property<DateTime?>("LastSignInAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime>("LinkedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("ProviderId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Subject")
+                        .IsRequired()
+                        .HasMaxLength(512)
+                        .HasColumnType("character varying(512)");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("UserId");
+
+                    b.HasIndex("ProviderId", "Subject")
+                        .IsUnique();
+
+                    b.ToTable("UserExternalIdentities");
                 });
 
             modelBuilder.Entity("Vora.Domain.Entities.Users.UserMediaRating", b =>
@@ -5613,6 +5770,25 @@ namespace Vora.Infrastructure.Migrations
                     b.Navigation("Profile");
                 });
 
+            modelBuilder.Entity("Vora.Domain.Entities.Users.UserExternalIdentity", b =>
+                {
+                    b.HasOne("Vora.Domain.Entities.Users.AuthProvider", "Provider")
+                        .WithMany("Identities")
+                        .HasForeignKey("ProviderId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("Vora.Domain.Entities.Users.User", "User")
+                        .WithMany("ExternalIdentities")
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Provider");
+
+                    b.Navigation("User");
+                });
+
             modelBuilder.Entity("Vora.Domain.Entities.Users.UserMediaRating", b =>
                 {
                     b.HasOne("Vora.Domain.Entities.Media.MediaItem", "MediaItem")
@@ -5786,8 +5962,15 @@ namespace Vora.Infrastructure.Migrations
                     b.Navigation("Requesters");
                 });
 
+            modelBuilder.Entity("Vora.Domain.Entities.Users.AuthProvider", b =>
+                {
+                    b.Navigation("Identities");
+                });
+
             modelBuilder.Entity("Vora.Domain.Entities.Users.User", b =>
                 {
+                    b.Navigation("ExternalIdentities");
+
                     b.Navigation("Profiles");
 
                     b.Navigation("ProviderConnections");

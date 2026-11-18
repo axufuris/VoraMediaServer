@@ -217,6 +217,7 @@ public static class ServiceRegistrationExtensions
         services.AddScoped<Vora.Infrastructure.Backups.BackupReferenceMapper>();
 
         services.AddScoped<Vora.Application.Backups.IBackupSection, Vora.Infrastructure.Backups.Sections.ServerSettingsBackupSection>();
+        services.AddScoped<Vora.Application.Backups.IBackupSection, Vora.Infrastructure.Backups.Sections.AuthProvidersBackupSection>();
         services.AddScoped<Vora.Application.Backups.IBackupSection, Vora.Infrastructure.Backups.Sections.PluginSettingsBackupSection>();
         services.AddScoped<Vora.Application.Backups.IBackupSection, Vora.Infrastructure.Backups.Sections.WebhooksBackupSection>();
         services.AddScoped<Vora.Application.Backups.IBackupSection>(sp =>
@@ -254,6 +255,7 @@ public static class ServiceRegistrationExtensions
         services.AddScoped<Vora.Application.Backups.IBackupSection, Vora.Infrastructure.Backups.Sections.AiPlaylistsBackupSection>();
         services.AddScoped<Vora.Application.Backups.IBackupSection, Vora.Infrastructure.Backups.Sections.MediaRequestsBackupSection>();
         services.AddScoped<Vora.Application.Backups.IBackupSection, Vora.Infrastructure.Backups.Sections.ExternalConnectionsBackupSection>();
+        services.AddScoped<Vora.Application.Backups.IBackupSection, Vora.Infrastructure.Backups.Sections.ExternalIdentitiesBackupSection>();
         services.AddScoped<Vora.Application.Backups.IBackupSection, Vora.Infrastructure.Backups.Sections.ChannelFavoritesBackupSection>();
         services.AddScoped<Vora.Application.Backups.IBackupSection, Vora.Infrastructure.Backups.Sections.PlaybackChoicesBackupSection>();
 
@@ -354,6 +356,7 @@ public static class ServiceRegistrationExtensions
         services.AddScoped<IEmailDeliveryLogRepository, EmailDeliveryLogRepository>();
         services.AddScoped<IEmailTemplateRepository, EmailTemplateRepository>();
         services.AddScoped<IInvitationRepository, InvitationRepository>();
+        services.AddScoped<Vora.Application.Auth.External.IAuthProviderRepository, AuthProviderRepository>();
         services.AddScoped<IChannelFavoriteRepository, ChannelFavoriteRepository>();
         services.AddScoped<IIptvRepository, IptvRepository>();
         services.AddScoped<ILibraryRepository, LibraryRepository>();
@@ -399,6 +402,10 @@ public static class ServiceRegistrationExtensions
         services.AddScoped<Vora.Application.Maintenance.IUnusedFileManager, Vora.Application.Maintenance.UnusedFileManager>();
         services.AddScoped<IAiStatsManager, AiStatsManager>();
         services.AddScoped<IAuthManager, AuthManager>();
+        services.AddScoped<Vora.Application.Auth.External.IAuthProviderManager, Vora.Application.Auth.External.AuthProviderManager>();
+        services.AddScoped<Vora.Application.Auth.External.IExternalSignInService, Vora.Application.Auth.External.ExternalSignInService>();
+        services.AddScoped<Vora.Application.Auth.External.IExternalIdentityManager, Vora.Application.Auth.External.ExternalIdentityManager>();
+        services.AddSingleton<Vora.Application.Auth.External.IExternalSignInCodeStore, Vora.Application.Auth.External.ExternalSignInCodeStore>();
         services.AddScoped<IJwtSecurityStampValidator, JwtSecurityStampValidator>();
         services.AddScoped<IBestPathDecisionManager, BestPathDecisionManager>();
         services.AddScoped<ICalendarManager, CalendarManager>();
@@ -683,6 +690,7 @@ public static class ServiceRegistrationExtensions
             .PersistKeysToFileSystem(new DirectoryInfo(keyPath));
 
         services.AddSingleton<IEmailSecretProtector, DataProtectionEmailSecretProtector>();
+        services.AddSingleton<Vora.Application.Auth.External.IAuthSecretProtector, Vora.Infrastructure.Auth.DataProtectionAuthSecretProtector>();
         services.AddSingleton<IEmailDispatchQueue, EmailDispatchQueue>();
         services.AddScoped<IEmailTemplateRenderer, EmailTemplateRenderer>();
         services.AddScoped<IEmailTransport, SmtpEmailTransport>();
