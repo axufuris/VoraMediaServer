@@ -93,4 +93,4 @@ What a server without a provider shows is unchanged. Everything below appears on
 
 ## Not built yet
 
-The TV pairing code flow, the Android phone return, and LDAP. See issue #294.
+The Android phone return and LDAP. The TV pairing code flow is built on the server and the web (`docs/device-pairing.md`); the native apps that use it come in their own PRs. See issue #294.

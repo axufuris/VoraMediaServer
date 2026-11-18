@@ -16,6 +16,7 @@ import ProviderAccessList from '../../components/Common/ProviderAccessList';
 import Spinner from '../../components/Common/Spinner';
 import PlexImportPanel from '../../components/LibraryMigration/PlexImportPanel';
 import LinkedSignIns from '../../components/Account/LinkedSignIns';
+import LinkDeviceCard from '../../components/Account/LinkDeviceCard';
 import { errorDetail } from '../../utils/apiError';
 export default function AccountSettingsPage() {
     const { serverId } = useParams<{ serverId?: string }>();
@@ -143,7 +144,8 @@ export default function AccountSettingsPage() {
                     />
                 )}
                 {user && (
-                    <div className="mt-8">
+                    <div className="mt-8 space-y-8">
+                        <LinkDeviceCard />
                         <PlexImportPanel serverId={serverId} />
                     </div>
                 )}
@@ -244,7 +246,8 @@ export default function AccountSettingsPage() {
                 </div>
             </div>
 
-            <div className="mt-8">
+            <div className="mt-8 space-y-8">
+                <LinkDeviceCard />
                 <PlexImportPanel serverId={serverId} />
             </div>
 

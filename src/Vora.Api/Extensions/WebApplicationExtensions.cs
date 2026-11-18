@@ -121,6 +121,7 @@ public static class WebApplicationExtensions
         app.MapAuthEndpoints();
         app.MapExternalAuthEndpoints();
         app.MapOidcEndpoints();
+        app.MapDevicePairingEndpoints();
         app.MapCalendarEndpoints();
         app.MapCollectionEndpoints();
         app.MapCollectionArtworkEndpoints();
