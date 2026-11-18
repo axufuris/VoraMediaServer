@@ -20,6 +20,7 @@ export type SmartListSortBy =
     | 'Random'
     | 'TopRated'
     | 'MostWatched'
+    | 'Popular'
     | 'TitleAsc';
 
 export interface SmartListRulesDto {

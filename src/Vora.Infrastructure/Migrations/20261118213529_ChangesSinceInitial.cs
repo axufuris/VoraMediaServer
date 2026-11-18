@@ -521,6 +521,18 @@ ALTER TABLE ""AuthProviders"" ADD COLUMN IF NOT EXISTS ""LdapUniqueIdAttribute""
 ALTER TABLE ""AuthProviders"" ADD COLUMN IF NOT EXISTS ""LdapGroupAttribute"" character varying(64) NOT NULL DEFAULT 'memberOf';
 ALTER TABLE ""AuthProviders"" ADD COLUMN IF NOT EXISTS ""LdapGroupBaseDn"" character varying(512);
 ALTER TABLE ""AuthProviders"" ADD COLUMN IF NOT EXISTS ""LdapGroupFilter"" character varying(1024);");
+
+            migrationBuilder.Sql(@"
+DO $popular$
+BEGIN
+    IF NOT EXISTS (SELECT 1 FROM ""__EFMigrationsHistory"" WHERE ""MigrationId"" >= '20261118213529_ChangesSinceInitial')
+       AND NOT EXISTS (SELECT 1 FROM ""SmartLists"" WHERE ""DefaultKey"" = 'popular-movies-shows') THEN
+        UPDATE ""SmartLists"" SET ""DisplayOrder"" = ""DisplayOrder"" + 1 WHERE ""DisplayOrder"" >= 2;
+
+        INSERT INTO ""SmartLists"" (""Id"", ""ActiveEndDay"", ""ActiveEndMonth"", ""ActiveStartDay"", ""ActiveStartMonth"", ""CollectionId"", ""DefaultKey"", ""DisplayOrder"", ""FilterRulesJson"", ""LibraryId"", ""MaxItems"", ""ShowOnHomepage"", ""ShowToFriends"", ""SortBy"", ""Source"", ""Title"")
+        VALUES ('ae950037-af38-4747-a566-bc9e25cb03ef', NULL, NULL, NULL, NULL, NULL, 'popular-movies-shows', 2, '{""mediaTypes"":[""Movie"",""TvShow""]}', NULL, 20, TRUE, TRUE, 7, 0, 'Popular Movies & Shows');
+    END IF;
+END $popular$;");
         }
 
         /// <inheritdoc />
@@ -748,6 +760,39 @@ CREATE UNIQUE INDEX ""IX_Albums_ArtistId_Title"" ON ""Albums"" (""ArtistId"", ""
 
             migrationBuilder.DropTable(
                 name: "ProfileChannelFavorites");
+
+            migrationBuilder.DeleteData(
+                table: "SmartLists",
+                keyColumn: "Id",
+                keyValue: new Guid("ae950037-af38-4747-a566-bc9e25cb03ef"));
+
+            migrationBuilder.UpdateData(
+                table: "SmartLists",
+                keyColumn: "Id",
+                keyValue: new Guid("ebbefd92-4232-4cae-9c5d-2134943b8bf8"),
+                column: "DisplayOrder",
+                value: 2);
+
+            migrationBuilder.UpdateData(
+                table: "SmartLists",
+                keyColumn: "Id",
+                keyValue: new Guid("c88d6c8a-57ea-4b24-a7be-3f2638a38aca"),
+                column: "DisplayOrder",
+                value: 3);
+
+            migrationBuilder.UpdateData(
+                table: "SmartLists",
+                keyColumn: "Id",
+                keyValue: new Guid("58424b85-b6da-4a9c-8204-e364f1319508"),
+                column: "DisplayOrder",
+                value: 4);
+
+            migrationBuilder.UpdateData(
+                table: "SmartLists",
+                keyColumn: "Id",
+                keyValue: new Guid("dfc420d4-421c-4e14-aec4-a5bedefd2f2e"),
+                column: "DisplayOrder",
+                value: 5);
 
             migrationBuilder.DropIndex(
                 name: "IX_SmartLists_DefaultKey",

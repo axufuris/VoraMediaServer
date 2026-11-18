@@ -22,6 +22,12 @@ A row whose feature is off is dropped from `GET /api/smartlists/active` for ever
 All sources share `Title`, `SortBy`, `MaxItems` (clamped 1–100 by `SmartListManager`), `ShowOnHomepage`, `ShowToFriends` (off = admins only) and the optional yearly window `ActiveStart/EndMonth/Day` (December → January wraps; an impossible date drops the window on save rather than breaking `/active`). A row built from a collection also follows the collection's Seasonal Visibility: it shows while both windows are open, on today's date in the server's time zone (`CollectionSeason`, `docs/theme-collections.md`). The rest of the options reuse `FilterRulesJson` (`SmartListRulesDto`):
 
 - **Library**: `mediaTypes`, `decade`, `genreIds`, `contentRating`, `unwatchedOnly`, plus `LibraryId` to read from one library. Every `SmartListSortBy` applies; `TitleAsc` sorts by sort title.
+  - **Most watched** (`MostWatched`) is the viewer's own: only titles this profile has played, the most-played first. A profile that has played nothing gets an empty row.
+  - **Popular** (`Popular`) is the server's: titles ordered by how many different profiles have played them, then by rating (`ThirdPartyRating1`, highest first, unrated last), then by id so the order doesn't shift between requests.
+    - A show counts the profiles that played any of its episodes, and one profile playing a title again and again counts once. Trailers and extras (`StreamSession.ExtraId`) and plays with no profile don't count.
+    - Titles nobody has played are not left out: they follow the played ones in order of rating, so a server with no play history yet reads as its top rated titles.
+    - The count is the same for every viewer (the viewer's library, rating and unrated filters still decide which titles can appear). Nothing here says who played what.
+    - It reads the plays, not an index, so it is the dearest of the library sorts: one grouped statement over `StreamSessions` for the ids (`ViewersPerTitle`), then the tiles. On a copy of 4,600 titles and 30,000 plays it took about 26 ms, against about 5 ms for the date rows; it grows with the number of plays, not with the library. Written as a correlated count per title it took 175 ms.
   - A show appears at most once. `DateAddedDesc` sorts by `LastContentAddedAt ?? AddedAt`, so a new episode lifts its season and its show as well. When a list mixes more than one of shows, seasons and episodes and is sorted by date added, `RecentlyAddedTv.OnePerShow` keeps one tile per show:
     - **the show** when the show itself is new (added within two days of its latest content) or its new episodes span several seasons;
     - **the episode** when exactly one episode is new;
@@ -64,7 +70,9 @@ A profile pins and unpins libraries in its sidebar on each device (its nav prefs
 
 ## Defaults
 
-`SmartListDefaults.All` is the one list of default rows: the six original library rows plus Favorite Channels, Recent Recordings, Recently Added Music, New Podcast Episodes and Favorite Radio Stations, in that display order. It seeds the table (`HasData`, so the ids are fixed) and stamps each row's `DefaultKey`. Admins can turn any default off or delete it; **Restore default lists** re-adds only the deleted ones, at the end of the order, with their original ids. Editing a default keeps its key.
+`SmartListDefaults.All` is the one list of default rows: the six original library rows with **Popular Movies & Shows** (movies and shows, `Popular`, 20 titles) third, then Favorite Channels, Recent Recordings, Recently Added Music, New Podcast Episodes and Favorite Radio Stations, in that display order. It seeds the table (`HasData`, so the ids are fixed) and stamps each row's `DefaultKey`. Admins can turn any default off or delete it; **Restore default lists** re-adds only the deleted ones, at the end of the order, with their original ids. Editing a default keeps its key.
+
+A server that already had the rows gets Popular Movies & Shows once, from the migration (`docs/database.md`): it goes third, every row from there down moves one place and an admin's own rows keep their order. An admin who removes it keeps it removed.
 
 ## Clients
 

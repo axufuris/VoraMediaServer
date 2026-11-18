@@ -69,10 +69,22 @@ public class SmartListRepository(VoraDbContext context) : ISmartListRepository
             query = query.Where(m => !(m is Episode) || keptEpisodeIds.Contains(m.Id));
         }
 
+        List<Guid>? popularOrder = null;
+        if (sortBy == SmartListSortBy.Popular)
+        {
+            popularOrder = await query.Select(m => m.Id).Take(maxItems).ToListAsync();
+            query = context.MediaItems.AsNoTracking().Where(m => popularOrder.Contains(m.Id));
+        }
+
         var items = await query
             .Select(LibraryItemVM.ProjectionFor(profileId, context.UserMediaStates, context.UserMediaRatings))
             .Take(maxItems)
             .ToListAsync();
+
+        if (popularOrder != null)
+        {
+            items = items.OrderBy(i => popularOrder.IndexOf(i.Id)).ToList();
+        }
 
         await AttachTrackArtworkAsync(items);
         return items;
@@ -327,6 +339,20 @@ public class SmartListRepository(VoraDbContext context) : ISmartListRepository
             context.Set<Episode>().Any(e => e.Season.TvShowId == m.Id && userSessions.Any(s => s.MediaItemId == e.Id)));
     }
 
+    private IQueryable<TitleViewers> ViewersPerTitle() =>
+        context.StreamSessions
+            .Where(s => s.ExtraId == null && s.UserProfileId != null)
+            .Select(s => new { TitleId = s.MediaItem is Episode ? ((Episode)s.MediaItem).Season.TvShowId : s.MediaItemId, s.UserProfileId })
+            .Distinct()
+            .GroupBy(s => s.TitleId)
+            .Select(g => new TitleViewers { TitleId = g.Key, Viewers = g.Count() });
+
+    private sealed class TitleViewers
+    {
+        public Guid TitleId { get; init; }
+        public int Viewers { get; init; }
+    }
+
     private IQueryable<MediaItem> ApplySortOrder(IQueryable<MediaItem> query, SmartListSortBy sortBy, Guid? profileId)
     {
         switch (sortBy)
@@ -341,6 +367,15 @@ public class SmartListRepository(VoraDbContext context) : ISmartListRepository
                 return query.OrderBy(m => EF.Functions.Random());
             case SmartListSortBy.TitleAsc:
                 return query.OrderBy(m => m.SortTitle ?? m.Title).ThenBy(m => m.Id);
+            case SmartListSortBy.Popular:
+                return query
+                    .GroupJoin(ViewersPerTitle(), m => m.Id, v => v.TitleId, (m, v) => new { Item = m, Viewers = v })
+                    .SelectMany(x => x.Viewers.DefaultIfEmpty(), (x, v) => new { x.Item, Viewers = (int?)v.Viewers ?? 0 })
+                    .OrderByDescending(x => x.Viewers)
+                    .ThenByDescending(x => x.Item.ThirdPartyRating1.HasValue)
+                    .ThenByDescending(x => x.Item.ThirdPartyRating1)
+                    .ThenBy(x => x.Item.Id)
+                    .Select(x => x.Item);
             case SmartListSortBy.MostWatched:
                 if (!profileId.HasValue) return query.OrderByDescending(m => m.LastContentAddedAt ?? m.AddedAt);
                 var pid = profileId.Value;

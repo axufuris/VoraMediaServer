@@ -53,6 +53,7 @@ export const SORT_OPTIONS: Record<SmartListSource, Option<SmartListSortBy>[]> = 
         { value: 'TitleAsc', label: 'Title A–Z' },
         { value: 'TopRated', label: 'Top rated' },
         { value: 'MostWatched', label: 'Most watched' },
+        { value: 'Popular', label: 'Popular with viewers' },
         { value: 'Random', label: 'Random (shuffle)' },
     ],
     FavoriteChannels: [

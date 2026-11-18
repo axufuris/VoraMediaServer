@@ -248,6 +248,13 @@ public sealed class LegacyDatabase : IAsyncDisposable
 
     public const string SignInProvidersMigration = "20261118014724_ChangesSinceInitial";
 
+    public const string LdapProvidersMigration = "20261118035147_ChangesSinceInitial";
+
+    private const string RowsSincePopularDefault = """
+        DELETE FROM "SmartLists" WHERE "DefaultKey" = 'popular-movies-shows';
+        UPDATE "SmartLists" SET "DisplayOrder" = "DisplayOrder" - 1 WHERE "DisplayOrder" >= 3;
+        """;
+
     public const string SignInColumns = """
         ALTER TABLE "Users" ADD COLUMN IF NOT EXISTS "HasPassword" boolean NOT NULL DEFAULT TRUE;
         ALTER TABLE "ServerSettings" ADD COLUMN IF NOT EXISTS "PasswordSignInEnabled" boolean NOT NULL DEFAULT TRUE;
@@ -646,6 +653,15 @@ public sealed class LegacyDatabase : IAsyncDisposable
         await seed(db);
         await db.Database.ExecuteSqlRawAsync(ColumnsSinceSignInProviders, cancellationToken);
         await ReplaceCombinedMigrationAsync(db, SignInProvidersMigration, "10.0.9", cancellationToken);
+    }
+
+    public async Task BuildLdapProvidersStateAsync(Func<VoraDbContext, Task> seed, CancellationToken cancellationToken)
+    {
+        await using var db = NewContext();
+        await db.Database.MigrateAsync(cancellationToken);
+        await db.Database.ExecuteSqlRawAsync(RowsSincePopularDefault, cancellationToken);
+        await seed(db);
+        await ReplaceCombinedMigrationAsync(db, LdapProvidersMigration, "10.0.9", cancellationToken);
     }
 
     private static async Task ReplaceCombinedMigrationAsync(VoraDbContext db, string migrationId, string productVersion, CancellationToken cancellationToken)

@@ -8,5 +8,6 @@ public enum SmartListSortBy
     Random,
     TopRated,
     MostWatched,
-    TitleAsc
+    TitleAsc,
+    Popular
 }

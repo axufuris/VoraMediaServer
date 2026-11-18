@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using Vora.Domain.Entities.Iptv;
+using Vora.Application.SmartLists;
 using Vora.Domain.Entities.SmartLists;
 using Vora.Domain.Entities.Users;
 using Vora.Domain.Enums;
@@ -56,6 +57,6 @@ public sealed class PostgresChannelFavoritesMigrationTests
 
         var lists = await after.Set<SmartList>().AsNoTracking().ToListAsync(cancellationToken);
         lists.Where(l => l.Source != SmartListSource.Library).Select(l => l.DisplayOrder).Should().OnlyContain(order => order > 8);
-        lists.Where(l => l.DefaultKey != null).Should().HaveCount(11);
+        lists.Where(l => l.DefaultKey != null).Should().HaveCount(SmartListDefaults.All.Count);
     }
 }

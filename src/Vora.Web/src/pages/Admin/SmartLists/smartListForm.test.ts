@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import type { SmartListAdminDto } from '../../../api/Collections/smartListService';
-import { describeList, emptyForm, formFromList, requestFromForm, withSource } from './smartListForm';
+import { describeList, emptyForm, formFromList, requestFromForm, sortOptionsFor, withSource } from './smartListForm';
 
 const list = (overrides: Partial<SmartListAdminDto> = {}): SmartListAdminDto => ({
     id: 'l1',
@@ -72,6 +72,20 @@ describe('smart list form', () => {
 
         expect(form.sortBy).toBe('TitleAsc');
         expect(form.libraryId).toBe('');
+    });
+
+    it('offers Popular for movie and show rows and saves it', () => {
+        expect(sortOptionsFor('Library').map(o => o.value)).toContain('Popular');
+        expect(sortOptionsFor('RecentlyAddedMusic').map(o => o.value)).not.toContain('Popular');
+
+        const saved = requestFromForm({ ...emptyForm(), title: 'Popular Movies & Shows', sortBy: 'Popular', mediaTypes: ['Movie', 'TvShow'] }, 2);
+
+        expect(saved.sortBy).toBe('Popular');
+        expect(JSON.parse(saved.filterRulesJson)).toEqual({ mediaTypes: ['Movie', 'TvShow'] });
+    });
+
+    it('switching from Popular to a source without it picks the first sort of the new source', () => {
+        expect(withSource({ ...emptyForm(), sortBy: 'Popular' }, 'NewPodcastEpisodes').sortBy).toBe('DateAddedDesc');
     });
 
     it('podcast rows keep only their own options', () => {
