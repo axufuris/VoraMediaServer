@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { fireEvent, render, screen, within } from '@testing-library/react';
-import { MemoryRouter } from 'react-router-dom';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom';
 import PlaylistsPage from './PlaylistsPage';
 import type { PlaylistSummaryVM, SharedPlaylistsVM } from '../../../api/Collections/playlistService';
 import type { SmartPlaylistSummaryVM } from '../../../api/Music/smartPlaylistService';
@@ -26,11 +26,16 @@ const mixes: GeneratedMixSummaryVM[] = [
 const theirs = { isShared: true, isOwner: false, ownerName: 'Andy' };
 
 let shared: SharedPlaylistsVM = { manual: [], smart: [] };
+let playlistLoads = 0;
 
 vi.mock('../../../api/Collections/playlistService', () => ({
     playlistService: {
-        getPlaylists: () => Promise.resolve(playlists),
+        getPlaylists: () => {
+            playlistLoads += 1;
+            return Promise.resolve(playlists);
+        },
         getShared: () => Promise.resolve(shared),
+        createPlaylist: () => Promise.resolve({ id: 'new-1' }),
     },
 }));
 vi.mock('../../../api/Music/smartPlaylistService', () => ({
@@ -54,6 +59,7 @@ describe('PlaylistsPage', () => {
         localStorage.clear();
         sessionStorage.clear();
         shared = { manual: [], smart: [] };
+        playlistLoads = 0;
     });
 
     it('locked to music shows only music playlists, with no type filter', async () => {
@@ -152,6 +158,91 @@ describe('PlaylistsPage', () => {
         expect(screen.queryByText('Road Trip')).toBeNull();
     });
 
+
+    describe('where a playlist opens', () => {
+        function Where() {
+            return <div data-testid="where">{useLocation().pathname}</div>;
+        }
+
+        const renderMusic = (props: Partial<React.ComponentProps<typeof PlaylistsPage>> = {}) => render(
+            <MemoryRouter initialEntries={['/music']}>
+                <Routes>
+                    <Route path="*" element={<PlaylistsPage embedded lockedType="music" {...props} />} />
+                </Routes>
+                <Where />
+            </MemoryRouter>,
+        );
+
+        const createManual = async () => {
+            await screen.findByText('Road Trip');
+            fireEvent.click(screen.getByRole('button', { name: 'New' }));
+            fireEvent.click(screen.getByRole('button', { name: /^Manual/ }));
+            fireEvent.change(screen.getByPlaceholderText('e.g. Workout'), { target: { value: 'Workout' } });
+            fireEvent.click(screen.getByRole('button', { name: 'Create' }));
+        };
+
+        it('opens a new music playlist through the host, not on a page of its own', async () => {
+            const onOpenPlaylist = vi.fn();
+            renderMusic({ onOpenPlaylist });
+
+            await createManual();
+
+            await waitFor(() => expect(onOpenPlaylist).toHaveBeenCalledWith('Playlist', 'new-1'));
+            expect(screen.getByTestId('where')).toHaveTextContent('/music');
+        });
+
+        it('opens a new playlist on its own page when there is no host', async () => {
+            renderMusic();
+
+            await createManual();
+
+            await waitFor(() => expect(screen.getByTestId('where')).toHaveTextContent('/playlist/new-1'));
+        });
+
+        it('opens a playlist, a smart one and a shared one through the host', async () => {
+            shared = { manual: [{ id: 'p-theirs', name: 'Sunday Jazz', mediaType: 'Music', itemCount: 5, posterUrls: [], backdropUrls: [], ...theirs }], smart: [] };
+            const onOpenPlaylist = vi.fn();
+            renderMusic({ onOpenPlaylist });
+
+            fireEvent.click(await screen.findByText('Road Trip'));
+            fireEvent.click(screen.getByText('Heavy Rotation'));
+            fireEvent.click(screen.getByRole('tab', { name: 'Shared' }));
+            fireEvent.click(screen.getByText('Sunday Jazz'));
+
+            expect(onOpenPlaylist.mock.calls).toEqual([
+                ['Playlist', 'p-music'],
+                ['SmartPlaylist', 's-music'],
+                ['Playlist', 'p-theirs'],
+            ]);
+            expect(screen.getByTestId('where')).toHaveTextContent('/music');
+        });
+
+        it('opens a tile on its own page when there is no host', async () => {
+            renderMusic();
+
+            fireEvent.click(await screen.findByText('Road Trip'));
+
+            expect(screen.getByTestId('where')).toHaveTextContent('/playlist/p-music');
+        });
+
+        it('reads the lists again when the host asks, without a skeleton', async () => {
+            const view = renderMusic({ refreshKey: 0 });
+            await screen.findByText('Road Trip');
+            expect(playlistLoads).toBe(1);
+
+            view.rerender(
+                <MemoryRouter initialEntries={['/music']}>
+                    <Routes>
+                        <Route path="*" element={<PlaylistsPage embedded lockedType="music" refreshKey={1} />} />
+                    </Routes>
+                    <Where />
+                </MemoryRouter>,
+            );
+
+            await waitFor(() => expect(playlistLoads).toBe(2));
+            expect(screen.getByText('Road Trip')).toBeInTheDocument();
+        });
+    });
     it('says so when nothing has been shared', async () => {
         render(
             <MemoryRouter>

@@ -70,14 +70,16 @@ export function PlaylistSharingControls({ isOwner, isShared, ownerName, onToggle
 // What a viewer sees when a shared playlist they had open has been deleted or
 // unshared. Nothing is kept around to spare them this: tracks already queued
 // keep playing, and the playlist itself is simply gone.
-export function PlaylistUnavailable({ backTo }: { backTo: string }) {
+export function PlaylistUnavailable({ backTo, onBack }: { backTo: string; onBack?: () => void }) {
     return (
         <div className="mx-auto mt-24 max-w-md px-6 text-center">
             <h1 className="text-xl font-bold" style={{ color: 'var(--vora-text-primary)' }}>This playlist isn't available anymore</h1>
             <p className="mt-2 text-sm" style={{ color: 'var(--vora-text-muted)' }}>
                 Its owner deleted it or stopped sharing it.
             </p>
-            <Link to={backTo} className="vora-button-primary mt-6 inline-block">Back to playlists</Link>
+            {onBack
+                ? <button type="button" onClick={onBack} className="vora-button-primary mt-6 inline-block cursor-pointer">Back to playlists</button>
+                : <Link to={backTo} className="vora-button-primary mt-6 inline-block">Back to playlists</Link>}
         </div>
     );
 }
@@ -88,11 +90,11 @@ export interface SavedCopyState {
     savedCopy?: boolean;
 }
 
-export function SavedCopyBanner() {
+export function SavedCopyBanner({ saved }: { saved?: boolean } = {}) {
     const location = useLocation();
     const [dismissed, setDismissed] = useState(false);
     const state = location.state as SavedCopyState | null;
-    if (!state?.savedCopy || dismissed) return null;
+    if (!(saved ?? state?.savedCopy) || dismissed) return null;
 
     return (
         <div

@@ -20,9 +20,22 @@ import { reorderListProps, reorderRowProps, useTouchReorder } from '../../../hoo
 import { mediaMenuTarget } from '../../../components/Media/ItemMenu/mediaItemMenu';
 import MediaMenuArea from '../../../components/Media/ItemMenu/MediaMenuArea';
 
-export default function PlaylistDetailsPage() {
+// Hosted inside the Music tab, a music playlist opens like a mix does: the tab
+// supplies the id and the way back (the Playlists or For You list it came from),
+// and keeps the breadcrumb, so nothing here navigates away.
+export interface EmbeddedPlaylistHost {
+    playlistId: string;
+    savedCopy: boolean;
+    onLoaded: (name: string) => void;
+    onDeleted: () => void;
+    onOpenCopy: (copyId: string) => void;
+    onMissing: () => void;
+}
+
+export default function PlaylistDetailsPage({ host }: { host?: EmbeddedPlaylistHost } = {}) {
     const dialog = useDialog();
-    const { serverId, id } = useParams<{ serverId?: string, id: string }>();
+    const { serverId, id: routeId } = useParams<{ serverId?: string, id: string }>();
+    const id = host?.playlistId ?? routeId;
     const navigate = useNavigate();
     const { playMedia, playQueue, isShuffled, toggleShuffle, playNext, addToQueue } = usePlayer();
 
@@ -89,6 +102,10 @@ export default function PlaylistDetailsPage() {
         if (!playlist) return;
         try {
             const { id: copyId } = await playlistService.copy(playlist.id, serverId);
+            if (host) {
+                host.onOpenCopy(copyId);
+                return;
+            }
             const state: SavedCopyState = { savedCopy: true };
             navigate(serverId ? `/server/${serverId}/playlist/${copyId}` : `/playlist/${copyId}`, { state });
         } catch {
@@ -97,6 +114,12 @@ export default function PlaylistDetailsPage() {
     };
 
     useEffect(() => { loadPlaylist(); }, [loadPlaylist]);
+
+    const reportName = host?.onLoaded;
+    const playlistName = playlist?.name;
+    useEffect(() => {
+        if (playlistName) reportName?.(playlistName);
+    }, [playlistName, reportName]);
 
     const handleDragStart = (e: React.DragEvent, index: number) => {
         setDraggedIndex(index);
@@ -252,7 +275,7 @@ export default function PlaylistDetailsPage() {
     };
 
     if (loading) return <div className="p-12 text-center text-[var(--vora-text-muted)] mt-16">Loading playlist...</div>;
-    if (unavailable || !playlist) return <PlaylistUnavailable backTo={serverId ? `/server/${serverId}/playlists` : '/playlists'} />;
+    if (unavailable || !playlist) return <PlaylistUnavailable backTo={serverId ? `/server/${serverId}/playlists` : '/playlists'} onBack={host?.onMissing} />;
 
     // Someone else's shared playlist is read-only here. The server enforces it —
     // every edit answers 404 to anyone but the owner — so this only stops the
@@ -268,7 +291,8 @@ export default function PlaylistDetailsPage() {
         if (!playlist || !await dialog.confirm(`Are you absolutely sure you want to delete "${playlist.name}"?`)) return;
         try {
             await playlistService.deletePlaylist(playlist.id, serverId);
-            navigate(serverId ? `/server/${serverId}/playlists` : '/playlists');
+            if (host) host.onDeleted();
+            else navigate(serverId ? `/server/${serverId}/playlists` : '/playlists');
         } catch {
             await dialog.alert("Failed to delete playlist.");
         }
@@ -332,10 +356,10 @@ export default function PlaylistDetailsPage() {
                                     onSaveCopy={handleSaveCopy}
                                 />
                                 {canEdit && (<>
-                                <button onClick={handleOpenEdit} className="p-1.5 rounded-md text-[var(--vora-text-muted)] hover:text-[var(--vora-text-primary)] hover:bg-[var(--vora-bg-sunken)] transition-colors" title="Edit Playlist">
+                                <button onClick={handleOpenEdit} className="p-1.5 rounded-md text-[var(--vora-text-muted)] hover:text-[var(--vora-text-primary)] hover:bg-[var(--vora-bg-sunken)] transition-colors cursor-pointer" title="Edit Playlist">
                                     <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" /></svg>
                                 </button>
-                                <button onClick={handleDeletePlaylist} className="p-1.5 rounded-md text-[var(--vora-text-muted)] hover:text-[var(--vora-danger-500)] hover:bg-[var(--vora-bg-sunken)] transition-colors" title="Delete Playlist">
+                                <button onClick={handleDeletePlaylist} className="p-1.5 rounded-md text-[var(--vora-text-muted)] hover:text-[var(--vora-danger-500)] hover:bg-[var(--vora-bg-sunken)] transition-colors cursor-pointer" title="Delete Playlist">
                                     <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
                                 </button>
                                 </>)}
@@ -420,9 +444,9 @@ export default function PlaylistDetailsPage() {
 
     if (isMusic) {
         return (
-            <div className="relative min-h-full pb-16">
-                <div className="relative z-10 mx-auto w-full max-w-7xl flex-1 px-4 pt-8 sm:px-12">
-                    <SavedCopyBanner />
+            <div className={host ? 'relative pb-16' : 'relative min-h-full pb-16'}>
+                <div className={host ? 'relative z-10 w-full' : 'relative z-10 mx-auto w-full max-w-7xl flex-1 px-4 pt-8 sm:px-12'}>
+                    <SavedCopyBanner saved={host?.savedCopy} />
                     <MusicPlaylistView
                         playlist={playlist}
                         canEdit={canEdit}
@@ -443,14 +467,14 @@ export default function PlaylistDetailsPage() {
     }
 
     return (
-        <div className="relative min-h-full pb-16">
+        <div className={host ? 'relative pb-16' : 'relative min-h-full pb-16'}>
 
             <div className="absolute inset-x-0 top-0 z-0">
                 <CinematicBackdrop src={selectedItem?.backgroundUrl} intensity="detail" parallax transitionKey={selectedItem?.id} />
             </div>
 
-            <div className="relative z-10 mx-auto w-full max-w-7xl flex-1 px-12 max-md:px-4 pt-8">
-                <SavedCopyBanner />
+            <div className={host ? 'relative z-10 w-full' : 'relative z-10 mx-auto w-full max-w-7xl flex-1 px-12 max-md:px-4 pt-8'}>
+                <SavedCopyBanner saved={host?.savedCopy} />
 
                 <div className="flex flex-col md:flex-row gap-10 mb-16 max-md:gap-5 max-md:mb-10">
                     <div className="w-64 shrink-0 relative max-md:w-36">

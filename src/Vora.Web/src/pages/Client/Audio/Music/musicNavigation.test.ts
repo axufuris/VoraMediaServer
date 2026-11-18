@@ -13,6 +13,18 @@ describe('parseMusicNavState', () => {
         expect(parseMusicNavState('{"view":"mood","mood":"chill"}')).toEqual({ view: 'mood', mood: 'chill' });
     });
 
+    it('restores a playlist opened in the tab, manual or smart, and a saved copy', () => {
+        expect(parseMusicNavState('{"view":"playlist","playlistId":"p1"}')).toEqual({ view: 'playlist', playlistId: 'p1' });
+        expect(parseMusicNavState('{"view":"smartPlaylist","playlistId":"s1"}')).toEqual({ view: 'smartPlaylist', playlistId: 's1' });
+        expect(parseMusicNavState('{"view":"playlist","playlistId":"p2","savedCopy":true}'))
+            .toEqual({ view: 'playlist', playlistId: 'p2', savedCopy: true });
+    });
+
+    it('sends a playlist view that names no playlist back to the root', () => {
+        expect(parseMusicNavState('{"view":"playlist"}')).toEqual({ view: 'root' });
+        expect(parseMusicNavState('{"view":"smartPlaylist","playlistId":""}')).toEqual({ view: 'root' });
+    });
+
     it('sends the old hub view back to the sub-tab root', () => {
         expect(parseMusicNavState('{"view":"artists"}')).toEqual({ view: 'root' });
     });

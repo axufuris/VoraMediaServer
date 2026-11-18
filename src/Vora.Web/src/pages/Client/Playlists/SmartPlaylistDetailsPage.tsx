@@ -16,8 +16,20 @@ import { PlaylistSharingControls, PlaylistUnavailable, SavedCopyBanner, type Sav
 import MediaGrid from '../../../components/Client/Primitives/MediaGrid';
 import MediaCard from '../../../components/Client/Primitives/MediaCard';
 
-export default function SmartPlaylistDetailsPage() {
-    const { serverId, id } = useParams<{ serverId?: string; id: string }>();
+// Hosted inside the Music tab, a smart playlist opens like a mix does: the tab
+// supplies the id and the way back and keeps the breadcrumb.
+export interface EmbeddedSmartPlaylistHost {
+    playlistId: string;
+    savedCopy: boolean;
+    onLoaded: (name: string) => void;
+    onDeleted: () => void;
+    onOpenCopy: (copyId: string) => void;
+    onMissing: () => void;
+}
+
+export default function SmartPlaylistDetailsPage({ host }: { host?: EmbeddedSmartPlaylistHost } = {}) {
+    const { serverId, id: routeId } = useParams<{ serverId?: string; id: string }>();
+    const id = host?.playlistId ?? routeId;
     const navigate = useNavigate();
     const dialog = useDialog();
     const { playQueue } = usePlayer();
@@ -46,6 +58,12 @@ export default function SmartPlaylistDetailsPage() {
 
     useEffect(() => { load(); }, [load]);
 
+    const reportName = host?.onLoaded;
+    const playlistName = detail?.name;
+    useEffect(() => {
+        if (playlistName) reportName?.(playlistName);
+    }, [playlistName, reportName]);
+
     const handleToggleShared = async (next: boolean) => {
         if (!detail) return;
         try {
@@ -62,6 +80,10 @@ export default function SmartPlaylistDetailsPage() {
         if (!detail) return;
         try {
             const { id: copyId } = await smartPlaylistService.copy(detail.id, serverId);
+            if (host) {
+                host.onOpenCopy(copyId);
+                return;
+            }
             const state: SavedCopyState = { savedCopy: true };
             navigate(serverId ? `/server/${serverId}/smart-playlist/${copyId}` : `/smart-playlist/${copyId}`, { state });
         } catch {
@@ -111,7 +133,8 @@ export default function SmartPlaylistDetailsPage() {
         if (!await dialog.confirm(`Delete the smart playlist "${detail.name}"?`)) return;
         try {
             await smartPlaylistService.remove(detail.id, serverId);
-            navigate(serverId ? `/server/${serverId}/playlists` : '/playlists');
+            if (host) host.onDeleted();
+            else navigate(serverId ? `/server/${serverId}/playlists` : '/playlists');
         } catch (err) {
             console.error(err);
             await dialog.alert('Failed to delete smart playlist.');
@@ -132,7 +155,7 @@ export default function SmartPlaylistDetailsPage() {
     }
     // The service turns a 404 into null: deleted, unshared or never existed.
     if (!detail || !items) {
-        return <PlaylistUnavailable backTo={serverId ? `/server/${serverId}/playlists` : '/playlists'} />;
+        return <PlaylistUnavailable backTo={serverId ? `/server/${serverId}/playlists` : '/playlists'} onBack={host?.onMissing} />;
     }
 
     // Someone else's shared smart playlist is read-only here; the server refuses
@@ -157,9 +180,9 @@ export default function SmartPlaylistDetailsPage() {
     const playLabel = items.mediaType === 'Music' ? '▶ Play' : '▶ Open';
 
     return (
-        <div className="min-h-full pb-16">
-            <div className="mx-auto w-full max-w-6xl px-8 max-md:px-4 pt-12">
-                <SavedCopyBanner />
+        <div className={host ? 'pb-16' : 'min-h-full pb-16'}>
+            <div className={host ? 'w-full' : 'mx-auto w-full max-w-6xl px-8 max-md:px-4 pt-12'}>
+                <SavedCopyBanner saved={host?.savedCopy} />
                 <div className="mb-8 flex items-end gap-6 pb-6" style={{ borderBottom: '1px solid var(--vora-border-subtle)' }}>
                     <div className={`w-48 h-48 rounded shadow-[var(--vora-shadow-overlay)] flex items-center justify-center ${heroGradient} flex-shrink-0 relative overflow-hidden`}>
                         {detail.artworkUrl

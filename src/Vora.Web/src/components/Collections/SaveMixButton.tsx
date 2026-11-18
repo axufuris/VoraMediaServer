@@ -7,7 +7,7 @@ import type { SavedCopyState } from '../../pages/Client/Playlists/PlaylistSharin
 // Keeps a generated mix - a Daily Mix today, an AI playlist tomorrow - as the
 // profile's own playlist, so a refresh can't take away one they liked. Opens
 // the new playlist with the same "saved" confirmation a copy gets.
-export default function SaveMixButton({ mixId }: { mixId: string }) {
+export default function SaveMixButton({ mixId, onSaved }: { mixId: string; onSaved?: (playlistId: string) => void }) {
     const { serverId } = useParams<{ serverId?: string }>();
     const navigate = useNavigate();
     const dialog = useDialog();
@@ -18,6 +18,10 @@ export default function SaveMixButton({ mixId }: { mixId: string }) {
         setSaving(true);
         try {
             const { id } = await musicService.saveMixAsPlaylist(mixId, serverId);
+            if (onSaved) {
+                onSaved(id);
+                return;
+            }
             const state: SavedCopyState = { savedCopy: true };
             navigate(serverId ? `/server/${serverId}/playlist/${id}` : `/playlist/${id}`, { state });
         } catch {
