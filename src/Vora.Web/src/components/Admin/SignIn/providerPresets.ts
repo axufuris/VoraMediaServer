@@ -73,7 +73,7 @@ export const PROVIDER_PRESETS: ProviderPreset[] = [
         type: 'Ldap',
         label: 'OpenLDAP, LLDAP, Authentik',
         description: 'OpenLDAP, LLDAP, the Authentik LDAP outpost, FreeIPA and other standards-based directories.',
-        steps: 'Use a read-only service account and the directory\'s LDAPS address. LLDAP: unique id attribute uuid, port 6360. Authentik: filter on cn instead of uid. memberOf needs the memberOf overlay in OpenLDAP; without it, use the group search below. The docs have the exact values for each.',
+        steps: 'Use a read-only service account and the directory\'s LDAPS address. LLDAP: unique id attribute uuid, port 6360. Authentik: search base ou=users below the provider\'s base DN, unique id attribute uid, filter on cn instead of uid. FreeIPA: unique id attribute ipaUniqueID. memberOf needs the memberOf overlay in OpenLDAP; without it, use the group search below. The docs have the exact values for each.',
         draft: {
             type: 'Ldap',
             displayName: 'Home directory',

@@ -289,6 +289,8 @@ describe('ProviderEditorModal for a directory', () => {
         fireEvent.click(screen.getByRole('button', { name: 'Show attribute names' }));
         expect(screen.getByLabelText('Unique id')).toHaveValue('entryUUID');
         expect(screen.getByText(/LLDAP: unique id attribute uuid/)).toBeInTheDocument();
+        expect(screen.getByText(/Authentik: search base ou=users below the provider's base DN, unique id attribute uid, filter on cn instead of uid/)).toBeInTheDocument();
+        expect(screen.getByText(/FreeIPA: unique id attribute ipaUniqueID/)).toBeInTheDocument();
     });
 
     it('describes the policies in terms of the directory and treats directory email as verified', () => {
