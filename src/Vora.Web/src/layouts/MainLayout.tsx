@@ -405,6 +405,7 @@ export default function MainLayout() {
             <div className="flex-1 flex flex-col h-full overflow-hidden relative">
                 <MainLayoutUserMenu
                     profileName={profileName}
+                    homePath={serverId ? `/server/${serverId}` : '/'}
                     isProfileMenuOpen={isProfileMenuOpen}
                     isServerAdmin={isServerAdmin}
                     isPhoneNavOpen={isPhoneNavOpen}
