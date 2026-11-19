@@ -2,7 +2,7 @@
 
 Vora is self-hosted and has no domain of its own, so every server is its own client of whatever identity provider its admin chooses (Authentik, Keycloak, Authelia, Pocket ID, Google, Microsoft Entra, any OpenID Connect server) or its own directory (LDAP: Active Directory, OpenLDAP, LLDAP, FreeIPA, the Authentik LDAP outpost). For OpenID Connect the admin registers Vora at the provider with a redirect address of their own server, then pastes the issuer, client id and secret into **Users & Access → Sign-in providers**; for LDAP they enter the directory's address and a read-only account (see **LDAP** below). Vora ships no client id and talks to no central service.
 
-This page is the design and the server rules. The server side of the OpenID Connect sign-in is complete (data, rules, the redirect flow, the one-time code, the admin API), and so is LDAP (**LDAP** below) and the web app's side of both (see **The web app**); TV pairing is built on the server and the web, and the native apps follow in later PRs. Nothing changes for a server whose admin adds no provider. How tokens work is in [`docs/auth-tokens.md`](auth-tokens.md); registration modes and invitations are in [`docs/auth-and-devices.md`](auth-and-devices.md).
+This page is the design and the server rules. The server side of the OpenID Connect sign-in is complete (data, rules, the redirect flow, the one-time code, the admin API), and so is LDAP (**LDAP** below) and the web app's side of both (see **The web app**); TV pairing is built on the server and the web, and the native apps use it (**The native apps** below). Nothing changes for a server whose admin adds no provider. How tokens work is in [`docs/auth-tokens.md`](auth-tokens.md); registration modes and invitations are in [`docs/auth-and-devices.md`](auth-and-devices.md).
 
 ## What is stored
 
@@ -116,6 +116,25 @@ A second `AuthProvider` type behind the same table, rules engine, new-user polic
 
 **Test** (`POST /api/admin/auth-providers/{id}/test`, answered by type) connects, binds the service account, runs the user filter for up to 50 entries and returns `LdapTestResultVM`: `ok`, `message`, `connected`, `serviceBound`, `entriesFound`, `searchLimited`, `entriesWithMail`, `entriesWithoutMail`, `entriesWithUniqueId`, `sampleDns` (three) and `warnings` (no encryption, anonymous search, entries without mail, no unique id). Tests: rules and fakes in `Vora.Application.Tests/Auth/Ldap`, endpoints in `LdapEndpointTests`, and `NovellLdapDirectoryTests` against a real OpenLDAP, skipped unless `VORA_TEST_LDAP` is set (`tests/Vora.Infrastructure.Tests/Ldap/README.md`).
 
+## The native apps
+
+Every client can sign in by each method the server has; none has provider buttons. A native app reaches OpenID Connect only through **device pairing** (`docs/device-pairing.md`): the TV shows a code, or the phone opens the browser, and the person signs in there with a password, a provider or the directory.
+
+| Client | Password and directory | Pairing | Sign out |
+|---|---|---|---|
+| Android | the name field says "Email or username" and takes a directory username when the server has a directory on | **Sign in with a code** (TV) or **Sign in with your browser** (phone) | calls `POST /api/auth/logout`, then clears the tokens |
+| Roku | the same | **Sign in with a code** | the same |
+| Apple TV | the same | **Sign in with a code** | the same |
+| Desktop | the web form, "Email or username" | **Sign in with your browser**, which opens the system browser | clears its tokens only (the web client's sign-out) |
+
+- A **first-time directory user** gets the 409 `NeedsCreateOrLink` described above, which the native password form cannot finish: they use the code button once, and the web page does the rest.
+- A server with no providers shows the same form as before. A server whose `/api/auth/providers` answers 404 (an older server) is treated as having no directory.
+- **Refresh and sign-out** treat `External` sessions like `Password` ones. "Remove server" on the native apps clears tokens locally and does not call the logout endpoint.
+
 ## Not built yet
 
-The Android phone return. The TV pairing code flow is built on the server and the web (`docs/device-pairing.md`); the native apps that use it, and native login fields that accept a username, come in their own PRs. See issue #294.
+- The Android phone return: after approving in the browser the person switches back to the app by hand.
+- The native apps read `directorySignInEnabled` but not `passwordSignInEnabled` or the provider list. On a server with password sign-in turned off they still show the password form first, a refused password gives a message that does not name the code button, and a session ended by turning password sign-in off lands on Login without a notice.
+- The Account tab offers "New password" to an account that signs in through a provider or the directory, with no caption saying that it sets a separate local password.
+
+See issue #294.
