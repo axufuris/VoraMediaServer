@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import OverlayEditor from './OverlayEditor';
@@ -86,6 +86,97 @@ describe('the overlay editor', () => {
         const corner = screen.getByTestId('overlay-canvas').querySelector('svg path')?.closest('div[style*="container-type"]') as HTMLElement | null;
         expect(corner).not.toBeNull();
         expect(corner?.className).toContain('inset-0');
+    });
+
+    describe('the Multi-Audio tag', () => {
+        // jsdom lays nothing out, and the editor draws badges only once it has measured its canvas.
+        const measured: { mockRestore: () => void }[] = [];
+
+        beforeEach(() => {
+            measured.push(
+                vi.spyOn(Element.prototype, 'clientWidth', 'get').mockReturnValue(300),
+                vi.spyOn(Element.prototype, 'clientHeight', 'get').mockReturnValue(450),
+            );
+        });
+
+        afterEach(() => {
+            measured.splice(0).forEach(spy => spy.mockRestore());
+        });
+
+        const savedLayouts = () => mocks.saveTemplate.mock.calls.map(([payload]: [{ targetMediaType: string; configurationJson: string }]) => ({
+            target: payload.targetMediaType,
+            types: (JSON.parse(payload.configurationJson) as { type: string }[]).map(element => element.type),
+        }));
+
+        it.each([['Movie Poster (2:3)', 'Movie'], ['Episode Thumbnail (16:9)', 'Episode']])('is offered on the %s canvas', async (_name, value) => {
+            renderEditor();
+            await waitFor(() => expect(mocks.getTemplateByMediaType).toHaveBeenCalled());
+
+            fireEvent.change(screen.getByDisplayValue('Movie Poster (2:3)'), { target: { value } });
+
+            expect(screen.getByRole('button', { name: 'Multi-Audio' })).toBeEnabled();
+        });
+
+        it.each([['TV Show Poster (2:3)', 'TvShow'], ['Season Poster (2:3)', 'Season']])('is left off the %s canvas, which has no audio files', async (_name, value) => {
+            renderEditor();
+            await waitFor(() => expect(mocks.getTemplateByMediaType).toHaveBeenCalled());
+
+            fireEvent.change(screen.getByDisplayValue('Movie Poster (2:3)'), { target: { value } });
+
+            expect(screen.queryByRole('button', { name: 'Multi-Audio' })).toBeNull();
+            expect(screen.getByRole('button', { name: 'Resolution' })).toBeInTheDocument();
+        });
+
+        it('adds the tag to the canvas once, with its badge picture, and saves it as a multi_audio element', async () => {
+            renderEditor();
+            await waitFor(() => expect(mocks.getTemplateByMediaType).toHaveBeenCalled());
+
+            fireEvent.click(screen.getByRole('button', { name: 'Multi-Audio' }));
+
+            expect(screen.getByRole('button', { name: 'Multi-Audio' })).toBeDisabled();
+            expect(screen.getByTestId('overlay-canvas').querySelector('img[src="/Overlays/MultiAudio/MultiAudio.png"]')).not.toBeNull();
+
+            fireEvent.click(screen.getByRole('button', { name: 'Save Template' }));
+
+            await waitFor(() => expect(mocks.saveTemplate).toHaveBeenCalled());
+            expect(savedLayouts()).toEqual([{ target: 'Movie', types: ['multi_audio'] }]);
+        });
+
+        it('loads a saved tag back onto the canvas', async () => {
+            mocks.getTemplateByMediaType.mockResolvedValue({
+                id: 'movie-template',
+                targetMediaType: 'Movie',
+                configurationJson: JSON.stringify([{ type: 'multi_audio', xPct: 0.1, yPct: 0.1, widthPct: 0.25, heightPct: 0.08 }]),
+            });
+            renderEditor();
+
+            await waitFor(() => expect(screen.getByTestId('overlay-canvas').querySelector('img[src="/Overlays/MultiAudio/MultiAudio.png"]')).not.toBeNull());
+            expect(screen.getByRole('button', { name: 'Multi-Audio' })).toBeDisabled();
+        });
+
+        it('stays out of the layout copied to show and season posters, which never draw it', async () => {
+            mocks.getTemplateByMediaType.mockImplementation((type: string) => Promise.resolve(type === 'Movie'
+                ? {
+                    id: 'movie-template',
+                    targetMediaType: 'Movie',
+                    configurationJson: JSON.stringify([
+                        { type: 'resolution', xPct: 0.05, yPct: 0.05, widthPct: 0.25, heightPct: 0.08 },
+                        { type: 'multi_audio', xPct: 0.05, yPct: 0.2, widthPct: 0.25, heightPct: 0.08 },
+                    ]),
+                }
+                : null));
+            renderEditor();
+            fireEvent.click(await screen.findByRole('button', { name: 'Copy layout…' }));
+
+            fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Copy layout' }));
+
+            await waitFor(() => expect(mocks.alert).toHaveBeenCalledWith('Layout copied to TV show posters and season posters.'));
+            expect(savedLayouts()).toEqual([
+                { target: 'Movie', types: ['resolution', 'multi_audio'] },
+                { target: 'TvShow', types: ['resolution'] },
+                { target: 'Season', types: ['resolution'] },
+            ]);
+        });
     });
 
     describe('copying a layout to the other portrait posters', () => {

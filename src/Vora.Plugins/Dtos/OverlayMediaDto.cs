@@ -10,6 +10,7 @@ public class OverlayMediaDto
     public string? VideoFormat { get; set; }
     public string? AudioCodec { get; set; }
     public bool HasStinger { get; set; }
+    public bool HasMultipleAudio { get; set; }
 
     public decimal? ServerAdminRating { get; set; }
     public string? ThirdPartyRating1Name { get; set; }
