@@ -14,6 +14,7 @@ import MediaInfoDialog from '../Media/MediaInfoDialog';
 import PlaybackStatsSections from './Panels/PlaybackStatsSections';
 import UpNextOverlay from './Panels/UpNextOverlay';
 import { isNoSubtitle, NoSubtitle } from '../../utils/subtitleKind';
+import { audioLayout } from '../../utils/trackLabels';
 import { ScrubPreview } from './VideoScrubThumbnails';
 import { WebVideoEngine } from './engine/WebVideoEngine';
 import { usePlaybackController } from './usePlaybackController';
@@ -322,7 +323,7 @@ export default function GlobalVideoPlayer() {
                                 {display.hdr && <span className="rounded-md px-2 py-0.5 text-[11px] font-semibold uppercase" style={{ ...chipStyle, color: 'var(--vora-warning-text)', borderColor: 'color-mix(in srgb, var(--vora-warning-500) 45%, transparent)' }}>{display.hdr}</span>}
                                 {display.videoCodec && <span className="rounded-md px-2 py-0.5 text-[11px] font-semibold uppercase" style={chipStyle}>{display.videoCodec}{currentMedia.videoStrategy === 'Transcode' ? ' (transcode)' : ''}</span>}
                                 {display.audioCodec && <span className="rounded-md px-2 py-0.5 text-[11px] font-semibold uppercase" style={chipStyle}>{display.audioCodec}{currentMedia.audioStrategy === 'Transcode' ? ' (transcode)' : ''}</span>}
-                                {display.audioChannels !== undefined && <span className="rounded-md px-2 py-0.5 text-[11px] font-semibold" style={chipStyle}>{display.audioChannels}ch</span>}
+                                {audioLayout(display.audioChannels) && <span className="rounded-md px-2 py-0.5 text-[11px] font-semibold" style={chipStyle}>{audioLayout(display.audioChannels)}</span>}
                                 {controller.isLoadingSubtitle && (
                                     <span className="rounded-md px-2 py-0.5 text-[11px] font-semibold uppercase" style={chipStyle}>
                                         Loading subtitles…

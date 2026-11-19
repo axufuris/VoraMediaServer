@@ -2,7 +2,7 @@ import type { MediaItem, MediaPart } from '../../../api/Media/mediaService';
 import type { DeviceCapabilities } from '../../../utils/hardwareScanner';
 import { isVideoDirectPlayable, isAudioDirectPlayable } from '../../../utils/playbackDecision';
 import { pickBestAudioTrack } from '../../../utils/audioTrackSelection';
-import { languageName } from '../../../utils/trackLabels';
+import { audioLayout, languageName } from '../../../utils/trackLabels';
 
 type VideoTrackType = NonNullable<MediaPart['videoTracks']>[number];
 type AudioTrackType = NonNullable<MediaPart['audioTracks']>[number];
@@ -122,9 +122,10 @@ export default function PlayerSettingsPanel({
                                 {sortedAudioTracks.map((at: AudioTrackType) => {
                                     const willTranscode = !isAudioDirectPlayable(at, caps);
                                     const name = at.title || languageName(at.language);
+                                    const layout = audioLayout(at.channels);
                                     return (
                                         <option key={at.id} value={at.id}>
-                                            {name} · {at.codec?.toUpperCase()} ({at.channels}ch){at.isDefault ? ' · default' : ''}{willTranscode ? ' · transcode' : ' · direct'}
+                                            {name} · {at.codec?.toUpperCase()}{layout ? ` (${layout})` : ''}{at.isDefault ? ' · default' : ''}{willTranscode ? ' · transcode' : ' · direct'}
                                         </option>
                                     );
                                 })}
