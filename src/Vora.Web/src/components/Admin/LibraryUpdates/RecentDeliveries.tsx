@@ -1,6 +1,6 @@
 import { type WebhookConnectionVM, type WebhookDeliveryVM } from '../../../api/System/webhookAdminService';
 import { formatDateTime } from '../../../utils/serverTime';
-import { FOCUS_FILL, SELECT_FOCUS } from './libraryUpdates';
+import { FOCUS_FILL } from './libraryUpdates';
 
 interface RecentDeliveriesProps {
     deliveries: WebhookDeliveryVM[] | null;
@@ -41,7 +41,7 @@ export default function RecentDeliveries({ deliveries, connections, filter, refr
                         aria-label="Filter by connection"
                         value={filter}
                         onChange={e => onFilterChange(e.target.value)}
-                        className={`vora-input w-auto min-w-0 cursor-pointer text-xs max-md:flex-1 ${SELECT_FOCUS}`}
+                        className={`vora-input w-auto min-w-0 cursor-pointer text-xs max-md:flex-1`}
                     >
                         <option value="">All connections</option>
                         {connections.map(connection => <option key={connection.id} value={connection.id}>{connection.name}</option>)}

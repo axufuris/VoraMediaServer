@@ -3,7 +3,7 @@ import { webhookAdminService, type WebhookRequestServerVM } from '../../../api/S
 import type { ConfirmOptions } from '../../../dialogs';
 import { FieldLabel } from '../../../pages/Admin/SetupGuide/SetupParts';
 import { webhookErrorMessage } from './connectionForm';
-import { FOCUS_FILL, SELECT_FOCUS } from './libraryUpdates';
+import { FOCUS_FILL } from './libraryUpdates';
 
 export interface RequestServerFillResult {
     name?: string;
@@ -54,8 +54,13 @@ export default function RequestServerFill({ servers, serverId, mappings, nameIsU
                 name: nameIsUntouched && found.name ? found.name : undefined,
                 mappings: incoming || undefined
             });
-            const unmatched = found.unmatchedRoots?.length ? ` No Vora folder was found for ${found.unmatchedRoots.join(', ')}.` : '';
-            setStatus({ tone: 'ok', text: `${incoming ? `Filled in from ${found.name}.` : `Nothing to map from ${found.name}.`}${unmatched}` });
+            const roots = found.unmatchedRoots ?? [];
+            const text = incoming
+                ? `Filled in from ${found.name}.${roots.length ? ` No Vora folder was found for ${roots.join(', ')}.` : ''}`
+                : roots.length
+                    ? `Read the root folders of ${found.name} (${roots.join(', ')}) but could not tell which Vora folder each one is. Type the mapping yourself below: the folder as ${found.name} sees it, then =>, then the folder as Vora sees it.`
+                    : `${found.name} has no root folders to map.`;
+            setStatus({ tone: 'ok', text });
         } catch (err) {
             setStatus({ tone: 'error', text: webhookErrorMessage(err, 'Could not read that Request Server.') });
         } finally {
@@ -71,7 +76,7 @@ export default function RequestServerFill({ servers, serverId, mappings, nameIsU
                     id="webhook-fill-server"
                     value={chosen}
                     onChange={e => setPicked(e.target.value)}
-                    className={`vora-input min-w-0 flex-1 cursor-pointer max-md:basis-full ${SELECT_FOCUS}`}
+                    className={`vora-input min-w-0 flex-1 cursor-pointer max-md:basis-full`}
                 >
                     {servers.map(server => <option key={server.id} value={server.id}>{server.name}</option>)}
                 </select>

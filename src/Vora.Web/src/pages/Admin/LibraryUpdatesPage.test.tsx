@@ -396,14 +396,23 @@ describe('LibraryUpdatesPage', () => {
         expect(mocks.getDeliveries).toHaveBeenCalledWith(100, undefined, 's1');
     });
 
-    it('shows keyboard focus as an accent fill on every tile, button and dropdown, never a ring', async () => {
+    it('shows keyboard focus as an accent fill on every tile and button, never a ring', async () => {
         renderPage();
 
         const tiles = [await tile(/^Movies 4K/), await tile(/^Family shows/), await tile(/^Home grown/), screen.getByRole('button', { name: 'Add connection' })];
-        const others = [screen.getByRole('button', { name: 'Refresh' }), screen.getByLabelText('Filter by connection')];
-        for (const control of [...tiles, ...others]) {
+        for (const control of [...tiles, screen.getByRole('button', { name: 'Refresh' })]) {
             for (const cls of FOCUS_FILL) expect(control.className).toContain(cls);
         }
+    });
+
+    it('draws the connection filter as a plain dropdown like every other, with no fill that its open list would inherit', async () => {
+        renderPage();
+        await tile(/^Movies 4K/);
+
+        const filter = screen.getByLabelText('Filter by connection');
+
+        expect(filter.className).toContain('vora-input');
+        expect(filter.className).not.toContain('accent');
     });
 
     it('marks a failed last delivery in words and in the danger colour', async () => {

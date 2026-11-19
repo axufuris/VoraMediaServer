@@ -2,7 +2,6 @@ import type { LibrarySummary } from '../../../api/Media/libraryService';
 import type { WebhookSettingDefinition } from '../../../api/System/webhookAdminService';
 import { FieldLabel, Hint } from '../../../pages/Admin/SetupGuide/SetupParts';
 import { isSettingVisible, parseOption } from './connectionForm';
-import { SELECT_FOCUS } from './libraryUpdates';
 
 interface TemplateSettingsProps {
     definitions: WebhookSettingDefinition[];
@@ -38,7 +37,7 @@ function SettingControl({ definition, value, libraries, onChange }: {
         const choices = definition.options.map(parseOption);
         const hasCurrent = choices.some(choice => choice.value === value);
         return (
-            <select {...common} value={value} onChange={e => onChange(e.target.value)} className={`vora-input w-full cursor-pointer ${SELECT_FOCUS}`}>
+            <select {...common} value={value} onChange={e => onChange(e.target.value)} className={`vora-input w-full cursor-pointer`}>
                 {!hasCurrent && <option value="">{definition.placeholder || ''}</option>}
                 {choices.map(choice => <option key={choice.value} value={choice.value}>{choice.label}</option>)}
             </select>
@@ -47,7 +46,7 @@ function SettingControl({ definition, value, libraries, onChange }: {
 
     if (definition.type === 'library') {
         return (
-            <select {...common} value={value} disabled={libraries === null} onChange={e => onChange(e.target.value)} className={`vora-input w-full cursor-pointer disabled:opacity-60 ${SELECT_FOCUS}`}>
+            <select {...common} value={value} disabled={libraries === null} onChange={e => onChange(e.target.value)} className={`vora-input w-full cursor-pointer disabled:opacity-60`}>
                 <option value="">{libraries === null ? 'Loading libraries…' : 'Choose a library…'}</option>
                 {(libraries ?? []).map(library => <option key={library.id} value={library.id}>{library.name}</option>)}
             </select>

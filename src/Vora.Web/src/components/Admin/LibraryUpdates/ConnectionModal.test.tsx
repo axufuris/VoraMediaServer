@@ -355,6 +355,55 @@ describe('ConnectionModal', () => {
             expect(await screen.findByRole('status')).toHaveTextContent('No Vora folder was found for /archive.');
         });
 
+        it('says what to do when it read the root folders but could not pair any with a Vora folder', async () => {
+            mocks.getRequestServerMappings.mockResolvedValue(found({ name: 'Movies', mappings: '', unmatchedRoots: ['/movies'] }));
+            renderModal();
+            await screen.findByLabelText('Fill in from a Request Server');
+
+            fireEvent.click(screen.getByRole('button', { name: 'Fill in' }));
+
+            const status = await screen.findByRole('status');
+            expect(status).toHaveTextContent('Read the root folders of Movies (/movies) but could not tell which Vora folder each one is');
+            expect(status).toHaveTextContent('Type the mapping yourself below');
+            expect(mappingsInput()).toHaveValue('');
+        });
+
+        it('says so when the server has no root folders at all', async () => {
+            mocks.getRequestServerMappings.mockResolvedValue(found({ name: 'Movies', mappings: '', unmatchedRoots: [], rootFolders: [] }));
+            renderModal();
+            await screen.findByLabelText('Fill in from a Request Server');
+
+            fireEvent.click(screen.getByRole('button', { name: 'Fill in' }));
+
+            expect(await screen.findByRole('status')).toHaveTextContent('Movies has no root folders to map.');
+        });
+
+        it('goes back to the template\'s own name when the template changes after a fill, and lets another fill replace the filled name', async () => {
+            mocks.getRequestServerMappings.mockResolvedValue(found({ name: 'Movies', mappings: '/movies => /media/movies' }));
+            renderModal();
+            await screen.findByLabelText('Fill in from a Request Server');
+
+            fireEvent.click(screen.getByRole('button', { name: 'Fill in' }));
+            await waitFor(() => expect(nameInput()).toHaveValue('Movies'));
+            mocks.getRequestServerMappings.mockResolvedValue(found({ name: 'Movies 4K', mappings: '/movies4k => /media/movies/4K' }));
+            fireEvent.click(screen.getByRole('button', { name: 'Fill in' }));
+            await waitFor(() => expect(nameInput()).toHaveValue('Movies 4K'));
+
+            chooseTemplate('sonarr_webhook');
+
+            expect(nameInput()).toHaveValue('Sonarr');
+        });
+
+        it('keeps a name the admin typed when the template changes', async () => {
+            renderModal();
+            await screen.findByLabelText('Fill in from a Request Server');
+
+            fireEvent.change(nameInput(), { target: { value: 'My own name' } });
+            chooseTemplate('sonarr_webhook');
+
+            expect(nameInput()).toHaveValue('My own name');
+        });
+
         it('is not part of editing a connection', () => {
             mocks.getConnection.mockResolvedValue(withSecret(makeConnection()));
             renderModal({ connection: makeConnection() });
@@ -854,7 +903,7 @@ describe('ConnectionModal', () => {
             expect(screen.getByRole('button', { name: 'Save' }).parentElement?.parentElement?.className).toContain('flex-wrap');
         });
 
-        it('fills every button, switch and dropdown with the accent on focus, never a ring', async () => {
+        it('fills every button and switch with the accent on focus, never a ring, and leaves dropdowns plain', async () => {
             renderModal();
             await screen.findByLabelText('Fill in from a Request Server');
             chooseTemplate('custom_webhook');
@@ -863,13 +912,19 @@ describe('ConnectionModal', () => {
             const dialog = screen.getByRole('dialog');
             const controls = [
                 ...within(dialog).getAllByRole('button'),
-                ...within(dialog).getAllByRole('switch'),
-                ...within(dialog).getAllByRole('combobox')
+                ...within(dialog).getAllByRole('switch')
             ];
-            expect(controls.length).toBeGreaterThanOrEqual(8);
+            expect(controls.length).toBeGreaterThanOrEqual(6);
             for (const control of controls) {
                 const expected = control === save() ? FOCUS_FILL_PRIMARY : FOCUS_FILL;
                 for (const cls of expected) expect(control.className).toContain(cls);
+            }
+
+            const dropdowns = within(dialog).getAllByRole('combobox');
+            expect(dropdowns.length).toBeGreaterThanOrEqual(2);
+            for (const dropdown of dropdowns) {
+                expect(dropdown.className).toContain('vora-input');
+                expect(dropdown.className).not.toContain('accent');
             }
         });
 
