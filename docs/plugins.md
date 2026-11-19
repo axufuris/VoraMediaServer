@@ -46,7 +46,7 @@ When adding a **new** provider interface:
 
 `Vora.Api/Extensions/PluginSettingsAdapter.cs` adapts the application-layer `ISystemSettingsRepository` to the plugin-facing `IPluginSettingsProvider`, so plugins can read/write their own settings without knowing about EF Core.
 
-`Vora.Application/Requests/RequestServerLookupAdapter.cs` implements `IRequestServerLookup` (declared in `Vora.Plugins.Interfaces`). Plugins that need to consume credentials owned by a different aggregate — most prominently the Radarr/Sonarr calendar providers — resolve `IRequestServerLookup` and ask for "calendar servers" by request-provider id (e.g. `radarr_requester`). This is how the calendar plugins share credentials with the Request Servers admin page; see the section on the `ProvidesReleaseCalendar` flag in `docs/database.md`.
+`Vora.Application/Requests/RequestServerLookupAdapter.cs` implements `IRequestServerLookup` (declared in `Vora.Plugins.Interfaces`). Plugins that need to consume credentials owned by a different aggregate — most prominently the Radarr/Sonarr calendar providers — resolve `IRequestServerLookup` and ask for "calendar servers" by request-provider id (e.g. `radarr_requester`). This is how the calendar plugins share credentials with the Request Servers tab of External Connections (`/admin/external-connections/request-servers`); see the section on the `ProvidesReleaseCalendar` flag in `docs/database.md`.
 
 ## Seeding plugin settings from environment variables
 
@@ -102,7 +102,7 @@ Each plugin category has a canonical home:
 | `CollectionSync` | Collections (TBD) |
 | `OverlayEngine` | Poster Overlays (TBD) |
 | `Request` | Request Queue (TBD) |
-| `MediaWebhook` | Library Updates (`/admin/library-updates`) |
+| `MediaWebhook` | External Connections → Webhooks (`/admin/external-connections/webhooks`) |
 | `Lyrics`, `ListeningData` | Music (TBD) |
 
 Categories marked TBD don't have a dedicated admin page yet, so their plugin settings are still reachable via the System Settings → Plugins sub-sidebar. That sub-sidebar filters out the homed categories automatically — when every category has a home, the section disappears entirely.

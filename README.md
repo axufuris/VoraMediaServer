@@ -488,9 +488,9 @@ in addition to the keys shown.
 | `lrclib_lyrics` | LRClib Lyrics | — |
 | `serpapi_theater` | SerpApi Google Showtimes | `api_key`, `default_location`, `max_theaters`, `auto_showtimes` |
 | `radarr_calendar` | Radarr Calendar | — *(reads from Request Servers tagged "Use for Release Calendar")* |
-| `radarr_requester` | Radarr | — *(uses Request Servers admin page)* |
+| `radarr_requester` | Radarr | — *(uses External Connections → Request Servers)* |
 | `sonarr_calendar` | Sonarr Calendar | — *(reads from Request Servers tagged "Use for Release Calendar")* |
-| `sonarr_requester` | Sonarr | — *(uses Request Servers admin page)* |
+| `sonarr_requester` | Sonarr | — *(uses External Connections → Request Servers)* |
 | `trakt_collection_sync` | Trakt.tv Lists | `client_id` |
 | `trakt_chronology` | Trakt.tv Community Lists | — |
 | `mdblist_collection_sync` | MDbList.com | `api_key` |
