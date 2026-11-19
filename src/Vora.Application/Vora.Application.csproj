@@ -254,6 +254,9 @@
     <None Update="Assets\Overlays\MediaStingers\MediaStinger.png">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
+    <None Update="Assets\Overlays\MultiAudio\MultiAudio.png">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
     <None Update="Assets\Overlays\Rating\AniDB.png">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>

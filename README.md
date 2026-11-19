@@ -613,8 +613,9 @@ to manage it through the UI from then on.
 
 Vora can add badges to your posters and episode thumbnails: resolution
 (4K, HDR, Dolby Vision…), audio codec, content rating, edition
-(Director's Cut, Extended…), a post-credits "stinger" tag, and a cluster
-of ratings. Design the layout in **Admin → Poster Overlays**, with a
+(Director's Cut, Extended…), a post-credits "stinger" tag, a
+"Multi-Audio" tag for a movie or episode with audio in more than one
+language, and a cluster of ratings. Design the layout in **Admin → Poster Overlays**, with a
 template each for movie, TV show and season posters (2:3) and episode
 thumbnails (16:9).
 Vora applies it after a library is scanned and analysed, and can also

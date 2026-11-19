@@ -172,6 +172,13 @@ public class LocalImageSharpOverlayProvider(ILogger<LocalImageSharpOverlayProvid
         builder.Append(item.ThirdPartyRating2Name).Append('|');
         builder.Append(item.ThirdPartyRating2);
 
+        // Only a title that draws the tag adds to the key, so every other poster keeps
+        // the file name it already has.
+        if (item.HasMultipleAudio)
+        {
+            builder.Append("|multi-audio");
+        }
+
         var bytes = SHA256.HashData(Encoding.UTF8.GetBytes(builder.ToString()));
         return Convert.ToHexString(bytes, 0, 8).ToLowerInvariant();
     }

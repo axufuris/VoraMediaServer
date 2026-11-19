@@ -293,6 +293,7 @@ public class PosterOverlayManager : IPosterOverlayManager
             VideoFormat = bestVideoTrack?.HdrType,
             AudioCodec = bestAudioTrack?.Codec,
             HasStinger = item.HasMidCreditsStinger || item.HasPostCreditsStinger,
+            HasMultipleAudio = OverlayAudioLanguages.HasMultiple(item.MediaParts.SelectMany(p => p.AudioTracks)),
             Edition = item.Edition,
             ServerAdminRating = ratings.ServerAdminRating,
             ThirdPartyRating1Name = ratings.Rating1Name,

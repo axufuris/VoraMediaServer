@@ -12,6 +12,7 @@ internal static class BadgeResolver
         "content_rating" => GetContentRatingBadge(item.ContentRating, basePath),
         "audio_codec" => GetAudioBadge(item.AudioCodec, basePath),
         "stinger" => item.HasStinger ? Path.Combine(basePath, "MediaStingers", "MediaStinger.png") : null,
+        "multi_audio" => item.HasMultipleAudio ? Path.Combine(basePath, "MultiAudio", "MultiAudio.png") : null,
         "edition" => GetEditionBadge(item.Edition, basePath),
         _ => null
     };

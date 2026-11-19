@@ -8,7 +8,7 @@ import { Modal, ModalBody, ModalFooter, ModalHeader } from '../../../components/
 import { CornerChip, PosterCorner, UnplayedCountBadge, WatchedBadge } from '../../../components/Client/Primitives/WatchedBadge';
 
 type MediaType = 'Movie' | 'Season' | 'TvShow' | 'Episode';
-type BadgeType = 'resolution' | 'content_rating' | 'audio_codec' | 'stinger' | 'edition' | 'composite_ratings' | 'critic_rating';
+type BadgeType = 'resolution' | 'content_rating' | 'audio_codec' | 'stinger' | 'edition' | 'multi_audio' | 'composite_ratings' | 'critic_rating';
 type MockType = 'none' | 'watched' | 'unplayed';
 type PreviewSize = 'large' | 'card' | 'small';
 
@@ -22,6 +22,12 @@ const PORTRAIT_CANVASES: { value: MediaType; label: string; inSentence: string }
 ];
 
 const LARGEST_CARD_WIDTH = 192;
+
+// The Multi-Audio tag reads a title's audio files, and only a movie and an
+// episode have them: a show or season poster would never draw it, so the
+// editor leaves it off those canvases.
+const DRAWN_ON: Partial<Record<BadgeType, MediaType[]>> = { multi_audio: ['Movie', 'Episode'] };
+const drawnOn = (type: BadgeType, mediaType: MediaType) => DRAWN_ON[type]?.includes(mediaType) ?? true;
 
 // The corner box a viewer sees on most of these posters, shown from the start
 // so badges are never placed under it: a show or season has episodes left, a
@@ -160,6 +166,9 @@ const PREVIEW_OPTIONS: Record<BadgeType, { label: string, path: string }[]> = {
     ],
     stinger: [
         { label: 'Stinger', path: '/Overlays/MediaStingers/MediaStinger.png' }
+    ],
+    multi_audio: [
+        { label: 'Multi-Audio', path: '/Overlays/MultiAudio/MultiAudio.png' }
     ],
     critic_rating: [
         { label: 'AniDB', path: '/Overlays/Rating/AniDB.png' },
@@ -344,7 +353,9 @@ export default function OverlayEditor() {
         setElements(elements.filter(el => el.id !== id));
     };
 
-    const layoutJson = () => JSON.stringify(elements.map(e => ({
+    // The layout as it is saved for one canvas: a badge that canvas never draws
+    // (the Multi-Audio tag on a show or season poster) is left out of it.
+    const layoutJson = (forMediaType: MediaType = mediaType) => JSON.stringify(elements.filter(e => drawnOn(e.type, forMediaType)).map(e => ({
         type: e.type,
         xPct: e.xPct,
         yPct: e.yPct,
@@ -370,12 +381,11 @@ export default function OverlayEditor() {
 
     const handleCopy = async () => {
         if (!copyTargets || copyTargets.length === 0) return;
-        const configurationJson = layoutJson();
         const targets = copyTargets;
         setCopying(true);
         try {
             for (const targetMediaType of [mediaType, ...targets]) {
-                await overlayService.saveTemplate({ targetMediaType, configurationJson }, serverId);
+                await overlayService.saveTemplate({ targetMediaType, configurationJson: layoutJson(targetMediaType) }, serverId);
             }
         } catch (error) {
             console.error('Error copying the overlay layout:', error);
@@ -475,11 +485,12 @@ export default function OverlayEditor() {
                     <div className="mb-6">
                         <label className="block text-xs font-bold uppercase tracking-widest text-[var(--vora-text-muted)] mb-1.5">Add Badges</label>
                         <div className="grid grid-cols-2 gap-2">
-                            {(['resolution', 'content_rating', 'audio_codec', 'edition', 'stinger'] as BadgeType[]).map(type => {
+                            {(['resolution', 'content_rating', 'audio_codec', 'edition', 'stinger', 'multi_audio'] as BadgeType[]).filter(type => drawnOn(type, mediaType)).map(type => {
                                 const label = type === 'resolution' ? 'Resolution' :
                                               type === 'content_rating' ? 'Content Rating' :
                                               type === 'audio_codec' ? 'Audio' :
-                                              type === 'edition' ? 'Edition' : 'Stinger Tag';
+                                              type === 'edition' ? 'Edition' :
+                                              type === 'multi_audio' ? 'Multi-Audio' : 'Stinger Tag';
                                 const disabled = hasElement(type);
                                 return (
                                     <button
