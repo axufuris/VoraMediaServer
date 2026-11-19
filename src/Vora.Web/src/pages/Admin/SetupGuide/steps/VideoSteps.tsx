@@ -161,7 +161,7 @@ export function RequestsStep({ serverId }: SetupStepProps) {
         <>
             <StepHeading eyebrow="Movies & TV" title="Requests" lead="Let your users ask for movies and shows you don't have yet. Vora sends each request to Radarr (movies) or Sonarr (shows), which download it." />
             <WhyNote>
-                Radarr and Sonarr can also feed the <b className="font-semibold text-[var(--vora-text-primary)]">Release Calendar</b> with the upcoming releases they track; tick the box in each. Skip this if you don't use them; you can connect them later in System Settings → Request Servers.
+                Radarr and Sonarr can also feed the <b className="font-semibold text-[var(--vora-text-primary)]">Release Calendar</b> with the upcoming releases they track; tick the box in each. Skip this if you don't use them; you can connect them later in External Connections → Request Servers.
             </WhyNote>
             {servers === null
                 ? <div className="vora-skeleton h-40" />

@@ -1,9 +1,9 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
-import { MemoryRouter, Route, Routes } from 'react-router-dom';
-import LibraryUpdatesPage from './LibraryUpdatesPage';
-import { formatDateTime } from '../../utils/serverTime';
-import type { LibrarySummary } from '../../api/Media/libraryService';
+import { MemoryRouter } from 'react-router-dom';
+import WebhooksTab from './WebhooksTab';
+import { formatDateTime } from '../../../utils/serverTime';
+import type { LibrarySummary } from '../../../api/Media/libraryService';
 import type {
     CreateWebhookConnection,
     SaveWebhookConnection,
@@ -12,7 +12,7 @@ import type {
     WebhookDeliveryVM,
     WebhookRequestServerVM,
     WebhookTemplateVM
-} from '../../api/System/webhookAdminService';
+} from '../../../api/System/webhookAdminService';
 import {
     FAKE_SECRET,
     FOCUS_FILL,
@@ -22,7 +22,7 @@ import {
     minutesAgo,
     requestServers,
     withSecret
-} from '../../test/webhookFixtures';
+} from '../../../test/webhookFixtures';
 
 const mocks = vi.hoisted(() => {
     const alert = vi.fn();
@@ -44,7 +44,7 @@ const mocks = vi.hoisted(() => {
     };
 });
 
-vi.mock('../../api/System/webhookAdminService', () => ({
+vi.mock('../../../api/System/webhookAdminService', () => ({
     webhookAdminService: {
         getProviders: mocks.getProviders,
         getConnections: mocks.getConnections,
@@ -56,9 +56,9 @@ vi.mock('../../api/System/webhookAdminService', () => ({
         getRequestServers: mocks.getRequestServers
     }
 }));
-vi.mock('../../api/Media/libraryService', () => ({ libraryService: { getLibraries: mocks.getLibraries } }));
-vi.mock('../../utils/copyText', () => ({ copyText: mocks.copyText }));
-vi.mock('../../dialogs', () => ({ useDialog: () => mocks.dialog }));
+vi.mock('../../../api/Media/libraryService', () => ({ libraryService: { getLibraries: mocks.getLibraries } }));
+vi.mock('../../../utils/copyText', () => ({ copyText: mocks.copyText }));
+vi.mock('../../../dialogs', () => ({ useDialog: () => mocks.dialog }));
 
 const connectionList = (): WebhookConnectionVM[] => [
     makeConnection({ id: 'c1', name: 'Movies 4K', lastDeliveryAt: minutesAgo(5), lastDeliveryOk: true }),
@@ -75,18 +75,15 @@ const refused = makeDelivery({
     event: 'Test', path: '', outcome: 'Wrong secret', ok: false
 });
 
-const renderPage = (path = '/admin/library-updates') => render(
-    <MemoryRouter initialEntries={[path]}>
-        <Routes>
-            <Route path="/admin/library-updates" element={<LibraryUpdatesPage />} />
-            <Route path="/admin/server/:serverId/library-updates" element={<LibraryUpdatesPage />} />
-        </Routes>
+const renderPage = (serverId?: string) => render(
+    <MemoryRouter>
+        <WebhooksTab serverId={serverId} />
     </MemoryRouter>
 );
 
 const tile = async (name: RegExp) => screen.findByRole('button', { name });
 
-describe('LibraryUpdatesPage', () => {
+describe('WebhooksTab', () => {
     beforeEach(() => {
         vi.resetAllMocks();
         mocks.getProviders.mockResolvedValue(allTemplates());
@@ -102,10 +99,11 @@ describe('LibraryUpdatesPage', () => {
 
     afterEach(cleanup);
 
-    it('explains what the page is for', async () => {
+    it('explains what the tab is for, and that these webhooks come in to Vora', async () => {
         renderPage();
 
-        expect(await screen.findByRole('heading', { name: 'Library Updates' })).toBeInTheDocument();
+        expect(await screen.findByText(/These are incoming webhooks/)).toBeInTheDocument();
+        expect(screen.queryByRole('heading', { level: 1 })).not.toBeInTheDocument();
         expect(screen.getByText(/imported, upgraded, renamed or deleted/)).toBeInTheDocument();
         expect(screen.getByText(/any system that can send a webhook/)).toBeInTheDocument();
         expect(screen.getByText(/real-time watching be turned off/)).toBeInTheDocument();
@@ -211,7 +209,7 @@ describe('LibraryUpdatesPage', () => {
             mocks.getConnections.mockRejectedValue(new Error('down'));
             renderPage();
 
-            await waitFor(() => expect(mocks.alert).toHaveBeenCalledWith('Failed to load the library update connections.'));
+            await waitFor(() => expect(mocks.alert).toHaveBeenCalledWith('Failed to load the webhook connections.'));
             expect(await screen.findByRole('button', { name: 'Add connection' })).toBeInTheDocument();
         });
     });
@@ -383,7 +381,7 @@ describe('LibraryUpdatesPage', () => {
     it('passes the server of the multi-server route to every call', async () => {
         mocks.getDeliveries.mockResolvedValue([imported]);
         mocks.updateConnection.mockResolvedValue(connectionList()[0]);
-        renderPage('/admin/server/s1/library-updates');
+        renderPage('s1');
 
         fireEvent.click(await tile(/^Movies 4K/));
         const dialog = await screen.findByRole('dialog');

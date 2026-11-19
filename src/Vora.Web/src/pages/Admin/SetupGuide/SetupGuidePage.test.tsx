@@ -156,6 +156,19 @@ describe('SetupGuidePage', () => {
         expect(screen.getByText(/1,000 lookups a day/)).toBeInTheDocument();
     });
 
+    it('tells the admin the Requests step can be skipped and where Request Servers are now, without leaving the guide', async () => {
+        mocks.getGuide.mockResolvedValue(guide({ step: 'requests' }));
+        renderGuide();
+
+        expect(await screen.findByRole('heading', { name: 'Requests' })).toBeInTheDocument();
+        expect(screen.getByText(/you can connect them later in External Connections → Request Servers\./)).toBeInTheDocument();
+        expect(screen.queryByText(/System Settings → Request Servers/)).not.toBeInTheDocument();
+        expect(await screen.findByLabelText('Address', { selector: '#setup-radarr-host' })).toBeInTheDocument();
+        expect(screen.getByRole('button', { name: 'Skip this step' })).toBeInTheDocument();
+        expect(screen.getByRole('button', { name: 'Save and continue →' })).toBeInTheDocument();
+        expect(localStorage.getItem('admin_settings_tab_global')).toBeNull();
+    });
+
     it('builds the remaining sections from what the admin will put on the server', async () => {
         mocks.getGuide.mockResolvedValue(guide({ step: 'content' }));
         renderGuide();

@@ -1,24 +1,25 @@
 import { useCallback, useEffect, useState } from 'react';
-import { useParams } from 'react-router-dom';
 import {
     webhookAdminService,
     type WebhookConnectionVM,
     type WebhookDeliveryVM,
     type WebhookTemplateVM
-} from '../../api/System/webhookAdminService';
-import PageHeader from '../../components/Admin/Primitives/PageHeader';
-import ConnectionModal from '../../components/Admin/LibraryUpdates/ConnectionModal';
-import ConnectionTiles from '../../components/Admin/LibraryUpdates/ConnectionTiles';
-import RecentDeliveries from '../../components/Admin/LibraryUpdates/RecentDeliveries';
-import { useDialog } from '../../dialogs';
+} from '../../../api/System/webhookAdminService';
+import ConnectionModal from './ConnectionModal';
+import ConnectionTiles from './ConnectionTiles';
+import RecentDeliveries from './RecentDeliveries';
+import { useDialog } from '../../../dialogs';
 
 const DELIVERY_LIMIT = 100;
 const MINUTE = 60_000;
 
 type ModalState = { kind: 'add' } | { kind: 'edit'; id: string } | null;
 
-export default function LibraryUpdatesPage() {
-    const { serverId } = useParams<{ serverId?: string }>();
+interface WebhooksTabProps {
+    serverId?: string;
+}
+
+export default function WebhooksTab({ serverId }: WebhooksTabProps) {
     const dialog = useDialog();
     const [templates, setTemplates] = useState<WebhookTemplateVM[] | null>(null);
     const [connections, setConnections] = useState<WebhookConnectionVM[] | null>(null);
@@ -57,7 +58,7 @@ export default function LibraryUpdatesPage() {
             .catch(() => {
                 if (cancelled) return;
                 setConnections([]);
-                dialog.alert('Failed to load the library update connections.');
+                dialog.alert('Failed to load the webhook connections.');
             });
         return () => { cancelled = true; };
     }, [serverId, dialog]);
@@ -110,13 +111,12 @@ export default function LibraryUpdatesPage() {
     const closeModal = () => setModal(null);
 
     return (
-        <div data-vora-page="">
-            <PageHeader
-                title="Library Updates"
-                description="Radarr, Sonarr, Lidarr or any system that can send a webhook tells Vora when a file is imported, upgraded, renamed or deleted, so the library updates at once. This lets a library's real-time watching be turned off."
-            />
+        <>
+            <div className="space-y-6">
+                <p className="max-w-2xl text-sm text-[var(--vora-text-secondary)]">
+                    These are incoming webhooks, sent to Vora by another app. Radarr, Sonarr, Lidarr or any system that can send a webhook tells Vora when a file is imported, upgraded, renamed or deleted, so the library updates at once. This lets a library's real-time watching be turned off.
+                </p>
 
-            <div className="mx-auto max-w-5xl space-y-6 px-8 pb-10 pt-6 max-md:px-4">
                 <ConnectionTiles
                     connections={connections}
                     now={now}
@@ -154,6 +154,6 @@ export default function LibraryUpdatesPage() {
                     onClose={closeModal}
                 />
             )}
-        </div>
+        </>
     );
 }
