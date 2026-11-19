@@ -152,4 +152,37 @@ public class MediaWebhookPathResolverTests
         MediaWebhookMappingSuggester.Suggest(new[] { "/data/films" }, Array.Empty<string>()).Unmatched.Should().Equal("/data/films");
     }
 
+
+    [Fact]
+    public void A_root_folder_is_matched_to_the_folder_above_library_folders_that_share_its_name()
+    {
+        var movies = new[] { "/media/movies/1080p", "/media/movies/4K", "/media/movies/Test/1080p" };
+        var shows = new[] { "/mnt/user/Media/TV/1080p", "/mnt/user/Media/TV/4K" };
+
+        MediaWebhookMappingSuggester.Suggest(new[] { "/movies" }, movies).Mappings.Should().Be("/movies => /media/movies");
+        MediaWebhookMappingSuggester.Suggest(new[] { "/tv" }, shows).Mappings.Should().Be("/tv => /mnt/user/Media/TV");
+        MediaWebhookMappingSuggester.Suggest(new[] { "/movies" }, movies).Unmatched.Should().BeEmpty();
+    }
+
+    [Fact]
+    public void The_candidate_that_shares_the_most_of_the_ending_wins_and_a_library_folder_wins_a_tie()
+    {
+        var movies = new[] { "/media/movies/1080p", "/media/movies/4K", "/media/movies/Test/1080p" };
+
+        MediaWebhookMappingSuggester.Suggest(new[] { "/movies/1080p" }, movies).Mappings.Should().Be("/movies/1080p => /media/movies/1080p");
+        MediaWebhookMappingSuggester.Suggest(new[] { "/data/4k" }, movies).Mappings.Should().Be("/data/4k => /media/movies/4K");
+        MediaWebhookMappingSuggester.Suggest(new[] { "/1080p" }, movies).Mappings.Should().Be("/1080p => /media/movies/1080p");
+    }
+
+    [Fact]
+    public void A_root_that_shares_nothing_with_several_library_folders_is_left_unmatched()
+    {
+        var movies = new[] { "/media/movies/1080p", "/media/movies/4K" };
+
+        var suggestion = MediaWebhookMappingSuggester.Suggest(new[] { "/data/films", "/movies" }, movies);
+
+        suggestion.Mappings.Should().Be("/movies => /media/movies");
+        suggestion.Unmatched.Should().Equal("/data/films");
+    }
+
 }
