@@ -17,7 +17,7 @@ import SamplePayload from './SamplePayload';
 import SetupInstructions from './SetupInstructions';
 import TemplateSettings from './TemplateSettings';
 import { hasMissingRequired, initialSettings, setupSteps, webhookErrorMessage } from './connectionForm';
-import { FOCUS_FILL, FOCUS_FILL_PRIMARY, SELECT_FOCUS, receiveUrl } from './libraryUpdates';
+import { FOCUS_FILL, FOCUS_FILL_PRIMARY, receiveUrl } from './libraryUpdates';
 
 interface ConnectionModalProps {
     connection: WebhookConnectionVM | null;
@@ -41,6 +41,7 @@ export default function ConnectionModal({ connection, templates, serverId, onCha
     const definitions = template?.settings ?? [];
 
     const [name, setName] = useState(connection?.name ?? template?.defaultConnectionName ?? '');
+    const [filledName, setFilledName] = useState<string | null>(null);
     const [isEnabled, setIsEnabled] = useState(connection?.isEnabled ?? true);
     const [handleDeletes, setHandleDeletes] = useState(connection?.handleDeletes ?? true);
     const [pathMappings, setPathMappings] = useState(connection?.pathMappings ?? '');
@@ -103,14 +104,18 @@ export default function ConnectionModal({ connection, templates, serverId, onCha
     const chooseTemplate = (id: string) => {
         const next = templates.find(candidate => candidate.id === id);
         if (!next) return;
-        setName(current => (!current.trim() || current === template?.defaultConnectionName ? next.defaultConnectionName : current));
+        setName(current => (!current.trim() || current === template?.defaultConnectionName || current === filledName ? next.defaultConnectionName : current));
+        setFilledName(null);
         setSettings(initialSettings(next.settings));
         setTemplateId(id);
         setError(null);
     };
 
     const applyFill = (fill: RequestServerFillResult) => {
-        if (fill.name) setName(fill.name);
+        if (fill.name) {
+            setName(fill.name);
+            setFilledName(fill.name);
+        }
         if (fill.mappings) setPathMappings(fill.mappings);
     };
 
@@ -229,7 +234,7 @@ export default function ConnectionModal({ connection, templates, serverId, onCha
                                     id="webhook-template"
                                     value={templateId}
                                     onChange={e => chooseTemplate(e.target.value)}
-                                    className={`vora-input w-full cursor-pointer ${SELECT_FOCUS}`}
+                                    className={`vora-input w-full cursor-pointer`}
                                 >
                                     {templates.map(candidate => <option key={candidate.id} value={candidate.id}>{candidate.name}</option>)}
                                 </select>
@@ -241,7 +246,7 @@ export default function ConnectionModal({ connection, templates, serverId, onCha
                                     servers={matchingServers}
                                     serverId={serverId}
                                     mappings={pathMappings}
-                                    nameIsUntouched={!name.trim() || name === template.defaultConnectionName}
+                                    nameIsUntouched={!name.trim() || name === template.defaultConnectionName || name === filledName}
                                     confirm={ask}
                                     onFill={applyFill}
                                 />

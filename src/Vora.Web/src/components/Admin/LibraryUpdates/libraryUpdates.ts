@@ -4,8 +4,6 @@ import { serverVault } from '../../../utils/serverVault';
 
 export const FOCUS_FILL = 'focus-visible:bg-[var(--vora-accent-500)]! focus-visible:text-[var(--vora-accent-contrast)]! focus-visible:outline-none!';
 
-export const SELECT_FOCUS = `${FOCUS_FILL} focus:shadow-none!`;
-
 export const FOCUS_FILL_PRIMARY = 'focus-visible:bg-[var(--vora-accent-active)]! focus-visible:text-[var(--vora-accent-contrast)]! focus-visible:outline-none!';
 
 export const FOCUS_CONTRAST_TEXT = 'group-focus-visible:text-[var(--vora-accent-contrast)]!';
