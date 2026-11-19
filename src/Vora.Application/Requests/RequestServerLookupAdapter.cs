@@ -22,13 +22,16 @@ public sealed class RequestServerLookupAdapter : IRequestServerLookup
             {
                 Id = s.Id,
                 Name = s.Name,
-                BaseUrl = BuildBaseUrl(s.UseSsl, s.Hostname, s.Port, s.UrlBase),
+                BaseUrl = RequestServerAddress.BaseUrl(s.UseSsl, s.Hostname, s.Port, s.UrlBase),
                 ApiKey = s.ApiKey
             })
             .ToList();
     }
+}
 
-    private static string BuildBaseUrl(bool useSsl, string hostname, int port, string urlBase)
+public static class RequestServerAddress
+{
+    public static string BaseUrl(bool useSsl, string hostname, int port, string urlBase)
     {
         var scheme = useSsl ? "https" : "http";
         var trimmedBase = (urlBase ?? string.Empty).Trim('/');

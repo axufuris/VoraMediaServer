@@ -1,10 +1,18 @@
 using System.Text.Json;
 using Vora.Plugins.Dtos;
+using Vora.Plugins.Interfaces;
+using Vora.Plugins.Providers.Arr;
 using Vora.Plugins.Providers.Lidarr;
 using Vora.Plugins.Providers.Radarr;
 using Vora.Plugins.Providers.Sonarr;
 
 namespace Vora.Application.Tests.Webhooks;
+
+internal static class ArrParseExtensions
+{
+    public static MediaWebhookParseResult Parse(this ArrWebhookProviderBase provider, string body) =>
+        provider.Parse(body, new Dictionary<string, string>());
+}
 
 public class ArrWebhookProviderTests
 {
@@ -19,7 +27,7 @@ public class ArrWebhookProviderTests
     private readonly LidarrWebhookProvider _lidarr = new();
 
     [Fact]
-    public void Each_provider_is_its_own_plugin_for_one_kind_of_library_with_a_secret_and_path_mappings()
+    public void Each_provider_is_its_own_template_for_one_kind_of_library_with_its_own_instructions()
     {
         _radarr.Id.Should().Be("radarr_webhook");
         _sonarr.Id.Should().Be("sonarr_webhook");
@@ -29,11 +37,19 @@ public class ArrWebhookProviderTests
         _sonarr.SupportedLibraryKinds.Should().Equal(LibraryKind.TvShow);
         _lidarr.SupportedLibraryKinds.Should().Equal(LibraryKind.Music);
 
-        var definitions = _radarr.GetSettingDefinitions().ToList();
-        definitions.Select(d => d.Key).Should().Equal(MediaWebhookSettingKeys.Secret, MediaWebhookSettingKeys.PathMappings);
-        definitions.Single(d => d.Key == MediaWebhookSettingKeys.Secret).Required.Should().BeTrue();
-        definitions.Single(d => d.Key == MediaWebhookSettingKeys.Secret).Type.Should().Be("password");
-        definitions.Single(d => d.Key == MediaWebhookSettingKeys.PathMappings).Required.Should().BeFalse();
+        foreach (var provider in new ArrWebhookProviderBase[] { _radarr, _sonarr, _lidarr })
+        {
+            provider.GetSettingDefinitions().Should().BeEmpty();
+            ((IMediaWebhookProvider)provider).GetConnectionSettingDefinitions().Should().BeEmpty();
+            provider.SetupInstructions.Split('\n').Should().HaveCountGreaterThanOrEqualTo(4);
+            provider.SetupInstructions.Should().Contain(provider.DefaultConnectionName);
+            provider.ResolveLibraryKind(new Dictionary<string, string>()).Should().Be(provider.SupportedLibraryKinds.Single());
+        }
+
+        _radarr.DefaultConnectionName.Should().Be("Radarr");
+        _radarr.RequestServerProviderId.Should().Be("radarr_requester");
+        _sonarr.RequestServerProviderId.Should().Be("sonarr_requester");
+        _lidarr.RequestServerProviderId.Should().BeNull();
     }
 
     [Fact]

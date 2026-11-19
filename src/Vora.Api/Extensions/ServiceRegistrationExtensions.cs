@@ -240,6 +240,7 @@ public static class ServiceRegistrationExtensions
 
         services.AddScoped<Vora.Application.Backups.IBackupSection, Vora.Infrastructure.Backups.Sections.ServerSettingsBackupSection>();
         services.AddScoped<Vora.Application.Backups.IBackupSection, Vora.Infrastructure.Backups.Sections.AuthProvidersBackupSection>();
+        services.AddScoped<Vora.Application.Backups.IBackupSection, Vora.Infrastructure.Backups.Sections.WebhookConnectionsBackupSection>();
         services.AddScoped<Vora.Application.Backups.IBackupSection, Vora.Infrastructure.Backups.Sections.PluginSettingsBackupSection>();
         services.AddScoped<Vora.Application.Backups.IBackupSection, Vora.Infrastructure.Backups.Sections.WebhooksBackupSection>();
         services.AddScoped<Vora.Application.Backups.IBackupSection>(sp =>
@@ -505,6 +506,9 @@ public static class ServiceRegistrationExtensions
         services.AddScoped<ISearchManager, SearchManager>();
         services.AddScoped<ISmartListManager, SmartListManager>();
         services.AddScoped<Vora.Application.Webhooks.IMediaWebhookManager, Vora.Application.Webhooks.MediaWebhookManager>();
+        services.AddScoped<Vora.Application.Webhooks.IWebhookConnectionRepository, Vora.Infrastructure.Persistence.Repositories.WebhookConnectionRepository>();
+        services.AddSingleton<Vora.Application.Webhooks.IWebhookSecretProtector, Vora.Infrastructure.Webhooks.DataProtectionWebhookSecretProtector>();
+        services.AddHttpClient<Vora.Application.Webhooks.IArrRootFolderClient, Vora.Infrastructure.Webhooks.ArrRootFolderClient>();
         services.AddSingleton<Vora.Application.Webhooks.IMediaWebhookLog, Vora.Application.Webhooks.MediaWebhookLog>();
         services.AddSingleton(Vora.Application.Webhooks.MediaWebhookTimings.Default);
         services.AddSingleton<Vora.Application.Webhooks.MediaWebhookProcessor>();

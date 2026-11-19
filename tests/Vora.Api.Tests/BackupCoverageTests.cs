@@ -66,6 +66,7 @@ public class BackupCoverageTests : IClassFixture<VoraApiTestFactory>
         ["MediaRequestUsers"] = "users.requests",
         ["UserProviderConnections"] = "users.external-connections",
         ["AuthProviders"] = "settings.auth-providers",
+        ["WebhookConnections"] = "settings.webhook-connections",
         ["UserExternalIdentities"] = "users.external-identities",
         ["ProfileChannelFavorites"] = "users.channel-favorites",
         ["PodcastShows"] = "podcasts.shows",

@@ -4,6 +4,7 @@ using Vora.Application.Backups;
 using Vora.Domain.Entities.Notifications;
 using Vora.Domain.Entities.Settings;
 using Vora.Domain.Entities.Users;
+using Vora.Domain.Entities.Webhooks;
 using Vora.Infrastructure.Persistence;
 
 namespace Vora.Infrastructure.Backups.Sections;
@@ -27,6 +28,18 @@ public sealed class AuthProvidersBackupSection : EntityTableBackupSection<AuthPr
     public override string? DestructiveWarning =>
         "Replaces the sign-in providers. Providers that are not in the backup are removed along with the links people made to them. The saved client secrets only decrypt with the matching DataProtection keys.";
     protected override DbSet<AuthProvider> Set(VoraDbContext db) => db.AuthProviders;
+}
+
+public sealed class WebhookConnectionsBackupSection : EntityTableBackupSection<WebhookConnection>
+{
+    public WebhookConnectionsBackupSection(VoraDbContext db) : base(db) { }
+    public override string Key => "settings.webhook-connections";
+    public override string DisplayName => "Library Update Connections";
+    public override BackupSectionGroup Group => BackupSectionGroup.Settings;
+    public override bool RequiresExplicitConfirm => true;
+    public override string? DestructiveWarning =>
+        "Replaces the Radarr, Sonarr, Lidarr and custom webhook connections. Connections that are not in the backup are removed. Their secrets only decrypt with the matching DataProtection keys; without them, regenerate each secret and update the app.";
+    protected override DbSet<WebhookConnection> Set(VoraDbContext db) => db.WebhookConnections;
 }
 
 public sealed class PluginSettingsBackupSection : EntityTableBackupSection<PluginSettingValue>

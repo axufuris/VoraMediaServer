@@ -664,6 +664,17 @@ public sealed class LegacyDatabase : IAsyncDisposable
         await ReplaceCombinedMigrationAsync(db, LdapProvidersMigration, "10.0.9", cancellationToken);
     }
 
+    public const string PopularRowMigration = "20261118213529_ChangesSinceInitial";
+
+    public async Task BuildPopularRowStateAsync(Func<VoraDbContext, Task> seed, CancellationToken cancellationToken)
+    {
+        await using var db = NewContext();
+        await db.Database.MigrateAsync(cancellationToken);
+        await db.Database.ExecuteSqlRawAsync("DROP TABLE IF EXISTS \"WebhookConnections\";", cancellationToken);
+        await seed(db);
+        await ReplaceCombinedMigrationAsync(db, PopularRowMigration, "10.0.9", cancellationToken);
+    }
+
     private static async Task ReplaceCombinedMigrationAsync(VoraDbContext db, string migrationId, string productVersion, CancellationToken cancellationToken)
     {
         await db.Database.ExecuteSqlAsync(

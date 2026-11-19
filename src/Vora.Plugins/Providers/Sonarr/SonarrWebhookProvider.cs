@@ -13,8 +13,15 @@ public class SonarrWebhookProvider : ArrWebhookProviderBase
     public override string Name => "Sonarr Webhook";
     public override string Description => "Lets Sonarr tell Vora when an episode file is imported, upgraded, renamed or deleted, so the library updates at once. Add a Webhook connection in Sonarr (Settings, Connect) pointing at Vora.";
     protected override LibraryKind Kind => LibraryKind.TvShow;
+    public override string RequestServerProviderId => "sonarr_requester";
+    public override string SetupInstructions =>
+        "In Sonarr, open Settings, then Connect, and add a Webhook connection.\n" +
+        "Paste the address above into URL and leave Method on POST.\n" +
+        "Set Username to anything (such as vora) and Password to the secret above.\n" +
+        "Tick On File Import, On File Upgrade, On Import Complete, On Rename, On Series Delete and On Episode File Delete.\n" +
+        "Press Test. It should appear under Recent deliveries as a test received.";
 
-    public override MediaWebhookParseResult Parse(string body)
+    public override MediaWebhookParseResult Parse(string body, IReadOnlyDictionary<string, string> settings)
     {
         using var document = Open(body);
         var root = document.RootElement;

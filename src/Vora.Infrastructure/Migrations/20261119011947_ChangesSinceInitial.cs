@@ -533,11 +533,30 @@ BEGIN
         VALUES ('ae950037-af38-4747-a566-bc9e25cb03ef', NULL, NULL, NULL, NULL, NULL, 'popular-movies-shows', 2, '{""mediaTypes"":[""Movie"",""TvShow""]}', NULL, 20, TRUE, TRUE, 7, 0, 'Popular Movies & Shows');
     END IF;
 END $popular$;");
+
+            migrationBuilder.Sql(@"
+CREATE TABLE IF NOT EXISTS ""WebhookConnections"" (
+    ""Id"" uuid NOT NULL,
+    ""Name"" character varying(128) NOT NULL,
+    ""ProviderId"" character varying(64) NOT NULL,
+    ""IsEnabled"" boolean NOT NULL,
+    ""SecretCiphertext"" character varying(2048) NOT NULL,
+    ""PathMappings"" text NOT NULL DEFAULT '',
+    ""HandleDeletes"" boolean NOT NULL,
+    ""SettingsJson"" text NOT NULL DEFAULT '{}',
+    ""CreatedAt"" timestamp with time zone NOT NULL,
+    CONSTRAINT ""PK_WebhookConnections"" PRIMARY KEY (""Id"")
+);
+
+CREATE INDEX IF NOT EXISTS ""IX_WebhookConnections_ProviderId"" ON ""WebhookConnections"" (""ProviderId"");");
         }
 
         /// <inheritdoc />
         protected override void Down(MigrationBuilder migrationBuilder)
         {
+            migrationBuilder.DropTable(
+                name: "WebhookConnections");
+
             migrationBuilder.DropTable(
                 name: "UserExternalIdentities");
 

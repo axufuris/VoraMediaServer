@@ -17,6 +17,7 @@ using Vora.Domain.Entities.Posters;
 using Vora.Domain.Entities.Requests;
 using Vora.Domain.Entities.Settings;
 using Vora.Domain.Entities.SmartLists;
+using Vora.Domain.Entities.Webhooks;
 using Vora.Domain.Entities.Tasks;
 using Vora.Domain.Entities.Templates;
 using Vora.Domain.Entities.Streaming;
@@ -101,6 +102,7 @@ public class VoraDbContext : DbContext
     public DbSet<Vora.Domain.Entities.Notifications.AdminNotification> AdminNotifications { get; set; }
 
     public DbSet<SmartList> SmartLists { get; set; }
+    public DbSet<WebhookConnection> WebhookConnections { get; set; }
 
     public DbSet<IptvPlaylist> IptvPlaylists { get; set; }
     public DbSet<IptvEpgSource> IptvEpgSources { get; set; }
@@ -196,6 +198,7 @@ public class VoraDbContext : DbContext
         ConfigurePlaylists(modelBuilder);
 
         ConfigureSmartLists(modelBuilder);
+        ConfigureWebhookConnections(modelBuilder);
         ConfigurePendingTasks(modelBuilder);
 
         ConfigureIptv(modelBuilder);
@@ -1202,6 +1205,20 @@ public class VoraDbContext : DbContext
                   .WithMany()
                   .HasForeignKey(s => s.CollectionId)
                   .OnDelete(DeleteBehavior.Cascade);
+        });
+    }
+
+    private static void ConfigureWebhookConnections(ModelBuilder modelBuilder)
+    {
+        modelBuilder.Entity<WebhookConnection>(entity =>
+        {
+            entity.HasKey(e => e.Id);
+            entity.Property(e => e.Name).IsRequired().HasMaxLength(128);
+            entity.Property(e => e.ProviderId).IsRequired().HasMaxLength(64);
+            entity.Property(e => e.SecretCiphertext).IsRequired().HasMaxLength(2048);
+            entity.Property(e => e.PathMappings).IsRequired().HasDefaultValue(string.Empty);
+            entity.Property(e => e.SettingsJson).IsRequired().HasDefaultValue("{}");
+            entity.HasIndex(e => e.ProviderId);
         });
     }
 
