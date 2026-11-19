@@ -123,4 +123,33 @@ public class MediaWebhookPathResolverTests
             .Should().Be(Path.Combine(Tv, "Wait... What (2020)", "Wait... What.mkv"));
         (await Resolver(string.Empty).ResolveAsync(string.Empty)).Target.Should().BeNull();
     }
+
+    [Fact]
+    public void A_mapping_line_without_an_arrow_or_a_side_is_found()
+    {
+        MediaWebhookPathMappings.FirstBadLine(null).Should().BeNull();
+        MediaWebhookPathMappings.FirstBadLine("/tv => /media/tv\n\n/movies => /media/movies").Should().BeNull();
+        MediaWebhookPathMappings.FirstBadLine("/tv => /media/tv\n/movies /media/movies").Should().Be("/movies /media/movies");
+        MediaWebhookPathMappings.FirstBadLine("=> /media/tv").Should().Be("=> /media/tv");
+        MediaWebhookPathMappings.FirstBadLine("/tv =>").Should().Be("/tv =>");
+    }
+
+    [Fact]
+    public void Root_folders_are_matched_to_library_folders_by_their_last_name_or_the_only_one()
+    {
+        var byName = MediaWebhookMappingSuggester.Suggest(new[] { "/data/Movies/", "/data/anime" }, new[] { "/media/anime", "/media/movies" });
+        byName.Mappings.Should().Be("/data/Movies => /media/movies\n/data/anime => /media/anime");
+        byName.Unmatched.Should().BeEmpty();
+
+        var onlyOne = MediaWebhookMappingSuggester.Suggest(new[] { "/data/films" }, new[] { "/media/movies" });
+        onlyOne.Mappings.Should().Be("/data/films => /media/movies");
+
+        var unmatched = MediaWebhookMappingSuggester.Suggest(new[] { "/data/films", "/data/kids" }, new[] { "/media/movies", "/media/tv" });
+        unmatched.Mappings.Should().BeEmpty();
+        unmatched.Unmatched.Should().Equal("/data/films", "/data/kids");
+
+        MediaWebhookMappingSuggester.Suggest(new[] { "", "  " }, new[] { "/media/movies" }).Mappings.Should().BeEmpty();
+        MediaWebhookMappingSuggester.Suggest(new[] { "/data/films" }, Array.Empty<string>()).Unmatched.Should().Equal("/data/films");
+    }
+
 }

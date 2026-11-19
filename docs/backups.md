@@ -26,6 +26,7 @@ Implementations live in `Vora.Infrastructure/Backups/Sections/`. `EntityTableBac
 | --- | --- |
 | `settings.server`, `settings.plugins`, `settings.webhooks` | `ServerSettings`, `PluginSettings`, `WebhookConfigs` |
 | `settings.auth-providers` | `AuthProviders`: the sign-in providers. The saved client secrets are DataProtection ciphertext, so they decrypt only with the matching keys (`settings.data-protection`) |
+| `settings.webhook-connections` | `WebhookConnections`: the library-update webhook connections (Radarr, Sonarr, Lidarr, custom), with their path mappings and settings. Each secret is DataProtection ciphertext, so it decrypts only with the matching keys (`settings.data-protection`); without them regenerate the secret and update the app |
 | `library.definitions` | `MediaLibraries`: name, type, folders and every per-library setting. A library with the same name and type is updated in place (its id stays); one that isn't here is added under its old id when that id is free. Libraries not in the backup are left alone, and nothing is scanned — after the restore `BackupManager` restarts the folder watchers (`IFolderWatcherService.RestartAllWatchersAsync`) and the result tells the admin which libraries to scan |
 | `settings.data-protection` | DataProtection key XML files (filesystem, not DB) |
 | `templates.client-schedules`, `templates.email`, `templates.overlay` | template schedules, email overrides, overlay templates |

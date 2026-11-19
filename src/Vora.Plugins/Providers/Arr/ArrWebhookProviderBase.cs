@@ -6,18 +6,21 @@ namespace Vora.Plugins.Providers.Arr;
 
 public abstract class ArrWebhookProviderBase : IMediaWebhookProvider
 {
-    private readonly string _app;
-
     protected ArrWebhookProviderBase(string app)
     {
-        _app = app;
+        App = app;
     }
+
+    protected string App { get; }
 
     public abstract string Id { get; }
     public abstract string Name { get; }
     public abstract string Description { get; }
+    public abstract string SetupInstructions { get; }
+    public virtual string? RequestServerProviderId => null;
     protected abstract LibraryKind Kind { get; }
 
+    public string DefaultConnectionName => App;
     public string Version => "1.0.0";
     public string Type => "MediaWebhook";
     public string DeveloperName => "System";
@@ -25,27 +28,11 @@ public abstract class ArrWebhookProviderBase : IMediaWebhookProvider
 
     public IEnumerable<LibraryKind> SupportedLibraryKinds => new[] { Kind };
 
-    public IEnumerable<PluginSettingDefinitionDto> GetSettingDefinitions() => new List<PluginSettingDefinitionDto>
-    {
-        new()
-        {
-            Key = MediaWebhookSettingKeys.Secret,
-            Label = "Webhook secret",
-            Type = "password",
-            Required = true,
-            Description = $"{_app} sends this as the password of its Webhook connection. Vora refuses any request that does not carry it. Use a long random value; the Library Updates page can generate one."
-        },
-        new()
-        {
-            Key = MediaWebhookSettingKeys.PathMappings,
-            Label = "Path mappings",
-            Type = "textarea",
-            Placeholder = "/tv => /media/tv",
-            Description = $"One per line: a folder as {_app} sees it, then =>, then the same folder as Vora sees it. Leave empty when both use the same paths. Vora also tries to work it out by matching folder names."
-        }
-    };
+    public IEnumerable<PluginSettingDefinitionDto> GetSettingDefinitions() => Array.Empty<PluginSettingDefinitionDto>();
 
-    public abstract MediaWebhookParseResult Parse(string body);
+    public LibraryKind? ResolveLibraryKind(IReadOnlyDictionary<string, string> settings) => Kind;
+
+    public abstract MediaWebhookParseResult Parse(string body, IReadOnlyDictionary<string, string> settings);
 
     protected static JsonDocument Open(string body) => JsonDocument.Parse(body);
 

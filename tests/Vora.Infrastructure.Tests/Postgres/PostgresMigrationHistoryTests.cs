@@ -1524,4 +1524,51 @@ public class PostgresMigrationHistoryTests(PostgresDatabase database) : IClassFi
         rows.Should().NotContain(r => r.Key == "popular-movies-shows");
         rows.Select(r => r.Order).Should().Equal(Enumerable.Range(0, 11));
     }
+
+    [Fact]
+    public async Task A_database_on_the_popular_row_migration_gains_the_empty_webhook_connections_table_and_keeps_its_home_rows()
+    {
+        Assert.SkipUnless(PostgresDatabase.IsConfigured, PostgresDatabase.SkipReason);
+        var cancellationToken = TestContext.Current.CancellationToken;
+        await using var legacy = new LegacyDatabase();
+        await legacy.BuildPopularRowStateAsync(_ => Task.CompletedTask, cancellationToken);
+
+        List<(string? Key, int Order, string Title)> rows;
+        await using (var before = legacy.NewContext())
+        {
+            (await before.Database.GetPendingMigrationsAsync(cancellationToken)).Should().Equal(MigrationHistoryTests.ChangesSinceInitial);
+            (await ColumnsAsync(before, "WebhookConnections", cancellationToken)).Should().BeEmpty();
+            rows = await HomeRowsAsync(before, cancellationToken);
+        }
+
+        await legacy.MigrateAsync(cancellationToken);
+
+        var connection = new Vora.Domain.Entities.Webhooks.WebhookConnection
+        {
+            Name = "Radarr", ProviderId = "radarr_webhook", SecretCiphertext = "sealed", PathMappings = "/movies => /media/movies", SettingsJson = "{\"a\":\"b\"}",
+        };
+        await using (var after = legacy.NewContext())
+        {
+            (await after.Database.GetPendingMigrationsAsync(cancellationToken)).Should().BeEmpty();
+            (await ColumnsAsync(after, "WebhookConnections", cancellationToken)).Should().Contain(new[]
+            {
+                "Id", "Name", "ProviderId", "IsEnabled", "SecretCiphertext", "PathMappings", "HandleDeletes", "SettingsJson", "CreatedAt",
+            });
+            (await HomeRowsAsync(after, cancellationToken)).Should().Equal(rows);
+
+            after.Add(connection);
+            await after.SaveChangesAsync(cancellationToken);
+            await after.Database.ExecuteSqlAsync($"DELETE FROM \"__EFMigrationsHistory\" WHERE \"MigrationId\" = {MigrationHistoryTests.ChangesSinceInitial}", cancellationToken);
+        }
+
+        await legacy.MigrateAsync(cancellationToken);
+
+        await using var again = legacy.NewContext();
+        var kept = await again.Set<Vora.Domain.Entities.Webhooks.WebhookConnection>().AsNoTracking().SingleAsync(c => c.Id == connection.Id, cancellationToken);
+        kept.PathMappings.Should().Be("/movies => /media/movies");
+        kept.IsEnabled.Should().BeTrue();
+        kept.HandleDeletes.Should().BeTrue();
+        (await HomeRowsAsync(again, cancellationToken)).Should().Equal(rows);
+    }
+
 }

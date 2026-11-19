@@ -25,6 +25,22 @@ public static class MediaWebhookPathMappings
 
         return mappings;
     }
+
+    public static string? FirstBadLine(string? text)
+    {
+        if (string.IsNullOrWhiteSpace(text)) return null;
+
+        foreach (var line in text.Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+        {
+            var at = line.IndexOf(Separator, StringComparison.Ordinal);
+            if (at <= 0 || line[..at].Trim().Length == 0 || line[(at + Separator.Length)..].Trim().Length == 0)
+            {
+                return line;
+            }
+        }
+
+        return null;
+    }
 }
 
 public sealed class MediaWebhookPathResolver

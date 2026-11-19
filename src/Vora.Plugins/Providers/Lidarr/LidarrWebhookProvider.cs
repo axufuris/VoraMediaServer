@@ -13,8 +13,14 @@ public class LidarrWebhookProvider : ArrWebhookProviderBase
     public override string Name => "Lidarr Webhook";
     public override string Description => "Lets Lidarr tell Vora when a track file is imported, upgraded, renamed, retagged or deleted, so the music library updates at once. Add a Webhook connection in Lidarr (Settings, Connect) pointing at Vora.";
     protected override LibraryKind Kind => LibraryKind.Music;
+    public override string SetupInstructions =>
+        "In Lidarr, open Settings, then Connect, and add a Webhook connection.\n" +
+        "Paste the address above into URL and leave Method on POST.\n" +
+        "Set Username to anything (such as vora) and Password to the secret above.\n" +
+        "Tick its import, upgrade, rename, retag, artist delete and album delete triggers.\n" +
+        "Press Test. It should appear under Recent deliveries as a test received.";
 
-    public override MediaWebhookParseResult Parse(string body)
+    public override MediaWebhookParseResult Parse(string body, IReadOnlyDictionary<string, string> settings)
     {
         using var document = Open(body);
         var root = document.RootElement;

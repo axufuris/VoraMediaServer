@@ -65,7 +65,12 @@ public sealed class MediaWebhookProcessorTests : IDisposable
     }
 
     private Task Process(LibraryType type, string eventName, params MediaWebhookChange[] changes) =>
-        _processor.ProcessAsync(new MediaWebhookWork($"{type}_webhook", "Instance", eventName, type, changes), TestContext.Current.CancellationToken);
+        Run(type, eventName, string.Empty, true, new Dictionary<string, string>(), changes);
+
+    private Task Run(LibraryType? type, string eventName, string mappings, bool handleDeletes, Dictionary<string, string> settings, params MediaWebhookChange[] changes) =>
+        _processor.ProcessAsync(
+            new MediaWebhookWork(Guid.NewGuid(), "Connection", "test_webhook", "Instance", eventName, type, mappings, handleDeletes, settings, changes),
+            TestContext.Current.CancellationToken);
 
     private static MediaWebhookChange Added(string path) => new(MediaWebhookChangeKind.Added, path);
 
@@ -128,9 +133,8 @@ public sealed class MediaWebhookProcessorTests : IDisposable
     public async Task A_mapping_set_for_the_provider_is_used()
     {
         var file = Touch(_movies, "Film (2020)", "Film.mkv");
-        _settings.GetPluginSettingAsync("Movie_webhook", MediaWebhookSettingKeys.PathMappings).Returns($"/data/films => {_movies}");
 
-        await Process(LibraryType.Movie, "Download", Added("/data/films/Film (2020)/Film.mkv"));
+        await Run(LibraryType.Movie, "Download", $"/data/films => {_movies}", true, new Dictionary<string, string>(), Added("/data/films/Film (2020)/Film.mkv"));
 
         _queue.Received(1).QueueScanNewFile(_movieLibrary, file);
     }
@@ -242,4 +246,58 @@ public sealed class MediaWebhookProcessorTests : IDisposable
         _queue.DidNotReceiveWithAnyArgs().QueueRemoveMissingMediaUnder(default!);
         OnlyDelivery().Ok.Should().BeFalse();
     }
+
+    [Fact]
+    public async Task A_connection_that_does_not_handle_deletes_still_ingests_but_ignores_removals()
+    {
+        var added = Touch(_movies, "Film (2020)", "Film.2160p.mkv");
+        _media.AnyMediaUnderPathAsync(Arg.Any<string>()).Returns(true);
+
+        await Run(
+            LibraryType.Movie, "Download", string.Empty, false, new Dictionary<string, string>(),
+            Added("/movies/Film (2020)/Film.2160p.mkv"), Removed("/movies/Film (2020)/Film.1080p.mkv"), Folder("/movies/Film (2020)"));
+
+        _queue.Received(1).QueueScanNewFile(_movieLibrary, added);
+        _queue.DidNotReceiveWithAnyArgs().QueueRemoveOrphanedMedia(default!);
+        _queue.DidNotReceiveWithAnyArgs().QueueRemoveMissingMediaUnder(default!);
+        _log.Recent(10).Count(d => d.Outcome.Contains("does not handle deletes")).Should().Be(2);
+    }
+
+    [Fact]
+    public async Task A_scan_connection_starts_a_scan_of_its_library_and_needs_no_path()
+    {
+        _libraries.GetProjectedByIdAsync(_tvLibrary, Arg.Any<Expression<Func<MediaLibrary, string>>>()).Returns("TV");
+
+        await Run(
+            null, "added", string.Empty, true,
+            new Dictionary<string, string> { [MediaWebhookSettingKeys.ScanLibrary] = _tvLibrary.ToString() },
+            new MediaWebhookChange(MediaWebhookChangeKind.ScanLibrary, string.Empty));
+
+        _queue.Received(1).QueueScanLibrary(_tvLibrary, "TV");
+        OnlyDelivery().Ok.Should().BeTrue();
+        OnlyDelivery().Outcome.Should().Contain("Scan queued for TV");
+    }
+
+    [Fact]
+    public async Task A_scan_connection_with_no_library_or_a_deleted_one_says_so()
+    {
+        _libraries.GetProjectedByIdAsync(Arg.Any<Guid>(), Arg.Any<Expression<Func<MediaLibrary, string>>>()).Returns((string?)null);
+        var change = new MediaWebhookChange(MediaWebhookChangeKind.ScanLibrary, string.Empty);
+
+        await Run(null, "added", string.Empty, true, new Dictionary<string, string>(), change);
+        await Run(null, "added", string.Empty, true, new Dictionary<string, string> { [MediaWebhookSettingKeys.ScanLibrary] = Guid.NewGuid().ToString() }, change);
+
+        _queue.DidNotReceiveWithAnyArgs().QueueScanLibrary(default);
+        _log.Recent(10).Should().OnlyContain(d => !d.Ok);
+    }
+
+    [Fact]
+    public async Task A_connection_with_no_kind_of_library_cannot_place_a_file()
+    {
+        await Run(null, "added", string.Empty, true, new Dictionary<string, string>(), Added("/movies/Film (2020)/Film.mkv"));
+
+        _queue.ReceivedCalls().Should().BeEmpty();
+        OnlyDelivery().Outcome.Should().Contain("kind of library");
+    }
+
 }

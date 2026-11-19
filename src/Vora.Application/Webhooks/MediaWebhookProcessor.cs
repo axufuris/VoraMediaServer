@@ -72,25 +72,24 @@ public sealed class MediaWebhookProcessor : BackgroundService, IMediaWebhookQueu
         {
             using var scope = _scopeFactory.CreateScope();
             var services = scope.ServiceProvider;
-            var settingsRepo = services.GetRequiredService<ISystemSettingsRepository>();
             var libraryRepo = services.GetRequiredService<ILibraryRepository>();
-            var mediaRepo = services.GetRequiredService<IMediaRepository>();
             var taskQueue = services.GetRequiredService<ITaskQueueManager>();
 
-            var settings = await settingsRepo.GetSettingsAsync();
-            var mappings = MediaWebhookPathMappings.Parse(await settingsRepo.GetPluginSettingAsync(work.ProviderId, MediaWebhookSettingKeys.PathMappings));
-            var libraries = (await libraryRepo.GetAllProjectedAsync(l => new MediaWebhookLibrary(l.Id, l.Name, l.Type, l.FolderPaths, l.ExcludeFilters)))
-                .Where(l => l.Type == work.LibraryType)
-                .Select(l => l with { ExcludeFilters = LibraryFileFilter.Combine(l.ExcludeFilters, settings.ScanIgnoredFolders) })
-                .ToList();
-
-            var resolver = new MediaWebhookPathResolver(mappings, libraries, async top =>
-                Directory.Exists(top) || File.Exists(top) || await mediaRepo.AnyMediaUnderPathAsync(top));
+            MediaWebhookPathResolver? resolver = null;
+            if (work.LibraryType is { } type)
+            {
+                resolver = await MediaWebhookResolvers.CreateAsync(
+                    libraryRepo,
+                    services.GetRequiredService<ISystemSettingsRepository>(),
+                    services.GetRequiredService<IMediaRepository>(),
+                    type,
+                    work.PathMappings);
+            }
 
             foreach (var change in work.Changes)
             {
                 cancellationToken.ThrowIfCancellationRequested();
-                await ProcessChangeAsync(work, change, resolver, taskQueue, cancellationToken);
+                await ProcessChangeAsync(work, change, resolver, libraryRepo, taskQueue, cancellationToken);
             }
         }
         catch (OperationCanceledException)
@@ -99,18 +98,42 @@ public sealed class MediaWebhookProcessor : BackgroundService, IMediaWebhookQueu
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Handling a {Event} webhook from {Provider} failed.", work.EventName, work.ProviderId);
-            _log.Record(work.ProviderId, work.InstanceName, work.EventName, string.Empty, $"Failed: {ex.Message}", false);
+            _logger.LogError(ex, "Handling a {Event} webhook for {Connection} failed.", work.EventName, work.ConnectionName);
+            Record(work, string.Empty, $"Failed: {ex.Message}", false);
         }
     }
 
-    private async Task ProcessChangeAsync(MediaWebhookWork work, MediaWebhookChange change, MediaWebhookPathResolver resolver, ITaskQueueManager taskQueue, CancellationToken cancellationToken)
+    private async Task ProcessChangeAsync(
+        MediaWebhookWork work,
+        MediaWebhookChange change,
+        MediaWebhookPathResolver? resolver,
+        ILibraryRepository libraryRepo,
+        ITaskQueueManager taskQueue,
+        CancellationToken cancellationToken)
     {
+        if (change.Kind == MediaWebhookChangeKind.ScanLibrary)
+        {
+            await ScanLibraryAsync(work, libraryRepo, taskQueue);
+            return;
+        }
+
+        if (change.Kind != MediaWebhookChangeKind.Added && !work.HandleDeletes)
+        {
+            Record(work, change.Path, "Skipped: this connection does not handle deletes.", true);
+            return;
+        }
+
+        if (resolver == null)
+        {
+            Record(work, change.Path, "This connection does not say which kind of library its files belong to.", false);
+            return;
+        }
+
         var resolution = await resolver.ResolveAsync(change.Path);
         if (resolution.Target is not { } target)
         {
             Record(work, change.Path, resolution.Reason, false);
-            _logger.LogWarning("Webhook {Event} from {Provider} named {Path}, which Vora could not place: {Reason}", work.EventName, work.ProviderId, change.Path, resolution.Reason);
+            _logger.LogWarning("Webhook {Event} for {Connection} named {Path}, which Vora could not place: {Reason}", work.EventName, work.ConnectionName, change.Path, resolution.Reason);
             return;
         }
 
@@ -126,6 +149,25 @@ public sealed class MediaWebhookProcessor : BackgroundService, IMediaWebhookQueu
                 await RemoveFolderAsync(work, target, taskQueue, cancellationToken);
                 break;
         }
+    }
+
+    private async Task ScanLibraryAsync(MediaWebhookWork work, ILibraryRepository libraryRepo, ITaskQueueManager taskQueue)
+    {
+        if (!work.Settings.TryGetValue(MediaWebhookSettingKeys.ScanLibrary, out var value) || !Guid.TryParse(value, out var libraryId))
+        {
+            Record(work, string.Empty, "This connection has no library to scan.", false);
+            return;
+        }
+
+        var name = await libraryRepo.GetProjectedByIdAsync(libraryId, l => l.Name);
+        if (name == null)
+        {
+            Record(work, string.Empty, "The library this connection scans no longer exists.", false);
+            return;
+        }
+
+        taskQueue.QueueScanLibrary(libraryId, name);
+        Record(work, string.Empty, $"Scan queued for {name}.", true);
     }
 
     private async Task AddFileAsync(MediaWebhookWork work, MediaWebhookTarget target, ITaskQueueManager taskQueue, CancellationToken cancellationToken)
@@ -147,7 +189,7 @@ public sealed class MediaWebhookProcessor : BackgroundService, IMediaWebhookQueu
         if (!await WaitForFileAsync(path, cancellationToken))
         {
             Record(work, path, $"Not found on disk after {_timings.AddRetryDelays.Count + 1} checks. Check the path mapping, and that Vora can see the folder.", false);
-            _logger.LogWarning("Webhook {Event} from {Provider} reported {Path}, which never appeared on disk.", work.EventName, work.ProviderId, path);
+            _logger.LogWarning("Webhook {Event} for {Connection} reported {Path}, which never appeared on disk.", work.EventName, work.ConnectionName, path);
             return;
         }
 
@@ -246,5 +288,5 @@ public sealed class MediaWebhookProcessor : BackgroundService, IMediaWebhookQueu
     }
 
     private void Record(MediaWebhookWork work, string path, string outcome, bool ok) =>
-        _log.Record(work.ProviderId, work.InstanceName, work.EventName, path, outcome, ok);
+        _log.Record(work.ConnectionId, work.ConnectionName, work.ProviderId, work.InstanceName, work.EventName, path, outcome, ok);
 }
