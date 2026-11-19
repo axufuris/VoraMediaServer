@@ -112,7 +112,7 @@ export default function SetupRequestServerCard({ kind, existing, serverId, onSav
                     </>}
                 />
                 <p className="text-[13px] text-[var(--vora-text-secondary)]">
-                    {meta.name} is already set up. Change it under <Link to={resolveAdminPath('/admin/settings', serverId)} className="font-semibold text-[var(--vora-accent-text)] hover:underline">System Settings → Request Servers</Link>.
+                    {meta.name} is already set up. Change it under <Link to={resolveAdminPath('/admin/external-connections/request-servers', serverId)} className="font-semibold text-[var(--vora-accent-text)] hover:underline">External Connections → Request Servers</Link>.
                 </p>
             </SetupCard>
         );

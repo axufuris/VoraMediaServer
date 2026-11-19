@@ -72,9 +72,10 @@ export interface AdminNavEntry {
 export const ADMIN_NAV: AdminNavEntry[] = [
     // === Server ===
     { label: 'Dashboard',            pathTemplate: '/admin',                  section: 'Server',  icon: 'dashboard',  end: true,  keywords: ['home'] },
-    { label: 'System Settings',      pathTemplate: '/admin/settings',         section: 'Server',  icon: 'settings',   keywords: ['core', 'transcoder', 'remote', 'request servers'] },
+    { label: 'System Settings',      pathTemplate: '/admin/settings',         section: 'Server',  icon: 'settings',   keywords: ['core', 'transcoder', 'remote'] },
     { label: 'Background Tasks',     pathTemplate: '/admin/tasks',            section: 'Server',  icon: 'tasks',      keywords: ['jobs', 'queue', 'worker'] },
     { label: 'Plugins',              pathTemplate: '/admin/plugins',          section: 'Server',  icon: 'plugins',    keywords: ['extensions'] },
+    { label: 'External Connections', pathTemplate: '/admin/external-connections', section: 'Server', icon: 'radio',    keywords: ['external', 'connection', 'request', 'requests', 'request servers', 'radarr', 'sonarr', 'lidarr', 'webhook', 'webhooks', 'notify', 'import', 'integration'] },
     { label: 'Users & Access',       pathTemplate: '/admin/users',            section: 'Server',  icon: 'users',      keywords: ['accounts', 'profiles', 'invite'] },
     { label: 'Email Invitations',    pathTemplate: '/admin/invitations',      section: 'Server',  icon: 'inbox',      keywords: ['invite', 'invites', 'invitation', 'email', 'register'] },
     { label: 'Sign-in Providers',    pathTemplate: '/admin/sign-in-providers', section: 'Server', icon: 'key',        keywords: ['sso', 'oidc', 'openid', 'ldap', 'login', 'authentik', 'keycloak', 'google', 'microsoft', 'single sign-on', 'password'] },
@@ -94,7 +95,6 @@ export const ADMIN_NAV: AdminNavEntry[] = [
     { label: 'Media Deduplication',  pathTemplate: '/admin/dedupe',           section: 'Library', icon: 'copy',       keywords: ['duplicates', 'duplicate', 'cleanup'] },
     { label: 'Media Trash',          pathTemplate: '/admin/media-trash',      section: 'Library', icon: 'trash',      keywords: ['missing', 'trash', 'deleted', 'removed', 'restore', 'retention'] },
     { label: 'Smart Lists',          pathTemplate: '/admin/smart-lists',      section: 'Library', icon: 'list',       keywords: ['home screen', 'rows'] },
-    { label: 'Library Updates',      pathTemplate: '/admin/library-updates',  section: 'Library', icon: 'inbox',      keywords: ['webhook', 'radarr', 'sonarr', 'lidarr', 'import', 'notify', 'connect'] },
     { label: 'Request Queue',        pathTemplate: '/admin/requests',         section: 'Library', icon: 'inbox',      keywords: ['radarr', 'sonarr', 'approve'] },
 
     // === Features ===

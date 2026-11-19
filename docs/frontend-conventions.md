@@ -90,7 +90,12 @@ components/Admin/Features/
                           accent section headers), FeatureTabs (admin
                           page sub-tabs)
 components/Admin/Settings/CoreSettingsTab, PluginSettingsTab,
-                          RemoteAccessTab, RequestServersTab
+                          RemoteAccessTab, EmailTab, StorageTab (the System
+                          Settings tabs), RequestServersTab (mounted by
+                          External Connections), requestServerText
+components/Admin/ExternalConnections/
+                          WebhooksTab and its tiles, modal and deliveries
+                          (the Webhooks tab of External Connections)
 components/Player/        GlobalVideoPlayer, LiveTvPlayer
 components/Player/Controls/ PlayerButtons (PlayPauseButton, SkipButton,
                           VolumeControl, FullscreenButton, MaximizeButton,
@@ -116,7 +121,8 @@ pages/Admin/              DashboardPage, AiStatsPage, HistoryPage,
                           MusicHistoryPage, PluginsPage, RequestsPage,
                           SettingsPage, UserManagementPage, DedupePage,
                           AuthorizedDevicesPage, AppearancePage,
-                          MediaTrashPage
+                          MediaTrashPage, ExternalConnectionsPage
+                          (Request Servers + Webhooks tabs)
 pages/Admin/Libraries/    CreateLibrary, ManageLibrary
 pages/Admin/SmartLists/   SmartListsPage, SmartListEditorModal (+ smartListForm.ts)
 pages/Admin/Discovery/    DiscoveryPage

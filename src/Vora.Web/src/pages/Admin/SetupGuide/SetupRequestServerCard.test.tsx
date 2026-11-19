@@ -7,10 +7,12 @@ import type { RequestServerVM } from '../../../api/Discovery/requestAdminService
 const mocks = vi.hoisted(() => ({ getProviderOptions: vi.fn(), saveServer: vi.fn() }));
 vi.mock('../../../api/Discovery/requestAdminService', () => ({ requestAdminService: { getProviderOptions: mocks.getProviderOptions, saveServer: mocks.saveServer } }));
 
-const renderCard = (kind: 'radarr' | 'sonarr', existing?: RequestServerVM, onSaved = vi.fn()) => {
-    render(<MemoryRouter><SetupRequestServerCard kind={kind} existing={existing} onSaved={onSaved} /></MemoryRouter>);
+const renderCard = (kind: 'radarr' | 'sonarr', existing?: RequestServerVM, onSaved = vi.fn(), serverId?: string) => {
+    render(<MemoryRouter><SetupRequestServerCard kind={kind} existing={existing} serverId={serverId} onSaved={onSaved} /></MemoryRouter>);
     return onSaved;
 };
+
+const existingSonarr: RequestServerVM = { id: 's1', name: 'Sonarr', providerId: 'sonarr_requester', mediaType: 'TvShow', hostname: 'sonarr.local', port: 8989, useSsl: false, apiKey: 'k', urlBase: '', isDefault: true, is4K: false, providesReleaseCalendar: true, providerSettingsJson: '{}', isEnabled: true };
 
 describe('SetupRequestServerCard', () => {
     beforeEach(() => {
@@ -64,10 +66,24 @@ describe('SetupRequestServerCard', () => {
     });
 
     it('shows a server that is already set up instead of a form', () => {
-        renderCard('sonarr', { id: 's1', name: 'Sonarr', providerId: 'sonarr_requester', mediaType: 'TvShow', hostname: 'sonarr.local', port: 8989, useSsl: false, apiKey: 'k', urlBase: '', isDefault: true, is4K: false, providesReleaseCalendar: true, providerSettingsJson: '{}', isEnabled: true });
+        renderCard('sonarr', existingSonarr);
 
         expect(screen.getByText('http://sonarr.local:8989')).toBeInTheDocument();
         expect(screen.getByText('Release Calendar')).toBeInTheDocument();
         expect(screen.queryByLabelText('API key')).not.toBeInTheDocument();
+    });
+
+    it('points a server that is already set up to the Request Servers tab of External Connections', () => {
+        renderCard('sonarr', existingSonarr);
+
+        const link = screen.getByRole('link', { name: 'External Connections → Request Servers' });
+        expect(link).toHaveAttribute('href', '/admin/external-connections/request-servers');
+        expect(screen.queryByText(/System Settings/)).not.toBeInTheDocument();
+    });
+
+    it('keeps the server in that link on the multi-server form', () => {
+        renderCard('sonarr', existingSonarr, vi.fn(), 's1');
+
+        expect(screen.getByRole('link', { name: 'External Connections → Request Servers' })).toHaveAttribute('href', '/admin/server/s1/external-connections/request-servers');
     });
 });

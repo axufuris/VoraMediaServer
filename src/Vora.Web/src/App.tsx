@@ -9,6 +9,7 @@ import { getOrCreateDeviceId } from './utils/deviceId';
 import { defaultApiBaseUrl } from './utils/apiBase';
 import MainLayout from './layouts/MainLayout';
 import AdminShell from './components/Admin/Shell/AdminShell';
+import { resolveAdminPath } from './components/Admin/Shell/adminNavData';
 import { PlayerProvider } from './contexts/PlayerContext';
 import { DialogProvider } from './dialogs';
 import { ThemeProvider } from './theme/ThemeProvider';
@@ -59,7 +60,7 @@ const AdminAiStatsPage = lazyPage(() => import('./pages/Admin/AiStatsPage'));
 const AdminAiSettingsPage = lazyPage(() => import('./pages/Admin/AiSettingsPage'));
 const AdminDedupePage = lazyPage(() => import('./pages/Admin/DedupePage'));
 const AdminMediaTrashPage = lazyPage(() => import('./pages/Admin/MediaTrashPage'));
-const AdminLibraryUpdatesPage = lazyPage(() => import('./pages/Admin/LibraryUpdatesPage'));
+const AdminExternalConnectionsPage = lazyPage(() => import('./pages/Admin/ExternalConnectionsPage'));
 const OverlayEditor = lazyPage(() => import('./pages/Admin/Overlay/OverlayEditor'));
 const AdminIptvPage = lazyPage(() => import('./pages/Admin/Iptv/IptvPage'));
 const AdminForYouPage = lazyPage(() => import('./pages/Admin/Features/ForYouPage'));
@@ -144,6 +145,12 @@ const RequireAuth = ({ children }: { children: ReactElement }) => {
     }
 
     return children;
+};
+
+// Library Updates became the Webhooks tab of External Connections; an old bookmark or link still lands there.
+const LibraryUpdatesRedirect = () => {
+    const { serverId } = useParams<{ serverId?: string }>();
+    return <Navigate to={resolveAdminPath('/admin/external-connections/webhooks', serverId)} replace />;
 };
 
 const RouteErrorBoundary = ({ children }: { children: ReactNode }) => {
@@ -236,7 +243,8 @@ export default function App() {
                         <Route path="libraries" element={<LibraryDashboard />} />
                         <Route path="dedupe" element={<AdminDedupePage />} />
                         <Route path="media-trash" element={<AdminMediaTrashPage />} />
-                        <Route path="library-updates" element={<AdminLibraryUpdatesPage />} />
+                        <Route path="external-connections/:tab?" element={<AdminExternalConnectionsPage />} />
+                        <Route path="library-updates" element={<LibraryUpdatesRedirect />} />
                         <Route path="devices" element={<AuthorizedDevicesPage />} />
                         <Route path="users" element={<AdminUserManagementPage />} />
                         <Route path="invitations" element={<AdminInvitationsPage />} />
@@ -271,7 +279,8 @@ export default function App() {
                             <Route path="libraries" element={<LibraryDashboard />} />
                             <Route path="dedupe" element={<AdminDedupePage />} />
                             <Route path="media-trash" element={<AdminMediaTrashPage />} />
-                            <Route path="library-updates" element={<AdminLibraryUpdatesPage />} />
+                            <Route path="external-connections/:tab?" element={<AdminExternalConnectionsPage />} />
+                            <Route path="library-updates" element={<LibraryUpdatesRedirect />} />
                             <Route path="devices" element={<AuthorizedDevicesPage />} />
                             <Route path="users" element={<AdminUserManagementPage />} />
                             <Route path="invitations" element={<AdminInvitationsPage />} />

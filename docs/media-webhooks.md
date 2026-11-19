@@ -2,7 +2,7 @@
 
 Radarr, Sonarr and Lidarr can tell Vora the moment a file is imported, upgraded, renamed or deleted, through the **Webhook** connection each has under Settings → Connect, and so can any other system that sends a webhook. Vora ingests just that file, or moves the deleted one to Media Trash, without waiting for the folder watcher. It also lets a library's real-time watching be switched off, which matters on a network share where polling the whole tree is the expensive part.
 
-The admin page is **Admin → Library → Library Updates** (`docs/frontend-admin.md`).
+The admin page is **Admin → External Connections → Webhooks** (`/admin/external-connections/webhooks`; the old Library Updates address redirects there; `docs/frontend-admin.md`).
 
 ## Connections and templates
 
@@ -107,7 +107,7 @@ A path with a `..` folder in it is refused. A path nothing matches is listed wit
 
 ### Filling in from a Request Server
 
-A Radarr or Sonarr template offers **Fill in from a Request Server** (`RequestServerProviderId`: `radarr_requester`, `sonarr_requester`), for the servers already under Request Servers. `GET /request-servers/{id}/mappings` asks that server for its root folders (`GET /api/v3/rootfolder`, with its API key, 10 seconds, `ArrRootFolderClient`) and suggests a mapping per root (`MediaWebhookMappingSuggester`): to the library folder of the template's kind, or a folder above it, whose ending shares the most folder names with the root (any case), so a root `/movies` is matched to `/media/movies` when the libraries are `/media/movies/1080p` and `/media/movies/4K`, and `/movies/1080p` to `/media/movies/1080p`; else to the only library folder there is; else the root is listed as unmatched. It is a suggestion: Try a sample payload shows where a path really lands. The page fills the name and the mappings box; if the server can't be reached the answer carries the reason in `error` and nothing is filled. Lidarr has no request server, so none is offered.
+A Radarr or Sonarr template offers **Fill in from a Request Server** (`RequestServerProviderId`: `radarr_requester`, `sonarr_requester`), for the servers already under External Connections → Request Servers. `GET /request-servers/{id}/mappings` asks that server for its root folders (`GET /api/v3/rootfolder`, with its API key, 10 seconds, `ArrRootFolderClient`) and suggests a mapping per root (`MediaWebhookMappingSuggester`): to the library folder of the template's kind, or a folder above it, whose ending shares the most folder names with the root (any case), so a root `/movies` is matched to `/media/movies` when the libraries are `/media/movies/1080p` and `/media/movies/4K`, and `/movies/1080p` to `/media/movies/1080p`; else to the only library folder there is; else the root is listed as unmatched. It is a suggestion: Try a sample payload shows where a path really lands. The page fills the name and the mappings box; if the server can't be reached the answer carries the reason in `error` and nothing is filled. Lidarr has no request server, so none is offered.
 
 ## Adding a file
 

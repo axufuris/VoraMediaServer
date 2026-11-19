@@ -20,7 +20,14 @@ vi.mock('./theme/ClientTemplateProvider', () => ({ ClientTemplateProvider: ({ ch
 vi.mock('./pages/Client/HomePage', () => ({ default: () => <h1>Home page</h1> }));
 vi.mock('./pages/Client/SearchPage', () => ({ default: () => <h1>Search page</h1> }));
 vi.mock('./pages/Auth/LinkDevicePage', () => ({ default: () => <h1>Link page</h1> }));
-vi.mock('./pages/Admin/LibraryUpdatesPage', () => ({ default: () => <h1>Library Updates page</h1> }));
+vi.mock('./pages/Admin/ExternalConnectionsPage', async () => {
+    const { useLocation, useParams } = await vi.importActual<typeof import('react-router-dom')>('react-router-dom');
+    const ExternalConnectionsStub = () => {
+        const { tab } = useParams<{ tab?: string }>();
+        return <h1>External Connections page at {useLocation().pathname} tab {tab ?? 'none'}</h1>;
+    };
+    return { default: ExternalConnectionsStub };
+});
 
 describe('client routes for a server', () => {
     beforeEach(() => {
@@ -76,19 +83,63 @@ describe('admin routes', () => {
         localStorage.setItem(StorageKeys.isServerAdmin, 'true');
     });
 
-    it('opens Library Updates', async () => {
+    it('opens External Connections on a tab', async () => {
+        window.history.pushState({}, '', '/admin/external-connections/webhooks');
+
+        render(<App />);
+
+        expect(await screen.findByRole('heading', { name: 'External Connections page at /admin/external-connections/webhooks tab webhooks' })).toBeInTheDocument();
+    });
+
+    it('opens External Connections with no tab, for the page to pick one', async () => {
+        window.history.pushState({}, '', '/admin/external-connections');
+
+        render(<App />);
+
+        expect(await screen.findByRole('heading', { name: 'External Connections page at /admin/external-connections tab none' })).toBeInTheDocument();
+    });
+
+    it('opens External Connections on a tab on a server', async () => {
+        window.history.pushState({}, '', '/admin/server/home/external-connections/request-servers');
+
+        render(<App />);
+
+        expect(await screen.findByRole('heading', { name: 'External Connections page at /admin/server/home/external-connections/request-servers tab request-servers' })).toBeInTheDocument();
+    });
+
+    it('opens External Connections with no tab on a server', async () => {
+        window.history.pushState({}, '', '/admin/server/home/external-connections');
+
+        render(<App />);
+
+        expect(await screen.findByRole('heading', { name: 'External Connections page at /admin/server/home/external-connections tab none' })).toBeInTheDocument();
+    });
+
+    it('sends the old Library Updates address to the Webhooks tab', async () => {
         window.history.pushState({}, '', '/admin/library-updates');
 
         render(<App />);
 
-        expect(await screen.findByRole('heading', { name: 'Library Updates page' })).toBeInTheDocument();
+        expect(await screen.findByRole('heading', { name: 'External Connections page at /admin/external-connections/webhooks tab webhooks' })).toBeInTheDocument();
+        expect(window.location.pathname).toBe('/admin/external-connections/webhooks');
     });
 
-    it('opens Library Updates on a server', async () => {
+    it('sends the old Library Updates address on a server to the Webhooks tab on that server', async () => {
         window.history.pushState({}, '', '/admin/server/home/library-updates');
 
         render(<App />);
 
-        expect(await screen.findByRole('heading', { name: 'Library Updates page' })).toBeInTheDocument();
+        expect(await screen.findByRole('heading', { name: 'External Connections page at /admin/server/home/external-connections/webhooks tab webhooks' })).toBeInTheDocument();
+        expect(window.location.pathname).toBe('/admin/server/home/external-connections/webhooks');
+    });
+
+    it('replaces the old address, so Back does not bounce through it again', async () => {
+        window.history.pushState({}, '', '/admin/library-updates');
+        const entriesBefore = window.history.length;
+
+        render(<App />);
+
+        await screen.findByRole('heading', { name: /External Connections page/ });
+        expect(window.history.length).toBe(entriesBefore);
     });
 });

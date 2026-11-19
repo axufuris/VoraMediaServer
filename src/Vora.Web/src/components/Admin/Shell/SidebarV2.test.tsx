@@ -42,16 +42,27 @@ describe('the admin sidebar', () => {
         expect(within(link).getByLabelText('150 pending')).toHaveTextContent('99+');
     });
 
-    it('lists Library Updates under Library', async () => {
+    it('lists External Connections under Server, after Plugins', async () => {
         renderSidebar();
 
-        const heading = await screen.findByRole('heading', { name: 'Library' });
-        const link = within(heading.parentElement as HTMLElement).getByRole('link', { name: /Library Updates/ });
+        const heading = await screen.findByRole('heading', { name: 'Server' });
+        const section = within(heading.parentElement as HTMLElement);
+        const link = section.getByRole('link', { name: /External Connections/ });
 
-        expect(link).toHaveAttribute('href', '/admin/library-updates');
+        expect(link).toHaveAttribute('href', '/admin/external-connections');
+        const labels = section.getAllByRole('link').map(l => l.textContent ?? '');
+        const plugins = labels.findIndex(text => /Plugins/.test(text));
+        expect(labels[plugins + 1]).toMatch(/External Connections/);
     });
 
-    it('opens Library Updates under the server on the multi-server form', async () => {
+    it('has no Library Updates entry any more', async () => {
+        renderSidebar();
+        await screen.findByRole('link', { name: /External Connections/ });
+
+        expect(screen.queryByRole('link', { name: /Library Updates/ })).not.toBeInTheDocument();
+    });
+
+    it('opens External Connections under the server on the multi-server form', async () => {
         render(
             <MemoryRouter initialEntries={['/admin/server/s1']}>
                 <Routes>
@@ -60,7 +71,47 @@ describe('the admin sidebar', () => {
             </MemoryRouter>
         );
 
-        expect(await screen.findByRole('link', { name: /Library Updates/ })).toHaveAttribute('href', '/admin/server/s1/library-updates');
+        expect(await screen.findByRole('link', { name: /External Connections/ })).toHaveAttribute('href', '/admin/server/s1/external-connections');
+    });
+
+    describe('highlighting External Connections', () => {
+        const renderAt = (path: string, route: string) => render(
+            <MemoryRouter initialEntries={[path]}>
+                <Routes>
+                    <Route path={route} element={<SidebarV2 />} />
+                </Routes>
+            </MemoryRouter>
+        );
+
+        it.each([
+            ['/admin/external-connections/request-servers'],
+            ['/admin/external-connections/webhooks'],
+            ['/admin/external-connections'],
+        ])('stays highlighted at %s', async path => {
+            renderAt(path, '/admin/*');
+
+            const link = await screen.findByRole('link', { name: /External Connections/ });
+
+            expect(link).toHaveAttribute('aria-current', 'page');
+            expect(screen.getByRole('link', { name: /System Settings/ })).not.toHaveAttribute('aria-current');
+            expect(screen.getByRole('link', { name: /Plugins/ })).not.toHaveAttribute('aria-current');
+        });
+
+        it.each([
+            ['/admin/server/s1/external-connections/request-servers'],
+            ['/admin/server/s1/external-connections/webhooks'],
+        ])('stays highlighted at %s on the multi-server form', async path => {
+            renderAt(path, '/admin/server/:serverId/*');
+
+            expect(await screen.findByRole('link', { name: /External Connections/ })).toHaveAttribute('aria-current', 'page');
+        });
+
+        it('is not highlighted on System Settings', async () => {
+            renderAt('/admin/settings', '/admin/*');
+
+            expect(await screen.findByRole('link', { name: /System Settings/ })).toHaveAttribute('aria-current', 'page');
+            expect(screen.getByRole('link', { name: /External Connections/ })).not.toHaveAttribute('aria-current');
+        });
     });
 
     it('counts on no other entry', async () => {
