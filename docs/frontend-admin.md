@@ -45,6 +45,17 @@ Authoring a new built-in theme: see the row in `docs/architecture.md`. Plugin-sh
 
 The sidebar's **Sign-in Providers** entry (`/admin/sign-in-providers`, `key` icon) is one such line in `ADMIN_NAV`; the page is described in `docs/sso.md` (The web app).
 
+## Library Updates
+
+`pages/Admin/LibraryUpdatesPage.tsx` at `/admin/library-updates` (and `/admin/server/:serverId/library-updates`), in the sidebar under Library. Radarr, Sonarr and Lidarr tell Vora through a Webhook connection when a file is imported, upgraded, renamed or deleted, so the library updates at once and a library's real-time watching can be turned off. The `MediaWebhook` plugins (`radarr_webhook`, `sonarr_webhook`, `lidarr_webhook`) hold the `secret` and `path_mappings` settings; the page is where they are set up.
+
+- **One card per provider** (`components/Admin/LibraryUpdates/WebhookProviderCard.tsx`), titled with the provider's name minus "Webhook". A status badge says `Off` (the plugin is off, and the card points to Plugins), `Needs a secret`, or `Ready`. The address to paste into the app is `window.location.origin` + the provider's `receivePath`, read-only with a Copy button and a note that the app must be able to reach it (inside Docker that is usually the container name and port). Under it: the numbered setup steps, **Generate secret**, and the generic `PluginSettingsForm` for the plugin (secret + path mappings; the path-mapping help text is the setting's own description).
+- **Generate secret** asks first, through `useDialog().confirm`, when a secret already exists (the app's connection has to be updated), then calls the server, shows the new secret once in a highlighted box with a Copy button, and remounts the settings form (a React `key`) so it reloads the stored secret. The provider list is read again so the badge follows.
+- **Recent deliveries** (`RecentDeliveries.tsx`): time (`formatDateTime`), source (provider name + instance), event, path and outcome, newest first, with a Refresh button and an empty state. The outcome carries an icon and the word OK or Failed, never colour alone. The table scrolls sideways on phones (`max-md:min-w-[44rem]` inside `overflow-x-auto`). The server keeps the list in memory, so it clears on a restart.
+- Every button on the page fills with `--vora-accent-500` on keyboard focus and drops the ring (`FOCUS_FILL` in `libraryUpdates.ts`). The buttons are `vora-button-secondary`: the primary one is already accent-filled, so a focus fill would not show.
+
+The calls are in `api/System/webhookAdminService.ts`, all admin only: `GET /api/admin/webhooks` (`getProviders`: id, name, description, `libraryKind`, `receivePath`, `isConfigured`, `isEnabled`, never a secret), `GET /api/admin/webhooks/deliveries?limit=100` (`getDeliveries`) and `POST /api/admin/webhooks/{providerId}/secret` (`generateSecret`: stores a new random secret and returns it once).
+
 ## Request Queue
 
 `pages/Admin/RequestsPage.tsx` keeps **movie and show requests apart**: a Movies tab and a Shows tab (the shared `Tabs` strip), each counting what is pending, and under them the Pending / Processing / Available pills, counted for the type on show. A show is a request whose `type` is `TvShow`, in any case; everything else is a movie. It opens on Movies, or on Shows when only shows are waiting; after that, reloads (an approval, a delete) leave the tab alone.
