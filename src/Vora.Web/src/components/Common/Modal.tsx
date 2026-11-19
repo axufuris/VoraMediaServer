@@ -95,6 +95,7 @@ interface ModalHeaderProps {
     bordered?: boolean;
     tabs?: ReactNode;
     surface?: ModalSurface;
+    closeClassName?: string;
 }
 
 export function ModalHeader({
@@ -106,6 +107,7 @@ export function ModalHeader({
     bordered = true,
     tabs,
     surface = 'gray-950',
+    closeClassName = '',
 }: ModalHeaderProps) {
     const isLight = surface === 'light';
     const borderClass = bordered ? 'border-b border-[var(--vora-border-subtle)]' : '';
@@ -116,7 +118,7 @@ export function ModalHeader({
         ? 'text-base font-semibold text-[var(--vora-text-primary)]'
         : 'text-xl font-bold text-[var(--vora-text-primary)]';
     const subtitleClass = 'text-xs text-[var(--vora-text-muted)] mt-1';
-    const closeClass = 'text-[var(--vora-text-muted)] hover:text-[var(--vora-text-primary)] text-2xl leading-none cursor-pointer disabled:opacity-50';
+    const closeClass = `text-[var(--vora-text-muted)] hover:text-[var(--vora-text-primary)] text-2xl leading-none cursor-pointer disabled:opacity-50 ${closeClassName}`.trim();
     const tabsClass = 'text-[var(--vora-text-muted)]';
 
     return (

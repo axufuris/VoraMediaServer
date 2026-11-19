@@ -1,73 +1,79 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
-import { useEffect } from 'react';
 import LibraryUpdatesPage from './LibraryUpdatesPage';
 import { formatDateTime } from '../../utils/serverTime';
-import type { GeneratedWebhookSecret, WebhookDeliveryVM, WebhookProviderVM } from '../../api/System/webhookAdminService';
+import type { LibrarySummary } from '../../api/Media/libraryService';
+import type {
+    CreateWebhookConnection,
+    SaveWebhookConnection,
+    WebhookConnectionVM,
+    WebhookConnectionWithSecret,
+    WebhookDeliveryVM,
+    WebhookRequestServerVM,
+    WebhookTemplateVM
+} from '../../api/System/webhookAdminService';
+import {
+    FAKE_SECRET,
+    FOCUS_FILL,
+    allTemplates,
+    makeConnection,
+    makeDelivery,
+    minutesAgo,
+    requestServers,
+    withSecret
+} from '../../test/webhookFixtures';
 
 const mocks = vi.hoisted(() => {
     const alert = vi.fn();
     const confirm = vi.fn();
     return {
-        getProviders: vi.fn<(serverId?: string) => Promise<WebhookProviderVM[]>>(),
-        getDeliveries: vi.fn<(limit?: number, serverId?: string) => Promise<WebhookDeliveryVM[]>>(),
-        generateSecret: vi.fn<(providerId: string, serverId?: string) => Promise<GeneratedWebhookSecret>>(),
+        getProviders: vi.fn<(serverId?: string) => Promise<WebhookTemplateVM[]>>(),
+        getConnections: vi.fn<(serverId?: string) => Promise<WebhookConnectionVM[]>>(),
+        getConnection: vi.fn<(id: string, serverId?: string) => Promise<WebhookConnectionWithSecret>>(),
+        createConnection: vi.fn<(body: CreateWebhookConnection, serverId?: string) => Promise<WebhookConnectionWithSecret>>(),
+        updateConnection: vi.fn<(id: string, body: SaveWebhookConnection, serverId?: string) => Promise<WebhookConnectionVM>>(),
+        deleteConnection: vi.fn<(id: string, serverId?: string) => Promise<void>>(),
+        getDeliveries: vi.fn<(limit?: number, connectionId?: string, serverId?: string) => Promise<WebhookDeliveryVM[]>>(),
+        getRequestServers: vi.fn<(serverId?: string) => Promise<WebhookRequestServerVM[]>>(),
+        getLibraries: vi.fn<(serverId?: string) => Promise<LibrarySummary[]>>(),
         copyText: vi.fn<(text: string) => Promise<boolean>>(),
         alert,
         confirm,
-        dialog: { alert, confirm, prompt: vi.fn() },
-        formMounts: {} as Record<string, number>,
-        formServers: {} as Record<string, string | undefined>,
+        dialog: { alert, confirm, prompt: vi.fn() }
     };
 });
 
 vi.mock('../../api/System/webhookAdminService', () => ({
     webhookAdminService: {
         getProviders: mocks.getProviders,
+        getConnections: mocks.getConnections,
+        getConnection: mocks.getConnection,
+        createConnection: mocks.createConnection,
+        updateConnection: mocks.updateConnection,
+        deleteConnection: mocks.deleteConnection,
         getDeliveries: mocks.getDeliveries,
-        generateSecret: mocks.generateSecret,
-    },
+        getRequestServers: mocks.getRequestServers
+    }
 }));
+vi.mock('../../api/Media/libraryService', () => ({ libraryService: { getLibraries: mocks.getLibraries } }));
 vi.mock('../../utils/copyText', () => ({ copyText: mocks.copyText }));
 vi.mock('../../dialogs', () => ({ useDialog: () => mocks.dialog }));
-vi.mock('../../components/Admin/Settings/PluginSettingsForm', () => ({
-    default: function PluginSettingsFormStub({ pluginId, serverId }: { pluginId: string; serverId?: string }) {
-        useEffect(() => {
-            mocks.formMounts[pluginId] = (mocks.formMounts[pluginId] ?? 0) + 1;
-            mocks.formServers[pluginId] = serverId;
-        }, [pluginId, serverId]);
-        return <div data-testid={`form-${pluginId}`}>Settings form for {pluginId}</div>;
-    },
-}));
 
-const radarr: WebhookProviderVM = {
-    id: 'radarr_webhook', name: 'Radarr Webhook', description: 'Updates movie libraries when Radarr changes a file.',
-    libraryKind: 'Movie', receivePath: '/api/webhooks/radarr_webhook', isConfigured: true, isEnabled: true,
-};
-const sonarr: WebhookProviderVM = {
-    id: 'sonarr_webhook', name: 'Sonarr Webhook', description: 'Updates TV libraries when Sonarr changes a file.',
-    libraryKind: 'TvShow', receivePath: '/api/webhooks/sonarr_webhook', isConfigured: false, isEnabled: true,
-};
-const lidarr: WebhookProviderVM = {
-    id: 'lidarr_webhook', name: 'Lidarr Webhook', description: 'Updates music libraries when Lidarr changes a file.',
-    libraryKind: 'Music', receivePath: '/api/webhooks/lidarr_webhook', isConfigured: true, isEnabled: false,
-};
-
-const imported: WebhookDeliveryVM = {
-    id: 'd1', at: '2026-11-18T10:15:00Z', providerId: 'radarr_webhook', instance: '4K', event: 'Download',
-    path: '/movies/Heat (1995)/Heat (1995).mkv', outcome: 'Scan queued', ok: true,
-};
-const refused: WebhookDeliveryVM = {
-    id: 'd2', at: '2026-11-18T10:10:00Z', providerId: 'sonarr_webhook', instance: null, event: 'Test',
-    path: '', outcome: 'Wrong secret', ok: false,
-};
-
-const FOCUS_FILL = [
-    'focus-visible:bg-[var(--vora-accent-500)]!',
-    'focus-visible:text-[var(--vora-accent-contrast)]!',
-    'focus-visible:outline-none!',
+const connectionList = (): WebhookConnectionVM[] => [
+    makeConnection({ id: 'c1', name: 'Movies 4K', lastDeliveryAt: minutesAgo(5), lastDeliveryOk: true }),
+    makeConnection({
+        id: 'c2', name: 'Family shows', providerId: 'sonarr_webhook', providerName: 'Sonarr', receivePath: '/api/webhooks/c2',
+        lastDeliveryAt: minutesAgo(12), lastDeliveryOk: false
+    }),
+    makeConnection({ id: 'c3', name: 'Home grown', providerId: 'custom_webhook', providerName: 'Custom', receivePath: '/api/webhooks/c3', isEnabled: false })
 ];
+
+const imported = makeDelivery({ id: 'd1', instance: '4K' });
+const refused = makeDelivery({
+    id: 'd2', at: '2026-11-18T10:10:00Z', connectionId: 'c2', connectionName: 'Family shows', providerId: 'sonarr_webhook',
+    event: 'Test', path: '', outcome: 'Wrong secret', ok: false
+});
 
 const renderPage = (path = '/admin/library-updates') => render(
     <MemoryRouter initialEntries={[path]}>
@@ -78,20 +84,17 @@ const renderPage = (path = '/admin/library-updates') => render(
     </MemoryRouter>
 );
 
-const cardFor = async (name: string) => screen.findByRole('article', { name });
+const tile = async (name: RegExp) => screen.findByRole('button', { name });
 
 describe('LibraryUpdatesPage', () => {
     beforeEach(() => {
-        mocks.getProviders.mockReset();
-        mocks.getDeliveries.mockReset();
-        mocks.generateSecret.mockReset();
-        mocks.copyText.mockReset();
-        mocks.alert.mockReset();
-        mocks.confirm.mockReset();
-        mocks.formMounts = {};
-        mocks.formServers = {};
-        mocks.getProviders.mockResolvedValue([radarr, sonarr, lidarr]);
+        vi.resetAllMocks();
+        mocks.getProviders.mockResolvedValue(allTemplates());
+        mocks.getConnections.mockImplementation(() => Promise.resolve(connectionList()));
+        mocks.getConnection.mockImplementation(id => Promise.resolve(withSecret(connectionList().find(c => c.id === id) ?? makeConnection())));
         mocks.getDeliveries.mockResolvedValue([]);
+        mocks.getRequestServers.mockResolvedValue(requestServers);
+        mocks.getLibraries.mockResolvedValue([]);
         mocks.copyText.mockResolvedValue(true);
         mocks.confirm.mockResolvedValue(true);
         mocks.alert.mockResolvedValue(undefined);
@@ -104,159 +107,154 @@ describe('LibraryUpdatesPage', () => {
 
         expect(await screen.findByRole('heading', { name: 'Library Updates' })).toBeInTheDocument();
         expect(screen.getByText(/imported, upgraded, renamed or deleted/)).toBeInTheDocument();
+        expect(screen.getByText(/any system that can send a webhook/)).toBeInTheDocument();
         expect(screen.getByText(/real-time watching be turned off/)).toBeInTheDocument();
     });
 
-    it('draws a card per provider, titled without the word Webhook, with its description', async () => {
-        renderPage();
-
-        for (const [title, description] of [
-            ['Radarr', radarr.description],
-            ['Sonarr', sonarr.description],
-            ['Lidarr', lidarr.description],
-        ]) {
-            const card = await cardFor(title);
-            expect(within(card).getByRole('heading', { name: title })).toBeInTheDocument();
-            expect(within(card).getByText(description)).toBeInTheDocument();
-        }
-        expect(screen.queryByText('Radarr Webhook')).not.toBeInTheDocument();
-    });
-
-    it('marks each card Ready, Needs a secret or Off', async () => {
-        renderPage();
-
-        expect(within(await cardFor('Radarr')).getByText('Ready')).toBeInTheDocument();
-        expect(within(await cardFor('Sonarr')).getByText('Needs a secret')).toBeInTheDocument();
-        expect(within(await cardFor('Lidarr')).getByText('Off')).toBeInTheDocument();
-    });
-
-    it('says an Off provider can be turned on under Plugins, and only that one', async () => {
-        renderPage();
-
-        expect(within(await cardFor('Lidarr')).getByText('This connection is off. Turn it on under Plugins.')).toBeInTheDocument();
-        expect(within(await cardFor('Radarr')).queryByText(/Turn it on under Plugins/)).not.toBeInTheDocument();
-        expect(within(await cardFor('Sonarr')).queryByText(/Turn it on under Plugins/)).not.toBeInTheDocument();
-    });
-
-    it('shows the address to paste, built from this page\'s origin and the receive path', async () => {
-        renderPage();
-
-        const card = await cardFor('Radarr');
-        const field = within(card).getByLabelText('Address to paste into Radarr');
-        expect(field).toHaveValue(`${window.location.origin}/api/webhooks/radarr_webhook`);
-        expect(field).toHaveAttribute('readonly');
-        expect(within(card).getByText(/container name and port, not localhost/)).toBeInTheDocument();
-    });
-
-    it('lists the setup steps for the app', async () => {
-        renderPage();
-
-        const steps = within(await cardFor('Sonarr')).getAllByRole('listitem').map(item => item.textContent);
-        expect(steps).toEqual([
-            'In Sonarr, go to Settings, Connect, and add a Webhook.',
-            'Paste the address above into the URL field.',
-            'Set Method to POST.',
-            'Username can be anything, for example vora.',
-            'Set Password to the secret.',
-            'Tick the triggers for import and upgrade, rename, and delete.',
-            'Press Test.',
-        ]);
-    });
-
-    it('copies the address', async () => {
-        renderPage();
-
-        const card = await cardFor('Radarr');
-        fireEvent.click(within(card).getByRole('button', { name: 'Copy Radarr address' }));
-
-        await waitFor(() => expect(mocks.copyText).toHaveBeenCalledWith(`${window.location.origin}/api/webhooks/radarr_webhook`));
-        expect(await within(card).findByRole('button', { name: 'Radarr address copied' })).toHaveTextContent('Copied');
-    });
-
-    it('mounts each provider\'s settings form for its own plugin', async () => {
-        renderPage();
-
-        expect(await screen.findByTestId('form-radarr_webhook')).toBeInTheDocument();
-        expect(screen.getByTestId('form-sonarr_webhook')).toBeInTheDocument();
-        expect(screen.getByTestId('form-lidarr_webhook')).toBeInTheDocument();
-    });
-
-    describe('generating a secret', () => {
-        it('shows the new secret with a Copy button, remounts the settings form and refreshes the badge', async () => {
-            mocks.getProviders.mockResolvedValueOnce([radarr, sonarr, lidarr]).mockResolvedValue([radarr, { ...sonarr, isConfigured: true }, lidarr]);
-            mocks.generateSecret.mockResolvedValue({ secret: 'fake-secret-for-tests' });
+    describe('the connection tiles', () => {
+        it('draw one tile per connection with its name, template and status', async () => {
             renderPage();
 
-            const card = await cardFor('Sonarr');
-            await waitFor(() => expect(mocks.formMounts['sonarr_webhook']).toBe(1));
-            expect(within(card).queryByText('fake-secret-for-tests')).not.toBeInTheDocument();
+            const movies = await tile(/^Movies 4K/);
+            expect(within(movies).getByText('Radarr')).toBeInTheDocument();
+            expect(within(movies).getByText('Ready')).toBeInTheDocument();
 
-            fireEvent.click(within(card).getByRole('button', { name: 'Generate secret' }));
+            const shows = await tile(/^Family shows/);
+            expect(within(shows).getByText('Sonarr')).toBeInTheDocument();
+            expect(within(shows).getByText('Ready')).toBeInTheDocument();
 
-            expect(await within(card).findByText('fake-secret-for-tests')).toBeInTheDocument();
-            expect(mocks.generateSecret).toHaveBeenCalledWith('sonarr_webhook', undefined);
-            expect(mocks.confirm).not.toHaveBeenCalled();
-            expect(within(card).getByText(/only shown here once/)).toBeInTheDocument();
-            expect(within(card).getByText(/already saved, and it is also editable below/)).toBeInTheDocument();
-            await waitFor(() => expect(mocks.formMounts['sonarr_webhook']).toBe(2));
-            expect(mocks.formMounts['radarr_webhook']).toBe(1);
-            await waitFor(() => expect(within(card).getByText('Ready')).toBeInTheDocument());
+            const custom = await tile(/^Home grown/);
+            expect(within(custom).getByText('Custom')).toBeInTheDocument();
+            expect(within(custom).getByText('Off')).toBeInTheDocument();
         });
 
-        it('copies the new secret', async () => {
-            mocks.generateSecret.mockResolvedValue({ secret: 'fake-secret-for-tests' });
+        it('say when the last delivery was, and whether it worked, in words', async () => {
             renderPage();
 
-            const card = await cardFor('Sonarr');
-            fireEvent.click(within(card).getByRole('button', { name: 'Generate secret' }));
-            await within(card).findByText('fake-secret-for-tests');
-            fireEvent.click(within(card).getByRole('button', { name: 'Copy Sonarr secret' }));
-
-            await waitFor(() => expect(mocks.copyText).toHaveBeenCalledWith('fake-secret-for-tests'));
-            expect(await within(card).findByRole('button', { name: 'Sonarr secret copied' })).toBeInTheDocument();
+            expect(within(await tile(/^Movies 4K/)).getByText('Last: 5 min ago, ok')).toBeInTheDocument();
+            expect(within(await tile(/^Family shows/)).getByText('Last: 12 min ago, failed')).toBeInTheDocument();
+            expect(within(await tile(/^Home grown/)).getByText('Nothing received yet')).toBeInTheDocument();
         });
 
-        it('asks first when a secret already exists, and generates once confirmed', async () => {
-            mocks.generateSecret.mockResolvedValue({ secret: 'fake-secret-for-tests' });
+        it('wrap in a grid and end with an Add connection tile', async () => {
             renderPage();
 
-            const card = await cardFor('Radarr');
-            fireEvent.click(within(card).getByRole('button', { name: 'Generate secret' }));
-
-            expect(await within(card).findByText('fake-secret-for-tests')).toBeInTheDocument();
-            expect(mocks.confirm).toHaveBeenCalledTimes(1);
-            expect(mocks.confirm.mock.calls[0][0]).toMatchObject({
-                title: 'Generate a new secret?',
-                message: expect.stringContaining("Radarr's connection must be updated"),
-            });
-            expect(mocks.generateSecret).toHaveBeenCalledWith('radarr_webhook', undefined);
+            await tile(/^Movies 4K/);
+            const list = screen.getByRole('list', { name: 'Connections' });
+            expect(list.className).toContain('grid');
+            expect(list.className).toContain('auto-fill');
+            const items = within(list).getAllByRole('listitem');
+            expect(items).toHaveLength(4);
+            expect(within(items[3]).getByRole('button', { name: 'Add connection' })).toBeInTheDocument();
         });
 
-        it('does nothing when the question is declined', async () => {
-            mocks.confirm.mockResolvedValue(false);
+        it('are compact', async () => {
             renderPage();
 
-            const card = await cardFor('Radarr');
-            await waitFor(() => expect(mocks.formMounts['radarr_webhook']).toBe(1));
-            fireEvent.click(within(card).getByRole('button', { name: 'Generate secret' }));
-
-            await waitFor(() => expect(mocks.confirm).toHaveBeenCalledTimes(1));
-            expect(mocks.generateSecret).not.toHaveBeenCalled();
-            expect(within(card).queryByText('New secret')).not.toBeInTheDocument();
-            expect(mocks.formMounts['radarr_webhook']).toBe(1);
+            const movies = await tile(/^Movies 4K/);
+            expect(movies.className).toContain('p-3');
+            expect(movies.className).toContain('min-h-[4.75rem]');
         });
 
-        it('says so when the secret could not be generated, and shows none', async () => {
-            mocks.generateSecret.mockRejectedValue(new Error('nope'));
+        it('sit above Recent deliveries', async () => {
             renderPage();
 
-            const card = await cardFor('Sonarr');
-            fireEvent.click(within(card).getByRole('button', { name: 'Generate secret' }));
+            const movies = await tile(/^Movies 4K/);
+            const deliveries = screen.getByRole('heading', { name: 'Recent deliveries' });
+            expect(movies.compareDocumentPosition(deliveries) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+        });
 
-            await waitFor(() => expect(mocks.alert).toHaveBeenCalledWith({
-                title: 'Error', message: 'Failed to generate a secret for Sonarr.', tone: 'danger',
-            }));
-            expect(within(card).queryByText('New secret')).not.toBeInTheDocument();
+        it('open the edit modal for the connection, loading its secret', async () => {
+            renderPage();
+
+            fireEvent.click(await tile(/^Family shows/));
+
+            const dialog = await screen.findByRole('dialog');
+            expect(within(dialog).getByRole('heading', { name: 'Edit connection' })).toBeInTheDocument();
+            expect(within(dialog).getByLabelText(/^Name/)).toHaveValue('Family shows');
+            await waitFor(() => expect(mocks.getConnection).toHaveBeenCalledWith('c2', undefined));
+            await waitFor(() => expect(within(dialog).getByLabelText('Secret')).toHaveValue(FAKE_SECRET));
+        });
+
+        it('are reloaded after a save, and the modal closes', async () => {
+            mocks.updateConnection.mockResolvedValue(connectionList()[0]);
+            renderPage();
+            fireEvent.click(await tile(/^Movies 4K/));
+            const dialog = await screen.findByRole('dialog');
+            mocks.getConnections.mockImplementation(() => Promise.resolve([
+                makeConnection({ id: 'c1', name: 'Renamed movies' }), ...connectionList().slice(1)
+            ]));
+
+            fireEvent.change(within(dialog).getByLabelText(/^Name/), { target: { value: 'Renamed movies' } });
+            fireEvent.click(within(dialog).getByRole('button', { name: 'Save' }));
+
+            expect(await tile(/^Renamed movies/)).toBeInTheDocument();
+            expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+            expect(mocks.getConnections).toHaveBeenCalledTimes(2);
+        });
+
+        it('lose a connection that was deleted', async () => {
+            mocks.deleteConnection.mockResolvedValue(undefined);
+            renderPage();
+            fireEvent.click(await tile(/^Movies 4K/));
+            const dialog = await screen.findByRole('dialog');
+            mocks.getConnections.mockImplementation(() => Promise.resolve(connectionList().slice(1)));
+
+            fireEvent.click(within(dialog).getByRole('button', { name: 'Delete connection' }));
+
+            await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
+            await waitFor(() => expect(screen.queryByRole('button', { name: /^Movies 4K/ })).not.toBeInTheDocument());
+            expect(mocks.deleteConnection).toHaveBeenCalledWith('c1', undefined);
+        });
+
+        it('say so when the connections cannot be loaded', async () => {
+            mocks.getConnections.mockRejectedValue(new Error('down'));
+            renderPage();
+
+            await waitFor(() => expect(mocks.alert).toHaveBeenCalledWith('Failed to load the library update connections.'));
+            expect(await screen.findByRole('button', { name: 'Add connection' })).toBeInTheDocument();
+        });
+    });
+
+    describe('adding a connection', () => {
+        it('opens the Add connection modal from its tile', async () => {
+            renderPage();
+
+            fireEvent.click(await screen.findByRole('button', { name: 'Add connection' }));
+
+            const dialog = await screen.findByRole('dialog');
+            expect(within(dialog).getByRole('heading', { name: 'Add connection' })).toBeInTheDocument();
+            expect(within(within(dialog).getByLabelText('Template')).getAllByRole('option').map(option => option.textContent))
+                .toEqual(['Radarr', 'Sonarr', 'Lidarr', 'Custom']);
+        });
+
+        it('shows the new connection\'s secret, then lists it once the modal is done', async () => {
+            const created = makeConnection({ id: 'c9', name: 'Radarr', receivePath: '/api/webhooks/c9' });
+            mocks.createConnection.mockResolvedValue(withSecret(created));
+            renderPage();
+            fireEvent.click(await screen.findByRole('button', { name: 'Add connection' }));
+            const dialog = await screen.findByRole('dialog');
+            mocks.getConnections.mockImplementation(() => Promise.resolve([...connectionList(), created]));
+
+            fireEvent.click(within(dialog).getByRole('button', { name: 'Save' }));
+
+            expect(await within(dialog).findByRole('heading', { name: 'Connection created' })).toBeInTheDocument();
+            expect(within(dialog).getByLabelText('Secret')).toHaveValue(FAKE_SECRET);
+            expect(await tile(/^Radarr/)).toBeInTheDocument();
+            expect(screen.getByRole('dialog')).toBeInTheDocument();
+
+            fireEvent.click(within(dialog).getByRole('button', { name: 'Done' }));
+            expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+        });
+
+        it('says so when the server has no templates', async () => {
+            mocks.getProviders.mockResolvedValue([]);
+            renderPage();
+
+            fireEvent.click(await screen.findByRole('button', { name: 'Add connection' }));
+
+            await waitFor(() => expect(mocks.alert).toHaveBeenCalledWith('This server has no connection templates.'));
+            expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
         });
     });
 
@@ -268,59 +266,108 @@ describe('LibraryUpdatesPage', () => {
             const table = await screen.findByRole('table');
             const rows = within(table).getAllByRole('row');
             expect(rows).toHaveLength(3);
+            expect(within(table).getAllByRole('columnheader').map(header => header.textContent))
+                .toEqual(['Time', 'Connection', 'Event', 'Path', 'Outcome']);
 
             const first = within(rows[1]);
             expect(first.getByRole('cell', { name: formatDateTime(imported.at) })).toBeInTheDocument();
-            expect(first.getByRole('cell', { name: 'Radarr (4K)' })).toBeInTheDocument();
+            expect(first.getByRole('cell', { name: 'Movies 4K (4K)' })).toBeInTheDocument();
             expect(first.getByText('Download')).toBeInTheDocument();
             expect(first.getByText(imported.path)).toBeInTheDocument();
             expect(first.getByText('OK')).toBeInTheDocument();
             expect(first.getByText('Scan queued')).toBeInTheDocument();
 
             const second = within(rows[2]);
-            expect(second.getByRole('cell', { name: 'Sonarr' })).toBeInTheDocument();
+            expect(second.getByRole('cell', { name: 'Family shows' })).toBeInTheDocument();
             expect(second.getByText('Failed')).toBeInTheDocument();
             expect(second.getByText('Wrong secret')).toBeInTheDocument();
             expect(second.queryByText('OK')).not.toBeInTheDocument();
         });
 
-        it('asks the server for 100 and falls back to the provider id for an unknown source', async () => {
-            mocks.getDeliveries.mockResolvedValue([{ ...imported, providerId: 'other_webhook', instance: null }]);
+        it('asks the server for 100, from every connection', async () => {
             renderPage();
 
-            expect(await screen.findByRole('cell', { name: 'other_webhook' })).toBeInTheDocument();
-            expect(mocks.getDeliveries).toHaveBeenCalledWith(100, undefined);
+            await waitFor(() => expect(mocks.getDeliveries).toHaveBeenCalledWith(100, undefined, undefined));
         });
 
         it('says so when nothing has been received', async () => {
             renderPage();
 
-            expect(await screen.findByText('Nothing received yet. Press Test in Radarr, Sonarr or Lidarr.')).toBeInTheDocument();
+            expect(await screen.findByText('Nothing received yet. Press Test in the app, or send a sample.')).toBeInTheDocument();
             expect(screen.queryByRole('table')).not.toBeInTheDocument();
         });
 
-        it('reloads the list when Refresh is pressed', async () => {
+        it('says the list clears when the server restarts', async () => {
+            renderPage();
+
+            expect(await screen.findByText(/The list clears when the server restarts\./)).toBeInTheDocument();
+        });
+
+        it('filters by connection, starting on All connections, and asks the server again', async () => {
+            mocks.getDeliveries.mockImplementation((_limit, connectionId) => Promise.resolve(connectionId === 'c2' ? [refused] : [imported, refused]));
+            renderPage();
+            await screen.findByRole('table');
+
+            const filter = screen.getByLabelText('Filter by connection');
+            expect(filter).toHaveValue('');
+            expect(within(filter).getAllByRole('option').map(option => option.textContent))
+                .toEqual(['All connections', 'Movies 4K', 'Family shows', 'Home grown']);
+
+            fireEvent.change(filter, { target: { value: 'c2' } });
+
+            await waitFor(() => expect(mocks.getDeliveries).toHaveBeenCalledWith(100, 'c2', undefined));
+            await waitFor(() => expect(within(screen.getByRole('table')).getAllByRole('row')).toHaveLength(2));
+            expect(screen.getByLabelText('Filter by connection')).toHaveValue('c2');
+
+            fireEvent.change(screen.getByLabelText('Filter by connection'), { target: { value: '' } });
+
+            await waitFor(() => expect(within(screen.getByRole('table')).getAllByRole('row')).toHaveLength(3));
+            expect(mocks.getDeliveries).toHaveBeenLastCalledWith(100, undefined, undefined);
+        });
+
+        it('reloads the list, and the tiles\' last delivery, when Refresh is pressed', async () => {
             mocks.getDeliveries.mockResolvedValueOnce([]).mockResolvedValue([imported]);
             renderPage();
-            await screen.findByText(/Nothing received yet/);
+            await screen.findByText(/Nothing received yet\. Press Test/);
 
             fireEvent.click(screen.getByRole('button', { name: 'Refresh' }));
 
-            expect(await screen.findByRole('cell', { name: 'Radarr (4K)' })).toBeInTheDocument();
+            expect(await screen.findByRole('cell', { name: 'Movies 4K (4K)' })).toBeInTheDocument();
             expect(mocks.getDeliveries).toHaveBeenCalledTimes(2);
-            expect(screen.queryByText(/Nothing received yet/)).not.toBeInTheDocument();
+            expect(mocks.getConnections).toHaveBeenCalledTimes(2);
+            expect(screen.queryByText(/Nothing received yet\. Press Test/)).not.toBeInTheDocument();
             expect(screen.getByRole('button', { name: 'Refresh' })).toBeEnabled();
+        });
+
+        it('refreshes with the filter that is chosen', async () => {
+            renderPage();
+            await screen.findByText(/Nothing received yet\. Press Test/);
+            fireEvent.change(screen.getByLabelText('Filter by connection'), { target: { value: 'c1' } });
+            await waitFor(() => expect(mocks.getDeliveries).toHaveBeenCalledWith(100, 'c1', undefined));
+            mocks.getDeliveries.mockClear();
+
+            fireEvent.click(screen.getByRole('button', { name: 'Refresh' }));
+
+            await waitFor(() => expect(mocks.getDeliveries).toHaveBeenCalledWith(100, 'c1', undefined));
         });
 
         it('keeps the list and says so when a refresh fails', async () => {
             mocks.getDeliveries.mockResolvedValueOnce([imported]).mockRejectedValue(new Error('down'));
             renderPage();
-            await screen.findByRole('cell', { name: 'Radarr (4K)' });
+            await screen.findByRole('cell', { name: 'Movies 4K (4K)' });
 
             fireEvent.click(screen.getByRole('button', { name: 'Refresh' }));
 
             await waitFor(() => expect(mocks.alert).toHaveBeenCalledWith('Failed to refresh recent deliveries.'));
-            expect(screen.getByRole('cell', { name: 'Radarr (4K)' })).toBeInTheDocument();
+            expect(screen.getByRole('cell', { name: 'Movies 4K (4K)' })).toBeInTheDocument();
+        });
+
+        it('says so when the first load fails', async () => {
+            mocks.getDeliveries.mockRejectedValue(new Error('down'));
+            renderPage();
+
+            await waitFor(() => expect(mocks.alert).toHaveBeenCalledWith('Failed to load recent deliveries.'));
+            expect(await screen.findByText(/Nothing received yet\. Press Test/)).toBeInTheDocument();
         });
 
         it('scrolls sideways on a phone', async () => {
@@ -333,56 +380,39 @@ describe('LibraryUpdatesPage', () => {
         });
     });
 
-    it('says so when the connections cannot be loaded', async () => {
-        mocks.getProviders.mockRejectedValue(new Error('down'));
-        renderPage();
-
-        await waitFor(() => expect(mocks.alert).toHaveBeenCalledWith('Failed to load the library update connections.'));
-        expect(screen.queryByRole('article')).not.toBeInTheDocument();
-    });
-
     it('passes the server of the multi-server route to every call', async () => {
-        mocks.generateSecret.mockResolvedValue({ secret: 'fake-secret-for-tests' });
+        mocks.getDeliveries.mockResolvedValue([imported]);
+        mocks.updateConnection.mockResolvedValue(connectionList()[0]);
         renderPage('/admin/server/s1/library-updates');
 
-        const card = await cardFor('Sonarr');
-        fireEvent.click(within(card).getByRole('button', { name: 'Generate secret' }));
-        await within(card).findByText('fake-secret-for-tests');
+        fireEvent.click(await tile(/^Movies 4K/));
+        const dialog = await screen.findByRole('dialog');
+        await waitFor(() => expect(mocks.getConnection).toHaveBeenCalledWith('c1', 's1'));
+        fireEvent.click(within(dialog).getByRole('button', { name: 'Save' }));
+        await waitFor(() => expect(mocks.updateConnection).toHaveBeenCalledWith('c1', expect.anything(), 's1'));
 
         expect(mocks.getProviders).toHaveBeenCalledWith('s1');
-        expect(mocks.getDeliveries).toHaveBeenCalledWith(100, 's1');
-        expect(mocks.generateSecret).toHaveBeenCalledWith('sonarr_webhook', 's1');
-        await waitFor(() => expect(mocks.formServers['sonarr_webhook']).toBe('s1'));
+        expect(mocks.getConnections).toHaveBeenCalledWith('s1');
+        expect(mocks.getDeliveries).toHaveBeenCalledWith(100, undefined, 's1');
     });
 
-    it('shows keyboard focus as an accent fill on every button, never a ring', async () => {
-        mocks.generateSecret.mockResolvedValue({ secret: 'fake-secret-for-tests' });
+    it('shows keyboard focus as an accent fill on every tile, button and dropdown, never a ring', async () => {
         renderPage();
 
-        const card = await cardFor('Sonarr');
-        fireEvent.click(within(card).getByRole('button', { name: 'Generate secret' }));
-        await within(card).findByText('fake-secret-for-tests');
-
-        const buttons = [
-            ...within(card).getAllByRole('button'),
-            screen.getByRole('button', { name: 'Refresh' }),
-        ];
-        expect(buttons.length).toBeGreaterThanOrEqual(4);
-        for (const button of buttons) {
-            for (const cls of FOCUS_FILL) expect(button.className).toContain(cls);
+        const tiles = [await tile(/^Movies 4K/), await tile(/^Family shows/), await tile(/^Home grown/), screen.getByRole('button', { name: 'Add connection' })];
+        const others = [screen.getByRole('button', { name: 'Refresh' }), screen.getByLabelText('Filter by connection')];
+        for (const control of [...tiles, ...others]) {
+            for (const cls of FOCUS_FILL) expect(control.className).toContain(cls);
         }
     });
 
-    it('lets the cards and the secret wrap on a phone', async () => {
-        mocks.generateSecret.mockResolvedValue({ secret: 'fake-secret-for-tests' });
+    it('marks a failed last delivery in words and in the danger colour', async () => {
         renderPage();
 
-        const card = await cardFor('Sonarr');
-        fireEvent.click(within(card).getByRole('button', { name: 'Generate secret' }));
-        const secret = await within(card).findByText('fake-secret-for-tests');
-
-        expect(secret.className).toContain('break-all');
-        expect(secret.parentElement?.className).toContain('max-md:flex-wrap');
-        expect(card.querySelector('header')?.className).toContain('flex-wrap');
+        const failed = within(await tile(/^Family shows/)).getByText('Last: 12 min ago, failed');
+        expect(failed.className).toContain('text-[var(--vora-danger-text)]');
+        expect(failed.className).toContain('font-semibold');
+        const fine = within(await tile(/^Movies 4K/)).getByText('Last: 5 min ago, ok');
+        expect(fine.className).not.toContain('text-[var(--vora-danger-text)]');
     });
 });

@@ -1,11 +1,13 @@
-import { type WebhookDeliveryVM, type WebhookProviderVM } from '../../../api/System/webhookAdminService';
+import { type WebhookConnectionVM, type WebhookDeliveryVM } from '../../../api/System/webhookAdminService';
 import { formatDateTime } from '../../../utils/serverTime';
-import { FOCUS_FILL, providerTitle } from './libraryUpdates';
+import { FOCUS_FILL, SELECT_FOCUS } from './libraryUpdates';
 
 interface RecentDeliveriesProps {
     deliveries: WebhookDeliveryVM[] | null;
-    providers: WebhookProviderVM[];
+    connections: WebhookConnectionVM[];
+    filter: string;
     refreshing: boolean;
+    onFilterChange: (connectionId: string) => void;
     onRefresh: () => void;
 }
 
@@ -26,12 +28,7 @@ function OutcomeMarker({ ok }: { ok: boolean }) {
     );
 }
 
-export default function RecentDeliveries({ deliveries, providers, refreshing, onRefresh }: RecentDeliveriesProps) {
-    const nameOf = (providerId: string) => {
-        const provider = providers.find(p => p.id === providerId);
-        return provider ? providerTitle(provider.name) : providerId;
-    };
-
+export default function RecentDeliveries({ deliveries, connections, filter, refreshing, onFilterChange, onRefresh }: RecentDeliveriesProps) {
     return (
         <section className="vora-card overflow-hidden p-0" aria-labelledby="recent-deliveries-title">
             <header className="flex flex-wrap items-center justify-between gap-3 border-b border-[var(--vora-border-subtle)] px-6 py-4 max-md:px-4">
@@ -39,16 +36,27 @@ export default function RecentDeliveries({ deliveries, providers, refreshing, on
                     <h2 id="recent-deliveries-title" className="text-base font-semibold text-[var(--vora-text-primary)]">Recent deliveries</h2>
                     <p className="mt-0.5 text-xs text-[var(--vora-text-muted)]">What Vora last received, newest first. The list clears when the server restarts.</p>
                 </div>
-                <button type="button" onClick={onRefresh} disabled={refreshing} className={`vora-button-secondary text-xs disabled:opacity-50 ${FOCUS_FILL}`}>
-                    {refreshing ? 'Refreshing…' : 'Refresh'}
-                </button>
+                <div className="flex items-center gap-2 max-md:w-full max-md:flex-wrap">
+                    <select
+                        aria-label="Filter by connection"
+                        value={filter}
+                        onChange={e => onFilterChange(e.target.value)}
+                        className={`vora-input w-auto min-w-0 cursor-pointer text-xs max-md:flex-1 ${SELECT_FOCUS}`}
+                    >
+                        <option value="">All connections</option>
+                        {connections.map(connection => <option key={connection.id} value={connection.id}>{connection.name}</option>)}
+                    </select>
+                    <button type="button" onClick={onRefresh} disabled={refreshing} className={`vora-button-secondary text-xs disabled:opacity-50 ${FOCUS_FILL}`}>
+                        {refreshing ? 'Refreshing…' : 'Refresh'}
+                    </button>
+                </div>
             </header>
 
             {deliveries === null ? (
                 <div className="p-6"><div className="vora-skeleton h-24" /></div>
             ) : deliveries.length === 0 ? (
                 <div className="p-8 text-center text-sm text-[var(--vora-text-muted)]">
-                    Nothing received yet. Press Test in Radarr, Sonarr or Lidarr.
+                    Nothing received yet. Press Test in the app, or send a sample.
                 </div>
             ) : (
                 <div className="overflow-x-auto">
@@ -56,7 +64,7 @@ export default function RecentDeliveries({ deliveries, providers, refreshing, on
                         <thead>
                             <tr className="border-b border-[var(--vora-border-subtle)] text-[10px] font-bold uppercase tracking-wider text-[var(--vora-text-muted)]">
                                 <th scope="col" className={`${TH} ${FIRST}`}>Time</th>
-                                <th scope="col" className={`${TH} ${MID}`}>Source</th>
+                                <th scope="col" className={`${TH} ${MID}`}>Connection</th>
                                 <th scope="col" className={`${TH} ${MID}`}>Event</th>
                                 <th scope="col" className={`${TH} ${MID}`}>Path</th>
                                 <th scope="col" className={`${TH} ${LAST}`}>Outcome</th>
@@ -67,7 +75,7 @@ export default function RecentDeliveries({ deliveries, providers, refreshing, on
                                 <tr key={delivery.id} className="border-b border-[var(--vora-border-subtle)] last:border-b-0">
                                     <td className={`${TD} ${FIRST} whitespace-nowrap text-[var(--vora-text-secondary)]`}>{formatDateTime(delivery.at)}</td>
                                     <td className={`${TD} ${MID} whitespace-nowrap text-[var(--vora-text-primary)]`}>
-                                        {nameOf(delivery.providerId)}
+                                        {delivery.connectionName}
                                         {delivery.instance && <span className="text-[var(--vora-text-muted)]"> ({delivery.instance})</span>}
                                     </td>
                                     <td className={`${TD} ${MID} whitespace-nowrap text-[var(--vora-text-secondary)]`}>{delivery.event}</td>
