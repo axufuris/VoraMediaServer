@@ -129,12 +129,13 @@ Every client can sign in by each method the server has; none has provider button
 
 - A **first-time directory user** gets the 409 `NeedsCreateOrLink` described above, which the native password form cannot finish: they use the code button once, and the web page does the rest.
 - A server with no providers shows the same form as before. A server whose `/api/auth/providers` answers 404 (an older server) is treated as having no directory.
-- **Refresh and sign-out** treat `External` sessions like `Password` ones. "Remove server" on the native apps clears tokens locally and does not call the logout endpoint.
+- **Refresh and sign-out** treat `External` sessions like `Password` ones. "Remove server" on the native apps signs the device out of that server first (`POST /api/auth/logout` with the server's own address and refresh token; Android and Apple TV wait at most five seconds, Roku sends it without waiting) and then removes the server whatever the answer, so an unreachable server never blocks it. Its confirmation says so: "This signs this device out of the server and doesn't change anything else on it."
+- **Pairing** polls the server every few seconds. A `429 Too Many Requests` on a poll is a slow-down, not a lost connection: the app waits longer (the `Retry-After` header when there is one, else double the interval, at most four times the normal one), goes back to the normal interval after a poll that works, and keeps polling until the code expires. The limit is 90 requests a minute per address, so many TVs behind one address can reach it. Only the request that starts pairing shows its own message for a 429.
+- **The Account tab** shows "New password" only to an account that has a local password (`hasPassword` on the user). An account that signs in through a provider or the directory sees "This account signs in through its provider or directory, so its password is managed there. To also set a Vora password, use the web app." instead, because a local password would be separate from the provider's and setting one signs every device out. A server too old to send `hasPassword` is treated as having one. Apple TV also trims spaces around the sign-in name.
 
 ## Not built yet
 
 - The Android phone return: after approving in the browser the person switches back to the app by hand.
 - The native apps read `directorySignInEnabled` but not `passwordSignInEnabled` or the provider list. On a server with password sign-in turned off they still show the password form first, a refused password gives a message that does not name the code button, and a session ended by turning password sign-in off lands on Login without a notice.
-- The Account tab offers "New password" to an account that signs in through a provider or the directory, with no caption saying that it sets a separate local password.
 
 See issue #294.
