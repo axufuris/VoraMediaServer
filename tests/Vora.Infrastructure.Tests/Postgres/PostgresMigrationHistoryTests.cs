@@ -1444,6 +1444,128 @@ public class PostgresMigrationHistoryTests(PostgresDatabase database) : IClassFi
             .ToList();
 
     [Fact]
+    public async Task A_database_on_the_webhooks_migration_gains_the_continue_listening_row_first_and_the_empty_resume_table()
+    {
+        Assert.SkipUnless(PostgresDatabase.IsConfigured, PostgresDatabase.SkipReason);
+        var cancellationToken = TestContext.Current.CancellationToken;
+        await using var legacy = new LegacyDatabase();
+        const string noRules = "{}";
+        var holidayId = Guid.NewGuid();
+
+        await legacy.BuildContinueListeningStateAsync(async db =>
+        {
+            await db.Database.ExecuteSqlAsync(
+                $"DELETE FROM \"SmartLists\" WHERE \"DefaultKey\" = 'recent-recordings'",
+                cancellationToken);
+            await db.Database.ExecuteSqlAsync(
+                $"INSERT INTO \"SmartLists\" (\"Id\", \"Title\", \"FilterRulesJson\", \"SortBy\", \"MaxItems\", \"DisplayOrder\", \"ShowOnHomepage\", \"ShowToFriends\") VALUES ({holidayId}, 'Holiday Movies', {noRules}, 0, 20, 12, TRUE, TRUE)",
+                cancellationToken);
+        }, cancellationToken);
+
+        await using (var before = legacy.NewContext())
+        {
+            (await before.Database.GetPendingMigrationsAsync(cancellationToken)).Should().Equal(MigrationHistoryTests.ChangesSinceInitial);
+            (await ColumnsAsync(before, "MusicResumePoints", cancellationToken)).Should().BeEmpty();
+            var earlier = await HomeRowsAsync(before, cancellationToken);
+            earlier.Should().NotContain(r => r.Key == "continue-listening");
+            earlier.Select(r => r.Order).Should().Equal(0, 1, 2, 3, 4, 5, 6, 7, 9, 10, 11, 12);
+        }
+
+        await legacy.MigrateAsync(cancellationToken);
+
+        List<(string? Key, int Order, string Title)> rows;
+        await using (var after = legacy.NewContext())
+        {
+            (await after.Database.GetPendingMigrationsAsync(cancellationToken)).Should().BeEmpty();
+            rows = await HomeRowsAsync(after, cancellationToken);
+            rows.Select(r => r.Key).Should().Equal(
+                "continue-listening", "recently-released-movies-episodes", "recently-added-movies-shows", "popular-movies-shows",
+                "recently-released-movies", "recently-added-movies", "recently-released-episodes", "recently-added-shows",
+                "favorite-channels", "recently-added-music", "new-podcast-episodes", "favorite-stations", null);
+            rows.Select(r => r.Order).Should().Equal(0, 1, 2, 3, 4, 5, 6, 7, 8, 10, 11, 12, 13);
+            rows.Single(r => r.Key == null).Title.Should().Be("Holiday Movies");
+
+            var row = await after.Set<SmartList>().AsNoTracking().SingleAsync(l => l.DefaultKey == "continue-listening", cancellationToken);
+            row.Id.Should().Be(SmartListDefaults.All.Single(d => d.Key == "continue-listening").Id);
+            row.Title.Should().Be("Continue Listening");
+            row.Source.Should().Be(SmartListSource.ContinueListening);
+            row.SortBy.Should().Be(SmartListSortBy.DateAddedDesc);
+            row.MaxItems.Should().Be(10);
+            row.FilterRulesJson.Should().Be("{}");
+            row.ShowOnHomepage.Should().BeTrue();
+            row.ShowToFriends.Should().BeTrue();
+
+            (await ColumnsAsync(after, "MusicResumePoints", cancellationToken)).Should().Contain(new[]
+            {
+                "Id", "ProfileId", "Source", "SourceId", "TrackIds", "TrackIndex", "UpdatedAt"
+            });
+            (await after.MusicResumePoints.CountAsync(cancellationToken)).Should().Be(0);
+
+            await after.Database.ExecuteSqlAsync($"DELETE FROM \"__EFMigrationsHistory\" WHERE \"MigrationId\" = {MigrationHistoryTests.ChangesSinceInitial}", cancellationToken);
+        }
+
+        await legacy.MigrateAsync(cancellationToken);
+
+        await using var again = legacy.NewContext();
+        (await HomeRowsAsync(again, cancellationToken)).Should().Equal(rows);
+    }
+
+    [Fact]
+    public async Task A_database_migrated_again_keeps_a_saved_resume_point_and_has_one_continue_listening_row()
+    {
+        Assert.SkipUnless(PostgresDatabase.IsConfigured, PostgresDatabase.SkipReason);
+        var cancellationToken = TestContext.Current.CancellationToken;
+        await using var legacy = new LegacyDatabase();
+        var user = new User { Email = "listener@example.com", DisplayName = "Listener" };
+        var profile = new UserProfile { Id = Guid.NewGuid(), Name = "Listener", UserId = user.Id };
+
+        await legacy.BuildContinueListeningStateAsync(db =>
+        {
+            db.AddRange(user, profile);
+            return db.SaveChangesAsync(cancellationToken);
+        }, cancellationToken);
+
+        await legacy.MigrateAsync(cancellationToken);
+
+        await using (var after = legacy.NewContext())
+        {
+            after.MusicResumePoints.Add(new MusicResumePoint { ProfileId = profile.Id, Source = MusicPlaySource.Playlist, SourceId = Guid.NewGuid(), TrackIds = [Guid.NewGuid(), Guid.NewGuid()], TrackIndex = 1 });
+            await after.SaveChangesAsync(cancellationToken);
+            await after.Database.ExecuteSqlAsync($"DELETE FROM \"__EFMigrationsHistory\" WHERE \"MigrationId\" = {MigrationHistoryTests.ChangesSinceInitial}", cancellationToken);
+        }
+
+        await legacy.MigrateAsync(cancellationToken);
+
+        await using var again = legacy.NewContext();
+        (await again.MusicResumePoints.AsNoTracking().SingleAsync(cancellationToken)).TrackIndex.Should().Be(1);
+        (await HomeRowsAsync(again, cancellationToken)).Count(r => r.Key == "continue-listening").Should().Be(1);
+    }
+
+    [Fact]
+    public async Task A_database_whose_history_already_holds_a_later_fold_in_is_not_given_the_continue_listening_row_again()
+    {
+        Assert.SkipUnless(PostgresDatabase.IsConfigured, PostgresDatabase.SkipReason);
+        var cancellationToken = TestContext.Current.CancellationToken;
+        await using var legacy = new LegacyDatabase();
+        const string laterFoldIn = "20261201000000_ChangesSinceInitial";
+
+        await legacy.BuildContinueListeningStateAsync(_ => Task.CompletedTask, cancellationToken);
+        await using (var before = legacy.NewContext())
+        {
+            await before.Database.ExecuteSqlAsync(
+                $"UPDATE \"__EFMigrationsHistory\" SET \"MigrationId\" = {laterFoldIn} WHERE \"MigrationId\" = {LegacyDatabase.ContinueListeningMigration}",
+                cancellationToken);
+        }
+
+        await legacy.MigrateAsync(cancellationToken);
+
+        await using var after = legacy.NewContext();
+        var rows = await HomeRowsAsync(after, cancellationToken);
+        rows.Should().NotContain(r => r.Key == "continue-listening");
+        rows.Select(r => r.Order).Should().Equal(Enumerable.Range(0, 12));
+    }
+
+    [Fact]
     public async Task A_database_on_the_ldap_migration_gains_the_popular_row_third_and_keeps_its_order()
     {
         Assert.SkipUnless(PostgresDatabase.IsConfigured, PostgresDatabase.SkipReason);
@@ -1476,10 +1598,10 @@ public class PostgresMigrationHistoryTests(PostgresDatabase database) : IClassFi
             (await after.Database.GetPendingMigrationsAsync(cancellationToken)).Should().BeEmpty();
             rows = await HomeRowsAsync(after, cancellationToken);
             rows.Select(r => r.Key).Should().Equal(
-                "recently-released-movies-episodes", "recently-added-movies-shows", "popular-movies-shows", "recently-released-movies",
+                "continue-listening", "recently-released-movies-episodes", "recently-added-movies-shows", "popular-movies-shows", "recently-released-movies",
                 "recently-added-movies", "recently-released-episodes", "recently-added-shows", "favorite-channels",
                 "recently-added-music", "new-podcast-episodes", "favorite-stations", null);
-            rows.Select(r => r.Order).Should().Equal(0, 1, 2, 3, 4, 5, 6, 7, 9, 10, 11, 12);
+            rows.Select(r => r.Order).Should().Equal(0, 1, 2, 3, 4, 5, 6, 7, 8, 10, 11, 12, 13);
             rows.Single(r => r.Key == "popular-movies-shows").Title.Should().Be("Popular Movies & Shows");
             rows.Single(r => r.Key == null).Title.Should().Be("Holiday Movies");
 

@@ -22,6 +22,7 @@ public interface IClientNotifier
     Task NotifyMusicAlbumUpdatedAsync(Guid albumId);
     Task NotifyMusicMixesUpdatedAsync(Guid profileId);
     Task NotifyMusicHistoryUpdatedAsync(Guid profileId);
+    Task NotifyMusicResumeUpdatedAsync(Guid profileId);
     Task NotifyRadioPrefsUpdatedAsync(Guid profileId);
     Task NotifyChannelFavoritesUpdatedAsync(Guid profileId);
     Task NotifyWatchlistUpdatedAsync(Guid profileId);

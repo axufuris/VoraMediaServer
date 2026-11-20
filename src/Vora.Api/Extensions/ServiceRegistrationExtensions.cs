@@ -388,6 +388,7 @@ public static class ServiceRegistrationExtensions
         services.AddScoped<IMediaRepository, MediaRepository>();
         services.AddScoped<Vora.Application.Maintenance.IStorageReferenceRepository, StorageReferenceRepository>();
         services.AddScoped<IMusicRepository, MusicRepository>();
+        services.AddScoped<IMusicResumeRepository, MusicResumeRepository>();
         services.AddScoped<Vora.Plugins.Interfaces.IMusicBrainzIdCache, Vora.Application.Media.MusicBrainzIdCache>();
         services.AddScoped<IMusicRecommendationRepository, MusicRecommendationRepository>();
         services.AddScoped<Vora.Application.Media.Ai.IAiPlaylistRepository, AiPlaylistRepository>();
@@ -480,6 +481,7 @@ public static class ServiceRegistrationExtensions
         services.AddScoped<IMediaManager, MediaManager>();
         services.AddScoped<IMusicManager, MusicManager>();
         services.AddScoped<IRecentlyPlayedManager, RecentlyPlayedManager>();
+        services.AddScoped<IMusicResumeManager, MusicResumeManager>();
         services.AddScoped<IMusicPopularityRefresher, MusicPopularityRefresher>();
         services.AddScoped<Vora.Application.Media.Ai.IMusicEmbeddingService, Vora.Application.Media.Ai.MusicEmbeddingService>();
         services.AddScoped<Vora.Application.Media.Ai.ITrackProfileService, Vora.Application.Media.Ai.TrackProfileService>();

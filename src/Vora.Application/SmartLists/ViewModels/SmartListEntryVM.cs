@@ -13,7 +13,8 @@ public enum SmartListEntryKind
     Station,
     PodcastEpisode,
     Album,
-    Recording
+    Recording,
+    MusicResume
 }
 
 public class SmartListEntryVM
@@ -29,4 +30,5 @@ public class SmartListEntryVM
     public PodcastFeedEpisodeVM? PodcastEpisode { get; set; }
     public AlbumVM? Album { get; set; }
     public IptvRecordingSessionVM? Recording { get; set; }
+    public MusicResumeItemVM? MusicResume { get; set; }
 }

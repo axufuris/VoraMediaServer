@@ -45,6 +45,7 @@ public class VoraDbContext : DbContext
     public DbSet<TrackLike> TrackLikes { get; set; }
     public DbSet<TrackPlayHistory> TrackPlayHistory { get; set; }
     public DbSet<GeneratedMix> GeneratedMixes { get; set; }
+    public DbSet<MusicResumePoint> MusicResumePoints { get; set; }
     public DbSet<Station> Stations { get; set; }
     public DbSet<ArtistSimilarity> ArtistSimilarities { get; set; }
     public DbSet<ArtistTag> ArtistTags { get; set; }
@@ -373,6 +374,23 @@ public class VoraDbContext : DbContext
 
             entity.HasIndex(e => new { e.ProfileId, e.Kind, e.Slot }).IsUnique();
             entity.HasIndex(e => e.ProfileId);
+        });
+
+        modelBuilder.Entity<MusicResumePoint>(entity =>
+        {
+            entity.HasKey(e => e.Id);
+            entity.Property(e => e.Source).HasConversion<int>();
+            entity.Property(e => e.TrackIds)
+                  .HasConversion(converters.GuidList)
+                  .Metadata.SetValueComparer(converters.GuidListComparer);
+
+            entity.HasOne(e => e.Profile)
+                  .WithMany()
+                  .HasForeignKey(e => e.ProfileId)
+                  .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasIndex(e => new { e.ProfileId, e.Source, e.SourceId }).IsUnique();
+            entity.HasIndex(e => new { e.ProfileId, e.UpdatedAt });
         });
 
         modelBuilder.Entity<Station>(entity =>

@@ -117,6 +117,35 @@ export interface RecentlyPlayedItemVM {
     track?: ArtistTrackVM | null;
 }
 
+export type MusicResumeSource = MusicPlaySource | 'None';
+
+export interface MusicResumeItemVM extends RecentlyPlayedItemVM {
+    source: MusicResumeSource;
+    sourceId?: string | null;
+    trackIndex: number;
+}
+
+export interface MusicResumeQueueVM {
+    source: MusicResumeSource;
+    sourceId?: string | null;
+    index: number;
+    tracks: ArtistTrackVM[];
+}
+
+export interface MusicResumeSave {
+    source: MusicResumeSource;
+    sourceId?: string;
+    trackIds: string[];
+    index: number;
+}
+
+const serversWithoutResume = new Set<string>();
+const resumeKey = (serverId?: string) => serverId ?? '';
+const hasNoResumeEndpoint = (err: unknown) => {
+    const status = getResponseStatus(err);
+    return status === 404 || status === 405;
+};
+
 export interface ArtistTrackVM {
     id: string;
     title: string;
@@ -723,6 +752,41 @@ export const musicService = {
             : { durationListenedSeconds, completed };
         const response = await apiClient.post<RecordPlayResponse>(`/music/tracks/${trackId}/played`, body, { serverId });
         return response.data;
+    },
+
+    // Continue Listening: where each music queue the profile left off stopped,
+    // newest first. A server without the endpoint answers an empty list.
+    getResumeItems: async (limit?: number, serverId?: string): Promise<MusicResumeItemVM[]> => {
+        if (serversWithoutResume.has(resumeKey(serverId))) return [];
+        try {
+            const response = await apiClient.get<MusicResumeItemVM[]>(`/music/resume`, { params: limit ? { limit } : undefined, serverId });
+            return response.data;
+        } catch (err: unknown) {
+            if (!hasNoResumeEndpoint(err)) throw err;
+            serversWithoutResume.add(resumeKey(serverId));
+            return [];
+        }
+    },
+
+    getResumeQueue: async (source: MusicResumeSource, sourceId: string | undefined, serverId?: string): Promise<MusicResumeQueueVM | null> => {
+        try {
+            const response = await apiClient.get<MusicResumeQueueVM>(`/music/resume/queue`, { params: { source, sourceId }, serverId });
+            return response.data;
+        } catch (err: unknown) {
+            if (getResponseStatus(err) === 404) return null;
+            throw err;
+        }
+    },
+
+    // Best effort: a failed save is not worth interrupting the music for. An
+    // empty trackIds list clears the source's point.
+    saveResume: async (save: MusicResumeSave, serverId?: string): Promise<void> => {
+        if (serversWithoutResume.has(resumeKey(serverId))) return;
+        try {
+            await apiClient.put(`/music/resume`, save, { serverId });
+        } catch (err: unknown) {
+            if (hasNoResumeEndpoint(err)) serversWithoutResume.add(resumeKey(serverId));
+        }
     },
 
     // For You's Recently Played row, newest first.

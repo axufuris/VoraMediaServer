@@ -2,6 +2,7 @@ using Microsoft.Extensions.Logging;
 using Vora.Application.Iptv;
 using Vora.Application.Iptv.ViewModels;
 using Vora.Application.Media;
+using Vora.Application.Media.SmartPlaylists;
 using Vora.Application.Podcasts;
 using Vora.Application.SmartLists.Dtos;
 using Vora.Application.SmartLists.ViewModels;
@@ -22,6 +23,7 @@ public class SmartListSourceResolver(
     IIptvEpgService epgService,
     IPodcastManager podcastManager,
     IMusicManager musicManager,
+    IMusicResumeManager musicResumeManager,
     IIptvRepository iptvRepository,
     ILogger<SmartListSourceResolver> logger) : ISmartListSourceResolver
 {
@@ -34,6 +36,7 @@ public class SmartListSourceResolver(
         SmartListSource.NewPodcastEpisodes => ResolvePodcastEpisodesAsync(list, rules, viewer),
         SmartListSource.RecentlyAddedMusic => ResolveAlbumsAsync(list, viewer),
         SmartListSource.RecentRecordings => ResolveRecordingsAsync(list, rules, viewer),
+        SmartListSource.ContinueListening => ResolveContinueListeningAsync(list, viewer),
         _ => Task.FromResult(new List<SmartListEntryVM>())
     };
 
@@ -182,6 +185,35 @@ public class SmartListSourceResolver(
             Subtitle = a.AlbumArtist ?? a.ArtistName,
             ImageUrl = a.ArtworkUrl,
             Album = a
+        }).ToList();
+    }
+
+    private async Task<List<SmartListEntryVM>> ResolveContinueListeningAsync(SmartList list, SmartListViewer viewer)
+    {
+        if (viewer.ProfileId is not { } profileId)
+        {
+            return [];
+        }
+
+        var access = new PlaylistAccessFilter
+        {
+            HasAllLibraryAccess = viewer.HasAllLibraryAccess,
+            AllowedLibraryIds = viewer.AllowedLibraryIds,
+            AllowedMovieRatings = viewer.AllowedMovieRatings,
+            AllowedTvRatings = viewer.AllowedTvRatings,
+            AllowedMusicRatings = viewer.MusicAccess.AllowedRatings,
+            BlockUnratedContent = viewer.BlockUnrated
+        };
+
+        var items = await musicResumeManager.GetItemsAsync(profileId, access, list.MaxItems);
+        return items.Select(i => new SmartListEntryVM
+        {
+            Kind = SmartListEntryKind.MusicResume,
+            Id = i.Id,
+            Title = i.Title,
+            Subtitle = i.Subtitle,
+            ImageUrl = i.ArtworkUrl,
+            MusicResume = i
         }).ToList();
     }
 

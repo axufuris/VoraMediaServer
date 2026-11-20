@@ -56,7 +56,7 @@ public sealed class PostgresChannelFavoritesMigrationTests
         favorites.Should().NotContain(f => f.ProfileId == otherProfile.Id);
 
         var lists = await after.Set<SmartList>().AsNoTracking().ToListAsync(cancellationToken);
-        lists.Where(l => l.Source != SmartListSource.Library).Select(l => l.DisplayOrder).Should().OnlyContain(order => order > 8);
+        lists.Where(l => l.Source != SmartListSource.Library && l.Source != SmartListSource.ContinueListening).Select(l => l.DisplayOrder).Should().OnlyContain(order => order > 8);
         lists.Where(l => l.DefaultKey != null).Should().HaveCount(SmartListDefaults.All.Count);
     }
 }

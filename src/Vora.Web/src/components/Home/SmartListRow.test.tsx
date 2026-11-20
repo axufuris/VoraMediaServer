@@ -5,11 +5,12 @@ import SmartListRow from './SmartListRow';
 import type { SmartListClientDto, SmartListEntry } from '../../api/Collections/smartListService';
 import type { IptvChannelVM } from '../../api/Iptv/iptvAdminService';
 
-const mocks = vi.hoisted(() => ({ getListEntries: vi.fn(), playMedia: vi.fn() }));
+const mocks = vi.hoisted(() => ({ getListEntries: vi.fn(), playMedia: vi.fn(), resumeMusic: vi.fn() }));
 
 vi.mock('../../api/Collections/smartListService', () => ({ smartListService: { getListEntries: mocks.getListEntries } }));
 vi.mock('../../contexts/usePlayer', () => ({ usePlayer: () => ({ playMedia: mocks.playMedia }) }));
 vi.mock('../../hooks/useSignalREvent', () => ({ useSignalREvent: () => { } }));
+vi.mock('../../hooks/useResumeMusic', () => ({ useResumeMusic: () => mocks.resumeMusic }));
 vi.mock('../../dialogs', () => ({ useDialog: () => ({ alert: () => Promise.resolve(), confirm: () => Promise.resolve(true) }) }));
 
 class NoopResizeObserver {
@@ -39,6 +40,7 @@ describe('SmartListRow', () => {
     beforeEach(() => {
         mocks.getListEntries.mockReset();
         mocks.playMedia.mockReset();
+        mocks.resumeMusic.mockReset();
         vi.stubGlobal('ResizeObserver', NoopResizeObserver);
     });
 
@@ -66,6 +68,45 @@ describe('SmartListRow', () => {
         expect(mocks.playMedia).toHaveBeenCalledWith(expect.objectContaining({
             id: 'ch-1', streamUrl: 'https://streams.test/news.m3u8', subtitle: 'Evening News', container: 'hls', playbackContextType: 'LiveTv',
         }));
+    });
+
+    describe('Continue Listening', () => {
+        const resume = {
+            kind: 'Playlist', id: 'p1', title: 'Road trip', subtitle: 'Karma Police', artworkUrl: 'https://art.test/cover.jpg', artworkUrls: [], trackCount: 24,
+            playedAt: '2026-11-19T20:00:00Z', source: 'Playlist', sourceId: 'p1', trackIndex: 2,
+        } as const;
+        const entry: SmartListEntry = { kind: 'MusicResume', id: 'p1', title: 'Road trip', subtitle: 'Karma Police', imageUrl: resume.artworkUrl, musicResume: resume };
+
+        it('shows each queue with the song it stopped on', async () => {
+            mocks.getListEntries.mockResolvedValue([entry]);
+
+            renderRow(row('ContinueListening', 'Continue Listening'));
+
+            expect(await screen.findByText('Continue Listening')).toBeInTheDocument();
+            expect(screen.getByText('Karma Police')).toBeInTheDocument();
+        });
+
+        it('starts the saved queue when a tile is picked', async () => {
+            mocks.getListEntries.mockResolvedValue([entry]);
+            mocks.resumeMusic.mockResolvedValue(true);
+
+            renderRow(row('ContinueListening', 'Continue Listening'));
+            fireEvent.click(await screen.findByRole('button', { name: /Road trip/ }));
+
+            await waitFor(() => expect(mocks.resumeMusic).toHaveBeenCalledWith(resume));
+            expect(mocks.getListEntries).toHaveBeenCalledTimes(1);
+        });
+
+        it('loads the row again when there was nothing left to play', async () => {
+            mocks.getListEntries.mockResolvedValueOnce([entry]).mockResolvedValueOnce([]);
+            mocks.resumeMusic.mockResolvedValue(false);
+
+            const { container } = renderRow(row('ContinueListening', 'Continue Listening'));
+            fireEvent.click(await screen.findByRole('button', { name: /Road trip/ }));
+
+            await waitFor(() => expect(mocks.getListEntries).toHaveBeenCalledTimes(2));
+            await waitFor(() => expect(container).toBeEmptyDOMElement());
+        });
     });
 
     it('a station plays as radio', async () => {

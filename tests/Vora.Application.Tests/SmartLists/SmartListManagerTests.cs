@@ -268,16 +268,32 @@ public class SmartListManagerTests
     }
 
     [Fact]
-    public void Popular_movies_and_shows_is_the_third_default()
+    public void Popular_movies_and_shows_follows_the_two_recently_rows()
     {
-        var third = SmartListDefaults.All.Single(d => d.DisplayOrder == 2);
+        var popular = SmartListDefaults.All.Single(d => d.Key == "popular-movies-shows");
 
-        third.Key.Should().Be("popular-movies-shows");
-        third.Title.Should().Be("Popular Movies & Shows");
-        third.Source.Should().Be(SmartListSource.Library);
-        third.SortBy.Should().Be(SmartListSortBy.Popular);
-        third.FilterRulesJson.Should().Be("{\"mediaTypes\":[\"Movie\",\"TvShow\"]}");
-        third.ToEntity().ShowToFriends.Should().BeTrue();
+        popular.DisplayOrder.Should().Be(3);
+        SmartListDefaults.All.Where(d => d.Source == SmartListSource.Library).OrderBy(d => d.DisplayOrder).Take(3).Select(d => d.Key)
+            .Should().Equal("recently-released-movies-episodes", "recently-added-movies-shows", "popular-movies-shows");
+        popular.Title.Should().Be("Popular Movies & Shows");
+        popular.Source.Should().Be(SmartListSource.Library);
+        popular.SortBy.Should().Be(SmartListSortBy.Popular);
+        popular.FilterRulesJson.Should().Be("{\"mediaTypes\":[\"Movie\",\"TvShow\"]}");
+        popular.ToEntity().ShowToFriends.Should().BeTrue();
+    }
+
+    [Fact]
+    public void Continue_listening_is_the_first_default_row_and_stays_off_the_rows_an_empty_profile_sees()
+    {
+        var first = SmartListDefaults.All.Single(d => d.DisplayOrder == 0);
+
+        first.Key.Should().Be("continue-listening");
+        first.Title.Should().Be("Continue Listening");
+        first.Source.Should().Be(SmartListSource.ContinueListening);
+        first.MaxItems.Should().Be(10);
+        first.FilterRulesJson.Should().Be("{}");
+        first.ToEntity().ShowOnHomepage.Should().BeTrue();
+        SmartListDefaults.All.Select(d => d.DisplayOrder).Should().Equal(Enumerable.Range(0, SmartListDefaults.All.Count));
     }
 
     [Fact]

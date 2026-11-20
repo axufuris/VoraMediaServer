@@ -18,6 +18,7 @@ import {
     type PlayerTimeContextType,
 } from './usePlayer';
 import { PlaybackTransportContext, type PlaybackTransportHost } from './usePlaybackTransport';
+import { useMusicResumeSaver } from './useMusicResumeSaver';
 import type { EngineSnapshot, PlaybackTransport } from '../components/Player/engine/PlaybackEngine';
 
 interface PendingPlay {
@@ -176,6 +177,10 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
     const [radioSeed, setRadioSeed] = useState<RadioSeed | null>(null);
     const [radioLabel, setRadioLabel] = useState<string | null>(null);
     const radioExtendingRef = useRef(false);
+
+    const resumeSaver = useMusicResumeSaver({ queue, queueIndex, isPlaying, isRadio: radioSeed !== null });
+    const clearResumeRef = useRef(resumeSaver.clear);
+    useEffect(() => { clearResumeRef.current = resumeSaver.clear; }, [resumeSaver.clear]);
 
     const preloadAudioRef = useRef<HTMLAudioElement | null>(null);
     const preloadedUrlRef = useRef<string | null>(null);
@@ -486,7 +491,9 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
                 setQueueIndex(0);
                 queueIndexRef.current = 0;
                 play(q[0]);
+                return;
             }
+            clearResumeRef.current(media);
         };
 
         video.addEventListener('timeupdate', updateTime);

@@ -250,6 +250,11 @@ public sealed class LegacyDatabase : IAsyncDisposable
 
     public const string LdapProvidersMigration = "20261118035147_ChangesSinceInitial";
 
+    private const string RowsSinceContinueListeningDefault = """
+        DELETE FROM "SmartLists" WHERE "DefaultKey" = 'continue-listening';
+        UPDATE "SmartLists" SET "DisplayOrder" = "DisplayOrder" - 1 WHERE "DisplayOrder" >= 1;
+        """;
+
     private const string RowsSincePopularDefault = """
         DELETE FROM "SmartLists" WHERE "DefaultKey" = 'popular-movies-shows';
         UPDATE "SmartLists" SET "DisplayOrder" = "DisplayOrder" - 1 WHERE "DisplayOrder" >= 3;
@@ -659,6 +664,7 @@ public sealed class LegacyDatabase : IAsyncDisposable
     {
         await using var db = NewContext();
         await db.Database.MigrateAsync(cancellationToken);
+        await db.Database.ExecuteSqlRawAsync(RowsSinceContinueListeningDefault, cancellationToken);
         await db.Database.ExecuteSqlRawAsync(RowsSincePopularDefault, cancellationToken);
         await seed(db);
         await ReplaceCombinedMigrationAsync(db, LdapProvidersMigration, "10.0.9", cancellationToken);
@@ -673,6 +679,18 @@ public sealed class LegacyDatabase : IAsyncDisposable
         await db.Database.ExecuteSqlRawAsync("DROP TABLE IF EXISTS \"WebhookConnections\";", cancellationToken);
         await seed(db);
         await ReplaceCombinedMigrationAsync(db, PopularRowMigration, "10.0.9", cancellationToken);
+    }
+
+    public const string ContinueListeningMigration = "20261119011947_ChangesSinceInitial";
+
+    public async Task BuildContinueListeningStateAsync(Func<VoraDbContext, Task> seed, CancellationToken cancellationToken)
+    {
+        await using var db = NewContext();
+        await db.Database.MigrateAsync(cancellationToken);
+        await db.Database.ExecuteSqlRawAsync("DROP TABLE IF EXISTS \"MusicResumePoints\";", cancellationToken);
+        await db.Database.ExecuteSqlRawAsync(RowsSinceContinueListeningDefault, cancellationToken);
+        await seed(db);
+        await ReplaceCombinedMigrationAsync(db, ContinueListeningMigration, "10.0.9", cancellationToken);
     }
 
     private static async Task ReplaceCombinedMigrationAsync(VoraDbContext db, string migrationId, string productVersion, CancellationToken cancellationToken)
