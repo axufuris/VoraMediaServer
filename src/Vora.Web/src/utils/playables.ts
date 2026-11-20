@@ -2,12 +2,13 @@ import type { IptvChannelVM } from '../api/Iptv/iptvAdminService';
 import type { IptvRecordingSessionVM } from '../api/Iptv/dvrService';
 import { dvrPlaybackService } from '../api/Iptv/dvrPlaybackService';
 import type { LibraryItem } from '../api/Media/libraryService';
-import { musicService } from '../api/Music/musicService';
+import { musicService, type ArtistTrackVM, type MusicSource } from '../api/Music/musicService';
 import type { PodcastFeedEpisodeVM } from '../api/Podcasts/podcastService';
 import type { PlayableMedia } from '../contexts/usePlayer';
 import { audioQualityStore } from './audioQuality';
 import { serverVault } from './serverVault';
 import { secureImageUrl } from './secureImageUrl';
+import { trackSubtitle } from './trackSubtitle';
 
 const resolveServer = (serverId?: string) => (serverId ? serverVault.getServer(serverId) : serverVault.getActiveServer());
 
@@ -53,6 +54,22 @@ export function trackPlayable(track: LibraryItem, serverId?: string): PlayableMe
         serverId: server?.id,
         container: 'audio',
         playbackContextType: 'Music',
+    };
+}
+
+export function artistTrackPlayable(track: ArtistTrackVM, serverId?: string, source?: MusicSource, artistName?: string): PlayableMedia {
+    const server = resolveServer(serverId);
+    const baseUrl = server?.url || (import.meta.env.VITE_API_BASE_URL as string | undefined)?.replace(/\/api\/?$/, '') || '';
+    return {
+        id: track.id,
+        title: track.title,
+        subtitle: trackSubtitle(artistName ?? track.artist, track.albumTitle),
+        posterUrl: track.albumArtworkUrl,
+        streamUrl: musicService.getTrackStreamUrl(track.id, baseUrl, audioQualityStore.get()),
+        serverId: server?.id,
+        container: 'audio',
+        playbackContextType: 'Music',
+        musicSource: source,
     };
 }
 

@@ -58,6 +58,9 @@ public class SignalRClientNotifier(IHubContext<VoraHub> hubContext) : IClientNot
     public Task NotifyMusicHistoryUpdatedAsync(Guid profileId) =>
         hubContext.Clients.Group(VoraHub.ProfileGroupName(profileId)).SendAsync("MusicHistoryUpdated", profileId.ToString());
 
+    public Task NotifyMusicResumeUpdatedAsync(Guid profileId) =>
+        hubContext.Clients.Group(VoraHub.ProfileGroupName(profileId)).SendAsync("MusicResumeUpdated", profileId.ToString());
+
     public Task NotifyRadioPrefsUpdatedAsync(Guid profileId) =>
         hubContext.Clients.Group(VoraHub.ProfileGroupName(profileId)).SendAsync("RadioPrefsUpdated", profileId.ToString());
 

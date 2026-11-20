@@ -77,6 +77,7 @@ describe('smart list form', () => {
     it('offers Popular for movie and show rows and saves it', () => {
         expect(sortOptionsFor('Library').map(o => o.value)).toContain('Popular');
         expect(sortOptionsFor('RecentlyAddedMusic').map(o => o.value)).not.toContain('Popular');
+        expect(sortOptionsFor('ContinueListening').map(o => o.value)).toEqual(['DateAddedDesc']);
 
         const saved = requestFromForm({ ...emptyForm(), title: 'Popular Movies & Shows', sortBy: 'Popular', mediaTypes: ['Movie', 'TvShow'] }, 2);
 

@@ -32,29 +32,31 @@ public static class SmartListDefaults
 {
     public static IReadOnlyList<SmartListDefault> All { get; } =
     [
+        new("continue-listening", Guid.Parse("b6d59416-23e5-40eb-9fff-925561301eff"), "Continue Listening",
+            SmartListSource.ContinueListening, SmartListSortBy.DateAddedDesc, 10, 0, "{}"),
         new("recently-released-movies-episodes", Guid.Parse("73c33c2c-1fe6-4885-875e-481a1dac5462"), "Recently Released Movies & Episodes",
-            SmartListSource.Library, SmartListSortBy.ReleaseDateDesc, 20, 0, "{\"mediaTypes\":[\"Movie\",\"Episode\"]}"),
+            SmartListSource.Library, SmartListSortBy.ReleaseDateDesc, 20, 1, "{\"mediaTypes\":[\"Movie\",\"Episode\"]}"),
         new("recently-added-movies-shows", Guid.Parse("17ddede2-2de0-42b8-9b33-32708b4d29b8"), "Recently Added Movies & Shows",
-            SmartListSource.Library, SmartListSortBy.DateAddedDesc, 20, 1, "{\"mediaTypes\":[\"Movie\",\"TvShow\",\"Season\",\"Episode\"]}"),
+            SmartListSource.Library, SmartListSortBy.DateAddedDesc, 20, 2, "{\"mediaTypes\":[\"Movie\",\"TvShow\",\"Season\",\"Episode\"]}"),
         new("popular-movies-shows", Guid.Parse("ae950037-af38-4747-a566-bc9e25cb03ef"), "Popular Movies & Shows",
-            SmartListSource.Library, SmartListSortBy.Popular, 20, 2, "{\"mediaTypes\":[\"Movie\",\"TvShow\"]}"),
+            SmartListSource.Library, SmartListSortBy.Popular, 20, 3, "{\"mediaTypes\":[\"Movie\",\"TvShow\"]}"),
         new("recently-released-movies", Guid.Parse("ebbefd92-4232-4cae-9c5d-2134943b8bf8"), "Recently Released Movies",
-            SmartListSource.Library, SmartListSortBy.ReleaseDateDesc, 20, 3, "{\"mediaTypes\":[\"Movie\"]}"),
+            SmartListSource.Library, SmartListSortBy.ReleaseDateDesc, 20, 4, "{\"mediaTypes\":[\"Movie\"]}"),
         new("recently-added-movies", Guid.Parse("c88d6c8a-57ea-4b24-a7be-3f2638a38aca"), "Recently Added Movies",
-            SmartListSource.Library, SmartListSortBy.DateAddedDesc, 20, 4, "{\"mediaTypes\":[\"Movie\"]}"),
+            SmartListSource.Library, SmartListSortBy.DateAddedDesc, 20, 5, "{\"mediaTypes\":[\"Movie\"]}"),
         new("recently-released-episodes", Guid.Parse("58424b85-b6da-4a9c-8204-e364f1319508"), "Recently Released Episodes",
-            SmartListSource.Library, SmartListSortBy.ReleaseDateDesc, 20, 5, "{\"mediaTypes\":[\"Episode\"]}"),
+            SmartListSource.Library, SmartListSortBy.ReleaseDateDesc, 20, 6, "{\"mediaTypes\":[\"Episode\"]}"),
         new("recently-added-shows", Guid.Parse("dfc420d4-421c-4e14-aec4-a5bedefd2f2e"), "Recently Added Shows",
-            SmartListSource.Library, SmartListSortBy.DateAddedDesc, 20, 6, "{\"mediaTypes\":[\"TvShow\"]}"),
+            SmartListSource.Library, SmartListSortBy.DateAddedDesc, 20, 7, "{\"mediaTypes\":[\"TvShow\"]}"),
         new("favorite-channels", Guid.Parse("80d62ff0-9b1a-4381-a03a-2595af4b1d9d"), "Favorite Channels",
-            SmartListSource.FavoriteChannels, SmartListSortBy.TitleAsc, 30, 7, "{}"),
+            SmartListSource.FavoriteChannels, SmartListSortBy.TitleAsc, 30, 8, "{}"),
         new("recent-recordings", Guid.Parse("1cca6bf0-87a6-4186-82a0-1d1efce4e6b8"), "Recent Recordings",
-            SmartListSource.RecentRecordings, SmartListSortBy.DateAddedDesc, 20, 8, "{}"),
+            SmartListSource.RecentRecordings, SmartListSortBy.DateAddedDesc, 20, 9, "{}"),
         new("recently-added-music", Guid.Parse("666c043f-f0f7-47f8-810b-8b0d5afcaeb9"), "Recently Added Music",
-            SmartListSource.RecentlyAddedMusic, SmartListSortBy.DateAddedDesc, 20, 9, "{}"),
+            SmartListSource.RecentlyAddedMusic, SmartListSortBy.DateAddedDesc, 20, 10, "{}"),
         new("new-podcast-episodes", Guid.Parse("2133070b-8810-4b2e-9514-619a682b04b1"), "New Podcast Episodes",
-            SmartListSource.NewPodcastEpisodes, SmartListSortBy.DateAddedDesc, 20, 10, "{\"unwatchedOnly\":true,\"days\":14}"),
+            SmartListSource.NewPodcastEpisodes, SmartListSortBy.DateAddedDesc, 20, 11, "{\"unwatchedOnly\":true,\"days\":14}"),
         new("favorite-stations", Guid.Parse("ee067d88-cd48-4382-8b05-1f75b39020eb"), "Favorite Radio Stations",
-            SmartListSource.FavoriteStations, SmartListSortBy.TitleAsc, 30, 11, "{}")
+            SmartListSource.FavoriteStations, SmartListSortBy.TitleAsc, 30, 12, "{}")
     ];
 }

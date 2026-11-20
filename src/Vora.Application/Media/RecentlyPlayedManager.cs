@@ -11,6 +11,7 @@ namespace Vora.Application.Media;
 public interface IRecentlyPlayedManager
 {
     Task<List<RecentlyPlayedItemVM>> GetAsync(Guid profileId, PlaylistAccessFilter access, int limit);
+    Task<List<RecentlyPlayedItemVM?>> TilesAsync(Guid profileId, PlaylistAccessFilter access, IReadOnlyList<(RecentlyPlayedKind Kind, Guid Id)> entries);
 }
 
 // Recently Played on Music's For You: what the profile last played from. A
@@ -41,6 +42,24 @@ public class RecentlyPlayedManager(
         var entries = Entries(plays, take * 2);
         if (entries.Count == 0) return new List<RecentlyPlayedItemVM>();
 
+        var tiles = await TilesAsync(profileId, access, entries.Select(e => (e.Kind, e.Id)).ToList());
+        var items = new List<RecentlyPlayedItemVM>();
+        for (var i = 0; i < entries.Count; i++)
+        {
+            var item = tiles[i];
+            if (item == null) continue;
+
+            item.PlayedAt = entries[i].PlayedAt;
+            items.Add(item);
+            if (items.Count == take) break;
+        }
+        return items;
+    }
+
+    public async Task<List<RecentlyPlayedItemVM?>> TilesAsync(Guid profileId, PlaylistAccessFilter access, IReadOnlyList<(RecentlyPlayedKind Kind, Guid Id)> entries)
+    {
+        if (entries.Count == 0) return new List<RecentlyPlayedItemVM?>();
+
         List<Guid> IdsOf(RecentlyPlayedKind kind) => entries.Where(e => e.Kind == kind).Select(e => e.Id).ToList();
 
         var tracks = (await music.GetTracksByIdsAsync(IdsOf(RecentlyPlayedKind.Track), access.Music)).ToDictionary(t => t.Id);
@@ -57,24 +76,14 @@ public class RecentlyPlayedManager(
             if (await smartPlaylists.GetVisibleAsync(id, profileId) is { } smart) smartRows[id] = smart;
         }
 
-        var items = new List<RecentlyPlayedItemVM>();
-        foreach (var entry in entries)
+        return entries.Select(entry => entry.Kind switch
         {
-            var item = entry.Kind switch
-            {
-                RecentlyPlayedKind.Track => tracks.TryGetValue(entry.Id, out var t) ? TrackItem(t, liked.Contains(t.Id)) : null,
-                RecentlyPlayedKind.Mix => mixRows.TryGetValue(entry.Id, out var m) ? MixItem(m, mixArt) : null,
-                RecentlyPlayedKind.Playlist => playlistRows.TryGetValue(entry.Id, out var p) ? PlaylistItem(p) : null,
-                RecentlyPlayedKind.SmartPlaylist => smartRows.TryGetValue(entry.Id, out var s) ? SmartPlaylistItem(s) : null,
-                _ => null
-            };
-            if (item == null) continue;
-
-            item.PlayedAt = entry.PlayedAt;
-            items.Add(item);
-            if (items.Count == take) break;
-        }
-        return items;
+            RecentlyPlayedKind.Track => tracks.TryGetValue(entry.Id, out var t) ? TrackItem(t, liked.Contains(t.Id)) : null,
+            RecentlyPlayedKind.Mix => mixRows.TryGetValue(entry.Id, out var m) ? MixItem(m, mixArt) : null,
+            RecentlyPlayedKind.Playlist => playlistRows.TryGetValue(entry.Id, out var p) ? PlaylistItem(p) : null,
+            RecentlyPlayedKind.SmartPlaylist => smartRows.TryGetValue(entry.Id, out var s) ? SmartPlaylistItem(s) : null,
+            _ => null
+        }).ToList();
     }
 
     // Newest first, one entry per tile. A play counts toward its playlist or

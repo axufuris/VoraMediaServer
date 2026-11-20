@@ -1,7 +1,7 @@
 import { describe, it, expect, vi } from 'vitest';
 import { fireEvent, render, screen, within } from '@testing-library/react';
 import MusicForYouView from './MusicForYouView';
-import type { AlbumVM, ArtistTrackVM, RecentlyPlayedItemVM } from '../../../../api/Music/musicService';
+import type { AlbumVM, ArtistTrackVM, MusicResumeItemVM, RecentlyPlayedItemVM } from '../../../../api/Music/musicService';
 import type { AiPlaylistsVM } from '../../../../api/Music/aiPlaylistService';
 import type { DialogApi } from '../../../../dialogs/useDialog';
 
@@ -49,6 +49,7 @@ const renderForYou = (overrides: Partial<Parameters<typeof MusicForYouView>[0]> 
         dailyMixes={[]}
         stations={[]}
         becauseYouPlayed={[]}
+        continueListening={[]}
         recentlyPlayed={[]}
         recentlyAddedAlbums={[album]}
         topArtists={[]}
@@ -59,6 +60,7 @@ const renderForYou = (overrides: Partial<Parameters<typeof MusicForYouView>[0]> 
         aiPlaylists={null}
         updateNav={vi.fn()}
         openPlaylist={vi.fn()}
+        resumeListening={vi.fn()}
         playArtistTrackList={vi.fn()}
         startStationRadio={vi.fn()}
         deleteStation={vi.fn()}
@@ -83,6 +85,38 @@ describe('MusicForYouView song rows', () => {
 
         expect(screen.getByText('Unknown B-side')).toBeInTheDocument();
         expect(screen.queryByTitle(/listeners on Last\.fm/)).not.toBeInTheDocument();
+    });
+});
+
+const resumable = (overrides: Partial<MusicResumeItemVM> = {}): MusicResumeItemVM => ({
+    kind: 'Playlist', id: 'p1', title: 'Road trip', subtitle: 'Karma Police', artworkUrls: [], trackCount: 24, playedAt: '2026-11-19T20:00:00Z',
+    source: 'Playlist', sourceId: 'p1', trackIndex: 2, ...overrides,
+});
+
+describe('MusicForYouView Continue Listening', () => {
+    it('is the row above Recently Played, with the song each queue stopped on', () => {
+        renderForYou({ continueListening: [resumable()], recentlyPlayed: [played(song('t1', 'Hey Mama'))] });
+
+        const titles = screen.getAllByRole('heading', { level: 2 }).map(h => h.textContent);
+
+        expect(titles.indexOf('Continue Listening')).toBeLessThan(titles.indexOf('Recently Played'));
+        expect(screen.getByText('Karma Police')).toBeInTheDocument();
+    });
+
+    it('is not shown when there is nothing to continue', () => {
+        renderForYou({ continueListening: [], recentlyPlayed: [played(song('t1', 'Hey Mama'))] });
+
+        expect(screen.queryByText('Continue Listening')).not.toBeInTheDocument();
+    });
+
+    it('starts the queue that is picked', () => {
+        const resumeListening = vi.fn();
+        const road = resumable();
+        renderForYou({ continueListening: [road], resumeListening });
+
+        fireEvent.click(screen.getByRole('button', { name: /Road trip/ }));
+
+        expect(resumeListening).toHaveBeenCalledWith(road);
     });
 });
 

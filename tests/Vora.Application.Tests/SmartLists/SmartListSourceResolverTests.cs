@@ -2,6 +2,7 @@ using Microsoft.Extensions.Logging.Abstractions;
 using Vora.Application.Iptv;
 using Vora.Application.Iptv.Dtos;
 using Vora.Application.Media;
+using Vora.Application.Media.SmartPlaylists;
 using Vora.Application.Media.ViewModels;
 using Vora.Application.Podcasts;
 using Vora.Application.Podcasts.ViewModels;
@@ -23,6 +24,7 @@ public class SmartListSourceResolverTests
     private readonly IIptvEpgService _epg = Substitute.For<IIptvEpgService>();
     private readonly IPodcastManager _podcasts = Substitute.For<IPodcastManager>();
     private readonly IMusicManager _music = Substitute.For<IMusicManager>();
+    private readonly IMusicResumeManager _resume = Substitute.For<IMusicResumeManager>();
     private readonly IIptvRepository _iptv = Substitute.For<IIptvRepository>();
     private readonly SmartListSourceResolver _resolver;
 
@@ -42,12 +44,69 @@ public class SmartListSourceResolverTests
             Profiles = new List<UserProfileVM> { new() { Id = _profileId, HasAllIptvAccess = true } }
         };
         _users.GetUserAccountAsync(_accountId).Returns(_user);
+        _resume.GetItemsAsync(default, default!, default).ReturnsForAnyArgs(new List<MusicResumeItemVM>());
         _epg.GetFilteredGuideAsync(Arg.Any<Guid>(), Arg.Any<Guid>(), Arg.Any<List<string>>(), Arg.Any<DateTime>(), Arg.Any<DateTime>())
             .Returns(new Dictionary<string, List<IptvProgramDto>>());
-        _resolver = new SmartListSourceResolver(_favorites, _users, _epg, _podcasts, _music, _iptv, NullLogger<SmartListSourceResolver>.Instance);
+        _resolver = new SmartListSourceResolver(_favorites, _users, _epg, _podcasts, _music, _resume, _iptv, NullLogger<SmartListSourceResolver>.Instance);
     }
 
     private SmartListViewer Viewer => new(_accountId, _profileId, false, true, new List<Guid>(), new List<string>(), new List<string>(), false, new MusicAccessFilter());
+
+    [Fact]
+    public async Task Continue_listening_draws_the_profiles_resume_tiles_as_music_resume_entries()
+    {
+        var sourceId = Guid.NewGuid();
+        var item = new MusicResumeItemVM
+        {
+            Kind = RecentlyPlayedKind.Playlist,
+            Id = sourceId,
+            Title = "Road trip",
+            Subtitle = "Karma Police",
+            ArtworkUrl = "/cover.jpg",
+            Source = MusicPlaySource.Playlist,
+            SourceId = sourceId,
+            TrackIndex = 2
+        };
+        _resume.GetItemsAsync(_profileId, Arg.Any<PlaylistAccessFilter>(), 8).Returns(new List<MusicResumeItemVM> { item });
+
+        var entries = await _resolver.ResolveAsync(List(SmartListSource.ContinueListening, SmartListSortBy.DateAddedDesc, 8), null, Viewer);
+
+        var entry = entries.Should().ContainSingle().Subject;
+        entry.Kind.Should().Be(SmartListEntryKind.MusicResume);
+        entry.Id.Should().Be(sourceId);
+        entry.Title.Should().Be("Road trip");
+        entry.Subtitle.Should().Be("Karma Police");
+        entry.ImageUrl.Should().Be("/cover.jpg");
+        entry.MusicResume.Should().BeSameAs(item);
+    }
+
+    [Fact]
+    public async Task Continue_listening_is_empty_without_a_profile()
+    {
+        var viewer = Viewer with { ProfileId = null };
+
+        var entries = await _resolver.ResolveAsync(List(SmartListSource.ContinueListening), null, viewer);
+
+        entries.Should().BeEmpty();
+        await _resume.DidNotReceiveWithAnyArgs().GetItemsAsync(default, default!, default);
+    }
+
+    [Fact]
+    public async Task Continue_listening_reads_through_the_viewers_own_access()
+    {
+        var library = Guid.NewGuid();
+        var viewer = new SmartListViewer(_accountId, _profileId, false, false, new List<Guid> { library }, new List<string> { "PG" }, new List<string> { "TV-Y" }, true, new MusicAccessFilter { HasAllLibraryAccess = false, AllowedLibraryIds = { library }, AllowedRatings = { "Clean" } });
+
+        await _resolver.ResolveAsync(List(SmartListSource.ContinueListening), null, viewer);
+
+        await _resume.Received(1).GetItemsAsync(_profileId, Arg.Is<PlaylistAccessFilter>(a =>
+            !a.HasAllLibraryAccess
+            && a.AllowedLibraryIds.SequenceEqual(new[] { library })
+            && a.AllowedMovieRatings.SequenceEqual(new[] { "PG" })
+            && a.AllowedTvRatings.SequenceEqual(new[] { "TV-Y" })
+            && a.AllowedMusicRatings.SequenceEqual(new[] { "Clean" })
+            && a.BlockUnratedContent), Arg.Any<int>());
+    }
 
     private static SmartList List(SmartListSource source, SmartListSortBy sortBy = SmartListSortBy.TitleAsc, int maxItems = 20) =>
         new() { Id = Guid.NewGuid(), Title = "Row", Source = source, SortBy = sortBy, MaxItems = maxItems };

@@ -43,6 +43,7 @@ export const SOURCE_OPTIONS: (Option<SmartListSource> & { description: string })
     { value: 'NewPodcastEpisodes', label: 'New podcast episodes', description: 'The latest episodes from the shows each profile subscribes to.' },
     { value: 'RecentlyAddedMusic', label: 'Music albums', description: 'Albums from your music libraries.' },
     { value: 'RecentRecordings', label: 'Recent DVR recordings', description: "Each profile's finished recordings, newest first." },
+    { value: 'ContinueListening', label: 'Continue listening (music)', description: "Each profile's unfinished music queues, newest first. Empty rows are not shown." },
 ];
 
 export const SORT_OPTIONS: Record<SmartListSource, Option<SmartListSortBy>[]> = {
@@ -74,6 +75,7 @@ export const SORT_OPTIONS: Record<SmartListSource, Option<SmartListSortBy>[]> = 
         { value: 'TitleAsc', label: 'Artist A–Z' },
     ],
     RecentRecordings: [{ value: 'DateAddedDesc', label: 'Newest first' }],
+    ContinueListening: [{ value: 'DateAddedDesc', label: 'Most recent first' }],
 };
 
 export const MEDIA_TYPES: Option<string>[] = [

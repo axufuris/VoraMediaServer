@@ -6,6 +6,7 @@ import {
     type GeneratedMixSummaryVM,
     type MoodSummaryVM,
     type BecauseYouPlayedRowVM,
+    type MusicResumeItemVM,
     type RecentlyPlayedItemVM,
     type StationVM,
     type ServerPlaybackSessionVM,
@@ -16,6 +17,7 @@ import { useDialog } from '../../../../dialogs';
 import MediaCard from '../../../../components/Client/Primitives/MediaCard';
 import MediaRow, { MediaRowItem } from '../../../../components/Client/Primitives/MediaRow';
 import AiPlaylistsSection from './AiPlaylistsSection';
+import ContinueListeningRow from './ContinueListeningRow';
 import RecentlyPlayedRow, { type RecentlyPlayedSource } from './RecentlyPlayedRow';
 import { MadeForYouRow, MixRow } from './MixRow';
 import EmptyState from '../../../../components/Client/Primitives/EmptyState';
@@ -32,6 +34,7 @@ interface MusicForYouViewProps {
     dailyMixes: GeneratedMixSummaryVM[];
     stations: StationVM[];
     becauseYouPlayed: BecauseYouPlayedRowVM[];
+    continueListening: MusicResumeItemVM[];
     recentlyPlayed: RecentlyPlayedItemVM[];
     recentlyAddedAlbums: AlbumVM[];
     topArtists: ArtistVM[];
@@ -44,6 +47,7 @@ interface MusicForYouViewProps {
     updateNav: (next: MusicNavState) => void;
     // A playlist or smart playlist from Recently Played; mixes open in place.
     openPlaylist: (kind: 'Playlist' | 'SmartPlaylist', id: string) => void;
+    resumeListening: (item: MusicResumeItemVM) => void;
     playArtistTrackList: (tracks: ArtistTrackVM[], startIndex: number) => void;
     startStationRadio: (station: StationVM) => Promise<void>;
     deleteStation: (stationId: string) => Promise<void>;
@@ -81,6 +85,7 @@ export default function MusicForYouView({
     dailyMixes,
     stations,
     becauseYouPlayed,
+    continueListening,
     recentlyPlayed,
     recentlyAddedAlbums,
     topArtists,
@@ -92,6 +97,7 @@ export default function MusicForYouView({
     moods = [],
     updateNav,
     openPlaylist,
+    resumeListening,
     playArtistTrackList,
     startStationRadio,
     deleteStation,
@@ -183,6 +189,8 @@ export default function MusicForYouView({
                     )}
                 </div>
             </section>
+
+            <ContinueListeningRow items={continueListening} onResume={resumeListening} />
 
             <RecentlyPlayedRow items={recentlyPlayed} onOpen={openRecent} onPlaySongs={playArtistTrackList} />
 

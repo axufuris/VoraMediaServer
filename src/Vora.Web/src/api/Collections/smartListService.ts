@@ -2,7 +2,7 @@ import { apiClient } from '../client';
 import type { LibraryItem } from '../Media/libraryService';
 import type { IptvChannelVM } from '../Iptv/iptvAdminService';
 import type { IptvRecordingSessionVM } from '../Iptv/dvrService';
-import type { AlbumVM } from '../Music/musicService';
+import type { AlbumVM, MusicResumeItemVM } from '../Music/musicService';
 import type { PodcastFeedEpisodeVM } from '../Podcasts/podcastService';
 
 export type SmartListSource =
@@ -11,7 +11,8 @@ export type SmartListSource =
     | 'FavoriteStations'
     | 'NewPodcastEpisodes'
     | 'RecentlyAddedMusic'
-    | 'RecentRecordings';
+    | 'RecentRecordings'
+    | 'ContinueListening';
 
 export type SmartListSortBy =
     | 'DateAddedDesc'
@@ -39,7 +40,7 @@ export interface SmartListClientDto {
     source?: SmartListSource;
 }
 
-export type SmartListEntryKind = 'Media' | 'Channel' | 'Station' | 'PodcastEpisode' | 'Album' | 'Recording';
+export type SmartListEntryKind = 'Media' | 'Channel' | 'Station' | 'PodcastEpisode' | 'Album' | 'Recording' | 'MusicResume';
 
 export interface SmartListEntry {
     kind: SmartListEntryKind;
@@ -52,6 +53,7 @@ export interface SmartListEntry {
     podcastEpisode?: PodcastFeedEpisodeVM | null;
     album?: AlbumVM | null;
     recording?: IptvRecordingSessionVM | null;
+    musicResume?: MusicResumeItemVM | null;
 }
 
 export interface SmartListAdminDto {

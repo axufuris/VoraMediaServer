@@ -1,7 +1,7 @@
 import { useEffect, useState, useCallback, useMemo, useRef } from 'react';
 import { useLocation, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { StorageKeys, SessionKeys, getProfileIdFromToken } from '../../../utils/storageKeys';
-import { musicService, type ArtistVM, type AlbumVM, type TrackVM, type ArtistTrackVM, type MusicSearchResultVM, type GeneratedMixSummaryVM, type GeneratedMixDetailVM, type BecauseYouPlayedRowVM, type RadioSeed, type StationVM, type YearRecapVM, type GenreSummaryVM, type GenreContentVM, type MoodSummaryVM, type ServerPlaybackSessionVM, type AudioQualityVM } from '../../../api/Music/musicService';
+import { musicService, type ArtistVM, type AlbumVM, type TrackVM, type ArtistTrackVM, type MusicSearchResultVM, type GeneratedMixSummaryVM, type GeneratedMixDetailVM, type BecauseYouPlayedRowVM, type RadioSeed, type StationVM, type YearRecapVM, type GenreSummaryVM, type GenreContentVM, type MoodSummaryVM, type ServerPlaybackSessionVM, type AudioQualityVM, type MusicResumeItemVM } from '../../../api/Music/musicService';
 import { mediaService } from '../../../api/Media/mediaService';
 import { usePlayer, type PlayableMedia } from '../../../contexts/usePlayer';
 import { serverVault } from '../../../utils/serverVault';
@@ -34,6 +34,8 @@ import MusicForYouView from './Music/MusicForYouView';
 import { AiPlaylistActions } from './Music/AiPlaylistsSection';
 import { useAiPlaylists } from './Music/useAiPlaylists';
 import { useRecentlyPlayed, RECENTLY_PLAYED_LIMIT } from './Music/useRecentlyPlayed';
+import { useMusicResume } from './Music/useMusicResume';
+import { useResumeMusic } from '../../../hooks/useResumeMusic';
 import MusicArtistsGrid from './Music/MusicArtistsGrid';
 import MusicAlbumsView from './Music/MusicAlbumsView';
 import { trackSubtitle } from '../../../utils/trackSubtitle';
@@ -103,6 +105,16 @@ export default function MusicTab() {
     const [likedCount, setLikedCount] = useState(0);
 
     const [recentlyPlayed, setRecentlyPlayed] = useRecentlyPlayed(serverId);
+    const { items: continueListening, reload: reloadContinueListening } = useMusicResume(serverId);
+    const resumeMusic = useResumeMusic(serverId);
+    const resumeListening = useCallback((item: MusicResumeItemVM) => {
+        resumeMusic(item)
+            .then(played => { if (!played) reloadContinueListening(); })
+            .catch(err => {
+                console.error('Failed to continue listening', err);
+                reloadContinueListening();
+            });
+    }, [resumeMusic, reloadContinueListening]);
     const [topTracks, setTopTracks] = useState<ArtistTrackVM[]>([]);
     const [topArtists, setTopArtists] = useState<ArtistVM[]>([]);
     const [recentlyAddedAlbums, setRecentlyAddedAlbums] = useState<AlbumVM[]>([]);
@@ -889,6 +901,7 @@ export default function MusicTab() {
                         dailyMixes={dailyMixes}
                         stations={stations}
                         becauseYouPlayed={becauseYouPlayed}
+                        continueListening={continueListening}
                         recentlyPlayed={recentlyPlayed}
                         recentlyAddedAlbums={recentlyAddedAlbums}
                         topArtists={topArtists}
@@ -900,6 +913,7 @@ export default function MusicTab() {
                         moods={moods}
                         updateNav={updateNav}
                         openPlaylist={openPlaylist}
+                        resumeListening={resumeListening}
                         playArtistTrackList={playArtistTrackList}
                         startStationRadio={startStationRadio}
                         deleteStation={deleteStation}

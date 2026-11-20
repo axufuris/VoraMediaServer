@@ -7,5 +7,6 @@ public enum SmartListSource
     FavoriteStations = 2,
     NewPodcastEpisodes = 3,
     RecentlyAddedMusic = 4,
-    RecentRecordings = 5
+    RecentRecordings = 5,
+    ContinueListening = 6
 }

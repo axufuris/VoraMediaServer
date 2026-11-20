@@ -549,11 +549,42 @@ CREATE TABLE IF NOT EXISTS ""WebhookConnections"" (
 );
 
 CREATE INDEX IF NOT EXISTS ""IX_WebhookConnections_ProviderId"" ON ""WebhookConnections"" (""ProviderId"");");
+
+            migrationBuilder.Sql(@"
+DO $continuelistening$
+BEGIN
+    IF NOT EXISTS (SELECT 1 FROM ""__EFMigrationsHistory"" WHERE ""MigrationId"" >= '20261119235856_ChangesSinceInitial')
+       AND NOT EXISTS (SELECT 1 FROM ""SmartLists"" WHERE ""DefaultKey"" = 'continue-listening') THEN
+        UPDATE ""SmartLists"" SET ""DisplayOrder"" = ""DisplayOrder"" + 1 WHERE ""DisplayOrder"" >= 0;
+
+        INSERT INTO ""SmartLists"" (""Id"", ""ActiveEndDay"", ""ActiveEndMonth"", ""ActiveStartDay"", ""ActiveStartMonth"", ""CollectionId"", ""DefaultKey"", ""DisplayOrder"", ""FilterRulesJson"", ""LibraryId"", ""MaxItems"", ""ShowOnHomepage"", ""ShowToFriends"", ""SortBy"", ""Source"", ""Title"")
+        VALUES ('b6d59416-23e5-40eb-9fff-925561301eff', NULL, NULL, NULL, NULL, NULL, 'continue-listening', 0, '{}', NULL, 10, TRUE, TRUE, 0, 6, 'Continue Listening');
+    END IF;
+END $continuelistening$;");
+
+            migrationBuilder.Sql(@"
+CREATE TABLE IF NOT EXISTS ""MusicResumePoints"" (
+    ""Id"" uuid NOT NULL,
+    ""ProfileId"" uuid NOT NULL,
+    ""Source"" integer NOT NULL,
+    ""SourceId"" uuid NOT NULL,
+    ""TrackIds"" text NOT NULL,
+    ""TrackIndex"" integer NOT NULL,
+    ""UpdatedAt"" timestamp with time zone NOT NULL,
+    CONSTRAINT ""PK_MusicResumePoints"" PRIMARY KEY (""Id""),
+    CONSTRAINT ""FK_MusicResumePoints_UserProfiles_ProfileId"" FOREIGN KEY (""ProfileId"") REFERENCES ""UserProfiles"" (""Id"") ON DELETE CASCADE
+);
+
+CREATE UNIQUE INDEX IF NOT EXISTS ""IX_MusicResumePoints_ProfileId_Source_SourceId"" ON ""MusicResumePoints"" (""ProfileId"", ""Source"", ""SourceId"");
+CREATE INDEX IF NOT EXISTS ""IX_MusicResumePoints_ProfileId_UpdatedAt"" ON ""MusicResumePoints"" (""ProfileId"", ""UpdatedAt"");");
         }
 
         /// <inheritdoc />
         protected override void Down(MigrationBuilder migrationBuilder)
         {
+            migrationBuilder.DropTable(
+                name: "MusicResumePoints");
+
             migrationBuilder.DropTable(
                 name: "WebhookConnections");
 

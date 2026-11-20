@@ -158,6 +158,20 @@ public static class MusicEndpoints
             .RequireAuthorization()
             .WithName("ListRecentlyPlayedItems")
             .Produces<IEnumerable<RecentlyPlayedItemVM>>(StatusCodes.Status200OK);
+        group.MapPut("/resume", SaveResumeAsync)
+            .RequireAuthorization()
+            .WithName("SaveMusicResumePoint")
+            .Produces(StatusCodes.Status204NoContent)
+            .Produces(StatusCodes.Status400BadRequest);
+        group.MapGet("/resume", GetResumeItemsAsync)
+            .RequireAuthorization()
+            .WithName("ListMusicResumeItems")
+            .Produces<IEnumerable<MusicResumeItemVM>>(StatusCodes.Status200OK);
+        group.MapGet("/resume/queue", GetResumeQueueAsync)
+            .RequireAuthorization()
+            .WithName("GetMusicResumeQueue")
+            .Produces<MusicResumeQueueVM>(StatusCodes.Status200OK)
+            .Produces(StatusCodes.Status404NotFound);
         group.MapGet("/history/top-tracks", GetTopTracksAsync)
             .RequireAuthorization()
             .WithName("ListTopTracks")
@@ -648,6 +662,40 @@ public static class MusicEndpoints
         if (profileId == null) return Results.Forbid();
         var items = await manager.GetAsync(profileId.Value, user.GetPlaylistAccessFilter(), limit ?? RecentlyPlayedManager.DefaultLimit);
         return Results.Ok(items);
+    }
+
+    public class SaveMusicResumeRequest
+    {
+        public MusicPlaySource? Source { get; set; }
+        public Guid? SourceId { get; set; }
+        public List<Guid>? TrackIds { get; set; }
+        public int Index { get; set; }
+    }
+
+    private static async Task<IResult> SaveResumeAsync([FromBody] SaveMusicResumeRequest request, ClaimsPrincipal user, IMusicResumeManager manager)
+    {
+        var profileId = user.GetProfileId();
+        if (profileId == null) return Results.Forbid();
+        if (request.Source == null || request.TrackIds == null) return Results.BadRequest();
+
+        var outcome = await manager.SaveAsync(profileId.Value, request.Source.Value, request.SourceId, request.TrackIds, request.Index);
+        return outcome == MusicResumeSaveOutcome.Invalid ? Results.BadRequest() : Results.NoContent();
+    }
+
+    private static async Task<IResult> GetResumeItemsAsync([FromQuery] int? limit, ClaimsPrincipal user, IMusicResumeManager manager)
+    {
+        var profileId = user.GetProfileId();
+        if (profileId == null) return Results.Forbid();
+        var items = await manager.GetItemsAsync(profileId.Value, user.GetPlaylistAccessFilter(), limit ?? MusicResumeManager.DefaultLimit);
+        return Results.Ok(items);
+    }
+
+    private static async Task<IResult> GetResumeQueueAsync([FromQuery] MusicPlaySource source, [FromQuery] Guid? sourceId, ClaimsPrincipal user, IMusicResumeManager manager)
+    {
+        var profileId = user.GetProfileId();
+        if (profileId == null) return Results.Forbid();
+        var queue = await manager.GetQueueAsync(profileId.Value, user.GetMusicAccessFilter(), source, sourceId);
+        return queue == null ? Results.NotFound() : Results.Ok(queue);
     }
 
     private static async Task<IResult> GetTopTracksAsync([FromQuery] int? limit, ClaimsPrincipal user, IMusicManager manager)

@@ -2,9 +2,10 @@ import { useCallback, useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { smartListService, type SmartListClientDto, type SmartListEntry, type SmartListSource } from '../../api/Collections/smartListService';
 import type { IptvRecordingSessionVM } from '../../api/Iptv/dvrService';
-import type { AlbumVM } from '../../api/Music/musicService';
+import type { AlbumVM, MusicResumeItemVM } from '../../api/Music/musicService';
 import { usePlayer } from '../../contexts/usePlayer';
 import { useDialog } from '../../dialogs';
+import { useResumeMusic } from '../../hooks/useResumeMusic';
 import { useSignalREvent } from '../../hooks/useSignalREvent';
 import { storeMusicNav } from '../../pages/Client/Audio/Music/storeMusicNav';
 import { albumCaption } from '../../pages/Client/Audio/Music/musicCaptions';
@@ -28,6 +29,7 @@ export default function SmartListRow({ list, serverId, excludeLibraryIds }: Smar
     const navigate = useNavigate();
     const dialog = useDialog();
     const { playMedia } = usePlayer();
+    const resumeMusic = useResumeMusic(serverId);
     const [entries, setEntries] = useState<SmartListEntry[]>([]);
     const [loading, setLoading] = useState(true);
     const [refreshes, setRefreshes] = useState(0);
@@ -59,6 +61,7 @@ export default function SmartListRow({ list, serverId, excludeLibraryIds }: Smar
     useSignalREvent('ChannelFavoritesUpdated', useCallback(() => refreshFor('FavoriteChannels', 'FavoriteStations'), [refreshFor]));
     useSignalREvent('PodcastEpisodesUpdated', useCallback(() => refreshFor('NewPodcastEpisodes'), [refreshFor]));
     useSignalREvent('DvrSessionsUpdated', useCallback(() => refreshFor('RecentRecordings'), [refreshFor]));
+    useSignalREvent('MusicResumeUpdated', useCallback(() => refreshFor('ContinueListening'), [refreshFor]));
 
     const openMedia = (id: string) => navigate(serverId ? `/server/${serverId}/media/${id}` : `/media/${id}`);
 
@@ -74,6 +77,15 @@ export default function SmartListRow({ list, serverId, excludeLibraryIds }: Smar
             console.error('Failed to start the recording', error);
             await dialog.alert({ title: 'Playback error', message: 'The recording could not be started. The file may be missing.', tone: 'danger' });
         }
+    };
+
+    const continueListening = async (item: MusicResumeItemVM) => {
+        try {
+            if (await resumeMusic(item)) return;
+        } catch (error) {
+            console.error('Failed to continue listening', error);
+        }
+        refresh();
     };
 
     if (loading) return source === 'Library' ? <div className="vora-skeleton mx-8 mb-8 h-48" /> : null;
@@ -147,6 +159,21 @@ export default function SmartListRow({ list, serverId, excludeLibraryIds }: Smar
         if (entry.kind === 'Album' && entry.album) {
             const album = entry.album;
             return <MediaCard item={albumCaption(album)} imageUrl={albumCover(album)} shape="square" size="xs" onClick={() => openAlbum(album)} />;
+        }
+
+        if (entry.kind === 'MusicResume' && entry.musicResume) {
+            const item = entry.musicResume;
+            return (
+                <MediaCard
+                    title={entry.title}
+                    captionLines={caption}
+                    imageUrl={entry.imageUrl ?? undefined}
+                    mosaicUrls={item.artworkUrls}
+                    shape="square"
+                    size="xs"
+                    onClick={() => { void continueListening(item); }}
+                />
+            );
         }
 
         if (entry.kind === 'Recording' && entry.recording) {
