@@ -215,3 +215,45 @@ describe('ManageLibrary folders', () => {
         expect(screen.getAllByText('/media/tv')).toHaveLength(1);
     });
 });
+
+describe('ManageLibrary intro detection', () => {
+    beforeEach(() => {
+        Object.values(mocks).forEach(m => m.mockReset());
+        mocks.updateLibrary.mockResolvedValue(undefined);
+    });
+
+    it('lets a movie library switch intro detection off and saves it', async () => {
+        mocks.getLibraryById.mockResolvedValue({ ...library('Movie'), enableIntroDetection: true });
+        render(
+            <MemoryRouter initialEntries={['/admin/libraries/lib1/manage']}>
+                <Routes>
+                    <Route path="/admin/libraries/:id/manage" element={<ManageLibrary />} />
+                </Routes>
+            </MemoryRouter>,
+        );
+        await screen.findByRole('button', { name: 'Refresh metadata' });
+
+        const box = screen.getByLabelText('Enable intro detection (studio logos and opening titles)');
+        expect(box).toBeChecked();
+        fireEvent.click(box);
+        fireEvent.click(screen.getAllByRole('button', { name: 'Save changes' })[0]);
+
+        await waitFor(() => expect(mocks.updateLibrary).toHaveBeenCalledWith(
+            'lib1',
+            expect.objectContaining({ enableIntroDetection: false }),
+            undefined,
+        ));
+    });
+
+    it('keeps the plain label on a TV library', async () => {
+        await renderManage('TvShow');
+
+        expect(screen.getByLabelText('Enable intro detection')).toBeInTheDocument();
+    });
+
+    it('does not offer it on a music library', async () => {
+        await renderManage('Music');
+
+        expect(screen.queryByLabelText(/Enable intro detection/)).toBeNull();
+    });
+});

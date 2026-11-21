@@ -167,6 +167,34 @@ public class MediaAnalyzerManagerDetectionTests
         await _analyzer.Received(detects ? 1 : 0).AnalyzeSilenceDetectionsAsync("/m/a.mkv", Arg.Any<SilenceDetectionParameters>(), Arg.Any<CancellationToken>());
     }
 
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task A_movie_library_with_intro_detection_off_gets_no_intro_search(bool forced)
+    {
+        var id = Guid.NewGuid();
+        StubMovieReady(id, "/m/a.mkv", TimeSpan.FromMinutes(90), meanDb: -20);
+        _media.GetMarkerDetectionGateAsync(id).Returns(new MarkerDetectionGateDto
+        { EnableIntroDetection = false, EnableCreditsDetection = true, LibraryType = LibraryType.Movie });
+
+        await _manager.TriggerMediaItemSilenceDetectionAsync(id, forceOverride: forced, cancellationToken: TestContext.Current.CancellationToken);
+
+        _assembler.Received(1).Assemble(Arg.Is<MarkerAssemblerInput>(i => !i.DetectIntro && i.DetectCredits));
+    }
+
+    [Fact]
+    public async Task A_movie_library_with_intro_detection_on_searches_for_an_intro()
+    {
+        var id = Guid.NewGuid();
+        StubMovieReady(id, "/m/a.mkv", TimeSpan.FromMinutes(90), meanDb: -20);
+        _media.GetMarkerDetectionGateAsync(id).Returns(new MarkerDetectionGateDto
+        { EnableIntroDetection = true, EnableCreditsDetection = true, LibraryType = LibraryType.Movie });
+
+        await _manager.TriggerMediaItemSilenceDetectionAsync(id, forceOverride: true, cancellationToken: TestContext.Current.CancellationToken);
+
+        _assembler.Received(1).Assemble(Arg.Is<MarkerAssemblerInput>(i => i.DetectIntro && i.DetectCredits));
+    }
+
     [Fact]
     public async Task RunMediaItemSilenceDetectionAsync_skips_when_no_file_paths_found()
     {
