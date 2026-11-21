@@ -524,7 +524,7 @@ public class VoraLocalMediaScannerProvider : ILocalMediaScannerProvider
     {
         var separated = new List<string>();
         var movies = (await _ingestionService.GetFilesOfMoviesWithSeveralFilesAsync(library))
-            .Where(p => !p.MatchedByHand && !ExternalIdSet.From(p.TmdbId, p.ImdbId).IsEmpty)
+            .Where(p => !p.MatchedByHand)
             .Where(p => knownFiles.Contains(p.FilePath) && roots.Any(root => IsInside(p.FilePath, root)) && File.Exists(p.FilePath))
             .GroupBy(p => p.MovieId);
         foreach (var movie in movies)
@@ -535,19 +535,24 @@ public class VoraLocalMediaScannerProvider : ILocalMediaScannerProvider
             var others = files
                 .Where(p => LocalIdentity.Contradicts(ResolveMovieIdentity(p.FilePath, regex, local).Ids, ExternalIdSet.From(p.TmdbId, p.ImdbId)))
                 .ToList();
-            if (others.Count == 0 || others.Count == files.Count) continue;
+            if (others.Count == files.Count) others = [];
 
-            foreach (var file in others)
+            var otherYears = MovieYears.FilesOfOtherYears(
+                files.Where(p => !others.Contains(p)).Select(p => (p.FilePath, ResolveMovieIdentity(p.FilePath, regex, local).Year)).ToList(),
+                movie.First().ReleaseYear);
+
+            var leaving = others.Select(p => p.FilePath).Concat(otherYears).ToList();
+            foreach (var path in leaving)
             {
-                await _ingestionService.RemoveMediaItemByPathAsync(file.FilePath);
-                knownFiles.Remove(file.FilePath);
-                separated.Add(file.FilePath);
+                await _ingestionService.RemoveMediaItemByPathAsync(path);
+                knownFiles.Remove(path);
+                separated.Add(path);
             }
         }
 
         if (separated.Count > 0)
         {
-            _logger.LogInformation("Took {Count} file(s) off a movie whose ids they don't share; they are added again as the films their names say they are.", separated.Count);
+            _logger.LogInformation("Took {Count} file(s) off a movie whose ids or release years they don't share; they are added again as the films their names say they are.", separated.Count);
         }
     }
 

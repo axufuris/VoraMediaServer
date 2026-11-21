@@ -72,7 +72,7 @@ Files under a `Plex Versions` folder (Plex's Optimize copies, `Plex Versions/Ori
 
 ## Duplicates that are stacked episodes
 
-The duplicates page groups the files of one item. When an episode's files are named as different episodes (`MediaDedupeManager.DifferentEpisodesNamed`, read the automatic way, explicit markers only), the group carries `EpisodesInFileNames` and the page says they aren't copies and that the next library scan adds each as its own episode, rather than leaving the admin to delete the "extra" ones.
+The duplicates page groups the files of one item. When an episode's files are named as different episodes (`MediaDedupeManager.DifferentEpisodesNamed`, read the automatic way, explicit markers only), the group carries `EpisodesInFileNames` and the page says they aren't copies and that the next library scan adds each as its own episode, rather than leaving the admin to delete the "extra" ones. Movies have the same warning for differing years (`YearsInFileNames`, see [`movie-file-names.md`](movie-file-names.md)).
 
 ## Ranges of known files
 

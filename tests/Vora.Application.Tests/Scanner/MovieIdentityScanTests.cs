@@ -115,8 +115,11 @@ public class MovieIdentityScanTests : IDisposable
     }
 
     private void Placed(Guid movieId, string? imdbId, bool matchedByHand, params string[] files) =>
+        PlacedIn(movieId, imdbId, matchedByHand, null, files);
+
+    private void PlacedIn(Guid movieId, string? imdbId, bool matchedByHand, int? releaseYear, params string[] files) =>
         _ingestion.GetFilesOfMoviesWithSeveralFilesAsync(Arg.Any<LibraryHandle>())
-            .Returns(files.Select(file => new MovieFilePlacement(file, movieId, null, imdbId, matchedByHand)).ToList());
+            .Returns(files.Select(file => new MovieFilePlacement(file, movieId, null, imdbId, matchedByHand, releaseYear)).ToList());
 
     [Fact]
     public async Task A_file_of_another_film_stacked_on_one_is_taken_off_and_added_as_its_own_film()
@@ -178,6 +181,50 @@ public class MovieIdentityScanTests : IDisposable
 
         await _scanner.ScanMovieLibraryAsync(_library.Value);
 
+        await _ingestion.DidNotReceive().RemoveMediaItemByPathAsync(Arg.Any<string>());
+    }
+
+    [Fact]
+    public async Task A_file_named_for_another_year_is_taken_off_the_film_of_the_stored_year()
+    {
+        var remake = Known("Elm/A Nightmare on Elm Street (2010) Bluray-2160p.mkv");
+        var original = Known("Elm/A Nightmare on Elm Street (1984) Bluray-2160p Proper.mp4");
+        PlacedIn(Guid.NewGuid(), null, false, 1984, remake, original);
+
+        await _scanner.ScanMovieLibraryAsync(_library.Value);
+
+        await _ingestion.Received(1).RemoveMediaItemByPathAsync(remake);
+        await _ingestion.DidNotReceive().RemoveMediaItemByPathAsync(original);
+        await Added("A Nightmare on Elm Street", 2010);
+    }
+
+    [Fact]
+    public async Task One_film_in_two_resolutions_and_neighbouring_years_stay()
+    {
+        var hd = Known("1080p/Heat (1995)/Heat (1995) [1080p].mkv");
+        var uhd = Known("4K/Heat (1996)/Heat (1996) [2160p].mkv");
+        var same = Known("4K/Heat (1995)/Heat (1995) [2160p].mkv");
+        PlacedIn(Guid.NewGuid(), null, false, 1995, hd, uhd, same);
+
+        await _scanner.ScanMovieLibraryAsync(_library.Value);
+
+        await _ingestion.DidNotReceive().RemoveMediaItemByPathAsync(Arg.Any<string>());
+    }
+
+    [Fact]
+    public async Task Hand_matched_films_and_files_without_a_year_keep_every_file()
+    {
+        var remake = Known("Elm/A Nightmare on Elm Street (2010).mkv");
+        var original = Known("Elm/A Nightmare on Elm Street (1984).mp4");
+        PlacedIn(Guid.NewGuid(), null, true, 1984, remake, original);
+
+        await _scanner.ScanMovieLibraryAsync(_library.Value);
+        await _ingestion.DidNotReceive().RemoveMediaItemByPathAsync(Arg.Any<string>());
+
+        var plain = Known("Elm/Elm Street.mkv");
+        PlacedIn(Guid.NewGuid(), null, false, 1984, plain, original);
+
+        await _scanner.ScanMovieLibraryAsync(_library.Value);
         await _ingestion.DidNotReceive().RemoveMediaItemByPathAsync(Arg.Any<string>());
     }
 }

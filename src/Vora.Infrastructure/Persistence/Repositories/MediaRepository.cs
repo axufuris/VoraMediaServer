@@ -152,12 +152,12 @@ public partial class MediaRepository : IMediaRepository
         var movies = await _context.Set<Movie>()
             .AsNoTracking()
             .Where(m => m.LibraryId == libraryId && m.MediaParts.Count > 1)
-            .Select(m => new { m.Id, m.TmdbId, m.ImdbId, m.LockedFields, Files = m.MediaParts.Select(p => p.FilePath).ToList() })
+            .Select(m => new { m.Id, m.TmdbId, m.ImdbId, m.LockedFields, m.ReleaseDate, Files = m.MediaParts.Select(p => p.FilePath).ToList() })
             .ToListAsync();
 
         return movies
             .SelectMany(m => m.Files.Select(file => new MovieFilePlacement(file, m.Id, m.TmdbId, m.ImdbId,
-                Vora.Application.Metadata.MediaMatchManager.IdentityChosenByHand(m.LockedFields))))
+                Vora.Application.Metadata.MediaMatchManager.IdentityChosenByHand(m.LockedFields), m.ReleaseDate?.Year)))
             .ToList();
     }
 

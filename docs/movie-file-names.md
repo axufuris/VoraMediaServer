@@ -42,15 +42,21 @@ A local trailer or extra (`-trailer`, a `Trailers` folder, …) is stored under 
 `SeparateFilesOfOtherFilmsAsync` runs at the start of a movie library scan (`DiscoverMovieScanUnitsAsync`) and of `ProcessMovieDirectoriesAsync`. It works from `GetFilesOfMoviesWithSeveralFilesAsync` and skips:
 
 - films matched by hand (`Match` in `LockedFields`);
-- films with no stored ids;
 - files that are no longer in the library, outside the folders being scanned, or gone from disk.
 
-For each film with two or more such files, it reads each file as above. Files whose ids contradict the film's are taken off with `RemoveMediaItemByPathAsync`, and the same scan adds them again as the film their name says.
+For each film with two or more such files, it reads each file as above. Two things take a file off its film with `RemoveMediaItemByPathAsync`, and the same scan adds it again as the film its name says:
+
+- **Ids.** A file whose ids contradict the film's stored ids.
+- **Years.** Each remaining file's year is `ResolveMovieIdentity(...).Year` (file name, `Title (Year)` folder, release names, NFO). `MovieYears.FilesOfOtherYears` sorts the distinct years into groups, a year joining the current group while it is within `LocalIdentity.YearTolerance` (1) of the group's first year. When the files that have a year fall into more than one group, the group holding the film's stored `ReleaseDate` year (`MovieFilePlacement.ReleaseYear`, within the tolerance) stays and the files of the other groups leave. With no matching group the largest stays, ties going to the earliest year. Files without a parsed year are never moved and never form a group, and the title is never used. A film with the same year in several resolutions, or years one apart, stays whole.
 
 It leaves a film alone when:
 
-- no file contradicts it. Files with no ids, or with the film's own ids, always stay.
+- no file contradicts it by id or year. Files with no ids, or with the film's own ids, always stay for the id rule.
 - **every** file contradicts it. The stored ids are then the odd ones out (a wrong Fix match or a wrong metadata match), and moving every file would only rebuild the same film.
+
+## Duplicates page
+
+When a film's files in one duplicate group are named for years more than a year apart (`MovieYears.Named`, the same year reading as the scan), the group carries `YearsInFileNames` and the page says they aren't copies and that the next scan adds each as its own film. Like the episode warning it only warns; the delete buttons stay as they are.
 
 ## Tests
 

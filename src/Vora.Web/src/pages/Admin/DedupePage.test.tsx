@@ -31,6 +31,23 @@ it('says files named as different episodes are not copies', async () => {
     expect(await screen.findByText(/These aren't copies: the files are named as S01E01, S01E02\./)).toBeInTheDocument();
 });
 
+it('says files named for different years are different films', async () => {
+    vi.mocked(adminService.getDuplicates).mockResolvedValue([{
+        ...group([]), type: 'Movie', title: 'A Nightmare on Elm Street', yearsInFileNames: [1984, 2010],
+    }]);
+    renderPage();
+
+    expect(await screen.findByText(/These aren't copies: the files are named for the years 1984, 2010/)).toBeInTheDocument();
+});
+
+it('says nothing extra about copies named for one year', async () => {
+    vi.mocked(adminService.getDuplicates).mockResolvedValue([{ ...group([]), type: 'Movie', yearsInFileNames: [] }]);
+    renderPage();
+
+    expect(await screen.findByText('Ted Lasso - S01E01')).toBeInTheDocument();
+    expect(screen.queryByText(/These aren't copies/)).not.toBeInTheDocument();
+});
+
 it('says nothing extra about real copies', async () => {
     vi.mocked(adminService.getDuplicates).mockResolvedValue([group([])]);
     renderPage();

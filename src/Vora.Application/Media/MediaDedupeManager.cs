@@ -138,7 +138,8 @@ public class MediaDedupeManager : IMediaDedupeManager
                     Parts = bucket.Select(p => MapAndScoreVideoPart(p, settings))
                         .OrderByDescending(p => p.QualityScore)
                         .ToList(),
-                    EpisodesInFileNames = item is Episode ? DifferentEpisodesNamed(bucket.Select(p => p.FilePath)) : []
+                    EpisodesInFileNames = item is Episode ? DifferentEpisodesNamed(bucket.Select(p => p.FilePath)) : [],
+                    YearsInFileNames = item is Movie ? MovieYears.Named(bucket.Select(p => p.FilePath)) : []
                 });
             }
         }

@@ -81,7 +81,7 @@ public class MediaRepositoryMovieMatchTests : IDisposable
         var files = await Repo().GetFilesOfMoviesWithSeveralFilesAsync(_library);
 
         files.Should().HaveCount(4);
-        files.Where(f => f.MovieId == princess.Id).Should().OnlyContain(f => f.ImdbId == "tt13406136" && !f.MatchedByHand);
+        files.Where(f => f.MovieId == princess.Id).Should().OnlyContain(f => f.ImdbId == "tt13406136" && !f.MatchedByHand && f.ReleaseYear == 2022);
         files.Where(f => f.MovieId == fixedByHand.Id).Should().OnlyContain(f => f.MatchedByHand);
     }
 }
