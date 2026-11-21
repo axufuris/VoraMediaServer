@@ -37,6 +37,12 @@ function typeLabel(t: string) {
     return TYPE_LABELS[t] ?? t;
 }
 
+/** The folder a file sits in: its path without the file name, either slash style. */
+function folderOf(filePath: string) {
+    const cut = Math.max(filePath.lastIndexOf("/"), filePath.lastIndexOf("\\"));
+    return cut > 0 ? filePath.slice(0, cut) : "";
+}
+
 function Chip({ children, tone = 'neutral' }: { children: React.ReactNode, tone?: 'neutral' | 'highlight' }) {
     const cls = tone === 'highlight'
         ? 'bg-[var(--vora-accent-soft)] text-[var(--vora-accent-text)]'
@@ -112,6 +118,8 @@ function DuplicatesTab({ dialog, serverId }: { dialog: DialogApi, serverId?: str
     useEffect(() => {
         fetchDuplicates();
     }, [fetchDuplicates]);
+
+    const differentFilms = (group: DedupeGroupVM) => (group.yearsInFileNames?.length ?? 0) > 1;
 
     const handleDelete = async (groupId: string, partId: string, deletePhysical: boolean) => {
         const actionText = deletePhysical ? 'delete this file from the disk AND database' : 'remove this file from the database ONLY';
@@ -262,7 +270,7 @@ function DuplicatesTab({ dialog, serverId }: { dialog: DialogApi, serverId?: str
                                     )}
                                     {(group.yearsInFileNames?.length ?? 0) > 1 && (
                                         <p className="mt-2 max-w-2xl text-xs text-[var(--vora-warning-text)]">
-                                            These aren't copies: the files are named for the years {group.yearsInFileNames?.join(', ')}, so they are different films. They ended up on one movie by mistake. The next library scan adds each one as its own film, so don't delete them.
+                                            These aren't copies: the files are named for the years {group.yearsInFileNames?.join(', ')}, so they are different films. They ended up on one movie by mistake. The next library scan adds each one as its own film, so deleting is switched off for this group.
                                         </p>
                                     )}
                                 </div>
@@ -294,6 +302,9 @@ function DuplicatesTab({ dialog, serverId }: { dialog: DialogApi, serverId?: str
                                                 {index === 0 && <HealthBadge tone="info" showDot={false}>Best</HealthBadge>}
                                                 <p className="font-mono text-sm text-[var(--vora-text-primary)] break-all">{part.fileName}</p>
                                             </div>
+                                            {folderOf(part.filePath) && (
+                                                <p className="-mt-1 mb-2 font-mono text-xs text-[var(--vora-text-muted)] break-all" title={part.filePath}>{folderOf(part.filePath)}</p>
+                                            )}
                                             <div className="flex flex-wrap gap-1.5">
                                                 <Chip>Score: <span className="text-[var(--vora-text-primary)] font-bold ml-0.5">{part.qualityScore}</span></Chip>
                                                 <Chip>{formatBytes(part.fileSizeBytes)}</Chip>
@@ -328,14 +339,18 @@ function DuplicatesTab({ dialog, serverId }: { dialog: DialogApi, serverId?: str
                                             <button
                                                 type="button"
                                                 onClick={() => handleDelete(group.mediaItemId, part.partId, true)}
-                                                className="text-xs font-semibold px-3 py-1.5 bg-[var(--vora-danger-soft)] hover:bg-[var(--vora-danger-500)] text-[var(--vora-danger-text)] hover:text-[var(--vora-text-primary)] rounded-[var(--vora-radius-md)] transition-colors cursor-pointer"
+                                                disabled={differentFilms(group)}
+                                                title={differentFilms(group) ? "Different films, not copies" : undefined}
+                                                className="text-xs font-semibold px-3 py-1.5 bg-[var(--vora-danger-soft)] hover:bg-[var(--vora-danger-500)] text-[var(--vora-danger-text)] hover:text-[var(--vora-text-primary)] rounded-[var(--vora-radius-md)] transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
                                             >
                                                 Delete file & DB
                                             </button>
                                             <button
                                                 type="button"
                                                 onClick={() => handleDelete(group.mediaItemId, part.partId, false)}
-                                                className="text-xs font-semibold px-3 py-1.5 bg-[var(--vora-bg-sunken)] hover:bg-[var(--vora-border-strong)] text-[var(--vora-text-secondary)] hover:text-[var(--vora-text-primary)] rounded-[var(--vora-radius-md)] transition-colors cursor-pointer"
+                                                disabled={differentFilms(group)}
+                                                title={differentFilms(group) ? "Different films, not copies" : undefined}
+                                                className="text-xs font-semibold px-3 py-1.5 bg-[var(--vora-bg-sunken)] hover:bg-[var(--vora-border-strong)] text-[var(--vora-text-secondary)] hover:text-[var(--vora-text-primary)] rounded-[var(--vora-radius-md)] transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
                                             >
                                                 Remove from DB only
                                             </button>
