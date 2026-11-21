@@ -9,4 +9,5 @@ public class DedupeGroupVM
     public string Resolution { get; set; } = string.Empty;
     public List<DedupeItemVM> Parts { get; set; } = new();
     public List<string> EpisodesInFileNames { get; set; } = new();
+    public List<int> YearsInFileNames { get; set; } = new();
 }

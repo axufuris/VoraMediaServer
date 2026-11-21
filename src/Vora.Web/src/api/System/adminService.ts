@@ -25,6 +25,7 @@ export interface DedupeGroupVM {
     resolution: string;
     parts: DedupeItemVM[];
     episodesInFileNames?: string[];
+    yearsInFileNames?: number[];
 }
 
 export interface DedupeSettingsVM {

@@ -6,7 +6,7 @@ namespace Vora.Plugins.Providers.Local;
 
 public static partial class LocalIdentity
 {
-    private const int YearTolerance = 1;
+    public const int YearTolerance = 1;
 
     public static MetadataResult? Trusted(MetadataResult? document, int? parsedYear, ExternalIdSet tagged)
     {
