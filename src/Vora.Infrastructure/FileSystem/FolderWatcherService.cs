@@ -139,7 +139,7 @@ public class FolderWatcherService : IFolderWatcherService
         // scanner would reject them anyway, but this keeps them off the task list.
         if (LibraryFileFilter.IsExcluded(filePath, library.ExcludeFilters))
         {
-            _logger.LogInformation("Skipping excluded file {FilePath}.", filePath);
+            _logger.LogDebug("Skipping excluded file {FilePath}.", filePath);
             return;
         }
 
