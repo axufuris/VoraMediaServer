@@ -135,16 +135,29 @@ public partial class MediaRepository : IMediaRepository
         var candidates = await _context.Set<Movie>()
             .AsNoTracking()
             .Where(m => m.LibraryId == libraryId && (year == null || (m.ReleaseDate != null && m.ReleaseDate.Value.Year == year)))
-            .Select(m => new { m.Id, m.Title, m.TmdbId, m.ImdbId })
+            .Select(m => new { m.Id, m.Title, m.TmdbId, m.ImdbId, Files = m.MediaParts.Select(p => p.FilePath).ToList() })
             .ToListAsync();
 
         var fileIds = ExternalIdSet.From(tmdbId, imdbId);
         var matches = candidates
             .Where(c => NormalizeTitle(c.Title) == normalized
+                && !NamedForAnotherYear(c.Files, year)
                 && !Vora.Plugins.Providers.Local.LocalIdentity.Contradicts(fileIds, ExternalIdSet.From(c.TmdbId, c.ImdbId)))
             .ToList();
 
         return year != null || matches.Count == 1 ? matches.FirstOrDefault()?.Id : null;
+    }
+
+    /// <summary>
+    /// True when every file the film already holds is named for a year other than the new file's.
+    /// The stored release year can drift (a metadata match, a hand edit), so a film whose own files
+    /// say 2010 must not take a file that says 1984 just because its release date now reads 1984.
+    /// </summary>
+    private static bool NamedForAnotherYear(IEnumerable<string> existingFiles, int? year)
+    {
+        if (year is not int wanted) return false;
+        var named = existingFiles.Select(Vora.Plugins.Providers.Local.MovieYears.In).OfType<int>().ToList();
+        return named.Count > 0 && named.All(n => Math.Abs(n - wanted) > Vora.Plugins.Providers.Local.LocalIdentity.YearTolerance);
     }
 
     public async Task<List<MovieFilePlacement>> GetFilesOfMoviesWithSeveralFilesAsync(Guid libraryId)

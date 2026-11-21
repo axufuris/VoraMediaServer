@@ -40,6 +40,23 @@ public class MediaRepositoryMovieMatchTests : IDisposable
     }
 
     [Fact]
+    public async Task A_film_whose_files_are_named_for_another_year_does_not_take_the_file_even_if_its_release_year_drifted()
+    {
+        // The 2010 remake's release date was rewritten to 1984 (a wrong match); its file still says 2010.
+        AddMovie("A Nightmare on Elm Street", 1984, files: "/media/movies/A Nightmare on Elm Street (2010)/A Nightmare on Elm Street (2010) Bluray-2160p.mkv");
+
+        (await Repo().GetMovieIdByTitleAndYearAsync("A Nightmare on Elm Street", 1984, _library)).Should().BeNull();
+    }
+
+    [Fact]
+    public async Task A_film_with_a_file_named_for_the_same_year_still_takes_another_version()
+    {
+        var elm = AddMovie("A Nightmare on Elm Street", 1984, files: "/media/movies/A Nightmare on Elm Street (1984)/A Nightmare on Elm Street (1984) 1080p.mkv");
+
+        (await Repo().GetMovieIdByTitleAndYearAsync("A Nightmare on Elm Street", 1984, _library)).Should().Be(elm.Id);
+    }
+
+    [Fact]
     public async Task A_film_whose_ids_contradict_the_files_is_another_film()
     {
         AddMovie("The Princess", 2022, imdbId: "tt13406136");
