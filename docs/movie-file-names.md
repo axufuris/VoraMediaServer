@@ -56,7 +56,7 @@ It leaves a film alone when:
 
 ## Duplicates page
 
-When a film's files in one duplicate group are named for years more than a year apart (`MovieYears.Named`, the same year reading as the scan), the group carries `YearsInFileNames` and the page says they aren't copies and that the next scan adds each as its own film. Like the episode warning it only warns; the delete buttons stay as they are.
+When a film's files in one duplicate group are named for years more than a year apart (`MovieYears.Named`, the same year reading as the scan), the group carries `YearsInFileNames` and the page says they aren't copies and that the next scan adds each as its own film. The page switches off both removal buttons (Delete file & DB, Remove from DB only) for such a group, and shows the folder each file sits in under its name so you can check they share one. The episode warning still only warns.
 
 ## Tests
 

@@ -55,3 +55,32 @@ it('says nothing extra about real copies', async () => {
     expect(await screen.findByText('Ted Lasso - S01E01')).toBeInTheDocument();
     expect(screen.queryByText(/These aren't copies/)).not.toBeInTheDocument();
 });
+
+it('switches off both delete buttons for films named for different years', async () => {
+    vi.mocked(adminService.getDuplicates).mockResolvedValue([{
+        ...group([]), type: 'Movie', yearsInFileNames: [1984, 2010],
+    }]);
+    renderPage();
+
+    await screen.findByText(/These aren't copies/);
+    for (const button of screen.getAllByRole('button', { name: /Delete file & DB|Remove from DB only/ })) {
+        expect(button).toBeDisabled();
+    }
+});
+
+it('leaves the delete buttons on for real copies', async () => {
+    vi.mocked(adminService.getDuplicates).mockResolvedValue([group([])]);
+    renderPage();
+
+    await screen.findByText('Ted Lasso - S01E01');
+    for (const button of screen.getAllByRole('button', { name: /Delete file & DB|Remove from DB only/ })) {
+        expect(button).toBeEnabled();
+    }
+});
+
+it('shows the folder each file sits in under its name', async () => {
+    vi.mocked(adminService.getDuplicates).mockResolvedValue([group([])]);
+    renderPage();
+
+    expect(await screen.findAllByText('/tv/Ted Lasso/Season 1')).toHaveLength(2);
+});
