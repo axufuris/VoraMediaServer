@@ -640,7 +640,7 @@ export default function ManageLibrary() {
                         {showVideoOptions && <Checkbox checked={library.onlyShowTrailers} onChange={v => handleChange('onlyShowTrailers', v)} label="Only show trailers" />}
                         {showVideoPreviewThumbnails && <Checkbox checked={library.enableVideoPreviewThumbnails} onChange={v => handleChange('enableVideoPreviewThumbnails', v)} label="Enable video preview thumbnails" />}
                         {isTvShow && <Checkbox checked={library.useSeasonTitles} onChange={v => handleChange('useSeasonTitles', v)} label="Use season titles" />}
-                        {isTvShow && <Checkbox checked={library.enableIntroDetection} onChange={v => handleChange('enableIntroDetection', v)} label="Enable intro detection" />}
+                        {showVideoOptions && <Checkbox checked={library.enableIntroDetection} onChange={v => handleChange('enableIntroDetection', v)} label={isTvShow ? 'Enable intro detection' : 'Enable intro detection (studio logos and opening titles)'} />}
                         {showVideoOptions && <Checkbox checked={library.enableCreditsDetection} onChange={v => handleChange('enableCreditsDetection', v)} label="Enable credits detection" />}
                         {isTvShow && <Checkbox checked={library.enablePreviewDetection} onChange={v => handleChange('enablePreviewDetection', v)} label="Enable next-episode preview skips" />}
                     </div>

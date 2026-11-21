@@ -553,9 +553,15 @@ public class MediaAnalyzerManager : IMediaAnalyzerManager
             detectCredits = gate.DetectsCredits;
             if (!detectIntro && !detectCredits) return;
         }
-        else if (gate.MarkersAnalyzedAt >= analyzedBefore)
+        else
         {
-            return;
+            if (gate.MarkersAnalyzedAt >= analyzedBefore) return;
+
+            if (gate.DetectsIntro || gate.DetectsCredits)
+            {
+                detectIntro = gate.DetectsIntro;
+                detectCredits = gate.DetectsCredits;
+            }
         }
 
         // Paths + duration + stinger flags in one round-trip instead of three.
