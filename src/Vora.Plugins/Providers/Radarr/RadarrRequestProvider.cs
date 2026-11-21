@@ -1,6 +1,7 @@
 ﻿using System.Net.Http;
 using System.Text.Json;
 using System.Text;
+using Microsoft.Extensions.Logging;
 using Vora.Plugins.Dtos;
 using Vora.Plugins.Interfaces;
 
@@ -9,6 +10,7 @@ namespace Vora.Plugins.Providers.Radarr;
 public class RadarrRequestProvider : IRequestProvider
 {
     private readonly HttpClient _httpClient;
+    private readonly ILogger<RadarrRequestProvider> _logger;
 
     public string Id => "radarr_requester";
     public string Name => "Radarr";
@@ -21,9 +23,10 @@ public class RadarrRequestProvider : IRequestProvider
 
     public string[] SupportedMediaTypes => new[] { "Movie" };
 
-    public RadarrRequestProvider(HttpClient httpClient)
+    public RadarrRequestProvider(HttpClient httpClient, ILogger<RadarrRequestProvider> logger)
     {
         _httpClient = httpClient;
+        _logger = logger;
     }
 
     public IEnumerable<PluginSettingDefinitionDto> GetSettingDefinitions() => new List<PluginSettingDefinitionDto>();
@@ -86,12 +89,12 @@ public class RadarrRequestProvider : IRequestProvider
             string minAvailability = settings.TryGetProperty("minimumAvailability", out var ma) ? ma.GetString() ?? "announced" : "announced";
             bool searchOnAdd = settings.TryGetProperty("searchOnAdd", out var search) ? search.GetBoolean() : true;
 
-            var client = CreateClient(host, port, useSsl, urlBase, apiKey);
+            using var client = CreateClient(host, port, useSsl, urlBase, apiKey);
 
             var payload = new
             {
                 title = title,
-                tmdbId = int.Parse(tmdbId),
+                tmdbId = int.Parse(tmdbId, System.Globalization.CultureInfo.InvariantCulture),
                 qualityProfileId = qualityProfileId,
                 rootFolderPath = rootFolderPath,
                 minimumAvailability = minAvailability,
@@ -107,10 +110,24 @@ public class RadarrRequestProvider : IRequestProvider
 
             var response = await client.PostAsync("api/v3/movie", content, cancellationToken);
 
-            return response.IsSuccessStatusCode;
+            if (response.IsSuccessStatusCode) return true;
+
+            var body = await response.Content.ReadAsStringAsync(cancellationToken);
+
+            // Radarr answers 400 when the film is already in its library. The request did
+            // reach Radarr and the film is there, so that is a success for us, not a failure.
+            if (response.StatusCode == System.Net.HttpStatusCode.BadRequest && body.Contains("MovieExistsValidator", StringComparison.OrdinalIgnoreCase))
+            {
+                _logger.LogInformation("Radarr already has \"{Title}\" (TMDb {TmdbId}); treating the request as sent.", title, tmdbId);
+                return true;
+            }
+
+            _logger.LogWarning("Radarr at {Host}:{Port} refused \"{Title}\" (TMDb {TmdbId}) with {Status}: {Body}", host, port, title, tmdbId, (int)response.StatusCode, body);
+            return false;
         }
-        catch
+        catch (Exception ex)
         {
+            _logger.LogWarning(ex, "Sending \"{Title}\" (TMDb {TmdbId}) to Radarr at {Host}:{Port} failed.", title, tmdbId, host, port);
             return false;
         }
     }
