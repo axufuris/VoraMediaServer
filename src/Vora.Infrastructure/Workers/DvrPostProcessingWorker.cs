@@ -134,6 +134,11 @@ public class DvrPostProcessingWorker : BackgroundService
         return await RunFfmpegTranscodeAsync(BuildFfmpegArgs(inputPath, outputPath, settings, encoder: null));
     }
 
+    // An antenna recording is usually interlaced MPEG-2 (1080i), and an MP4 that kept the fields
+    // combs on every movement. Only frames flagged interlaced are deinterlaced, so progressive
+    // material, and a broadcast that switches between 1080i and 720p, passes through untouched.
+    internal const string DeinterlaceFilter = "yadif=deint=interlaced";
+
     internal static List<string> BuildFfmpegArgs(string inputPath, string outputPath, ServerSetting settings, HardwareAccelerator? encoder)
     {
         if (settings.DisableVideoTranscoding)
@@ -159,13 +164,13 @@ public class DvrPostProcessingWorker : BackgroundService
 
         var args = new List<string>();
         if (encoder is not null) args.AddRange(HardwareArguments.InitDevices(encoder));
-        args.AddRange(["-i", inputPath]);
+        args.AddRange(["-i", inputPath, "-vf", encoder?.Type == HardwareAccelerationType.Vaapi ? $"{DeinterlaceFilter},format=nv12,hwupload" : DeinterlaceFilter]);
         args.AddRange(encoder?.Type switch
         {
             HardwareAccelerationType.Nvidia when encoder.Device is { } gpu => ["-c:v", useHevc ? "hevc_nvenc" : "h264_nvenc", "-gpu", gpu, "-preset", "p4", "-cq", "28"],
             HardwareAccelerationType.Nvidia => ["-c:v", useHevc ? "hevc_nvenc" : "h264_nvenc", "-preset", "p4", "-cq", "28"],
             HardwareAccelerationType.QuickSync => ["-c:v", useHevc ? "hevc_qsv" : "h264_qsv", "-preset", qsvPreset, "-global_quality", "28"],
-            HardwareAccelerationType.Vaapi => ["-vf", "format=nv12,hwupload", "-c:v", useHevc ? "hevc_vaapi" : "h264_vaapi", "-qp", "28"],
+            HardwareAccelerationType.Vaapi => ["-c:v", useHevc ? "hevc_vaapi" : "h264_vaapi", "-qp", "28"],
             _ => ["-c:v", useHevc ? "libx265" : "libx264", "-preset", preset, "-crf", "23"]
         });
         // Stereo, as timeshift: a 5.1(side) source would otherwise be written
