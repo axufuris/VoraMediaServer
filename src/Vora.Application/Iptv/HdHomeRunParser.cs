@@ -54,12 +54,26 @@ public static class HdHomeRunParser
                 ExternalChannelId = Limit(number, MaxIdLength),
                 Name = Limit(Text(entry, "GuideName") ?? number, MaxNameLength),
                 StreamUrl = StreamUrl(Text(entry, "URL"), number, device),
-                Kind = IptvChannelKind.Tv
+                Kind = IptvChannelKind.Tv,
+                VideoCodec = CodecName(Text(entry, "VideoCodec"))
             });
         }
 
         return channels;
     }
+
+    /// <summary>
+    /// The codec a lineup entry names (<c>"VideoCodec":"MPEG2"</c>), as ffprobe spells it, or null when it
+    /// names none or one that isn't recognised. It is only a hint: the channel is told apart as copy or
+    /// encode from it before anything has been tuned, and playback replaces it with what it measures.
+    /// </summary>
+    internal static string? CodecName(string? listed) => listed?.Trim().ToUpperInvariant() switch
+    {
+        "MPEG2" or "MPEG-2" or "MPEG2VIDEO" => "mpeg2video",
+        "H264" or "H.264" or "AVC" => "h264",
+        "HEVC" or "H265" or "H.265" => "hevc",
+        _ => null
+    };
 
     /// <summary>
     /// The address to open a channel at. The device names it in the lineup; that is used unless it is missing,

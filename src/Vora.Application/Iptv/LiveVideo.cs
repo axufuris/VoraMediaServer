@@ -2,7 +2,11 @@ using System.Globalization;
 
 namespace Vora.Application.Iptv;
 
-public sealed record LiveVideoFormat(string Codec, string? Profile, int? Level, int? Height, double? FrameRate, bool Interlaced);
+/// <summary>
+/// A channel's video as playback saw it. <paramref name="Interlaced"/> is null while only the codec is
+/// known, as when an HDHomeRun lineup names a channel's codec and nothing else.
+/// </summary>
+public sealed record LiveVideoFormat(string Codec, string? Profile, int? Level, int? Height, double? FrameRate, bool? Interlaced);
 
 public sealed record LiveVideoLimits(IReadOnlyList<string>? VideoCodecs, int? MaxH264Level, IReadOnlyList<string>? H264Profiles)
 {
@@ -19,7 +23,9 @@ public sealed record LiveVideoLimits(IReadOnlyList<string>? VideoCodecs, int? Ma
     public static LiveVideoLimits Effective(LiveVideoLimits? sent) => sent is { IsEmpty: false } ? sent : Default;
 }
 
-public sealed record LiveVideoEncode(int Level, int? MaxHeight, bool Deinterlace, int SegmentSeconds = LiveVideoDecision.TimeshiftSegmentSeconds);
+/// <param name="Deinterlace">Whether the encode deinterlaces at all.</param>
+/// <param name="OnlyFlaggedFrames">Deinterlace only the frames the stream flags as interlaced, which is what an encode does when it is not known whether the channel is interlaced: a 720p60 channel passes through untouched, a 1080i one is deinterlaced.</param>
+public sealed record LiveVideoEncode(int Level, int? MaxHeight, bool Deinterlace, int SegmentSeconds = LiveVideoDecision.TimeshiftSegmentSeconds, bool OnlyFlaggedFrames = false);
 
 public static class LiveVideoDecision
 {
@@ -67,7 +73,7 @@ public static class LiveVideoDecision
         var wanted = format.FrameRate > StandardLevelMaxFrameRate ? HighFrameRateLevel : StandardLevel;
         var level = limits.MaxH264Level is { } maxLevel ? Math.Min(wanted, maxLevel) : wanted;
         var tooTall = format.Height is not { } height || height > MaxEncodedHeight;
-        return new LiveVideoEncode(level, tooTall ? MaxEncodedHeight : null, format.Interlaced, segmentSeconds);
+        return new LiveVideoEncode(level, tooTall ? MaxEncodedHeight : null, format.Interlaced != false, segmentSeconds, OnlyFlaggedFrames: format.Interlaced is null);
     }
 
     private static string LevelName(int level) => (level / 10.0).ToString("0.0", CultureInfo.InvariantCulture);

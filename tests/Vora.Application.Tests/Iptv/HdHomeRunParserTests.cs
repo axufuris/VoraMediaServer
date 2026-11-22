@@ -47,6 +47,29 @@ public class HdHomeRunParserTests
     }
 
     [Fact]
+    public void A_channel_the_lineup_gives_a_codec_for_carries_it_as_ffprobe_spells_it()
+    {
+        var channels = HdHomeRunParser.ParseLineup(HdHomeRunFixtures.Lineup, Guid.NewGuid(), Device);
+
+        channels.Single(c => c.ExternalChannelId == "2.1").VideoCodec.Should().Be("mpeg2video");
+        channels.Single(c => c.ExternalChannelId == "7.1").VideoCodec.Should().BeNull("the lineup names no codec for it");
+    }
+
+    [Theory]
+    [InlineData("MPEG2", "mpeg2video")]
+    [InlineData("mpeg2", "mpeg2video")]
+    [InlineData("H264", "h264")]
+    [InlineData("HEVC", "hevc")]
+    [InlineData("H265", "hevc")]
+    [InlineData("VP9", null)]
+    [InlineData("", null)]
+    [InlineData(null, null)]
+    public void A_listed_codec_is_a_hint_only_when_it_is_one_this_server_knows(string? listed, string? expected)
+    {
+        HdHomeRunParser.CodecName(listed).Should().Be(expected);
+    }
+
+    [Fact]
     public void A_lineup_with_no_listed_address_is_built_from_the_address_the_admin_gave()
     {
         HdHomeRunParser.StreamUrl(null, "7.1", new Uri("https://hdhr.lan")).Should().Be("https://hdhr.lan:5004/auto/v7.1");

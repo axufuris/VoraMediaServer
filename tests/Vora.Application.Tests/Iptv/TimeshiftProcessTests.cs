@@ -155,8 +155,17 @@ public class TimeshiftProcessTests
             VideoLevel = 51,
             VideoHeight = 1080,
             VideoFrameRate = 25,
+            VideoInterlaced = false,
         };
 
         IptvManager.StoredVideoFormat(channel).Should().Be(new LiveVideoFormat("h264", "High 10", 51, 1080, 25, false));
+    }
+
+    [Fact]
+    public void A_channel_known_only_by_its_codec_brings_back_an_unknown_scan_type_not_a_progressive_one()
+    {
+        var channel = new IptvChannel { ExternalChannelId = "2.1", Name = "WCBS-HD", StreamUrl = StreamUrl, VideoCodec = "mpeg2video" };
+
+        IptvManager.StoredVideoFormat(channel).Should().Be(new LiveVideoFormat("mpeg2video", null, null, null, null, null));
     }
 }

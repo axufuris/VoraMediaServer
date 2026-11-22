@@ -11,6 +11,7 @@ internal static class TimeshiftVideoArgumentsBuilder
 
     public static string KeyframeEvery(int seconds) => $"expr:gte(t,n_forced*{seconds.ToString(CultureInfo.InvariantCulture)})";
     public const string CpuEncoder = "libx264";
+    public const string FlaggedFramesDeinterlace = "yadif=deint=interlaced";
 
     public static TimeshiftVideoArguments Build(LiveVideoEncode encode, HardwareAccelerator? encoder)
     {
@@ -19,7 +20,7 @@ internal static class TimeshiftVideoArgumentsBuilder
             : null;
 
         var filters = new List<string>();
-        if (encode.Deinterlace) filters.Add("yadif");
+        if (encode.Deinterlace) filters.Add(encode.OnlyFlaggedFrames ? FlaggedFramesDeinterlace : "yadif");
         if (encode.MaxHeight is { } height) filters.Add($"scale=-2:'min(ih,{height.ToString(CultureInfo.InvariantCulture)})'");
         filters.AddRange(UploadFilters(gpu));
 
