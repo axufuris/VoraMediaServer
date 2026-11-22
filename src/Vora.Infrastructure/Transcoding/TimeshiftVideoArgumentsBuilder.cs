@@ -8,6 +8,8 @@ namespace Vora.Infrastructure.Transcoding;
 internal static class TimeshiftVideoArgumentsBuilder
 {
     public const string KeyframeEveryFourSeconds = "expr:gte(t,n_forced*4)";
+
+    public static string KeyframeEvery(int seconds) => $"expr:gte(t,n_forced*{seconds.ToString(CultureInfo.InvariantCulture)})";
     public const string CpuEncoder = "libx264";
 
     public static TimeshiftVideoArguments Build(LiveVideoEncode encode, HardwareAccelerator? encoder)
@@ -26,7 +28,7 @@ internal static class TimeshiftVideoArgumentsBuilder
         video.AddRange(Encoder(gpu));
         video.AddRange(["-profile:v", "high", "-level", encode.Level.ToString(CultureInfo.InvariantCulture)]);
         if (gpu is null or { Type: HardwareAccelerationType.Nvidia }) video.AddRange(["-pix_fmt", "yuv420p"]);
-        video.AddRange(["-force_key_frames", KeyframeEveryFourSeconds]);
+        video.AddRange(["-force_key_frames", KeyframeEvery(encode.SegmentSeconds)]);
 
         return gpu is null
             ? new TimeshiftVideoArguments([], video, CpuEncoder, OnGpu: false)

@@ -34,7 +34,7 @@ public interface IIptvManager
     Task<string?> StartTimeshiftSessionAsync(Guid channelId, Guid userId, Guid profileId, LiveVideoLimits? limits);
     Task StopTimeshiftSessionAsync(Guid profileId);
     void PingTimeshiftSession(Guid profileId);
-    Task<string> StartLiveRemuxAsync(IptvChannel channel, IptvUpstream upstream, Guid viewerKey, int connectionLimit);
+    Task<string> StartLiveRemuxAsync(IptvChannel channel, IptvUpstream upstream, Guid viewerKey, int connectionLimit, LiveVideoLimits? limits = null);
     Task StopLiveRemuxAsync(Guid viewerKey);
 }
 
@@ -50,7 +50,10 @@ public class IptvManager : IIptvManager
     private const string SecondSegmentFileName = "seg_001.ts";
     private const string TimeshiftTokenScope = "timeshift";
     private const string ProviderGuideSuffix = " (provider guide)";
-    public const int LiveRemuxWindowSegments = 6;
+    // The live remux has no rewind, so its segments are short: the player gets its first two
+    // after about four seconds of video instead of eight. Timeshift keeps four-second segments.
+    public const int LiveRemuxSegmentSeconds = 2;
+    public const int LiveRemuxWindowSegments = 10;
     private const int InitializationRetryDelayMs = 500;
     private static readonly TimeSpan InitializationTimeout = TimeSpan.FromSeconds(20);
     private static readonly TimeSpan TimeshiftTokenTtl = TimeSpan.FromHours(4);
@@ -405,58 +408,11 @@ public class IptvManager : IIptvManager
 
         try
         {
-            var clientLimits = limits is { IsEmpty: false } ? limits : null;
-            var known = StoredVideoFormat(channel);
-            var encode = clientLimits is not null && known is not null && !LiveVideoDecision.Plays(known, clientLimits)
-                ? LiveVideoDecision.EncodeFor(known, clientLimits)
-                : null;
-            var video = encode is null ? TimeshiftVideoArguments.Copy : await _timeshiftVideo.EncodeArgumentsAsync(encode, onCpu: false);
-            if (video.Encodes && known is not null && clientLimits is not null)
-            {
-                _logger.LogInformation("Timeshift of {Channel} encodes with {Encoder}: {Reason}.",
-                    channel.Name, video.Encoder, LiveVideoDecision.Mismatch(known, clientLimits));
-            }
-
-            var run = await LaunchTimeshiftAsync(profileId, upstream, secret, video, LiveSessionKind.Timeshift);
+            var run = await StartFormatAwareAsync(channel, profileId, upstream, secret, limits, LiveSessionKind.Timeshift);
             if (run is null)
             {
                 _tunerRegistry.Release(leaseKey);
                 return null;
-            }
-
-            if (!video.Encodes)
-            {
-                var seen = await LearnVideoFormatAsync(channel, known, profileId, run);
-                if (encode is null && clientLimits is not null && seen is not null && LiveVideoDecision.Mismatch(seen, clientLimits) is { } reason)
-                {
-                    encode = LiveVideoDecision.EncodeFor(seen, clientLimits);
-                    video = await _timeshiftVideo.EncodeArgumentsAsync(encode, onCpu: false);
-                    if (video.Encodes)
-                    {
-                        _logger.LogInformation("Timeshift of {Channel} restarts to encode with {Encoder}: {Reason}.", channel.Name, video.Encoder, reason);
-                        run = await LaunchTimeshiftAsync(profileId, upstream, secret, video, LiveSessionKind.Timeshift);
-                        if (run is null)
-                        {
-                            _tunerRegistry.Release(leaseKey);
-                            return null;
-                        }
-                    }
-                }
-            }
-
-            await WaitForFileAsync(profileId, run, SecondSegmentFileName);
-
-            if (encode is not null && video.OnGpu && HasExited(run.Process) && !File.Exists(run.PlaylistPath))
-            {
-                _logger.LogWarning("Timeshift of {Channel} failed to encode with {Encoder}; retrying on the CPU.", channel.Name, video.Encoder);
-                video = await _timeshiftVideo.EncodeArgumentsAsync(encode, onCpu: true);
-                run = await LaunchTimeshiftAsync(profileId, upstream, secret, video, LiveSessionKind.Timeshift);
-                if (run is null)
-                {
-                    _tunerRegistry.Release(leaseKey);
-                    return null;
-                }
-                await WaitForFileAsync(profileId, run, SecondSegmentFileName);
             }
 
             if (!_timeshiftCoordinator.IsActive(profileId))
@@ -493,7 +449,7 @@ public class IptvManager : IIptvManager
     public void PingTimeshiftSession(Guid profileId) =>
         _timeshiftCoordinator.Heartbeat(profileId);
 
-    public async Task<string> StartLiveRemuxAsync(IptvChannel channel, IptvUpstream upstream, Guid viewerKey, int connectionLimit)
+    public async Task<string> StartLiveRemuxAsync(IptvChannel channel, IptvUpstream upstream, Guid viewerKey, int connectionLimit, LiveVideoLimits? limits = null)
     {
         IptvPlaylist? playlist = channel.Playlist;
         var secret = playlist is null ? null : _upstreamResolver.PasswordFor(playlist);
@@ -509,10 +465,9 @@ public class IptvManager : IIptvManager
 
         try
         {
-            var run = await LaunchTimeshiftAsync(viewerKey, upstream, secret, TimeshiftVideoArguments.Copy, LiveSessionKind.Remux)
+            var run = await StartFormatAwareAsync(channel, viewerKey, upstream, secret, limits, LiveSessionKind.Remux)
                 ?? throw new InvalidOperationException("Another stream for this viewer is starting.");
 
-            await WaitForFileAsync(viewerKey, run, SecondSegmentFileName);
             if (!_timeshiftCoordinator.IsActive(viewerKey) || !File.Exists(run.PlaylistPath))
             {
                 await _timeshiftCoordinator.StopAsync(viewerKey);
@@ -546,6 +501,63 @@ public class IptvManager : IIptvManager
             : null;
 
     private sealed record TimeshiftRun(Process Process, string SessionPath, string PlaylistPath, DateTime ReadyBy);
+
+    /// <summary>
+    /// Starts the ffmpeg session for a live channel and returns it once its second segment exists.
+    /// The video is copied when the player can play it and encoded to H.264 (deinterlaced) when it
+    /// can not. The channel's format is remembered, so only the first play of a channel whose format
+    /// is not yet known starts by copying and restarts when its first segment shows the player
+    /// can't take it. A player that sent no limits is assumed to take <see cref="LiveVideoLimits.Default"/>.
+    /// </summary>
+    private async Task<TimeshiftRun?> StartFormatAwareAsync(IptvChannel channel, Guid viewerKey, IptvUpstream upstream, string? secret, LiveVideoLimits? sent, LiveSessionKind kind)
+    {
+        var limits = LiveVideoLimits.Effective(sent);
+        var segmentSeconds = kind == LiveSessionKind.Remux ? LiveRemuxSegmentSeconds : LiveVideoDecision.TimeshiftSegmentSeconds;
+        var label = kind == LiveSessionKind.Remux ? "Live remux" : "Timeshift";
+
+        var known = StoredVideoFormat(channel);
+        var encode = known is not null && !LiveVideoDecision.Plays(known, limits)
+            ? LiveVideoDecision.EncodeFor(known, limits, segmentSeconds)
+            : null;
+        var video = encode is null ? TimeshiftVideoArguments.Copy : await _timeshiftVideo.EncodeArgumentsAsync(encode, onCpu: false);
+        if (video.Encodes && known is not null)
+        {
+            _logger.LogInformation("{Kind} of {Channel} encodes with {Encoder}: {Reason}.",
+                label, channel.Name, video.Encoder, LiveVideoDecision.Mismatch(known, limits));
+        }
+
+        var run = await LaunchTimeshiftAsync(viewerKey, upstream, secret, video, kind);
+        if (run is null) return null;
+
+        if (!video.Encodes)
+        {
+            var seen = await LearnVideoFormatAsync(channel, known, viewerKey, run);
+            if (encode is null && seen is not null && LiveVideoDecision.Mismatch(seen, limits) is { } reason)
+            {
+                encode = LiveVideoDecision.EncodeFor(seen, limits, segmentSeconds);
+                video = await _timeshiftVideo.EncodeArgumentsAsync(encode, onCpu: false);
+                if (video.Encodes)
+                {
+                    _logger.LogInformation("{Kind} of {Channel} restarts to encode with {Encoder}: {Reason}.", label, channel.Name, video.Encoder, reason);
+                    run = await LaunchTimeshiftAsync(viewerKey, upstream, secret, video, kind);
+                    if (run is null) return null;
+                }
+            }
+        }
+
+        await WaitForFileAsync(viewerKey, run, SecondSegmentFileName);
+
+        if (encode is not null && video.OnGpu && HasExited(run.Process) && !File.Exists(run.PlaylistPath))
+        {
+            _logger.LogWarning("{Kind} of {Channel} failed to encode with {Encoder}; retrying on the CPU.", label, channel.Name, video.Encoder);
+            video = await _timeshiftVideo.EncodeArgumentsAsync(encode, onCpu: true);
+            run = await LaunchTimeshiftAsync(viewerKey, upstream, secret, video, kind);
+            if (run is null) return null;
+            await WaitForFileAsync(viewerKey, run, SecondSegmentFileName);
+        }
+
+        return run;
+    }
 
     private async Task<TimeshiftRun?> LaunchTimeshiftAsync(Guid profileId, IptvUpstream upstream, string? secret, TimeshiftVideoArguments video, LiveSessionKind kind)
     {
@@ -702,7 +714,7 @@ public class IptvManager : IIptvManager
         args.Add("-ac"); args.Add("2");
         args.Add("-b:a"); args.Add("128k");
         args.Add("-f"); args.Add("hls");
-        args.Add("-hls_time"); args.Add("4");
+        args.Add("-hls_time"); args.Add((rollingWindow ? LiveRemuxSegmentSeconds : LiveVideoDecision.TimeshiftSegmentSeconds).ToString(System.Globalization.CultureInfo.InvariantCulture));
         if (rollingWindow)
         {
             args.Add("-hls_list_size"); args.Add(LiveRemuxWindowSegments.ToString(System.Globalization.CultureInfo.InvariantCulture));

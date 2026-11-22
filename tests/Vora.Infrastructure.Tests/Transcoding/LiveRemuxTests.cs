@@ -101,6 +101,62 @@ public sealed class LiveRemuxTests : IAsyncDisposable
         _tuners.ActiveCount(channel.PlaylistId).Should().Be(0);
     }
 
+    [Fact]
+    public async Task An_over_the_air_mpeg2_channel_is_encoded_to_h264_for_a_player_that_sent_no_limits()
+    {
+        Assert.SkipUnless(FfmpegTool.IsAvailable(), FfmpegTool.SkipReason);
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var channel = Serve(await Mpeg2SampleAsync(cancellationToken));
+        var upstream = new IptvUpstream(channel.StreamUrl, IptvRequestPolicy.None);
+
+        var url = await Manager().StartLiveRemuxAsync(channel, upstream, _viewer, connectionLimit: 1);
+
+        var segment = Path.Combine(SessionFolder(url), "seg_000.ts");
+        var format = await ReadFormatAsync(segment, cancellationToken);
+        format.Should().NotBeNull();
+        format!.Codec.Should().Be("h264");
+        format.Interlaced.Should().BeFalse("the encode deinterlaces");
+        await _repository.Received().UpdateChannelVideoFormatAsync(channel.Id, Arg.Is<LiveVideoFormat>(f => f.Codec == "mpeg2video"), Arg.Any<DateTime>());
+    }
+
+    [Fact]
+    public async Task An_mpeg2_channel_is_copied_for_a_player_that_says_it_takes_mpeg2()
+    {
+        Assert.SkipUnless(FfmpegTool.IsAvailable(), FfmpegTool.SkipReason);
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var channel = Serve(await Mpeg2SampleAsync(cancellationToken));
+        var upstream = new IptvUpstream(channel.StreamUrl, IptvRequestPolicy.None);
+
+        var url = await Manager().StartLiveRemuxAsync(channel, upstream, _viewer, connectionLimit: 1, new LiveVideoLimits(["h264", "mpeg2video"], null, null));
+
+        var format = await ReadFormatAsync(Path.Combine(SessionFolder(url), "seg_000.ts"), cancellationToken);
+        format!.Codec.Should().Be("mpeg2video");
+    }
+
+    [Fact]
+    public async Task A_remux_that_already_knows_the_channel_is_mpeg2_encodes_from_the_start()
+    {
+        Assert.SkipUnless(FfmpegTool.IsAvailable(), FfmpegTool.SkipReason);
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var channel = Serve(await Mpeg2SampleAsync(cancellationToken));
+        channel.VideoCodec = "mpeg2video";
+        channel.VideoHeight = 480;
+        channel.VideoFrameRate = 29.97;
+        channel.VideoInterlaced = true;
+        channel.VideoFormatSeenAt = DateTime.UtcNow;
+        var upstream = new IptvUpstream(channel.StreamUrl, IptvRequestPolicy.None);
+
+        var url = await Manager().StartLiveRemuxAsync(channel, upstream, _viewer, connectionLimit: 1);
+
+        var format = await ReadFormatAsync(Path.Combine(SessionFolder(url), "seg_000.ts"), cancellationToken);
+        format!.Codec.Should().Be("h264");
+        lock (_requests) _requests.Count.Should().Be(1, "a channel whose format is known is tuned once, not twice");
+    }
+
+    private static Task<LiveVideoFormat?> ReadFormatAsync(string segment, CancellationToken cancellationToken) =>
+        new TimeshiftVideo(Substitute.For<ISystemSettingsRepository>(), Substitute.For<IHardwareCapabilityService>(), NullLogger<TimeshiftVideo>.Instance)
+            .ReadFormatAsync(segment, cancellationToken);
+
     private IptvManager Manager()
     {
         var settings = Substitute.For<ISystemSettingsRepository>();
@@ -150,6 +206,19 @@ public sealed class LiveRemuxTests : IAsyncDisposable
             "-f", "lavfi", "-i", "sine=duration=48",
             "-c:v", "libx264", "-preset", "veryfast", "-g", "50",
             "-c:a", "aac", path);
+        return path;
+    }
+
+    // What an antenna tuner sends: interlaced MPEG-2 video and AC-3 audio in a transport stream.
+    private async Task<string> Mpeg2SampleAsync(CancellationToken cancellationToken)
+    {
+        var path = Path.Combine(_root, "mpeg2.ts");
+        if (File.Exists(path)) return path;
+        await FfmpegTool.RunAsync(cancellationToken,
+            "-f", "lavfi", "-i", "testsrc2=size=720x480:rate=30000/1001:duration=48",
+            "-f", "lavfi", "-i", "sine=duration=48",
+            "-c:v", "mpeg2video", "-flags", "+ilme+ildct", "-top", "1", "-g", "15", "-b:v", "3M",
+            "-c:a", "ac3", path);
         return path;
     }
 

@@ -27,6 +27,14 @@ public class TimeshiftVideoArgumentsTests
     }
 
     [Fact]
+    public void A_live_remux_encode_forces_a_keyframe_every_two_second_segment()
+    {
+        var arguments = TimeshiftVideoArgumentsBuilder.Build(new LiveVideoEncode(41, null, false, SegmentSeconds: 2), encoder: null);
+
+        arguments.Video.TakeLast(2).Should().Equal("-force_key_frames", "expr:gte(t,n_forced*2)");
+    }
+
+    [Fact]
     public void Nvenc_takes_the_chosen_gpu_and_makes_each_forced_keyframe_an_idr()
     {
         var arguments = TimeshiftVideoArgumentsBuilder.Build(Level41, new HardwareAccelerator(HardwareAccelerationType.Nvidia, "1", GpuVendor.Nvidia));

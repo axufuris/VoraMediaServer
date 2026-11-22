@@ -47,7 +47,7 @@ public sealed class PassthroughAudioStream : IDisposable
 
 public interface IIptvPassthroughService
 {
-    Task<PassthroughStartResult> StartPassthroughAsync(Guid channelId, Guid userId, Guid? profileId);
+    Task<PassthroughStartResult> StartPassthroughAsync(Guid channelId, Guid userId, Guid? profileId, LiveVideoLimits? limits = null);
     Task<PassthroughPlaylistResult?> GetRewrittenPlaylistAsync(string token);
     Task<HttpResponseMessage?> FetchSegmentAsync(string token, CancellationToken cancellationToken);
     Task<PassthroughAudioStream?> FetchAudioStreamAsync(string token, CancellationToken cancellationToken);
@@ -115,7 +115,7 @@ public class IptvPassthroughService : IIptvPassthroughService
 
     private sealed record StreamProbe(string Url, string Type, string? Format);
 
-    public async Task<PassthroughStartResult> StartPassthroughAsync(Guid channelId, Guid userId, Guid? profileId)
+    public async Task<PassthroughStartResult> StartPassthroughAsync(Guid channelId, Guid userId, Guid? profileId, LiveVideoLimits? limits = null)
     {
         var channel = await _repository.GetChannelWithPlaylistAsync(channelId)
             ?? throw new InvalidOperationException("Channel not found.");
@@ -138,7 +138,7 @@ public class IptvPassthroughService : IIptvPassthroughService
 
         if (NeedsRemux(channel.Kind, streamType))
         {
-            var remuxUrl = await _iptvManager.StartLiveRemuxAsync(channel, upstream with { Url = resolvedUrl }, viewerKey, limit);
+            var remuxUrl = await _iptvManager.StartLiveRemuxAsync(channel, upstream with { Url = resolvedUrl }, viewerKey, limit, limits);
             return new PassthroughStartResult
             {
                 Url = remuxUrl,

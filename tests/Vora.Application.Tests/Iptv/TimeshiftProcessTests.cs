@@ -33,8 +33,8 @@ public class TimeshiftProcessTests
             "-ac", "2",
             "-b:a", "128k",
             "-f", "hls",
-            "-hls_time", "4",
-            "-hls_list_size", "6",
+            "-hls_time", "2",
+            "-hls_list_size", "10",
             "-hls_flags", "delete_segments+temp_file",
             "-hls_segment_filename", Segments,
             Playlist);

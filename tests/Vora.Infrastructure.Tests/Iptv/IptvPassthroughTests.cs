@@ -287,6 +287,17 @@ public class IptvPassthroughTests
     }
 
     [Fact]
+    public async Task The_players_video_limits_reach_the_remux()
+    {
+        var channel = XtreamChannel(maxConnections: 2, extension: "ts");
+        var limits = new LiveVideoLimits(["h264", "mpeg2video"], 42, ["main", "high"]);
+
+        await Service().StartPassthroughAsync(channel.Id, _accountId, _profileId, limits);
+
+        await _manager.Received(1).StartLiveRemuxAsync(channel, Arg.Any<IptvUpstream>(), _profileId, 2, limits);
+    }
+
+    [Fact]
     public async Task A_tv_channel_sniffed_as_a_raw_stream_is_remuxed_too()
     {
         var channel = FreeRadioChannel();

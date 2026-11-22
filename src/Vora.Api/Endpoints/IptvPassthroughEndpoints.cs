@@ -12,6 +12,15 @@ namespace Vora.Api.Endpoints;
 public class StartPassthroughRequestDto
 {
     public Guid ChannelId { get; set; }
+
+    /// <summary>
+    /// What the player can play, as on a timeshift start (ffprobe codec names, H.264 level times ten,
+    /// H.264 profiles). All optional: a player that sends none is assumed to take the modern codecs
+    /// (h264, hevc, vp9, av1) and gets anything else, such as an over-the-air MPEG-2 channel, encoded to H.264.
+    /// </summary>
+    public List<string>? VideoCodecs { get; set; }
+    public int? MaxH264Level { get; set; }
+    public List<string>? H264Profiles { get; set; }
 }
 
 public static class IptvPassthroughEndpoints
@@ -41,7 +50,8 @@ public static class IptvPassthroughEndpoints
 
         try
         {
-            var result = await service.StartPassthroughAsync(request.ChannelId, accountId.Value, user.GetProfileId());
+            var limits = new LiveVideoLimits(request.VideoCodecs, request.MaxH264Level, request.H264Profiles);
+            var result = await service.StartPassthroughAsync(request.ChannelId, accountId.Value, user.GetProfileId(), limits);
             return Results.Ok(new PassthroughStartVM { Url = result.Url, StreamType = result.StreamType, AudioFormat = result.AudioFormat });
         }
         catch (UnauthorizedAccessException)
