@@ -135,15 +135,25 @@ public class MediaDedupeManager : IMediaDedupeManager
                     Type = item is Movie ? "Movie" : "Episode",
                     MediaKind = "video",
                     Resolution = groupResolutionLabel,
-                    Parts = bucket.Select(p => MapAndScoreVideoPart(p, settings))
-                        .OrderByDescending(p => p.QualityScore)
-                        .ToList(),
+                    Parts = Ranked(bucket.Select(p => MapAndScoreVideoPart(p, settings))),
                     EpisodesInFileNames = item is Episode ? DifferentEpisodesNamed(bucket.Select(p => p.FilePath)) : [],
                     YearsInFileNames = item is Movie ? MovieYears.Named(bucket.Select(p => p.FilePath)) : []
                 });
             }
         }
     }
+
+    /// <summary>
+    /// Best first. The score divides bitrate and size into whole steps, so two files of one codec
+    /// and rate often tie (928 and 945 kbps both score 9); ties go to the higher bitrate, then the
+    /// larger file, then the path, so the 'Best' pick is the same on every load.
+    /// </summary>
+    internal static List<DedupeItemVM> Ranked(IEnumerable<DedupeItemVM> parts) => parts
+        .OrderByDescending(p => p.QualityScore)
+        .ThenByDescending(p => p.Bitrate ?? 0)
+        .ThenByDescending(p => p.FileSizeBytes)
+        .ThenBy(p => p.FilePath, StringComparer.Ordinal)
+        .ToList();
 
     private static readonly EpisodeFileNames AutomaticEpisodeNames = new(null);
 
@@ -175,9 +185,7 @@ public class MediaDedupeManager : IMediaDedupeManager
             Type = "Track",
             MediaKind = "audio",
             Resolution = groupResolutionLabel,
-            Parts = eligibleParts.Select(p => MapAndScoreAudioPart(p, track, settings))
-                .OrderByDescending(p => p.QualityScore)
-                .ToList()
+            Parts = Ranked(eligibleParts.Select(p => MapAndScoreAudioPart(p, track, settings)))
         });
     }
 
