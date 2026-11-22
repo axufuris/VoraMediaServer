@@ -3,6 +3,7 @@ using System.Security.Cryptography;
 using System.Text;
 using System.Text.RegularExpressions;
 using System.Xml;
+using System.Xml.Linq;
 using Vora.Application.Iptv.Dtos;
 using Vora.Domain.Entities.Iptv;
 
@@ -24,10 +25,16 @@ internal static class XmlTvParser
 
     private static readonly Regex SeasonEpisodeRegex = new(@"[Ss](\d+)\s*[Ee](\d+)", RegexOptions.Compiled);
 
-    public static async Task<XmlTvParseStats> ParseAsync(Stream stream, List<IptvChannel> knownChannels, Dictionary<string, List<IptvProgramDto>> updatedCache, DateTime cutoffTime, DateTime maxFutureTime, CancellationToken cancellationToken)
+    /// <param name="tunerPlaylistIds">Playlists whose channels have no guide ids of their own (HDHomeRun tuners). Their channels are
+    /// also found by the number and call sign in the feed's display names; every other channel matches by id only.</param>
+    public static async Task<XmlTvParseStats> ParseAsync(Stream stream, List<IptvChannel> knownChannels, Dictionary<string, List<IptvProgramDto>> updatedCache, DateTime cutoffTime, DateTime maxFutureTime, CancellationToken cancellationToken, IReadOnlySet<Guid>? tunerPlaylistIds = null)
     {
         var idMap = BuildKnownIdMap(knownChannels);
         var stats = new XmlTvParseStats();
+        var tuners = tunerPlaylistIds is { Count: > 0 } ? knownChannels.Where(c => tunerPlaylistIds.Contains(c.PlaylistId)).ToList() : [];
+        var aliases = tuners.Count > 0 ? new TunerGuideAliases(tuners) : null;
+        var aliased = new Dictionary<string, List<string>>(StringComparer.OrdinalIgnoreCase);
+        var pendingChannels = new List<(string Id, List<string> Names)>();
 
         var xmlSettings = new XmlReaderSettings
         {
@@ -43,13 +50,52 @@ internal static class XmlTvParser
             if (cancellationToken.IsCancellationRequested) break;
             if (reader.NodeType != XmlNodeType.Element) continue;
 
-            if (reader.Name == "programme")
+            if (reader.Name == "channel" && aliases is not null)
             {
-                await ParseProgrammeElementAsync(reader, idMap, updatedCache, cutoffTime, maxFutureTime, stats);
+                if (await ReadChannelAsync(reader, cancellationToken) is { } channel) pendingChannels.Add(channel);
+            }
+            else if (reader.Name == "programme")
+            {
+                if (aliases is not null && pendingChannels.Count > 0)
+                {
+                    ResolveAliases(pendingChannels, idMap, aliases, aliased);
+                    pendingChannels.Clear();
+                }
+                await ParseProgrammeElementAsync(reader, idMap, aliased, updatedCache, cutoffTime, maxFutureTime, stats);
             }
         }
 
         return stats;
+    }
+
+    private static async Task<(string Id, List<string> Names)?> ReadChannelAsync(XmlReader reader, CancellationToken cancellationToken)
+    {
+        var id = reader.GetAttribute("id")?.Trim();
+        using var subtree = reader.ReadSubtree();
+        var element = await XElement.LoadAsync(subtree, LoadOptions.None, cancellationToken);
+        if (string.IsNullOrEmpty(id)) return null;
+
+        var names = element.Elements("display-name").Select(e => e.Value.Trim()).Where(n => n.Length > 0).ToList();
+        return (id, names);
+    }
+
+    // An XMLTV channel whose id matches nothing is looked for by its display names. The feed lists its channels
+    // before its programmes, so this runs when the first programme arrives and sees every channel: the ones that
+    // match by id claim their channels first, so a channel found by name never stacks on top of one found by id.
+    private static void ResolveAliases(List<(string Id, List<string> Names)> channels, Dictionary<string, List<string>> idMap, TunerGuideAliases aliases, Dictionary<string, List<string>> aliased)
+    {
+        var unmatched = new List<(string Id, List<string> Names)>();
+        foreach (var channel in channels)
+        {
+            if (idMap.TryGetValue(channel.Id, out var direct) || idMap.TryGetValue(NormalizeId(channel.Id), out direct)) aliases.Claim(channel.Id, direct);
+            else if (channel.Names.Count > 0) unmatched.Add(channel);
+        }
+
+        foreach (var (id, names) in unmatched)
+        {
+            var matched = aliases.Resolve(id, names);
+            if (matched.Count > 0) aliased[id] = matched;
+        }
     }
 
     private static Dictionary<string, List<string>> BuildKnownIdMap(List<IptvChannel> knownChannels)
@@ -101,27 +147,27 @@ internal static class XmlTvParser
         return atIndex > 0 ? id.Substring(0, atIndex) : id;
     }
 
-    private static async Task ParseProgrammeElementAsync(XmlReader reader, Dictionary<string, List<string>> idMap, Dictionary<string, List<IptvProgramDto>> updatedCache, DateTime cutoffTime, DateTime maxFutureTime, XmlTvParseStats stats)
+    private static async Task ParseProgrammeElementAsync(XmlReader reader, Dictionary<string, List<string>> idMap, Dictionary<string, List<string>> aliased, Dictionary<string, List<IptvProgramDto>> updatedCache, DateTime cutoffTime, DateTime maxFutureTime, XmlTvParseStats stats)
     {
         var xmlChannelId = reader.GetAttribute("channel")?.Trim();
         stats.ProgrammesSeen++;
 
         if (string.IsNullOrEmpty(xmlChannelId))
         {
-            await reader.SkipAsync();
+            await DiscardAsync(reader);
             return;
         }
 
         if (!idMap.TryGetValue(xmlChannelId, out var canonicalIds))
         {
             var normalized = NormalizeId(xmlChannelId);
-            if (string.IsNullOrEmpty(normalized) || !idMap.TryGetValue(normalized, out canonicalIds))
+            if ((string.IsNullOrEmpty(normalized) || !idMap.TryGetValue(normalized, out canonicalIds)) && !aliased.TryGetValue(xmlChannelId, out canonicalIds))
             {
                 if (stats.UnmatchedIdSamples.Count < XmlTvParseStats.UnmatchedSampleLimit)
                 {
                     stats.UnmatchedIdSamples.Add(xmlChannelId);
                 }
-                await reader.SkipAsync();
+                await DiscardAsync(reader);
                 return;
             }
         }
@@ -133,7 +179,7 @@ internal static class XmlTvParser
 
         if (stopTime < cutoffTime || startTime > maxFutureTime)
         {
-            await reader.SkipAsync();
+            await DiscardAsync(reader);
             return;
         }
 
@@ -166,6 +212,17 @@ internal static class XmlTvParser
 
             if (!updatedCache.ContainsKey(canonicalId)) updatedCache[canonicalId] = new List<IptvProgramDto>();
             updatedCache[canonicalId].Add(program);
+        }
+    }
+
+    // XmlReader.Skip moves to the node after the element, and the read loop then steps over that node as well, so the
+    // programme straight after a skipped one was lost. Reading the element through a subtree leaves the reader on the
+    // element itself, like the programmes that are parsed, and the loop's next read moves on exactly once.
+    private static async Task DiscardAsync(XmlReader reader)
+    {
+        using var subtree = reader.ReadSubtree();
+        while (await subtree.ReadAsync())
+        {
         }
     }
 

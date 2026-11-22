@@ -124,10 +124,12 @@ public class IptvEpgService : IIptvEpgService
             var resolver = scope.ServiceProvider.GetRequiredService<IIptvUpstreamResolver>();
 
             var sources = await repository.GetActiveEpgSourcesAsync(cancellationToken);
-            var providerGuides = (await repository.GetActivePlaylistsAsync(cancellationToken))
+            var activePlaylists = await repository.GetActivePlaylistsAsync(cancellationToken);
+            var providerGuides = activePlaylists
                 .Where(p => p.SourceType == IptvSourceType.Xtream && p.UseProviderGuide)
                 .OrderBy(p => p.AddedAt)
                 .ToList();
+            var tunerPlaylistIds = activePlaylists.Where(p => p.SourceType == IptvSourceType.HdHomeRun).Select(p => p.Id).ToHashSet();
             if (sources.Count == 0 && providerGuides.Count == 0)
             {
                 _logger.LogInformation("No active EPG sources configured — skipping sync.");
@@ -148,7 +150,7 @@ public class IptvEpgService : IIptvEpgService
 
             foreach (var source in sources)
             {
-                await SyncSourceAsync(repository, source, allChannels, mergedCache, claimedBy, cutoffTime, maxFutureTime, cancellationToken);
+                await SyncSourceAsync(repository, source, allChannels, tunerPlaylistIds, mergedCache, claimedBy, cutoffTime, maxFutureTime, cancellationToken);
             }
 
             foreach (var playlist in providerGuides)
@@ -231,6 +233,7 @@ public class IptvEpgService : IIptvEpgService
         IIptvRepository repository,
         IptvEpgSource source,
         List<IptvChannel> allChannels,
+        IReadOnlySet<Guid> tunerPlaylistIds,
         Dictionary<string, List<IptvProgramDto>> mergedCache,
         Dictionary<string, Guid> claimedBy,
         DateTime cutoffTime,
@@ -248,7 +251,7 @@ public class IptvEpgService : IIptvEpgService
             var stream = await response.Content.ReadAsStreamAsync(cancellationToken);
             stream = await DecompressIfNeededAsync(stream, IsGzip(source.XmlTvUrl, response), cancellationToken);
 
-            var stats = await XmlTvParser.ParseAsync(stream, allChannels, parsed, cutoffTime, maxFutureTime, cancellationToken);
+            var stats = await XmlTvParser.ParseAsync(stream, allChannels, parsed, cutoffTime, maxFutureTime, cancellationToken, tunerPlaylistIds);
 
             _syncStats[source.Id] = new IptvSourceSyncStats
             {
