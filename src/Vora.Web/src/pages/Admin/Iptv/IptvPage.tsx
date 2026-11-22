@@ -38,7 +38,7 @@ export default function IptvPage({ kind }: IptvPageProps) {
     const playlistNounPlural = isRadio ? 'Radio Playlists' : 'Live TV Playlists';
     const playlistDescription = isRadio
         ? 'A playlist is an M3U source or an Xtream Codes account that supplies radio stations.'
-        : 'A playlist is an M3U source or an Xtream Codes account that supplies channels. Programme guide data is layered on separately from EPG sources below.';
+        : 'A playlist is an M3U source, an Xtream Codes account or an HDHomeRun tuner that supplies channels. Programme guide data is layered on separately from EPG sources below.';
     const filteredFreePlaylists = FREE_PLAYLISTS.filter(p => p.defaultKind === kind);
 
     const [playlists, setPlaylists] = useState<IptvPlaylistVM[]>([]);
@@ -140,7 +140,7 @@ export default function IptvPage({ kind }: IptvPageProps) {
     };
 
     const changeSource = (patch: Partial<IptvSourceDraft>) => {
-        if (patch.sourceType === 'Xtream' && sourceDraft.sourceType !== 'Xtream') {
+        if ((patch.sourceType === 'Xtream' || patch.sourceType === 'HdHomeRun') && sourceDraft.sourceType !== patch.sourceType) {
             setEnableHealthCheck(false);
         }
         setSourceDraft(current => ({ ...current, ...patch }));

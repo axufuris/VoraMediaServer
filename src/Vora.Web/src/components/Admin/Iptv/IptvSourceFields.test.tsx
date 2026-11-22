@@ -81,6 +81,41 @@ describe('IptvSourceFields', () => {
         expect(onTest).toHaveBeenCalledOnce();
     });
 
+    it('offers an HDHomeRun tuner on Live TV and asks only for its address', () => {
+        render(<Harness />);
+
+        fireEvent.click(screen.getByRole('radio', { name: 'HDHomeRun tuner' }));
+
+        expect(screen.getByRole('radio', { name: 'HDHomeRun tuner' })).toHaveAttribute('aria-checked', 'true');
+        expect(screen.getByLabelText('Device address')).toBeInTheDocument();
+        expect(screen.queryByLabelText('Username')).not.toBeInTheDocument();
+        expect(screen.queryByLabelText('M3U URL')).not.toBeInTheDocument();
+        expect(screen.queryByRole('button', { name: 'Advanced' })).not.toBeInTheDocument();
+        expect(screen.queryByRole('checkbox', { name: /Use the provider's guide/ })).not.toBeInTheDocument();
+    });
+
+    it('does not offer a tuner for internet radio', () => {
+        render(<IptvSourceFields idPrefix="r" kind="Radio" draft={emptySourceDraft()} onChange={() => undefined} onTest={() => Promise.resolve({ succeeded: true, channelCount: 0 })} />);
+
+        expect(screen.queryByRole('radio', { name: 'HDHomeRun tuner' })).not.toBeInTheDocument();
+        expect(screen.getByRole('radio', { name: 'Xtream Codes account' })).toBeInTheDocument();
+    });
+
+    it('tests an HDHomeRun and reports its model, tuners and channels', async () => {
+        const onTest = vi.fn(() => Promise.resolve({ succeeded: true, accountStatus: 'HDHomeRun FLEX 4K (HDHR5-4K)', accountMaxConnections: 4, channelCount: 28 }));
+        render(<Harness initial={{ sourceType: 'HdHomeRun', serverUrl: '192.168.1.50' }} onTest={onTest} />);
+
+        fireEvent.click(screen.getByRole('button', { name: 'Test connection' }));
+
+        await waitFor(() => expect(screen.getByRole('status')).toHaveTextContent('Connected · HDHomeRun FLEX 4K (HDHR5-4K) · 4 tuners · 28 channels'));
+    });
+
+    it('cannot be tested until the HDHomeRun has an address', () => {
+        render(<Harness initial={{ sourceType: 'HdHomeRun' }} />);
+
+        expect(screen.getByRole('button', { name: 'Test connection' })).toBeDisabled();
+    });
+
     it('cannot be tested until the account is complete', () => {
         render(<Harness initial={{ sourceType: 'Xtream', serverUrl: 'provider.example.com', username: 'viewer' }} />);
 

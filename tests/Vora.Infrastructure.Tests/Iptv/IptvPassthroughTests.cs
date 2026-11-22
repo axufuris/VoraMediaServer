@@ -85,6 +85,21 @@ public class IptvPassthroughTests
         return channel;
     }
 
+    private IptvChannel TunerChannel(int tuners = 2)
+    {
+        var playlist = new IptvPlaylist
+        {
+            Name = "Antenna",
+            SourceType = IptvSourceType.HdHomeRun,
+            ServerUrl = "http://192.168.1.50",
+            AccountMaxConnections = tuners,
+            TunerProfile = new IptvTunerProfile()
+        };
+        var channel = new IptvChannel { ExternalChannelId = "7.1", Name = "WABC-HD", StreamUrl = "http://192.168.1.50:5004/auto/v7.1", PlaylistId = playlist.Id, Playlist = playlist };
+        _repository.GetChannelWithPlaylistAsync(channel.Id).Returns(channel);
+        return channel;
+    }
+
     private static string Token(string url) => url[(url.IndexOf("t=", StringComparison.Ordinal) + 2)..];
 
     [Fact]
@@ -295,6 +310,22 @@ public class IptvPassthroughTests
         await Service().StartPassthroughAsync(channel.Id, _accountId, _profileId, limits);
 
         await _manager.Received(1).StartLiveRemuxAsync(channel, Arg.Any<IptvUpstream>(), _profileId, 2, limits);
+    }
+
+    [Fact]
+    public async Task A_tuner_channel_is_remuxed_without_opening_its_stream_to_sniff_it()
+    {
+        var channel = TunerChannel(tuners: 2);
+
+        var start = await Service().StartPassthroughAsync(channel.Id, _accountId, _profileId);
+
+        start.StreamType.Should().Be(IptvPassthroughService.StreamTypeHls);
+        _upstream.Requests.Should().BeEmpty("opening an HDHomeRun stream tunes the channel, and the remux opens it next");
+        await _manager.Received(1).StartLiveRemuxAsync(
+            channel,
+            Arg.Is<IptvUpstream>(u => u.Url == "http://192.168.1.50:5004/auto/v7.1"),
+            _profileId,
+            2);
     }
 
     [Fact]

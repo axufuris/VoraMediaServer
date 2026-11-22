@@ -134,4 +134,58 @@ public class IptvChannelLoaderTests
         request.Headers.Contains("Referer").Should().BeFalse();
         request.Headers.UserAgent.ToString().Should().Be("DefaultAgent/1.0");
     }
+
+    private static IptvPlaylist HdHomeRun(string address = HdHomeRunFixtures.Address) => new()
+    {
+        Name = "Antenna",
+        SourceType = IptvSourceType.HdHomeRun,
+        ServerUrl = "http://" + address
+    };
+
+    [Fact]
+    public async Task An_hdhomerun_loads_its_lineup_and_its_tuner_count_without_a_login()
+    {
+        _upstream.On(uri => uri.AbsolutePath == "/discover.json", HdHomeRunFixtures.Discover)
+            .On(uri => uri.AbsolutePath == "/lineup.json", HdHomeRunFixtures.Lineup);
+
+        var load = await Loader().LoadAsync(HdHomeRun(), TestContext.Current.CancellationToken);
+
+        load.Device!.TunerCount.Should().Be(4);
+        load.Account.Should().BeNull();
+        load.Channels.Select(c => c.ExternalChannelId).Should().Equal("2.1", "7.1", "11.1");
+        _upstream.Requests.Select(r => r.RequestUri!.ToString()).Should().Equal("http://192.168.1.50/discover.json", "http://192.168.1.50/lineup.json");
+        _upstream.Requests.Should().OnlyContain(r => r.Headers.Authorization == null);
+    }
+
+    [Fact]
+    public async Task A_device_without_discover_json_still_gives_its_channels()
+    {
+        _upstream.On(uri => uri.AbsolutePath == "/discover.json", "", status: HttpStatusCode.NotFound)
+            .On(uri => uri.AbsolutePath == "/lineup.json", HdHomeRunFixtures.Lineup);
+
+        var load = await Loader().LoadAsync(HdHomeRun(), TestContext.Current.CancellationToken);
+
+        load.Device.Should().Be(new HdHomeRunDevice("HDHomeRun", null, null, null));
+        load.Channels.Should().HaveCount(3);
+    }
+
+    [Fact]
+    public async Task A_device_that_cannot_be_reached_is_a_readable_error()
+    {
+        _upstream.Fail(_ => true, new HttpRequestException("No route to host"));
+
+        var act = async () => await Loader().LoadAsync(HdHomeRun(), TestContext.Current.CancellationToken);
+
+        await act.Should().ThrowAsync<IptvSourceException>().WithMessage("The provider could not be reached*");
+        _upstream.Requests.Should().ContainSingle("an unreachable device is not asked for its lineup as well");
+    }
+
+    [Fact]
+    public async Task An_hdhomerun_with_no_address_is_refused_before_any_request()
+    {
+        var act = async () => await Loader().LoadAsync(new IptvPlaylist { Name = "Antenna", SourceType = IptvSourceType.HdHomeRun }, TestContext.Current.CancellationToken);
+
+        await act.Should().ThrowAsync<IptvSourceException>().WithMessage("*needs its address*");
+        _upstream.Requests.Should().BeEmpty();
+    }
 }

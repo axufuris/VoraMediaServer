@@ -3,6 +3,17 @@ import HealthBadge from '../Primitives/HealthBadge';
 import { describeSource, formatAccountDate } from './iptvSourceDraft';
 
 export function AccountBadges({ playlist }: { playlist: IptvPlaylistVM }) {
+    if (playlist.sourceType === 'HdHomeRun') {
+        const tuners = playlist.accountMaxConnections;
+        if (!playlist.accountStatus && !tuners) return null;
+        return (
+            <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
+                {playlist.accountStatus && <HealthBadge tone="neutral" showDot={false}>{playlist.accountStatus}</HealthBadge>}
+                {tuners ? <HealthBadge tone="neutral" showDot={false}>{tuners} {tuners === 1 ? 'tuner' : 'tuners'}</HealthBadge> : null}
+            </div>
+        );
+    }
+
     if (playlist.sourceType !== 'Xtream' || !playlist.accountStatus) return null;
 
     const active = playlist.accountStatus.toLowerCase() === 'active';
@@ -19,7 +30,7 @@ export function AccountBadges({ playlist }: { playlist: IptvPlaylistVM }) {
 }
 
 export default function PlaylistSourceCell({ playlist }: { playlist: IptvPlaylistVM }) {
-    const isXtream = playlist.sourceType === 'Xtream';
+    const isXtream = playlist.sourceType !== 'M3u';
     return (
         <div className="min-w-0">
             <div className={`break-all text-sm text-[var(--vora-text-secondary)] ${isXtream ? '' : 'font-mono'}`}>{describeSource(playlist)}</div>

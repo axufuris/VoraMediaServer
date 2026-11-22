@@ -177,30 +177,31 @@ public class IptvManager : IIptvManager
             password = _upstreamResolver.PasswordFor(candidate);
 
             var load = await _channelLoader.LoadAsync(candidate, cancellationToken);
-            return TestResult(null, load.Account, load.Channels.Count);
+            return TestResult(null, load.Account, load.Channels.Count, load.Device);
         }
         catch (XtreamAccountException ex)
         {
-            return TestResult(ex.Message, ex.Account, 0);
+            return TestResult(ex.Message, ex.Account, 0, null);
         }
         catch (Exception ex) when (ex is IptvSourceException or ArgumentException)
         {
-            return TestResult(IptvUrlRedactor.Redact(ex.Message, password, settings.NewPassword), null, 0);
+            return TestResult(IptvUrlRedactor.Redact(ex.Message, password, settings.NewPassword), null, 0, null);
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
             _logger.LogWarning("Testing the IPTV source {Name} failed with {ErrorType}: {Error}", settings.Name, ex.GetType().Name, IptvUrlRedactor.Redact(ex.Message, password, settings.NewPassword));
-            return TestResult("The source could not be read. The server log has the details.", null, 0);
+            return TestResult("The source could not be read. The server log has the details.", null, 0, null);
         }
     }
 
-    private static IptvConnectionTestVM TestResult(string? error, XtreamAccountInfo? account, int channelCount) => new()
+    // A tuner reports through the account fields: its name and model as the status, its tuner count as the connections.
+    private static IptvConnectionTestVM TestResult(string? error, XtreamAccountInfo? account, int channelCount, HdHomeRunDevice? device) => new()
     {
         Succeeded = error is null,
         Error = error,
-        AccountStatus = account?.Status,
+        AccountStatus = device is null ? account?.Status : device.Model is null ? device.Name : $"{device.Name} ({device.Model})",
         AccountExpiresAt = account?.ExpiresAt,
-        AccountMaxConnections = account?.MaxConnections,
+        AccountMaxConnections = device is null ? account?.MaxConnections : device.TunerCount,
         ChannelCount = channelCount
     };
 
@@ -425,6 +426,7 @@ public class IptvManager : IIptvManager
             {
                 await _timeshiftCoordinator.StopAsync(profileId);
                 _tunerRegistry.Release(leaseKey);
+                if (TunerIsBusy(run, channel)) return null;
                 throw new InvalidOperationException("FFmpeg failed to generate the stream playlist in time. The stream source may be dead or incompatible.");
             }
 
@@ -471,6 +473,7 @@ public class IptvManager : IIptvManager
             if (!_timeshiftCoordinator.IsActive(viewerKey) || !File.Exists(run.PlaylistPath))
             {
                 await _timeshiftCoordinator.StopAsync(viewerKey);
+                if (TunerIsBusy(run, channel)) throw new TunerLimitReachedException();
                 throw new IptvSourceException("The channel's stream could not be read.");
             }
 
@@ -500,7 +503,19 @@ public class IptvManager : IIptvManager
             ? new LiveVideoFormat(codec, channel.VideoProfile, channel.VideoLevel, channel.VideoHeight, channel.VideoFrameRate, channel.VideoInterlaced ?? false)
             : null;
 
-    private sealed record TimeshiftRun(Process Process, string SessionPath, string PlaylistPath, DateTime ReadyBy);
+    private sealed class RunDiagnostics
+    {
+        public volatile bool UpstreamBusy;
+    }
+
+    private sealed record TimeshiftRun(Process Process, string SessionPath, string PlaylistPath, DateTime ReadyBy, RunDiagnostics Diagnostics);
+
+    // What ffmpeg prints when the upstream answers 503. A tuner answers that when every tuner is in use.
+    internal static bool IsUpstreamBusy(string ffmpegLine) =>
+        ffmpegLine.Contains("HTTP error 503", StringComparison.OrdinalIgnoreCase);
+
+    private static bool TunerIsBusy(TimeshiftRun run, IptvChannel channel) =>
+        run.Diagnostics.UpstreamBusy && channel.Playlist is { SourceType: IptvSourceType.HdHomeRun };
 
     /// <summary>
     /// Starts the ffmpeg session for a live channel and returns it once its second segment exists.
@@ -574,16 +589,18 @@ public class IptvManager : IIptvManager
             TryDeleteDirectory(sessionPath);
             return null;
         }
+        var diagnostics = new RunDiagnostics();
         process.ErrorDataReceived += (_, line) =>
         {
             if (!string.IsNullOrWhiteSpace(line.Data))
             {
+                if (IsUpstreamBusy(line.Data)) diagnostics.UpstreamBusy = true;
                 _logger.LogDebug("Timeshift ffmpeg for profile {ProfileId}: {Output}", profileId, IptvUrlRedactor.Redact(line.Data, secret));
             }
         };
         process.Start();
         process.BeginErrorReadLine();
-        return new TimeshiftRun(process, sessionPath, outputPath, DateTime.UtcNow + InitializationTimeout);
+        return new TimeshiftRun(process, sessionPath, outputPath, DateTime.UtcNow + InitializationTimeout, diagnostics);
     }
 
     private async Task<LiveVideoFormat?> LearnVideoFormatAsync(IptvChannel channel, LiveVideoFormat? known, Guid profileId, TimeshiftRun run)
@@ -745,6 +762,11 @@ public class IptvManager : IIptvManager
             if (load.Account is not null)
             {
                 IptvPlaylistSettings.RecordAccount(playlist, load.Account, DateTime.UtcNow);
+            }
+
+            if (load.Device is not null)
+            {
+                IptvPlaylistSettings.RecordDevice(playlist, load.Device, DateTime.UtcNow);
             }
 
             playlist.LastError = null;

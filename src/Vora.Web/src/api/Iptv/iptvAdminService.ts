@@ -2,7 +2,7 @@ import { apiClient } from '../client';
 
 export type IptvChannelKind = 'Tv' | 'Radio';
 
-export type IptvSourceType = 'M3u' | 'Xtream';
+export type IptvSourceType = 'M3u' | 'Xtream' | 'HdHomeRun';
 
 export interface IptvChannelVM {
     id: string;

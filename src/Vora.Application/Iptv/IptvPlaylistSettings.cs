@@ -56,6 +56,16 @@ public static class IptvPlaylistSettings
         playlist.CountryFilter = NormalizeCountryFilter(settings.CountryFilter);
         playlist.EnableHealthCheck = settings.EnableHealthCheck;
 
+        if (playlist.SourceType == IptvSourceType.HdHomeRun)
+        {
+            // A tuner has no login, only carries live TV, and every health probe would tune a channel.
+            playlist.Username = null;
+            playlist.PasswordCiphertext = null;
+            playlist.M3uUrl = null;
+            playlist.DefaultChannelKind = IptvChannelKind.Tv;
+            playlist.EnableHealthCheck = false;
+        }
+
         if (playlist.TunerProfile == null)
         {
             playlist.TunerProfile = new IptvTunerProfile { PlaylistId = playlist.Id, MaxConcurrentStreams = Math.Max(settings.MaxConcurrentStreams, 0) };
@@ -67,7 +77,9 @@ public static class IptvPlaylistSettings
 
         Validate(playlist);
 
-        if (playlist.SourceType != IptvSourceType.Xtream)
+        // A tuner's model and tuner count live in the same fields as an account's, and are read again
+        // by the channel sync that every address change triggers, so they are kept until then.
+        if (playlist.SourceType == IptvSourceType.M3u || before.SourceType != playlist.SourceType)
         {
             ForgetAccount(playlist);
         }
@@ -94,6 +106,15 @@ public static class IptvPlaylistSettings
         playlist.AccountCheckedAt = checkedAt;
     }
 
+    public static void RecordDevice(IptvPlaylist playlist, HdHomeRunDevice device, DateTime checkedAt)
+    {
+        var label = device.Model is null ? device.Name : $"{device.Name} ({device.Model})";
+        playlist.AccountStatus = label.Length <= 32 ? label : label[..32];
+        playlist.AccountExpiresAt = null;
+        playlist.AccountMaxConnections = device.TunerCount;
+        playlist.AccountCheckedAt = checkedAt;
+    }
+
     public static string? NormalizeCountryFilter(string? value)
     {
         if (string.IsNullOrWhiteSpace(value)) return null;
@@ -103,6 +124,12 @@ public static class IptvPlaylistSettings
 
     private static void Validate(IptvPlaylist playlist)
     {
+        if (playlist.SourceType == IptvSourceType.HdHomeRun)
+        {
+            if (string.IsNullOrEmpty(playlist.ServerUrl)) throw new ArgumentException("An HDHomeRun needs its address, such as 192.168.1.50.");
+            return;
+        }
+
         if (playlist.SourceType == IptvSourceType.Xtream)
         {
             if (string.IsNullOrEmpty(playlist.ServerUrl)) throw new ArgumentException("An Xtream Codes account needs the server address.");

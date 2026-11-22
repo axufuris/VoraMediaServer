@@ -20,7 +20,7 @@ public static class IptvPlaylistView
 
     public static string ClientM3uUrl(IptvPlaylist playlist)
     {
-        var address = playlist.SourceType == IptvSourceType.Xtream ? playlist.ServerUrl : playlist.M3uUrl;
+        var address = playlist.SourceType == IptvSourceType.M3u ? playlist.M3uUrl : playlist.ServerUrl;
         return IptvUrlRedactor.SchemeAndHost(address) ?? PlaylistReferenceScheme + playlist.Id;
     }
 
