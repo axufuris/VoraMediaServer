@@ -13,7 +13,11 @@ public class DvrPostProcessingArgumentsTests
 
     private static ServerSetting Settings(int x264Preset = 2, int hevc = 0) => new() { BackgroundX264Preset = x264Preset, EnableHevcEncoding = hevc };
 
-    private static List<string> Expected(params string[] middle) => ["-i", Input, .. middle, .. AudioAndOutput.Split(' '), Output];
+    private const string Deinterlace = "yadif=deint=interlaced";
+
+    private static List<string> ExpectedWith(string filter, params string[] middle) => ["-i", Input, "-vf", filter, .. middle, .. AudioAndOutput.Split(' '), Output];
+
+    private static List<string> Expected(params string[] middle) => ExpectedWith(Deinterlace, middle);
 
     [Fact]
     public void Without_a_gpu_the_recording_encodes_with_x264()
@@ -50,7 +54,7 @@ public class DvrPostProcessingArgumentsTests
         DvrPostProcessingWorker.BuildFfmpegArgs(Input, Output, Settings(), vaapi)
             .Should().Equal([
                 "-init_hw_device", "vaapi=va:/dev/dri/renderD129", "-filter_hw_device", "va",
-                .. Expected("-vf", "format=nv12,hwupload", "-c:v", "h264_vaapi", "-qp", "28")]);
+                .. ExpectedWith($"{Deinterlace},format=nv12,hwupload", "-c:v", "h264_vaapi", "-qp", "28")]);
     }
 
     [Fact]

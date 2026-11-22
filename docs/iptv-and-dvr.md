@@ -112,6 +112,8 @@ The DVR Dashboard groups sessions into three tabs (`Completed`, `Upcoming`, `Fai
 
 `PostProcessing` and `DetectingCommercials` recordings have finished but aren't ready yet; playback is disabled until they reach `Completed`. The dashboard used to look for `Post-Processing` and `Completed (Partial)`, names the server never sends, so processing recordings fell into the Failed tab.
 
+**Recordings are deinterlaced.** A recording is the channel's stream copied to a transport stream, then `DvrPostProcessingWorker` converts it to MP4 (`BuildFfmpegArgs`). An antenna channel is usually interlaced MPEG-2 (1080i, 480i), and an MP4 that kept the fields combs on every movement, so the conversion runs `yadif=deint=interlaced` (on the CPU, before a GPU encoder takes the frames, and before the upload for VAAPI). It touches only frames flagged interlaced, so a progressive channel, or a broadcast that switches between 1080i and 720p, comes out frame for frame as it would without the filter. A conversion with video transcoding turned off is a plain remux and can't deinterlace. `DvrPostProcessingDeinterlaceTests` (real ffmpeg, skipped without it) checks a combed MPEG-2 sample comes out progressive and a progressive one is unchanged.
+
 **Playback is owner-only.** `POST /api/streaming/dvr/play/{sessionId}` signs a file URL only for an admin or the account that owns the recording's schedule (`DvrEndpoints.CallerOwnsSession`, the same rule as delete and cancel-series); anyone else gets a 404.
 
 ## Series recording vs single
