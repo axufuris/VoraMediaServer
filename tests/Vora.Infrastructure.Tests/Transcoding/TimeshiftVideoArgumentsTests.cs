@@ -13,6 +13,16 @@ public class TimeshiftVideoArgumentsTests
     private static readonly LiveVideoEncode Level41 = new(41, null, false);
 
     [Fact]
+    public void An_encode_that_does_not_know_the_scan_type_deinterlaces_only_the_frames_flagged_interlaced()
+    {
+        var unknown = TimeshiftVideoArgumentsBuilder.Build(new LiveVideoEncode(41, 1080, Deinterlace: true, OnlyFlaggedFrames: true), encoder: null);
+        var known = TimeshiftVideoArgumentsBuilder.Build(new LiveVideoEncode(41, 1080, Deinterlace: true), encoder: null);
+
+        unknown.Video.Take(2).Should().Equal("-vf", "yadif=deint=interlaced,scale=-2:'min(ih,1080)'");
+        known.Video.Take(2).Should().Equal("-vf", "yadif,scale=-2:'min(ih,1080)'");
+    }
+
+    [Fact]
     public void The_cpu_encodes_h264_high_at_the_planned_level_with_a_keyframe_every_segment()
     {
         var arguments = TimeshiftVideoArgumentsBuilder.Build(Level41, encoder: null);

@@ -500,7 +500,7 @@ public class IptvManager : IIptvManager
 
     internal static LiveVideoFormat? StoredVideoFormat(IptvChannel channel) =>
         channel.VideoCodec is { } codec
-            ? new LiveVideoFormat(codec, channel.VideoProfile, channel.VideoLevel, channel.VideoHeight, channel.VideoFrameRate, channel.VideoInterlaced ?? false)
+            ? new LiveVideoFormat(codec, channel.VideoProfile, channel.VideoLevel, channel.VideoHeight, channel.VideoFrameRate, channel.VideoInterlaced)
             : null;
 
     private sealed class RunDiagnostics

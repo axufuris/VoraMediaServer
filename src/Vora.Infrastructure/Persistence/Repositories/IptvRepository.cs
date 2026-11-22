@@ -170,6 +170,7 @@ public class IptvRepository : IIptvRepository
                 existing.Referer = newChan.Referer;
                 existing.Resolution = newChan.Resolution;
                 existing.CountryCode = newChan.CountryCode;
+                HintVideoCodec(existing, newChan);
 
                 if (!existing.KindOverriddenByAdmin)
                 {
@@ -227,6 +228,19 @@ public class IptvRepository : IIptvRepository
     private const int VideoFormatTextLength = 32;
 
     private static string Clip(string text) => text.Length <= VideoFormatTextLength ? text : text[..VideoFormatTextLength];
+
+    // A codec the provider's own channel list names (an HDHomeRun lineup says MPEG2) fills in a channel whose
+    // format isn't known yet and replaces one that names another codec, so the first play of an antenna
+    // channel doesn't have to start copying to find out. It never replaces what playback measured for the
+    // same codec: that has the profile, level, size and scan type as well.
+    private static void HintVideoCodec(IptvChannel channel, IptvChannel incoming)
+    {
+        if (incoming.VideoCodec is not { } hinted) return;
+        if (string.Equals(channel.VideoCodec, hinted, StringComparison.OrdinalIgnoreCase)) return;
+
+        ForgetVideoFormat(channel);
+        channel.VideoCodec = hinted;
+    }
 
     private static void ForgetVideoFormat(IptvChannel channel)
     {

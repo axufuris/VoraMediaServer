@@ -92,4 +92,64 @@ public class IptvChannelVideoFormatTests
             VideoFormatSeenAt = (DateTime?)null,
         });
     }
+
+    private static IptvChannel Hinted(Guid playlistId, string codec)
+    {
+        var channel = Channel(playlistId, "https://iptv.example.com/action24.ts");
+        channel.VideoCodec = codec;
+        return channel;
+    }
+
+    [Fact]
+    public async Task A_codec_the_lineup_names_fills_in_a_channel_that_has_no_format_yet()
+    {
+        await using var db = NewContext();
+        var playlist = new IptvPlaylist { Name = "Tuner", M3uUrl = "x" };
+        var channel = Channel(playlist.Id, "https://iptv.example.com/action24.ts");
+        db.AddRange(playlist, channel);
+        await db.SaveChangesAsync(TestContext.Current.CancellationToken);
+
+        await new IptvRepository(db).UpdateChannelsAsync(playlist.Id, [Hinted(playlist.Id, "mpeg2video")]);
+
+        (await ChannelAsync(channel.Id)).Should().BeEquivalentTo(new { VideoCodec = "mpeg2video", VideoProfile = (string?)null, VideoInterlaced = (bool?)null, VideoFormatSeenAt = (DateTime?)null });
+    }
+
+    [Fact]
+    public async Task A_codec_the_lineup_names_does_not_replace_what_playback_measured_for_the_same_codec()
+    {
+        var (playlistId, channelId) = await SeedAsync();
+
+        await using (var db = NewContext())
+        {
+            await new IptvRepository(db).UpdateChannelsAsync(playlistId, [Hinted(playlistId, "H264".ToLowerInvariant())]);
+        }
+
+        (await ChannelAsync(channelId)).Should().BeEquivalentTo(new { VideoCodec = "h264", VideoProfile = "High 10", VideoLevel = (int?)51, VideoFormatSeenAt = (DateTime?)SeenAt });
+    }
+
+    [Fact]
+    public async Task A_codec_the_lineup_names_replaces_a_measured_format_of_another_codec()
+    {
+        var (playlistId, channelId) = await SeedAsync();
+
+        await using (var db = NewContext())
+        {
+            await new IptvRepository(db).UpdateChannelsAsync(playlistId, [Hinted(playlistId, "mpeg2video")]);
+        }
+
+        (await ChannelAsync(channelId)).Should().BeEquivalentTo(new { VideoCodec = "mpeg2video", VideoProfile = (string?)null, VideoLevel = (int?)null, VideoHeight = (int?)null, VideoInterlaced = (bool?)null, VideoFormatSeenAt = (DateTime?)null });
+    }
+
+    [Fact]
+    public async Task A_lineup_that_names_no_codec_leaves_the_measured_format_alone()
+    {
+        var (playlistId, channelId) = await SeedAsync();
+
+        await using (var db = NewContext())
+        {
+            await new IptvRepository(db).UpdateChannelsAsync(playlistId, [Channel(playlistId, "https://iptv.example.com/action24.ts")]);
+        }
+
+        (await ChannelAsync(channelId)).VideoCodec.Should().Be("h264");
+    }
 }

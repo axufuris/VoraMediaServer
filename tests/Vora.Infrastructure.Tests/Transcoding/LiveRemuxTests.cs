@@ -154,6 +154,38 @@ public sealed class LiveRemuxTests : IAsyncDisposable
         lock (_requests) _requests.Count.Should().Be(1, "a channel whose format is known is tuned once, not twice");
     }
 
+    [Fact]
+    public async Task A_channel_known_only_by_the_codec_its_lineup_named_is_tuned_once_and_comes_out_deinterlaced_h264()
+    {
+        Assert.SkipUnless(FfmpegTool.IsAvailable(), FfmpegTool.SkipReason);
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var channel = Serve(await Mpeg2SampleAsync(cancellationToken));
+        channel.VideoCodec = "mpeg2video";
+        var upstream = new IptvUpstream(channel.StreamUrl, IptvRequestPolicy.None);
+
+        var url = await Manager().StartLiveRemuxAsync(channel, upstream, _viewer, connectionLimit: 1);
+
+        var format = await ReadFormatAsync(Path.Combine(SessionFolder(url), "seg_000.ts"), cancellationToken);
+        format!.Codec.Should().Be("h264");
+        lock (_requests) _requests.Count.Should().Be(1, "the lineup said the channel is MPEG-2, so nothing had to be tuned to find out");
+        await _repository.DidNotReceive().UpdateChannelVideoFormatAsync(channel.Id, Arg.Any<LiveVideoFormat>(), Arg.Any<DateTime>());
+    }
+
+    [Fact]
+    public async Task A_channel_known_only_by_codec_is_copied_for_a_player_that_takes_it_and_then_known_in_full()
+    {
+        Assert.SkipUnless(FfmpegTool.IsAvailable(), FfmpegTool.SkipReason);
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var channel = Serve(await Mpeg2SampleAsync(cancellationToken));
+        channel.VideoCodec = "mpeg2video";
+        var upstream = new IptvUpstream(channel.StreamUrl, IptvRequestPolicy.None);
+
+        var url = await Manager().StartLiveRemuxAsync(channel, upstream, _viewer, connectionLimit: 1, new LiveVideoLimits(["h264", "mpeg2video"], null, null));
+
+        (await ReadFormatAsync(Path.Combine(SessionFolder(url), "seg_000.ts"), cancellationToken))!.Codec.Should().Be("mpeg2video");
+        await _repository.Received().UpdateChannelVideoFormatAsync(channel.Id, Arg.Is<LiveVideoFormat>(f => f.Codec == "mpeg2video" && f.Interlaced == true && f.Height == 480), Arg.Any<DateTime>());
+    }
+
     private static Task<LiveVideoFormat?> ReadFormatAsync(string segment, CancellationToken cancellationToken) =>
         new TimeshiftVideo(Substitute.For<ISystemSettingsRepository>(), Substitute.For<IHardwareCapabilityService>(), NullLogger<TimeshiftVideo>.Instance)
             .ReadFormatAsync(segment, cancellationToken);
