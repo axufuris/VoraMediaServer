@@ -43,6 +43,36 @@ public class LiveVideoDecisionTests
     }
 
     [Fact]
+    public void A_player_that_sent_nothing_is_assumed_to_take_the_modern_codecs_and_not_mpeg2()
+    {
+        var limits = LiveVideoLimits.Effective(None);
+
+        limits.Should().BeSameAs(LiveVideoLimits.Default);
+        LiveVideoDecision.Plays(H264("High 10", 51), limits).Should().BeTrue();
+        LiveVideoDecision.Plays(new LiveVideoFormat("hevc", "Main 10", 153, 2160, 50, false), limits).Should().BeTrue();
+        LiveVideoDecision.Plays(new LiveVideoFormat("mpeg2video", "Main", 8, 1080, 29.97, true), limits).Should().BeFalse();
+        LiveVideoDecision.Plays(new LiveVideoFormat("mpeg4", "Simple", 1, 480, 25, false), limits).Should().BeFalse();
+        LiveVideoDecision.Plays(new LiveVideoFormat("vc1", "Advanced", 3, 1080, 25, false), limits).Should().BeFalse();
+    }
+
+    [Fact]
+    public void A_player_that_sent_limits_keeps_them_and_null_means_nothing_was_sent()
+    {
+        LiveVideoLimits.Effective(Roku).Should().BeSameAs(Roku);
+        LiveVideoLimits.Effective(null).Should().BeSameAs(LiveVideoLimits.Default);
+    }
+
+    [Fact]
+    public void An_encode_for_a_live_remux_carries_its_shorter_segment_length()
+    {
+        var format = new LiveVideoFormat("mpeg2video", "Main", 8, 1080, 29.97, true);
+
+        LiveVideoDecision.EncodeFor(format, LiveVideoLimits.Default).SegmentSeconds.Should().Be(4);
+        LiveVideoDecision.EncodeFor(format, LiveVideoLimits.Default, segmentSeconds: 2).SegmentSeconds.Should().Be(2);
+        LiveVideoDecision.EncodeFor(format, LiveVideoLimits.Default).Deinterlace.Should().BeTrue();
+    }
+
+    [Fact]
     public void A_codec_the_player_doesnt_list_is_encoded()
     {
         LiveVideoDecision.Mismatch(new LiveVideoFormat("mpeg2video", "Main", 8, 576, 25, true), Roku).Should().Be("the player doesn't take mpeg2video");
