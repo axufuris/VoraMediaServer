@@ -1,10 +1,12 @@
 import { apiClient } from '../client';
 import { serverVault } from '../../utils/serverVault';
 import { StorageKeys } from '../../utils/storageKeys';
+import type { LiveVideoLimits } from '../../utils/liveVideoLimits';
 
 export const timeshiftService = {
-    startTimeshift: async (channelId: string, serverId?: string): Promise<{ url: string }> => {
-        const response = await apiClient.post<{ url: string }>('/iptv/timeshift/start', { channelId }, { serverId });
+    // limits: what the player takes, sent for a TV channel. A radio start is the channel alone.
+    startTimeshift: async (channelId: string, serverId?: string, limits?: LiveVideoLimits): Promise<{ url: string }> => {
+        const response = await apiClient.post<{ url: string }>('/iptv/timeshift/start', { channelId, ...limits }, { serverId });
         return response.data;
     },
 
