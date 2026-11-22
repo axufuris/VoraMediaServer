@@ -124,6 +124,21 @@ public class IptvPlaylistViewTests
         JsonSerializer.Serialize(view).Should().NotContain("ciphertext");
     }
 
+    [Fact]
+    public void Clients_see_only_the_scheme_and_host_of_a_tuner_and_never_a_stream_address()
+    {
+        var playlist = new IptvPlaylist { Name = "Antenna", SourceType = IptvSourceType.HdHomeRun, ServerUrl = "http://192.168.1.50", AccountMaxConnections = 4, AccountStatus = "HDHomeRun FLEX 4K" };
+        playlist.Channels.Add(new IptvChannel { ExternalChannelId = "7.1", Name = "WABC-HD", StreamUrl = "http://192.168.1.50:5004/auto/v7.1", PlaylistId = playlist.Id });
+
+        var view = IptvPlaylistView.ForClient(playlist);
+
+        view.M3uUrl.Should().Be("http://192.168.1.50");
+        view.ServerUrl.Should().BeNull();
+        view.AccountStatus.Should().BeNull();
+        view.Channels.Single().StreamUrl.Should().StartWith("vora-channel:");
+        view.ConnectionLimit.Should().Be(4);
+    }
+
     [Theory]
     [InlineData(0, null, 0)]
     [InlineData(0, 2, 2)]

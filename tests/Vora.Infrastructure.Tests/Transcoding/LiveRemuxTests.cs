@@ -9,6 +9,7 @@ using Vora.Application.Tasks;
 using Vora.Application.Users;
 using Vora.Domain.Entities.Iptv;
 using Vora.Domain.Entities.Settings;
+using Vora.Domain.Enums;
 using Vora.Infrastructure.Transcoding;
 
 namespace Vora.Infrastructure.Tests.Transcoding;
@@ -209,6 +210,33 @@ public sealed class LiveRemuxTests : IAsyncDisposable
         return path;
     }
 
+    [Fact]
+    public async Task A_tuner_that_answers_503_is_reported_as_all_tuners_in_use_and_frees_the_lease()
+    {
+        Assert.SkipUnless(FfmpegTool.IsAvailable(), FfmpegTool.SkipReason);
+        var channel = ServeStatus(503);
+        channel.Playlist = new IptvPlaylist { Name = "Antenna", SourceType = IptvSourceType.HdHomeRun, ServerUrl = "http://127.0.0.1" };
+        var upstream = new IptvUpstream(channel.StreamUrl, IptvRequestPolicy.None);
+
+        var act = async () => await Manager().StartLiveRemuxAsync(channel, upstream, _viewer, connectionLimit: 1);
+
+        await act.Should().ThrowAsync<TunerLimitReachedException>();
+        _tuners.ActiveCount(channel.PlaylistId).Should().Be(0);
+        _coordinator.IsActive(_viewer).Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task A_503_from_an_ordinary_provider_is_a_dead_stream_not_a_busy_tuner()
+    {
+        Assert.SkipUnless(FfmpegTool.IsAvailable(), FfmpegTool.SkipReason);
+        var channel = ServeStatus(503);
+        var upstream = new IptvUpstream(channel.StreamUrl, IptvRequestPolicy.None);
+
+        var act = async () => await Manager().StartLiveRemuxAsync(channel, upstream, _viewer, connectionLimit: 1);
+
+        await act.Should().ThrowAsync<IptvSourceException>();
+    }
+
     // What an antenna tuner sends: interlaced MPEG-2 video and AC-3 audio in a transport stream.
     private async Task<string> Mpeg2SampleAsync(CancellationToken cancellationToken)
     {
@@ -239,6 +267,53 @@ public sealed class LiveRemuxTests : IAsyncDisposable
         };
         _repository.GetChannelWithPlaylistAsync(channel.Id).Returns(channel);
         return channel;
+    }
+
+    private IptvChannel ServeStatus(int status)
+    {
+        _listener = new TcpListener(IPAddress.Loopback, 0);
+        _listener.Start();
+        var port = ((IPEndPoint)_listener.LocalEndpoint).Port;
+        _ = AcceptStatusAsync(_listener, status, _serving.Token);
+
+        var channel = new IptvChannel
+        {
+            ExternalChannelId = "7.1",
+            Name = "WABC-HD",
+            StreamUrl = $"http://127.0.0.1:{port}/auto/v7.1",
+            PlaylistId = Guid.NewGuid()
+        };
+        _repository.GetChannelWithPlaylistAsync(channel.Id).Returns(channel);
+        return channel;
+    }
+
+    private static async Task AcceptStatusAsync(TcpListener listener, int status, CancellationToken cancellationToken)
+    {
+        while (!cancellationToken.IsCancellationRequested)
+        {
+            TcpClient client;
+            try
+            {
+                client = await listener.AcceptTcpClientAsync(cancellationToken);
+            }
+            catch (Exception ex) when (ex is OperationCanceledException or SocketException or ObjectDisposedException)
+            {
+                return;
+            }
+
+            using (client)
+            {
+                try
+                {
+                    var network = client.GetStream();
+                    await ReadRequestAsync(network, cancellationToken);
+                    await network.WriteAsync(Encoding.ASCII.GetBytes($"HTTP/1.1 {status} Service Unavailable\r\nX-HDHomeRun-Error: 805\r\nContent-Length: 0\r\nConnection: close\r\n\r\n"), cancellationToken);
+                }
+                catch (Exception ex) when (ex is IOException or SocketException or OperationCanceledException or ObjectDisposedException)
+                {
+                }
+            }
+        }
     }
 
     private async Task AcceptAsync(TcpListener listener, byte[] stream, CancellationToken cancellationToken)

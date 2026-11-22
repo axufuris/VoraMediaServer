@@ -52,6 +52,17 @@ public class IptvSourceAvailabilityTests
     }
 
     [Fact]
+    public async Task An_hdhomerun_with_an_address_makes_live_tv_available_before_its_first_sync()
+    {
+        var tuner = new IptvPlaylist { Id = Guid.NewGuid(), Name = "Antenna", SourceType = IptvSourceType.HdHomeRun, DefaultChannelKind = IptvChannelKind.Tv, ServerUrl = "http://192.168.1.50" };
+
+        var availability = await AvailabilityAsync(tuner);
+
+        availability.Tv.Should().BeTrue();
+        availability.Radio.Should().BeFalse();
+    }
+
+    [Fact]
     public async Task Tv_channels_make_live_tv_available_and_leave_radio_alone()
     {
         var playlist = Playlist(IptvChannelKind.Tv);

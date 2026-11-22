@@ -129,7 +129,11 @@ public class IptvPassthroughService : IIptvPassthroughService
         var upstream = _resolver.Resolve(playlist, channel);
         var limit = playlist is null ? 0 : IptvConnectionLimit.Of(playlist);
 
-        var (resolvedUrl, streamType, format) = await ResolveStreamAsync(upstream.Url, upstream.Policy, channel.Name, depth: 0);
+        // A tuner's stream is raw MPEG-TS and opening it tunes the channel, so it is not opened just to be sniffed.
+        var probe = playlist is { SourceType: IptvSourceType.HdHomeRun }
+            ? new StreamProbe(upstream.Url, StreamTypeAudio, null)
+            : await ResolveStreamAsync(upstream.Url, upstream.Policy, channel.Name, depth: 0);
+        var (resolvedUrl, streamType, format) = probe;
         var audioFormat = channel.Kind == IptvChannelKind.Tv ? null : format;
 
         var viewerKey = profileId ?? Guid.NewGuid();

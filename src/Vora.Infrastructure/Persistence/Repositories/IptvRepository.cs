@@ -94,7 +94,7 @@ public class IptvRepository : IIptvRepository
                 .AsNoTracking()
                 .AnyAsync(c => playlistIds.Contains(c.PlaylistId) && c.Kind == kind && !c.IsHiddenByAdmin, cancellationToken)
             || playlists.Any(p => p.DefaultChannelKind == kind
-                && (p.SourceType == IptvSourceType.Xtream ? !string.IsNullOrWhiteSpace(p.ServerUrl) : !string.IsNullOrWhiteSpace(p.M3uUrl)));
+                && (p.SourceType == IptvSourceType.M3u ? !string.IsNullOrWhiteSpace(p.M3uUrl) : !string.IsNullOrWhiteSpace(p.ServerUrl)));
 
         return (await HasSourceAsync(IptvChannelKind.Tv), await HasSourceAsync(IptvChannelKind.Radio));
     }

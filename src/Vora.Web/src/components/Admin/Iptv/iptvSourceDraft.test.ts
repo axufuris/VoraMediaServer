@@ -51,6 +51,40 @@ describe('sourceRequestFields', () => {
     });
 });
 
+describe('HDHomeRun source', () => {
+    const tuner = { ...emptySourceDraft(), sourceType: 'HdHomeRun' as const, serverUrl: ' 192.168.1.50 ', username: 'left over', userAgent: 'left over', referer: 'left over', password: { value: 'left over', clear: false, editing: true } };
+
+    it('sends only its address, with no login or headers left over from another source', () => {
+        expect(sourceRequestFields(tuner)).toEqual({
+            sourceType: 'HdHomeRun',
+            m3uUrl: '',
+            serverUrl: '192.168.1.50',
+            username: '',
+            newPassword: null,
+            clearPassword: true,
+            userAgent: '',
+            referer: '',
+            useProviderGuide: true,
+        });
+    });
+
+    it('asks for the address and nothing else', () => {
+        expect(missingSourceField({ ...tuner, serverUrl: ' ' }, false)).toBe("Enter the HDHomeRun's address.");
+        expect(missingSourceField(tuner, false)).toBeNull();
+    });
+
+    it('is named by its host', () => {
+        expect(describeSource({ sourceType: 'HdHomeRun', serverUrl: 'http://192.168.1.50' } as IptvPlaylistVM)).toBe('HDHomeRun · 192.168.1.50');
+    });
+
+    it('sums up a working tuner in tuners, not connections', () => {
+        expect(describeTestResult({ succeeded: true, accountStatus: 'HDHomeRun CONNECT (HDHR3-US)', accountMaxConnections: 2, channelCount: 18 }, 'channels', 'HdHomeRun'))
+            .toBe('Connected · HDHomeRun CONNECT (HDHR3-US) · 2 tuners · 18 channels');
+        expect(describeTestResult({ succeeded: true, accountMaxConnections: 1, channelCount: 1 }, 'channels', 'HdHomeRun'))
+            .toBe('Connected · 1 tuner · 1 channels');
+    });
+});
+
 describe('missingSourceField', () => {
     it('asks for everything an Xtream account needs', () => {
         const draft = { ...emptySourceDraft(), sourceType: 'Xtream' as const };

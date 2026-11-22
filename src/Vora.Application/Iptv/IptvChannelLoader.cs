@@ -4,7 +4,7 @@ using Vora.Domain.Enums;
 
 namespace Vora.Application.Iptv;
 
-public sealed record IptvChannelLoad(List<IptvChannel> Channels, XtreamAccountInfo? Account);
+public sealed record IptvChannelLoad(List<IptvChannel> Channels, XtreamAccountInfo? Account, HdHomeRunDevice? Device = null);
 
 public interface IIptvChannelLoader
 {
@@ -27,6 +27,11 @@ public class IptvChannelLoader : IIptvChannelLoader
         if (playlist.SourceType == IptvSourceType.Xtream)
         {
             return await LoadXtreamAsync(playlist, cancellationToken);
+        }
+
+        if (playlist.SourceType == IptvSourceType.HdHomeRun)
+        {
+            return await LoadHdHomeRunAsync(playlist, cancellationToken);
         }
 
         if (string.IsNullOrWhiteSpace(playlist.M3uUrl))
@@ -61,6 +66,29 @@ public class IptvChannelLoader : IIptvChannelLoader
         var extension = XtreamParser.PreferredExtension(info.AllowedOutputFormats);
         var channels = XtreamParser.ParseLiveStreams(streams, playlist.Id, playlist.DefaultChannelKind, categories, extension);
         return new IptvChannelLoad(channels, info);
+    }
+
+    private async Task<IptvChannelLoad> LoadHdHomeRunAsync(IptvPlaylist playlist, CancellationToken cancellationToken)
+    {
+        var address = XtreamAccount.NormalizeServerUrl(playlist.ServerUrl)
+            ?? throw new IptvSourceException("The HDHomeRun needs its address, such as 192.168.1.50.");
+        var device = new Uri(address);
+        var policy = _resolver.PolicyFor(playlist);
+
+        // Older firmware answers discover.json with an HTTP error; the lineup alone still gives the channels.
+        // A device that cannot be reached at all is not asked twice.
+        HdHomeRunDevice? info = null;
+        try
+        {
+            info = HdHomeRunParser.ParseDevice(await GetStringAsync($"{address}/{HdHomeRunParser.DiscoverPath}", policy, cancellationToken));
+        }
+        catch (IptvSourceException ex) when (ex.InnerException is null)
+        {
+        }
+
+        var lineup = await GetStringAsync($"{address}/{HdHomeRunParser.LineupPath}", policy, cancellationToken);
+        var channels = HdHomeRunParser.ParseLineup(lineup, playlist.Id, device);
+        return new IptvChannelLoad(channels, null, info ?? new HdHomeRunDevice("HDHomeRun", null, null, null));
     }
 
     private async Task<string> GetStringAsync(string url, IptvRequestPolicy policy, CancellationToken cancellationToken)

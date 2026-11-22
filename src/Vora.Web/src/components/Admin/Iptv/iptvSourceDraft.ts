@@ -40,16 +40,17 @@ export function draftFromPlaylist(playlist: IptvPlaylistVM): IptvSourceDraft {
 }
 
 export function sourceRequestFields(draft: IptvSourceDraft): IptvSourceRequestFields {
-    const isXtream = draft.sourceType === 'Xtream';
+    const usesServer = draft.sourceType !== 'M3u';
+    const isTuner = draft.sourceType === 'HdHomeRun';
     return {
         sourceType: draft.sourceType,
-        m3uUrl: isXtream ? '' : draft.m3uUrl.trim(),
-        serverUrl: isXtream ? draft.serverUrl.trim() : '',
-        username: draft.username.trim(),
-        newPassword: draft.password.clear || draft.password.value.length === 0 ? null : draft.password.value,
-        clearPassword: draft.password.clear,
-        userAgent: draft.userAgent.trim(),
-        referer: draft.referer.trim(),
+        m3uUrl: usesServer ? '' : draft.m3uUrl.trim(),
+        serverUrl: usesServer ? draft.serverUrl.trim() : '',
+        username: isTuner ? '' : draft.username.trim(),
+        newPassword: isTuner || draft.password.clear || draft.password.value.length === 0 ? null : draft.password.value,
+        clearPassword: isTuner || draft.password.clear,
+        userAgent: isTuner ? '' : draft.userAgent.trim(),
+        referer: isTuner ? '' : draft.referer.trim(),
         useProviderGuide: draft.useProviderGuide,
     };
 }
@@ -60,6 +61,9 @@ export function hasPassword(draft: IptvSourceDraft, passwordIsSet: boolean): boo
 }
 
 export function missingSourceField(draft: IptvSourceDraft, passwordIsSet: boolean): string | null {
+    if (draft.sourceType === 'HdHomeRun') {
+        return draft.serverUrl.trim() ? null : "Enter the HDHomeRun's address.";
+    }
     if (draft.sourceType === 'Xtream') {
         if (!draft.serverUrl.trim()) return 'Enter the server address.';
         if (!draft.username.trim()) return 'Enter the username.';
@@ -72,6 +76,7 @@ export function missingSourceField(draft: IptvSourceDraft, passwordIsSet: boolea
 }
 
 export function hasAdvancedValues(draft: IptvSourceDraft, passwordIsSet: boolean): boolean {
+    if (draft.sourceType === 'HdHomeRun') return false;
     return draft.userAgent.trim().length > 0
         || draft.referer.trim().length > 0
         || (draft.sourceType === 'M3u' && (draft.username.trim().length > 0 || passwordIsSet));
@@ -101,6 +106,7 @@ export function hostOf(url: string | null | undefined): string {
 }
 
 export function describeSource(playlist: IptvPlaylistVM): string {
+    if (playlist.sourceType === 'HdHomeRun') return `HDHomeRun · ${hostOf(playlist.serverUrl)}`;
     if (playlist.sourceType === 'Xtream') {
         const host = hostOf(playlist.serverUrl);
         return playlist.username ? `Xtream Codes · ${host} · ${playlist.username}` : `Xtream Codes · ${host}`;
@@ -114,8 +120,16 @@ export function formatAccountDate(value: string | null | undefined): string | nu
     return Number.isNaN(date.getTime()) ? null : date.toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' });
 }
 
-export function describeTestResult(result: IptvConnectionTestVM, unit: string): string {
+export function describeTestResult(result: IptvConnectionTestVM, unit: string, sourceType?: IptvSourceType): string {
     if (!result.succeeded) return result.error ?? 'The source could not be read.';
+    if (sourceType === 'HdHomeRun') {
+        const tuners = result.accountMaxConnections;
+        const device = ['Connected'];
+        if (result.accountStatus) device.push(result.accountStatus);
+        if (tuners) device.push(`${tuners} ${tuners === 1 ? 'tuner' : 'tuners'}`);
+        device.push(`${result.channelCount.toLocaleString()} ${unit}`);
+        return device.join(' · ');
+    }
     const parts = ['Connected'];
     if (result.accountStatus) parts.push(`account ${result.accountStatus.toLowerCase()}`);
     const expiry = formatAccountDate(result.accountExpiresAt);

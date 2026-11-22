@@ -192,6 +192,105 @@ public class IptvProviderManagerTests
         _upstream.Requests[0].RequestUri!.Query.Should().Contain("password=example-password");
     }
 
+    private static IptvPlaylistSettingsDto TunerSettings(string name = "Antenna", string address = "192.168.1.50") => new()
+    {
+        Name = name,
+        SourceType = IptvSourceType.HdHomeRun,
+        ServerUrl = address,
+        Username = "ignored",
+        NewPassword = "ignored",
+        M3uUrl = "https://ignored.example.com/list.m3u",
+        EnableHealthCheck = true,
+        DefaultChannelKind = IptvChannelKind.Radio
+    };
+
+    private void ServeTuner() =>
+        _upstream.On(uri => uri.AbsolutePath == "/discover.json", HdHomeRunFixtures.Discover)
+            .On(uri => uri.AbsolutePath == "/lineup.json", HdHomeRunFixtures.Lineup);
+
+    [Fact]
+    public async Task Adding_an_hdhomerun_records_its_tuners_as_the_connection_limit_and_keeps_it_a_login_free_tv_source()
+    {
+        ServeTuner();
+        IptvPlaylist? saved = null;
+        await _repo.AddPlaylistAsync(Arg.Do<IptvPlaylist>(p => saved = p));
+
+        var view = await _manager.AddPlaylistAsync(TunerSettings());
+
+        saved!.ServerUrl.Should().Be("http://192.168.1.50");
+        saved.Username.Should().BeNull();
+        saved.PasswordCiphertext.Should().BeNull();
+        saved.M3uUrl.Should().BeNull();
+        saved.EnableHealthCheck.Should().BeFalse("a health probe would tune every channel");
+        saved.DefaultChannelKind.Should().Be(IptvChannelKind.Tv);
+        saved.AccountMaxConnections.Should().Be(4);
+        saved.AccountStatus.Should().Be("HDHomeRun FLEX 4K (HDHR5-4K)");
+        view.ConnectionLimit.Should().Be(4);
+        await _repo.Received(1).UpdateChannelsAsync(saved.Id, Arg.Is<List<IptvChannel>>(c => c.Count == 3));
+    }
+
+    [Fact]
+    public async Task Renaming_an_hdhomerun_keeps_what_it_reported_and_does_not_reload_the_channels()
+    {
+        var playlist = new IptvPlaylist
+        {
+            Name = "Antenna",
+            SourceType = IptvSourceType.HdHomeRun,
+            ServerUrl = "http://192.168.1.50",
+            AccountMaxConnections = 4,
+            AccountStatus = "HDHomeRun FLEX 4K (HDHR5-4K)",
+            TunerProfile = new IptvTunerProfile()
+        };
+        _repo.GetPlaylistByIdAsync(playlist.Id).Returns(playlist);
+
+        await _manager.UpdatePlaylistAsync(playlist.Id, new IptvPlaylistSettingsDto { Name = "Living room", ServerUrl = "192.168.1.50", DefaultChannelKind = IptvChannelKind.Tv });
+
+        playlist.Name.Should().Be("Living room");
+        playlist.AccountMaxConnections.Should().Be(4);
+        playlist.AccountStatus.Should().Be("HDHomeRun FLEX 4K (HDHR5-4K)");
+        await _repo.DidNotReceiveWithAnyArgs().UpdateChannelsAsync(default, default!);
+    }
+
+    [Fact]
+    public async Task An_hdhomerun_without_an_address_is_refused()
+    {
+        var act = async () => await _manager.AddPlaylistAsync(TunerSettings(address: ""));
+
+        await act.Should().ThrowAsync<ArgumentException>().WithMessage("*needs its address*");
+    }
+
+    [Fact]
+    public async Task Testing_an_hdhomerun_reports_its_model_tuners_and_channels()
+    {
+        ServeTuner();
+
+        var result = await _manager.TestConnectionAsync(TunerSettings(), existingId: null, TestContext.Current.CancellationToken);
+
+        result.Succeeded.Should().BeTrue();
+        result.AccountStatus.Should().Be("HDHomeRun FLEX 4K (HDHR5-4K)");
+        result.AccountMaxConnections.Should().Be(4);
+        result.ChannelCount.Should().Be(3);
+    }
+
+    [Fact]
+    public async Task Testing_an_address_that_is_not_a_tuner_says_so()
+    {
+        _upstream.On(_ => true, "<html>router</html>", "text/html");
+
+        var result = await _manager.TestConnectionAsync(TunerSettings(), existingId: null, TestContext.Current.CancellationToken);
+
+        result.Succeeded.Should().BeFalse();
+        result.Error.Should().Contain("not like an HDHomeRun");
+    }
+
+    [Fact]
+    public void A_busy_tuner_line_is_recognised_from_ffmpeg_s_message_and_other_lines_are_not()
+    {
+        IptvManager.IsUpstreamBusy("[http @ 0x649a3d788540] HTTP error 503 Service Unavailable").Should().BeTrue();
+        IptvManager.IsUpstreamBusy("[in#0 @ 0x649a3d7c7200] Error opening input: Server returned 5XX Server Error reply").Should().BeFalse();
+        IptvManager.IsUpstreamBusy("[http @ 0x1] HTTP error 404 Not Found").Should().BeFalse();
+    }
+
     [Fact]
     public async Task A_failed_test_explains_itself()
     {

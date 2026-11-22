@@ -14,6 +14,7 @@ interface IptvSourceFieldsProps {
 const SOURCE_OPTIONS: { value: IptvSourceType; label: string }[] = [
     { value: 'M3u', label: 'M3U playlist' },
     { value: 'Xtream', label: 'Xtream Codes account' },
+    { value: 'HdHomeRun', label: 'HDHomeRun tuner' },
 ];
 
 const FILL_BUTTON = 'cursor-pointer rounded-[var(--vora-radius-md)] transition-colors hover:bg-[var(--vora-accent-soft)] hover:text-[var(--vora-accent-text)] focus-visible:bg-[var(--vora-accent-soft)] focus-visible:text-[var(--vora-accent-text)] focus-visible:outline-none';
@@ -26,10 +27,12 @@ function FieldHint({ children }: { children: ReactNode }) {
     return <p className="mt-1.5 text-xs text-[var(--vora-text-muted)]">{children}</p>;
 }
 
-function SourceSelector({ idPrefix, value, onChange }: { idPrefix: string; value: IptvSourceType; onChange: (value: IptvSourceType) => void }) {
+function SourceSelector({ idPrefix, value, kind, onChange }: { idPrefix: string; value: IptvSourceType; kind: IptvChannelKind; onChange: (value: IptvSourceType) => void }) {
+    // A tuner only carries live TV.
+    const options = SOURCE_OPTIONS.filter(option => option.value !== 'HdHomeRun' || kind === 'Tv');
     return (
         <div role="radiogroup" aria-labelledby={`${idPrefix}-source-label`} className="inline-flex flex-wrap gap-1 rounded-[var(--vora-radius-md)] border border-[var(--vora-border-strong)] bg-[var(--vora-bg-sunken)] p-1">
-            {SOURCE_OPTIONS.map(option => {
+            {options.map(option => {
                 const selected = option.value === value;
                 return (
                     <button
@@ -86,6 +89,7 @@ function PasswordField({ id, label, isSet, draft, onChange, placeholder }: { id:
 export default function IptvSourceFields({ idPrefix, kind, draft, onChange, passwordIsSet = false, onTest }: IptvSourceFieldsProps) {
     const id = (name: string) => `${idPrefix}-${name}`;
     const isXtream = draft.sourceType === 'Xtream';
+    const isTuner = draft.sourceType === 'HdHomeRun';
     const unit = kind === 'Radio' ? 'stations' : 'channels';
     const [showAdvanced, setShowAdvanced] = useState(() => hasAdvancedValues(draft, passwordIsSet));
     const [testing, setTesting] = useState(false);
@@ -103,7 +107,7 @@ export default function IptvSourceFields({ idPrefix, kind, draft, onChange, pass
         setTestResult(null);
         try {
             const result = await onTest();
-            setTestResult({ ok: result.succeeded, message: describeTestResult(result, unit) });
+            setTestResult({ ok: result.succeeded, message: describeTestResult(result, unit, draft.sourceType) });
         } catch {
             setTestResult({ ok: false, message: 'The test could not be run. Check the fields and try again.' });
         } finally {
@@ -115,10 +119,16 @@ export default function IptvSourceFields({ idPrefix, kind, draft, onChange, pass
         <div className="flex flex-col gap-4">
             <div>
                 <span id={id('source-label')} className="mb-1.5 block text-xs font-bold uppercase tracking-widest text-[var(--vora-text-muted)]">Source</span>
-                <SourceSelector idPrefix={idPrefix} value={draft.sourceType} onChange={value => change({ sourceType: value })} />
+                <SourceSelector idPrefix={idPrefix} value={draft.sourceType} kind={kind} onChange={value => change({ sourceType: value })} />
             </div>
 
-            {isXtream ? (
+            {isTuner ? (
+                <div>
+                    <FieldLabel htmlFor={id('device')}>Device address</FieldLabel>
+                    <input id={id('device')} type="text" value={draft.serverUrl} onChange={e => change({ serverUrl: e.target.value })} className="vora-input font-mono text-sm" placeholder="192.168.1.50" autoComplete="off" />
+                    <FieldHint>The HDHomeRun&apos;s address on your network: an IP address, or a name like hdhomerun.local. Vora reads the channel list from it and tunes a channel only while someone watches. The tuners are shared with every other app that uses the device, so a channel can fail to start when they are all busy.</FieldHint>
+                </div>
+            ) : isXtream ? (
                 <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
                     <div className="md:col-span-3">
                         <FieldLabel htmlFor={id('server')}>Server address</FieldLabel>
@@ -151,7 +161,7 @@ export default function IptvSourceFields({ idPrefix, kind, draft, onChange, pass
                 </label>
             )}
 
-            <div>
+            {!isTuner && <div>
                 <button
                     type="button"
                     aria-expanded={showAdvanced}
@@ -185,7 +195,7 @@ export default function IptvSourceFields({ idPrefix, kind, draft, onChange, pass
                         <p className="text-xs text-[var(--vora-text-muted)] md:col-span-2">Only if the provider asks for them. A channel that names its own in the playlist keeps it.</p>
                     </div>
                 )}
-            </div>
+            </div>}
 
             <div className="flex flex-wrap items-center gap-3">
                 <button type="button" onClick={test} disabled={testing || missing !== null} className="vora-button-secondary !px-3 !py-1.5 text-xs disabled:cursor-not-allowed disabled:opacity-50">
