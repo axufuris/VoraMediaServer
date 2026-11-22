@@ -7,6 +7,7 @@ import { iptvClientService, type IptvProgramDto } from '../../api/Iptv/iptvClien
 import { dvrService, type IptvRecordingSessionVM } from '../../api/Iptv/dvrService';
 import { timeshiftService } from '../../api/Iptv/timeshiftService';
 import { passthroughService } from '../../api/Iptv/passthroughService';
+import { liveVideoLimits } from '../../utils/liveVideoLimits';
 import { serverVault } from '../../utils/serverVault';
 import { StorageKeys } from '../../utils/storageKeys';
 import { profileIdForServer, userIdForServer } from '../../api/client';
@@ -145,7 +146,7 @@ export default function LiveTvPlayer() {
             const activeServer = serverVault.getActiveServer();
             let passthroughUrl: string;
             try {
-                const data = await passthroughService.startPassthrough(currentMedia.id, activeServer?.id);
+                const data = await passthroughService.startPassthrough(currentMedia.id, activeServer?.id, liveVideoLimits());
                 if (!isMounted) return;
                 passthroughUrl = `${import.meta.env.VITE_API_URL || ''}${data.url}`;
             } catch (err) {
@@ -191,7 +192,7 @@ export default function LiveTvPlayer() {
 
             try {
                 const activeServer = serverVault.getActiveServer();
-                const data = await timeshiftService.startTimeshift(currentMedia.id, activeServer?.id);
+                const data = await timeshiftService.startTimeshift(currentMedia.id, activeServer?.id, liveVideoLimits());
                 if (!isMounted) return;
 
                 const finalUrl = `${import.meta.env.VITE_API_URL || ''}${data.url}`;
