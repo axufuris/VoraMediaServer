@@ -39,7 +39,7 @@ public class IptvManagerTests
         var protector = new PlainSecretProtector();
 
         _manager = new IptvManager(_repo, _epg, _users, _tasks, _timeshift, _tunerRegistry, _signer, Substitute.For<ITimeshiftVideo>(),
-            _loader, new IptvUpstreamResolver(protector), protector, NullLogger<IptvManager>.Instance);
+            Substitute.For<IEncodeSlots>(), _loader, new IptvUpstreamResolver(protector), protector, NullLogger<IptvManager>.Instance);
     }
 
     [Fact]

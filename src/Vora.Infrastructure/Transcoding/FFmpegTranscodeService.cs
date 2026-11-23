@@ -32,14 +32,23 @@ public class FFmpegTranscodeService : ITranscodeService
 
     private readonly IServiceProvider _serviceProvider;
     private readonly IHardwareCapabilityService _hardware;
+    private readonly IEncodeSlots _slots;
     private readonly ILogger<FFmpegTranscodeService> _logger;
 
-    public FFmpegTranscodeService(IServiceProvider serviceProvider, IHardwareCapabilityService hardware, ILogger<FFmpegTranscodeService> logger)
+    public FFmpegTranscodeService(IServiceProvider serviceProvider, IHardwareCapabilityService hardware, IEncodeSlots slots, ILogger<FFmpegTranscodeService> logger)
     {
         _serviceProvider = serviceProvider;
         _hardware = hardware;
+        _slots = slots;
         _logger = logger;
     }
+
+    /// <summary>The video encodes running now, other than the one for <paramref name="except"/> (a seek restarting a transcode doesn't count itself).</summary>
+    internal static IReadOnlyList<RunningEncode> RunningEncodes(Guid except) =>
+        _activeTranscodes
+            .Where(running => running.Key != except && running.Value.EncodesVideo)
+            .Select(running => new RunningEncode(running.Value.IsGpu))
+            .ToList();
 
     public async Task<string> StartTranscodeSessionAsync(string sourceFilePath, string outputDirectory, PlaybackDecisionVM decision, CancellationToken cancellationToken = default)
     {
@@ -80,10 +89,11 @@ public class FFmpegTranscodeService : ITranscodeService
         try
         {
             bool encodesVideo = !CopiesVideo(decision);
-            var others = _activeTranscodes
-                .Where(running => running.Key != decision.MediaItemId)
-                .Select(running => new TranscodeSlots.Running(running.Value.EncodesVideo, running.Value.IsGpu));
-            var slot = TranscodeSlots.Assign(encodesVideo, accelerator is not null && settings.UseHardwareEncoding, others, settings.MaxGpuTranscodes, settings.MaxCpuTranscodes);
+            // Held until LaunchFFmpegAsync has recorded the process, so a live TV start at the same moment sees it.
+            using var slotHold = encodesVideo ? await _slots.HoldAsync(cancellationToken) : null;
+            var slot = encodesVideo
+                ? _slots.Assign(decision.MediaItemId, accelerator is not null && settings.UseHardwareEncoding, settings.MaxGpuTranscodes, settings.MaxCpuTranscodes)
+                : new EncodeSlot(OnGpu: false, Refusal: null);
             if (slot.Refusal is { } refusal) throw new InvalidOperationException(refusal);
 
             await StopProcessAndCleanFilesAsync(decision.MediaItemId, targetDir);

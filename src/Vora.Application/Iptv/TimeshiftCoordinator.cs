@@ -1,4 +1,5 @@
 using Microsoft.Extensions.Logging;
+using Vora.Application.Streaming;
 using System.Collections.Concurrent;
 using System.Diagnostics;
 
@@ -10,9 +11,11 @@ public enum LiveSessionKind
     Remux = 1
 }
 
-public interface ITimeshiftCoordinator
+public interface ITimeshiftCoordinator : IEncodeSource
 {
-    bool TryRegister(Guid profileId, Process process, string sessionPath, LiveSessionKind kind = LiveSessionKind.Timeshift);
+    /// <param name="encode">What the session's ffmpeg encodes, or null when it copies the video, so the server
+    /// can count the encodes it is running.</param>
+    bool TryRegister(Guid profileId, Process process, string sessionPath, LiveSessionKind kind = LiveSessionKind.Timeshift, RunningEncode? encode = null);
     bool IsActive(Guid profileId);
     LiveSessionKind? KindOf(Guid profileId);
     void Heartbeat(Guid profileId);
@@ -41,10 +44,10 @@ public class TimeshiftCoordinator : ITimeshiftCoordinator
         _logger = logger;
     }
 
-    public bool TryRegister(Guid profileId, Process process, string sessionPath, LiveSessionKind kind = LiveSessionKind.Timeshift)
+    public bool TryRegister(Guid profileId, Process process, string sessionPath, LiveSessionKind kind = LiveSessionKind.Timeshift, RunningEncode? encode = null)
     {
         var now = DateTime.UtcNow;
-        return _activeTimeshifts.TryAdd(profileId, new ActiveSession(process, sessionPath, kind)
+        return _activeTimeshifts.TryAdd(profileId, new ActiveSession(process, sessionPath, kind, encode)
         {
             StartedAtUtc = now,
             LastHeartbeatUtc = now
@@ -52,6 +55,26 @@ public class TimeshiftCoordinator : ITimeshiftCoordinator
     }
 
     public bool IsActive(Guid profileId) => _activeTimeshifts.ContainsKey(profileId);
+
+    // A session whose ffmpeg has stopped (or never started) holds no encoder, so it is not counted even
+    // while it waits to be evicted.
+    public IReadOnlyList<RunningEncode> RunningEncodes(Guid except) =>
+        _activeTimeshifts
+            .Where(session => session.Key != except && session.Value.Encode is not null && IsRunning(session.Value.Process))
+            .Select(session => session.Value.Encode!)
+            .ToList();
+
+    private static bool IsRunning(Process process)
+    {
+        try
+        {
+            return !process.HasExited;
+        }
+        catch (InvalidOperationException)
+        {
+            return false;
+        }
+    }
 
     public LiveSessionKind? KindOf(Guid profileId) =>
         _activeTimeshifts.TryGetValue(profileId, out var session) ? session.Kind : null;
@@ -269,7 +292,7 @@ public class TimeshiftCoordinator : ITimeshiftCoordinator
         }
     }
 
-    private sealed record ActiveSession(Process Process, string SessionPath, LiveSessionKind Kind)
+    private sealed record ActiveSession(Process Process, string SessionPath, LiveSessionKind Kind, RunningEncode? Encode)
     {
         public required DateTime StartedAtUtc { get; init; }
         public required DateTime LastHeartbeatUtc { get; set; }

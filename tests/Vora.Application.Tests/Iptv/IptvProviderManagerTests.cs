@@ -26,7 +26,7 @@ public class IptvProviderManagerTests
     {
         var resolver = new IptvUpstreamResolver(_protector);
         _manager = new IptvManager(_repo, Substitute.For<IIptvEpgService>(), _users, _tasks, _timeshift, _tuners,
-            Substitute.For<IStreamingTokenSigner>(), Substitute.For<ITimeshiftVideo>(), new IptvChannelLoader(_upstream, resolver), resolver, _protector,
+            Substitute.For<IStreamingTokenSigner>(), Substitute.For<ITimeshiftVideo>(), Substitute.For<IEncodeSlots>(), new IptvChannelLoader(_upstream, resolver), resolver, _protector,
             NullLogger<IptvManager>.Instance);
     }
 
@@ -384,7 +384,7 @@ public class IptvProviderManagerTests
         _users.GetUserAccountAsync(accountId).Returns(new UserVM { Id = accountId, HasAllIptvAccess = true, Profiles = new List<UserProfileVM> { new() { Id = profileId, HasAllIptvAccess = true } } });
         _tuners.TryAcquire(playlistId, 1, IptvPassthroughService.LiveLeaseKey($"{profileId:N}.{playlistId:N}.{Guid.NewGuid():N}"), TunerLeaseKind.Live);
         _tuners.TryAcquire(playlistId, 0, IptvPassthroughService.LiveLeaseKey($"{Guid.NewGuid():N}.{playlistId:N}.{Guid.NewGuid():N}"), TunerLeaseKind.Live);
-        _timeshift.TryRegister(default, default!, default!, default).ReturnsForAnyArgs(false);
+        _timeshift.TryRegister(default, default!, default!, default, default).ReturnsForAnyArgs(false);
         var root = Path.Combine(Path.GetTempPath(), "vora-takeover-" + Guid.NewGuid().ToString("N"));
         _repo.GetServerSettingsAsync().Returns(new ServerSetting { TranscoderTempDirectory = root });
 

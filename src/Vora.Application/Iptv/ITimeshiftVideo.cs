@@ -10,5 +10,11 @@ public sealed record TimeshiftVideoArguments(IReadOnlyList<string> BeforeInput, 
 public interface ITimeshiftVideo
 {
     Task<LiveVideoFormat?> ReadFormatAsync(string segmentPath, CancellationToken cancellationToken = default);
-    Task<TimeshiftVideoArguments> EncodeArgumentsAsync(LiveVideoEncode encode, bool onCpu, CancellationToken cancellationToken = default);
+    /// <summary>
+    /// How to encode a viewer's video: on the GPU while the server's limit has room, otherwise on the CPU
+    /// (<paramref name="onCpu"/> asks for the CPU, as when the GPU just failed). Takes a slot, so call it
+    /// with <see cref="Vora.Application.Streaming.IEncodeSlots.HoldAsync"/> held until the session is registered.
+    /// </summary>
+    /// <exception cref="Vora.Application.Streaming.EncodeLimitReachedException">There is no slot for it.</exception>
+    Task<TimeshiftVideoArguments> EncodeArgumentsAsync(LiveVideoEncode encode, Guid viewerKey, bool onCpu, CancellationToken cancellationToken = default);
 }

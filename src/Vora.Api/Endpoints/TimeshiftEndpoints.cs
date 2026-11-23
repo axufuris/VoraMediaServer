@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Mvc;
 using Vora.Api.Extensions;
 using Vora.Application.Iptv;
 using Vora.Application.Iptv.ViewModels;
+using Vora.Application.Streaming;
 
 namespace Vora.Api.Endpoints;
 
@@ -55,6 +56,10 @@ public static class TimeshiftEndpoints
         catch (UnauthorizedAccessException)
         {
             return Results.Forbid();
+        }
+        catch (EncodeLimitReachedException ex)
+        {
+            return Results.Json(new { error = ex.Message }, statusCode: StatusCodes.Status503ServiceUnavailable);
         }
         if (url == null)
         {
