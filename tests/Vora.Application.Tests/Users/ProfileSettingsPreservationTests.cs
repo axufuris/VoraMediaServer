@@ -17,15 +17,16 @@ public class ProfileSettingsPreservationTests
         _manager = new UserManager(_repo, Substitute.For<IUserProfileImageService>(), Substitute.For<IClientNotifier>(), NullLogger<UserManager>.Instance);
     }
 
-    private UserProfile Profile(string? showtimesLocation) => new()
+    private UserProfile Profile(string? showtimesLocation, bool canRecordLiveTv = false) => new()
     {
         Id = Guid.NewGuid(),
         Name = "Andy",
         UserId = Guid.NewGuid(),
-        ShowtimesLocation = showtimesLocation
+        ShowtimesLocation = showtimesLocation,
+        CanRecordLiveTv = canRecordLiveTv
     };
 
-    private async Task UpdateAsync(UserProfile profile, string? showtimesLocation, bool canRecordLiveTv = false)
+    private async Task UpdateAsync(UserProfile profile, string? showtimesLocation, bool? canRecordLiveTv = null)
     {
         _repo.GetProfileByIdAsync(profile.Id).Returns(profile);
         await _manager.UpdateManagedProfileAsync(
@@ -73,5 +74,35 @@ public class ProfileSettingsPreservationTests
         await UpdateAsync(profile, showtimesLocation: null, canRecordLiveTv: true);
 
         profile.CanRecordLiveTv.Should().BeTrue();
+    }
+
+    [Fact]
+    public async Task An_editor_that_omits_the_dvr_permission_leaves_it_on()
+    {
+        var profile = Profile(null, canRecordLiveTv: true);
+
+        await UpdateAsync(profile, showtimesLocation: null, canRecordLiveTv: null);
+
+        profile.CanRecordLiveTv.Should().BeTrue();
+    }
+
+    [Fact]
+    public async Task An_editor_that_omits_the_dvr_permission_leaves_it_off()
+    {
+        var profile = Profile(null, canRecordLiveTv: false);
+
+        await UpdateAsync(profile, showtimesLocation: null, canRecordLiveTv: null);
+
+        profile.CanRecordLiveTv.Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task Sending_false_takes_the_dvr_permission_away()
+    {
+        var profile = Profile(null, canRecordLiveTv: true);
+
+        await UpdateAsync(profile, showtimesLocation: null, canRecordLiveTv: false);
+
+        profile.CanRecordLiveTv.Should().BeFalse();
     }
 }

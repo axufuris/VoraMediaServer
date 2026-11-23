@@ -138,6 +138,10 @@ episodes and tracks), `Movie.TheatricalReleaseDate` / `DigitalReleaseDate`,
 stays a `DateTime` on purpose — it carries a TV airing's time of day alongside
 `AirTime`, so it is a real instant.
 
+## Editing a profile
+
+`PUT /api/users/profiles/{id}` (`UpdateProfileDto`) replaces the lists and flags the editor sends, and leaves alone the three values an editor may not carry. `pin` is unchanged when absent and cleared by an empty string. `showtimesLocation` is the same. `canRecordLiveTv` is unchanged when absent and set by `true` or `false`. The web editor sends it. The Android, Roku, tvOS and iOS profile editors have no DVR toggle and leave it out, so editing a child's profile there keeps the recording permission the parent gave it. `POST /api/users/{userId}/profiles` reads an absent `canRecordLiveTv` as `false`. The permission that `DvrManager` checks is the profile's own flag (an account's main profile is an admin profile and always passes), not the account-level one in `UserAccessModal`.
+
 ## Live permission refetch
 
 The profile JWT carries permission claims (`canTimeshiftIptv`, `canRecordLiveTv`, etc.) as they were when it was issued. An admin edit of the account's access or of the profile rotates the security stamp, so the old token is refused within about 30 seconds (`docs/auth-tokens.md`), and the hub sends `UserAccessUpdated` / `ProfileAccessUpdated`, which `MainLayout` answers with an alert, dropping `profile_token` and returning to the profile picker. Until then the claims can be out of date.
