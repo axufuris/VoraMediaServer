@@ -5,7 +5,19 @@ using Vora.Domain.Enums;
 
 namespace Vora.Application.Iptv;
 
-public sealed record HdHomeRunDevice(string Name, string? Model, string? DeviceId, int? TunerCount);
+public sealed record HdHomeRunDevice(string Name, string? Model, string? DeviceId, int? TunerCount, string? FirmwareVersion = null);
+
+public sealed record HdHomeRunTuner(
+    int Index,
+    bool InUse,
+    string? ChannelNumber,
+    string? ChannelName,
+    long? FrequencyHz,
+    int? SignalStrengthPercent,
+    int? SignalQualityPercent,
+    int? SymbolQualityPercent,
+    long? BitsPerSecond,
+    string? TargetAddress);
 
 /// <summary>
 /// Reads the two documents every HDHomeRun serves over HTTP: <c>/discover.json</c> (the device) and
@@ -17,17 +29,74 @@ public static class HdHomeRunParser
     public const int DefaultStreamPort = 5004;
     public const string DiscoverPath = "discover.json";
     public const string LineupPath = "lineup.json";
+    public const string StatusPath = "status.json";
+    public const string GuideAddress = "https://api.hdhomerun.com/api/xmltv";
 
     private const int MaxNameLength = 256;
     private const int MaxIdLength = 256;
     private const string DrmTag = "drm";
+    private const string TunerResourcePrefix = "tuner";
 
     public static HdHomeRunDevice ParseDevice(string json)
     {
         var root = Root(json);
         var model = Text(root, "ModelNumber");
         var name = Text(root, "FriendlyName") ?? model ?? "HDHomeRun";
-        return new HdHomeRunDevice(Limit(name, MaxNameLength), model, Text(root, "DeviceID"), Number(root, "TunerCount") is > 0 and var tuners ? tuners : null);
+        return new HdHomeRunDevice(Limit(name, MaxNameLength), model, Text(root, "DeviceID"), Number(root, "TunerCount") is > 0 and var tuners ? tuners : null, Text(root, "FirmwareVersion"));
+    }
+
+    public static string? DeviceAuth(string json) => Text(Root(json), "DeviceAuth");
+
+    public static string GuideUrl(string deviceAuth) => $"{GuideAddress}?DeviceAuth={Uri.EscapeDataString(deviceAuth)}";
+
+    public static List<HdHomeRunTuner> ParseStatus(string json)
+    {
+        var root = Root(json);
+        if (root.ValueKind != JsonValueKind.Array) throw new IptvSourceException("The device's tuner status isn't in the format an HDHomeRun uses.");
+
+        var tuners = new List<HdHomeRunTuner>();
+        foreach (var entry in root.EnumerateArray())
+        {
+            if (entry.ValueKind != JsonValueKind.Object || TunerIndex(Text(entry, "Resource")) is not { } index) continue;
+
+            var number = Text(entry, "VctNumber");
+            var name = Text(entry, "VctName");
+            var frequency = Long(entry, "Frequency");
+            var target = Text(entry, "TargetIP");
+            tuners.Add(new HdHomeRunTuner(
+                index,
+                number is not null || name is not null || target is not null || frequency is > 0,
+                number is null ? null : Limit(number, MaxIdLength),
+                name is null ? null : Limit(name, MaxNameLength),
+                frequency is > 0 ? frequency : null,
+                Percent(entry, "SignalStrengthPercent"),
+                Percent(entry, "SignalQualityPercent"),
+                Percent(entry, "SymbolQualityPercent"),
+                Long(entry, "NetworkRate") is > 0 and var rate ? rate : null,
+                target is null ? null : Limit(target, MaxIdLength)));
+        }
+
+        return tuners.OrderBy(t => t.Index).ToList();
+    }
+
+    private static int? TunerIndex(string? resource) =>
+        resource is not null
+        && resource.StartsWith(TunerResourcePrefix, StringComparison.OrdinalIgnoreCase)
+        && int.TryParse(resource.AsSpan(TunerResourcePrefix.Length), NumberStyles.None, CultureInfo.InvariantCulture, out var index)
+            ? index
+            : null;
+
+    private static int? Percent(JsonElement element, string name) => Number(element, name) is { } value ? Math.Clamp(value, 0, 100) : null;
+
+    private static long? Long(JsonElement element, string name)
+    {
+        if (element.ValueKind != JsonValueKind.Object || !element.TryGetProperty(name, out var value)) return null;
+        return value.ValueKind switch
+        {
+            JsonValueKind.Number when value.TryGetInt64(out var number) => number,
+            JsonValueKind.String when long.TryParse(value.GetString(), NumberStyles.Integer, CultureInfo.InvariantCulture, out var parsed) => parsed,
+            _ => null
+        };
     }
 
     /// <summary>

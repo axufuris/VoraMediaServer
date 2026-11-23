@@ -17,6 +17,12 @@ public sealed class StubUpstream : HttpMessageHandler, IHttpClientFactory
         return this;
     }
 
+    public StubUpstream OnBytes(Func<Uri, bool> matches, byte[] body, string contentType = "application/xml")
+    {
+        _routes.Add((matches, () => new HttpResponseMessage(HttpStatusCode.OK) { Content = new ByteArrayContent(body) { Headers = { ContentType = new System.Net.Http.Headers.MediaTypeHeaderValue(contentType) } } }));
+        return this;
+    }
+
     public StubUpstream Fail(Func<Uri, bool> matches, Exception error)
     {
         _failures.Add((matches, error));

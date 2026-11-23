@@ -51,13 +51,21 @@ public class IptvEpgService : IIptvEpgService
     private readonly IServiceScopeFactory _scopeFactory;
     private readonly IHttpClientFactory _httpClientFactory;
     private readonly ILogger<IptvEpgService> _logger;
+    private readonly HdHomeRunGuideFeed _deviceGuide;
     private readonly string _cacheFilePath;
 
-    public IptvEpgService(IServiceScopeFactory scopeFactory, IHttpClientFactory httpClientFactory, IOptions<StoragePathsOptions> storagePaths, ILogger<IptvEpgService> logger)
+    public IptvEpgService(
+        IServiceScopeFactory scopeFactory,
+        IHttpClientFactory httpClientFactory,
+        IOptions<StoragePathsOptions> storagePaths,
+        ILogger<IptvEpgService> logger,
+        IHdHomeRunClient? deviceClient = null,
+        TimeProvider? timeProvider = null)
     {
         _scopeFactory = scopeFactory;
         _httpClientFactory = httpClientFactory;
         _logger = logger;
+        _deviceGuide = new HdHomeRunGuideFeed(httpClientFactory, deviceClient ?? new HdHomeRunClient(httpClientFactory), timeProvider ?? TimeProvider.System);
 
         var cacheDirectory = StorageRoots.EpgCache(storagePaths.Value);
         if (!Directory.Exists(cacheDirectory)) Directory.CreateDirectory(cacheDirectory);
@@ -129,8 +137,12 @@ public class IptvEpgService : IIptvEpgService
                 .Where(p => p.SourceType == IptvSourceType.Xtream && p.UseProviderGuide)
                 .OrderBy(p => p.AddedAt)
                 .ToList();
+            var deviceGuides = activePlaylists
+                .Where(p => p.SourceType == IptvSourceType.HdHomeRun && p.UseProviderGuide)
+                .OrderBy(p => p.AddedAt)
+                .ToList();
             var tunerPlaylistIds = activePlaylists.Where(p => p.SourceType == IptvSourceType.HdHomeRun).Select(p => p.Id).ToHashSet();
-            if (sources.Count == 0 && providerGuides.Count == 0)
+            if (sources.Count == 0 && providerGuides.Count == 0 && deviceGuides.Count == 0)
             {
                 _logger.LogInformation("No active EPG sources configured — skipping sync.");
                 return;
@@ -158,6 +170,11 @@ public class IptvEpgService : IIptvEpgService
                 await SyncProviderGuideAsync(resolver, playlist, allChannels, mergedCache, claimedBy, cutoffTime, maxFutureTime, cancellationToken);
             }
 
+            foreach (var playlist in deviceGuides)
+            {
+                await SyncDeviceGuideAsync(playlist, allChannels, mergedCache, claimedBy, cutoffTime, maxFutureTime, cancellationToken);
+            }
+
             foreach (var kvp in mergedCache)
             {
                 kvp.Value.Sort((a, b) => a.StartTime.CompareTo(b.StartTime));
@@ -167,7 +184,7 @@ public class IptvEpgService : IIptvEpgService
             _memoryCache = new ConcurrentDictionary<string, List<IptvProgramDto>>(mergedCache, StringComparer.OrdinalIgnoreCase);
             _channelsCovered = new HashSet<string>(mergedCache.Keys, StringComparer.OrdinalIgnoreCase);
 
-            _logger.LogInformation("Completed EPG sync. {ChannelCount} channels populated from {SourceCount} sources.", mergedCache.Count, sources.Count + providerGuides.Count);
+            _logger.LogInformation("Completed EPG sync. {ChannelCount} channels populated from {SourceCount} sources.", mergedCache.Count, sources.Count + providerGuides.Count + deviceGuides.Count);
         }
         finally
         {
@@ -342,6 +359,37 @@ public class IptvEpgService : IIptvEpgService
             _syncStats[playlist.Id] = new IptvSourceSyncStats { SyncedAt = DateTime.UtcNow, Error = error };
             _logger.LogWarning("Failed to load the provider guide of {Name} ({ErrorType}): {Error}", playlist.Name, ex.GetType().Name, error);
         }
+    }
+
+    private async Task SyncDeviceGuideAsync(
+        IptvPlaylist playlist,
+        List<IptvChannel> allChannels,
+        Dictionary<string, List<IptvProgramDto>> mergedCache,
+        Dictionary<string, Guid> claimedBy,
+        DateTime cutoffTime,
+        DateTime maxFutureTime,
+        CancellationToken cancellationToken)
+    {
+        var channels = allChannels.Where(c => c.PlaylistId == playlist.Id).ToList();
+        var result = await _deviceGuide.ReadAsync(playlist, channels, cutoffTime, maxFutureTime, cancellationToken);
+        if (result is null) return;
+
+        _syncStats[playlist.Id] = result.Stats;
+        if (result.Stats.Error is { } error)
+        {
+            _logger.LogWarning("Failed to load the HDHomeRun guide of {Name}: {Error}", playlist.Name, error);
+        }
+        else
+        {
+            _logger.LogInformation(
+                "HDHomeRun guide of {Name}: parsed {Seen} programmes, matched {Matched}. Sample unmatched IDs: [{Unmatched}]",
+                playlist.Name,
+                result.Stats.TotalProgrammes,
+                result.Stats.MatchedProgrammes,
+                string.Join(", ", result.Stats.UnmatchedSamples));
+        }
+
+        ClaimChannelsForSource(playlist.Id, result.Programs, mergedCache, claimedBy);
     }
 
     private static bool IsGzip(string? url, HttpResponseMessage response) =>

@@ -50,6 +50,8 @@ public class IptvManager : IIptvManager
     private const string SecondSegmentFileName = "seg_001.ts";
     private const string TimeshiftTokenScope = "timeshift";
     private const string ProviderGuideSuffix = " (provider guide)";
+    private const string DeviceGuideSuffix = " (HDHomeRun guide)";
+    private const string DeviceGuideHost = "https://api.hdhomerun.com";
     // The live remux has no rewind, so its segments are short: the player gets its first two
     // after about four seconds of video instead of eight. Timeshift keeps four-second segments.
     public const int LiveRemuxSegmentSeconds = 2;
@@ -331,6 +333,14 @@ public class IptvManager : IIptvManager
             {
                 allStats.TryGetValue(p.Id, out var stats);
                 return Diagnostics(p.Id, p.Name + ProviderGuideSuffix, IptvUrlRedactor.SchemeAndHost(p.ServerUrl) ?? string.Empty, stats, stats?.SyncedAt, stats?.Error);
+            }));
+
+        sourceDiags.AddRange(playlists
+            .Where(p => p.SourceType == IptvSourceType.HdHomeRun && p.UseProviderGuide)
+            .Select(p =>
+            {
+                allStats.TryGetValue(p.Id, out var stats);
+                return Diagnostics(p.Id, p.Name + DeviceGuideSuffix, DeviceGuideHost, stats, stats?.SyncedAt, stats?.Error);
             }));
 
         return new IptvEpgDiagnosticsVM

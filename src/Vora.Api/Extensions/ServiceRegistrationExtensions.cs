@@ -556,6 +556,8 @@ public static class ServiceRegistrationExtensions
         services.AddSingleton<IIptvPassthroughTokenProtector, DataProtectionPassthroughTokenProtector>();
         services.AddSingleton<IIptvUpstreamResolver, IptvUpstreamResolver>();
         services.AddScoped<IIptvChannelLoader, IptvChannelLoader>();
+        services.AddSingleton<IHdHomeRunClient, HdHomeRunClient>();
+        services.AddScoped<IHdHomeRunStatusManager, HdHomeRunStatusManager>();
         services.AddScoped<IMediaAnalyzerService, FFmpegAnalyzerService>();
         services.AddScoped<IMediaEmbeddingService, MediaEmbeddingService>();
         services.AddScoped<IMediaIngestionService, MediaIngestionService>();
