@@ -12,9 +12,25 @@ Which GPU decodes and encodes video, how Vora finds it, and what happens when it
 | `UseHardwareEncoding` | GPU encoding of playback and DVR transcodes (decode can stay on the GPU) |
 | `AnalyzeUseHardwareDecode` | GPU decode in the marker scan |
 | `VideoThumbnailUseHardwareDecode` | GPU decode for scrub-bar sprites |
-| `MaxGpuTranscodes` | GPU encodes at once; past it a stream decodes on the GPU and encodes on the CPU. A session that copies the video (a remux, or one that converts only the audio) takes no GPU or CPU slot and runs without the GPU, and a seek restarting a transcode doesn't count itself (`TranscodeSlots`) |
+| `MaxGpuTranscodes` | GPU encodes at once; past it a stream decodes on the GPU and encodes on the CPU. A session that copies the video (a remux, or one that converts only the audio) takes no GPU or CPU slot and runs without the GPU, and a seek restarting a transcode doesn't count itself (`TranscodeSlots`). Live TV and DVR encodes count too, see *Transcode limits* |
 
 Every caller turns the setting into a concrete `HardwareAccelerator` (type, device, vendor, Vulkan interop) through `IHardwareCapabilityService.ResolveAsync`. **Never hard-code `-hwaccel cuda` or a device path**; build the flags with `HardwareArguments` (`InitDevices`, `Decode`, `InitAndDecode`, `DownloadScaled`).
+
+## Transcode limits
+
+`MaxGpuTranscodes` and `MaxCpuTranscodes` (0 is unlimited) cap the video **encodes** running at once, and everything that encodes counts against them, because each one takes a slot: a GPU's encoder runs only so many sessions at once (a GeForce card has a fixed number), and a CPU has only so many cores.
+
+| Counted | Where |
+|---|---|
+| A playback transcode | `FFmpegTranscodeService` |
+| A live TV channel converted to H.264 for a player that can't play it (`docs/iptv-and-dvr.md`) | `TimeshiftVideo` |
+| A DVR recording being converted | `DvrPostProcessingWorker` |
+
+An encode takes a GPU slot while there is one, then a CPU slot, then is refused: playback and live TV fail to start ("Maximum GPU and CPU transcodes reached"; live TV answers 503 with the reason) and a recording is left for the next pass, a minute on. Video that is **copied** takes no slot. A restart of the same stream (a seek, a channel change, a retry on the CPU after the GPU failed) doesn't count itself, and a retry on the CPU is held to the CPU limit.
+
+Each place that encodes keeps its own record of what it is running and reports it through `IEncodeSource` (the transcode dictionary, the live session registry, `DvrEncodes`), so nothing has to be kept in step and a stopped session can't leave a slot taken. `EncodeSlots` adds them up when a start asks. The start holds `IEncodeSlots.HoldAsync` from choosing a slot until it has registered its encode, so two starts at the same moment (every viewer reconnecting after a restart) can't both take the last slot.
+
+`Max Background Transcodes` in the admin UI is stored but nothing reads it.
 
 ## Finding the GPU
 

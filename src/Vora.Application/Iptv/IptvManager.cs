@@ -66,6 +66,7 @@ public class IptvManager : IIptvManager
     private readonly ITunerRegistry _tunerRegistry;
     private readonly IStreamingTokenSigner _tokenSigner;
     private readonly ITimeshiftVideo _timeshiftVideo;
+    private readonly IEncodeSlots _encodeSlots;
     private readonly IIptvChannelLoader _channelLoader;
     private readonly IIptvUpstreamResolver _upstreamResolver;
     private readonly IIptvSecretProtector _secretProtector;
@@ -80,6 +81,7 @@ public class IptvManager : IIptvManager
         ITunerRegistry tunerRegistry,
         IStreamingTokenSigner tokenSigner,
         ITimeshiftVideo timeshiftVideo,
+        IEncodeSlots encodeSlots,
         IIptvChannelLoader channelLoader,
         IIptvUpstreamResolver upstreamResolver,
         IIptvSecretProtector secretProtector,
@@ -93,6 +95,7 @@ public class IptvManager : IIptvManager
         _tunerRegistry = tunerRegistry;
         _tokenSigner = tokenSigner;
         _timeshiftVideo = timeshiftVideo;
+        _encodeSlots = encodeSlots;
         _channelLoader = channelLoader;
         _upstreamResolver = upstreamResolver;
         _secretProtector = secretProtector;
@@ -534,44 +537,79 @@ public class IptvManager : IIptvManager
         var encode = known is not null && !LiveVideoDecision.Plays(known, limits)
             ? LiveVideoDecision.EncodeFor(known, limits, segmentSeconds)
             : null;
-        var video = encode is null ? TimeshiftVideoArguments.Copy : await _timeshiftVideo.EncodeArgumentsAsync(encode, onCpu: false);
+        TimeshiftVideoArguments video;
+        TimeshiftRun? run;
+        if (encode is null)
+        {
+            video = TimeshiftVideoArguments.Copy;
+            run = await LaunchTimeshiftAsync(viewerKey, upstream, secret, video, kind);
+        }
+        else
+        {
+            (video, run) = await LaunchEncodeAsync(encode, onCpu: false, launchCopy: true, viewerKey, upstream, secret, kind);
+        }
         if (video.Encodes && known is not null)
         {
             _logger.LogInformation("{Kind} of {Channel} encodes with {Encoder}: {Reason}.",
                 label, channel.Name, video.Encoder, LiveVideoDecision.Mismatch(known, limits));
         }
-
-        var run = await LaunchTimeshiftAsync(viewerKey, upstream, secret, video, kind);
         if (run is null) return null;
 
-        if (!video.Encodes)
+        try
         {
-            var seen = await LearnVideoFormatAsync(channel, known, viewerKey, run);
-            if (encode is null && seen is not null && LiveVideoDecision.Mismatch(seen, limits) is { } reason)
+            if (!video.Encodes)
             {
-                encode = LiveVideoDecision.EncodeFor(seen, limits, segmentSeconds);
-                video = await _timeshiftVideo.EncodeArgumentsAsync(encode, onCpu: false);
-                if (video.Encodes)
+                var seen = await LearnVideoFormatAsync(channel, known, viewerKey, run);
+                if (encode is null && seen is not null && LiveVideoDecision.Mismatch(seen, limits) is { } reason)
                 {
-                    _logger.LogInformation("{Kind} of {Channel} restarts to encode with {Encoder}: {Reason}.", label, channel.Name, video.Encoder, reason);
-                    run = await LaunchTimeshiftAsync(viewerKey, upstream, secret, video, kind);
-                    if (run is null) return null;
+                    encode = LiveVideoDecision.EncodeFor(seen, limits, segmentSeconds);
+                    var restart = await LaunchEncodeAsync(encode, onCpu: false, launchCopy: false, viewerKey, upstream, secret, kind);
+                    video = restart.Video;
+                    if (video.Encodes)
+                    {
+                        _logger.LogInformation("{Kind} of {Channel} restarts to encode with {Encoder}: {Reason}.", label, channel.Name, video.Encoder, reason);
+                        run = restart.Run;
+                        if (run is null) return null;
+                    }
                 }
             }
-        }
 
-        await WaitForFileAsync(viewerKey, run, SecondSegmentFileName);
-
-        if (encode is not null && video.OnGpu && HasExited(run.Process) && !File.Exists(run.PlaylistPath))
-        {
-            _logger.LogWarning("{Kind} of {Channel} failed to encode with {Encoder}; retrying on the CPU.", label, channel.Name, video.Encoder);
-            video = await _timeshiftVideo.EncodeArgumentsAsync(encode, onCpu: true);
-            run = await LaunchTimeshiftAsync(viewerKey, upstream, secret, video, kind);
-            if (run is null) return null;
             await WaitForFileAsync(viewerKey, run, SecondSegmentFileName);
+
+            if (encode is not null && video.OnGpu && HasExited(run.Process) && !File.Exists(run.PlaylistPath))
+            {
+                _logger.LogWarning("{Kind} of {Channel} failed to encode with {Encoder}; retrying on the CPU.", label, channel.Name, video.Encoder);
+                (video, run) = await LaunchEncodeAsync(encode, onCpu: true, launchCopy: true, viewerKey, upstream, secret, kind);
+                if (run is null) return null;
+                await WaitForFileAsync(viewerKey, run, SecondSegmentFileName);
+            }
+        }
+        catch (EncodeLimitReachedException)
+        {
+            // The session already started (copying, or on a GPU that failed) is of no use to a viewer who is turned away.
+            await _timeshiftCoordinator.StopAsync(viewerKey);
+            throw;
         }
 
         return run;
+    }
+
+    // An encode takes a GPU or CPU slot. The slot is held from the moment it is chosen until the session
+    // that uses it is registered, so two starts at the same moment can't both take the last one.
+    // launchCopy: whether the viewer's session is replaced even when transcoding turns out to be off and the
+    // video is copied. When it is, the session being replaced is stopped first, so stopping it (a moment)
+    // isn't done while other starts wait for the slots, and a viewer who is then turned away isn't left
+    // with the stream they asked to leave.
+    private async Task<(TimeshiftVideoArguments Video, TimeshiftRun? Run)> LaunchEncodeAsync(
+        LiveVideoEncode encode, bool onCpu, bool launchCopy, Guid viewerKey, IptvUpstream upstream, string? secret, LiveSessionKind kind)
+    {
+        if (launchCopy) await _timeshiftCoordinator.StopAsync(viewerKey);
+
+        using var slot = await _encodeSlots.HoldAsync();
+        var video = await _timeshiftVideo.EncodeArgumentsAsync(encode, viewerKey, onCpu);
+        if (!video.Encodes && !launchCopy) return (video, null);
+
+        return (video, await LaunchTimeshiftAsync(viewerKey, upstream, secret, video, kind));
     }
 
     private async Task<TimeshiftRun?> LaunchTimeshiftAsync(Guid profileId, IptvUpstream upstream, string? secret, TimeshiftVideoArguments video, LiveSessionKind kind)
@@ -583,7 +621,7 @@ public class IptvManager : IIptvManager
         var process = BuildTimeshiftProcess(upstream.Url, upstream.Policy, outputPath, segmentPath, video, kind == LiveSessionKind.Remux);
 
         await _timeshiftCoordinator.StopAsync(profileId);
-        if (!_timeshiftCoordinator.TryRegister(profileId, process, sessionPath, kind))
+        if (!_timeshiftCoordinator.TryRegister(profileId, process, sessionPath, kind, video.Encodes ? new RunningEncode(video.OnGpu) : null))
         {
             process.Dispose();
             TryDeleteDirectory(sessionPath);

@@ -187,7 +187,7 @@ public sealed class LiveRemuxTests : IAsyncDisposable
     }
 
     private static Task<LiveVideoFormat?> ReadFormatAsync(string segment, CancellationToken cancellationToken) =>
-        new TimeshiftVideo(Substitute.For<ISystemSettingsRepository>(), Substitute.For<IHardwareCapabilityService>(), NullLogger<TimeshiftVideo>.Instance)
+        new TimeshiftVideo(Substitute.For<ISystemSettingsRepository>(), Substitute.For<IHardwareCapabilityService>(), Substitute.For<IEncodeSlots>(), NullLogger<TimeshiftVideo>.Instance)
             .ReadFormatAsync(segment, cancellationToken);
 
     private IptvManager Manager()
@@ -197,6 +197,7 @@ public sealed class LiveRemuxTests : IAsyncDisposable
         var signer = Substitute.For<IStreamingTokenSigner>();
         signer.Sign(default!, default!, default).ReturnsForAnyArgs("token");
         var protector = Substitute.For<IIptvSecretProtector>();
+        var slots = new EncodeSlots([_coordinator]);
 
         return new IptvManager(
             _repository,
@@ -206,7 +207,8 @@ public sealed class LiveRemuxTests : IAsyncDisposable
             _coordinator,
             _tuners,
             signer,
-            new TimeshiftVideo(settings, Substitute.For<IHardwareCapabilityService>(), NullLogger<TimeshiftVideo>.Instance),
+            new TimeshiftVideo(settings, Substitute.For<IHardwareCapabilityService>(), slots, NullLogger<TimeshiftVideo>.Instance),
+            slots,
             Substitute.For<IIptvChannelLoader>(),
             new IptvUpstreamResolver(protector),
             protector,

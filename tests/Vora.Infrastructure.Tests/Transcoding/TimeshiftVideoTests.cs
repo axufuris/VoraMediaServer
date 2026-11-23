@@ -1,6 +1,7 @@
 using Microsoft.Extensions.Logging.Abstractions;
 using Vora.Application.Iptv;
 using Vora.Application.Settings;
+using Vora.Application.Streaming;
 using Vora.Domain.Entities.Settings;
 using Vora.Domain.Enums;
 using Vora.Infrastructure.Transcoding;
@@ -29,7 +30,15 @@ public sealed class TimeshiftVideoTests : IDisposable
         }
     }
 
-    private TimeshiftVideo Video() => new(_settings, _hardware, NullLogger<TimeshiftVideo>.Instance);
+    private readonly List<RunningEncode> _running = [];
+    private readonly Guid _viewer = Guid.NewGuid();
+
+    private TimeshiftVideo Video() => new(_settings, _hardware, new EncodeSlots([new Elsewhere(_running)]), NullLogger<TimeshiftVideo>.Instance);
+
+    private sealed class Elsewhere(List<RunningEncode> encodes) : IEncodeSource
+    {
+        public IReadOnlyList<RunningEncode> RunningEncodes(Guid except) => encodes;
+    }
 
     [Fact]
     public void Ffprobes_answer_for_a_transport_stream_segment_becomes_the_channels_format()
@@ -78,7 +87,64 @@ public sealed class TimeshiftVideoTests : IDisposable
     {
         _settings.GetSettingsAsync().Returns(new ServerSetting { DisableVideoTranscoding = true });
 
-        (await Video().EncodeArgumentsAsync(new LiveVideoEncode(41, null, false), onCpu: false, TestContext.Current.CancellationToken))
+        (await Video().EncodeArgumentsAsync(new LiveVideoEncode(41, null, false), _viewer, onCpu: false, TestContext.Current.CancellationToken))
+            .Should().BeSameAs(TimeshiftVideoArguments.Copy);
+    }
+
+    private static readonly ServerSetting GpuOn = new()
+    {
+        UseHardwareAcceleration = true, UseHardwareEncoding = true, HardwareAccelerationType = HardwareAccelerationType.Auto, HardwareTranscodingDevice = "Auto",
+    };
+
+    private void NvidiaPresent() =>
+        _hardware.ResolveAsync(HardwareAccelerationType.Auto, "Auto", Arg.Any<CancellationToken>()).Returns(new HardwareAccelerator(HardwareAccelerationType.Nvidia, "0", GpuVendor.Nvidia));
+
+    [Fact]
+    public async Task A_live_encode_takes_the_cpu_once_the_gpu_has_as_many_encodes_as_the_limit_allows()
+    {
+        NvidiaPresent();
+        _settings.GetSettingsAsync().Returns(new ServerSetting { UseHardwareAcceleration = true, UseHardwareEncoding = true, HardwareAccelerationType = HardwareAccelerationType.Auto, HardwareTranscodingDevice = "Auto", MaxGpuTranscodes = 2 });
+        var encode = new LiveVideoEncode(41, null, false);
+        var cancellationToken = TestContext.Current.CancellationToken;
+
+        _running.Add(new RunningEncode(OnGpu: true));
+        (await Video().EncodeArgumentsAsync(encode, _viewer, onCpu: false, cancellationToken)).Encoder.Should().Be("NVIDIA (NVENC)");
+
+        _running.Add(new RunningEncode(OnGpu: true));
+        (await Video().EncodeArgumentsAsync(encode, _viewer, onCpu: false, cancellationToken)).Encoder.Should().Be("libx264");
+    }
+
+    [Fact]
+    public async Task A_live_encode_is_refused_when_the_gpu_and_the_cpu_are_both_at_their_limits()
+    {
+        NvidiaPresent();
+        _settings.GetSettingsAsync().Returns(new ServerSetting { UseHardwareAcceleration = true, UseHardwareEncoding = true, HardwareAccelerationType = HardwareAccelerationType.Auto, HardwareTranscodingDevice = "Auto", MaxGpuTranscodes = 1, MaxCpuTranscodes = 1 });
+        _running.AddRange([new RunningEncode(OnGpu: true), new RunningEncode(OnGpu: false)]);
+
+        var start = async () => await Video().EncodeArgumentsAsync(new LiveVideoEncode(41, null, false), _viewer, onCpu: false, TestContext.Current.CancellationToken);
+
+        await start.Should().ThrowAsync<EncodeLimitReachedException>().WithMessage("Maximum GPU and CPU transcodes reached.");
+    }
+
+    [Fact]
+    public async Task A_retry_on_the_cpu_after_the_gpu_failed_is_held_to_the_cpu_limit()
+    {
+        NvidiaPresent();
+        _settings.GetSettingsAsync().Returns(new ServerSetting { UseHardwareAcceleration = true, UseHardwareEncoding = true, HardwareAccelerationType = HardwareAccelerationType.Auto, HardwareTranscodingDevice = "Auto", MaxCpuTranscodes = 1 });
+        _running.Add(new RunningEncode(OnGpu: false));
+
+        var retry = async () => await Video().EncodeArgumentsAsync(new LiveVideoEncode(41, null, false), _viewer, onCpu: true, TestContext.Current.CancellationToken);
+
+        await retry.Should().ThrowAsync<EncodeLimitReachedException>().WithMessage("Maximum CPU transcodes reached.");
+    }
+
+    [Fact]
+    public async Task Video_that_is_copied_because_transcoding_is_off_takes_no_slot_however_full_the_server_is()
+    {
+        _settings.GetSettingsAsync().Returns(new ServerSetting { DisableVideoTranscoding = true, MaxCpuTranscodes = 1 });
+        _running.Add(new RunningEncode(OnGpu: false));
+
+        (await Video().EncodeArgumentsAsync(new LiveVideoEncode(41, null, false), _viewer, onCpu: false, TestContext.Current.CancellationToken))
             .Should().BeSameAs(TimeshiftVideoArguments.Copy);
     }
 
@@ -91,11 +157,11 @@ public sealed class TimeshiftVideoTests : IDisposable
         var cancellationToken = TestContext.Current.CancellationToken;
 
         _settings.GetSettingsAsync().Returns(new ServerSetting { UseHardwareAcceleration = true, UseHardwareEncoding = true, HardwareAccelerationType = HardwareAccelerationType.Auto, HardwareTranscodingDevice = "Auto" });
-        (await Video().EncodeArgumentsAsync(encode, onCpu: false, cancellationToken)).Encoder.Should().Be("NVIDIA (NVENC)");
-        (await Video().EncodeArgumentsAsync(encode, onCpu: true, cancellationToken)).Encoder.Should().Be("libx264");
+        (await Video().EncodeArgumentsAsync(encode, _viewer, onCpu: false, cancellationToken)).Encoder.Should().Be("NVIDIA (NVENC)");
+        (await Video().EncodeArgumentsAsync(encode, _viewer, onCpu: true, cancellationToken)).Encoder.Should().Be("libx264");
 
         _settings.GetSettingsAsync().Returns(new ServerSetting { UseHardwareAcceleration = true, UseHardwareEncoding = false });
-        (await Video().EncodeArgumentsAsync(encode, onCpu: false, cancellationToken)).Encoder.Should().Be("libx264");
+        (await Video().EncodeArgumentsAsync(encode, _viewer, onCpu: false, cancellationToken)).Encoder.Should().Be("libx264");
     }
 
     [Fact]

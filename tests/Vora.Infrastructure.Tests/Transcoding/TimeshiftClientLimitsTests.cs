@@ -61,6 +61,7 @@ public sealed class TimeshiftClientLimitsTests : IAsyncDisposable
 
         await _repository.Received(1).UpdateChannelVideoFormatAsync(channel.Id, Arg.Is<LiveVideoFormat>(f => f.Profile == "High 10" && f.Level == 51), Arg.Any<DateTime>());
         (await SessionFormatAsync(url, cancellationToken)).Should().BeEquivalentTo(new { Codec = "h264", Profile = "High", Level = (int?)41 });
+        _coordinator.RunningEncodes(Guid.NewGuid()).Should().ContainSingle("the session encodes, so it holds a slot").Which.OnGpu.Should().BeFalse();
     }
 
     [Fact]
@@ -74,6 +75,7 @@ public sealed class TimeshiftClientLimitsTests : IAsyncDisposable
 
         await _repository.DidNotReceiveWithAnyArgs().UpdateChannelVideoFormatAsync(default, default!, default);
         (await SessionFormatAsync(url, cancellationToken)).Should().BeEquivalentTo(new { Profile = "High", Level = (int?)41 });
+        _coordinator.RunningEncodes(Guid.NewGuid()).Should().ContainSingle();
     }
 
     [Fact]
@@ -101,12 +103,54 @@ public sealed class TimeshiftClientLimitsTests : IAsyncDisposable
 
         await _repository.DidNotReceiveWithAnyArgs().UpdateChannelVideoFormatAsync(default, default!, default);
         (await SessionFormatAsync(url, cancellationToken)).Should().Be(known);
+        _coordinator.RunningEncodes(Guid.NewGuid()).Should().BeEmpty("a copy takes no slot");
     }
 
-    private IptvManager Manager()
+    [Fact]
+    public async Task A_channel_that_needs_an_encode_is_turned_away_when_the_server_is_running_as_many_as_it_may()
+    {
+        var channel = Serve(DummyStream(), new LiveVideoFormat("h264", "High 10", 51, 360, 25, false));
+        var manager = Manager(new ServerSetting { UseHardwareAcceleration = false, MaxCpuTranscodes = 1 }, new Running(new RunningEncode(OnGpu: false)));
+
+        var start = () => manager.StartTimeshiftSessionAsync(channel.Id, Guid.NewGuid(), _profileId, Roku);
+
+        await start.Should().ThrowAsync<EncodeLimitReachedException>().WithMessage("Maximum CPU transcodes reached.");
+        _coordinator.IsActive(_profileId).Should().BeFalse("nothing was started for the viewer who was turned away");
+    }
+
+    [Fact]
+    public async Task A_channel_the_player_can_take_is_not_turned_away_by_the_encode_limit()
+    {
+        Assert.SkipUnless(FfmpegTool.IsAvailable(), FfmpegTool.SkipReason);
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var known = new LiveVideoFormat("h264", "High", 41, 360, 25, false);
+        var channel = Serve(await SampleAsync("high", "yuv420p", "4.1", cancellationToken), known);
+        var manager = Manager(new ServerSetting { UseHardwareAcceleration = false, MaxCpuTranscodes = 1 }, new Running(new RunningEncode(OnGpu: false)));
+
+        var url = await manager.StartTimeshiftSessionAsync(channel.Id, Guid.NewGuid(), _profileId, Roku);
+
+        url.Should().NotBeNull();
+    }
+
+    private sealed class Running(params RunningEncode[] encodes) : IEncodeSource
+    {
+        public IReadOnlyList<RunningEncode> RunningEncodes(Guid except) => encodes;
+    }
+
+    // A channel that is turned away is never opened, so what it would have sent doesn't matter.
+    private string DummyStream()
+    {
+        var path = Path.Combine(_root, "never-opened.ts");
+        File.WriteAllBytes(path, [0x47]);
+        return path;
+    }
+
+    // others: encodes running elsewhere on the server (a playback transcode, a recording being converted).
+    private IptvManager Manager(ServerSetting? serverSettings = null, params IEncodeSource[] others)
     {
         var settings = Substitute.For<ISystemSettingsRepository>();
-        settings.GetSettingsAsync().Returns(new ServerSetting { UseHardwareAcceleration = false });
+        settings.GetSettingsAsync().Returns(serverSettings ?? new ServerSetting { UseHardwareAcceleration = false });
+        var slots = new EncodeSlots([_coordinator, .. others]);
         var signer = Substitute.For<IStreamingTokenSigner>();
         signer.Sign(default!, default!, default).ReturnsForAnyArgs("token");
 
@@ -126,7 +170,8 @@ public sealed class TimeshiftClientLimitsTests : IAsyncDisposable
             _coordinator,
             new TunerRegistry(),
             signer,
-            new TimeshiftVideo(settings, Substitute.For<IHardwareCapabilityService>(), NullLogger<TimeshiftVideo>.Instance),
+            new TimeshiftVideo(settings, Substitute.For<IHardwareCapabilityService>(), slots, NullLogger<TimeshiftVideo>.Instance),
+            slots,
             Substitute.For<IIptvChannelLoader>(),
             new IptvUpstreamResolver(protector),
             protector,
@@ -138,7 +183,7 @@ public sealed class TimeshiftClientLimitsTests : IAsyncDisposable
         url.Should().NotBeNull();
         var sessionId = (url ?? string.Empty).Split('/')[^2];
         var segment = Path.Combine(_root, TimeshiftCoordinator.TimeshiftSubdirectory, _profileId.ToString(), sessionId, "seg_000.ts");
-        var video = new TimeshiftVideo(Substitute.For<ISystemSettingsRepository>(), Substitute.For<IHardwareCapabilityService>(), NullLogger<TimeshiftVideo>.Instance);
+        var video = new TimeshiftVideo(Substitute.For<ISystemSettingsRepository>(), Substitute.For<IHardwareCapabilityService>(), Substitute.For<IEncodeSlots>(), NullLogger<TimeshiftVideo>.Instance);
         return await video.ReadFormatAsync(segment, cancellationToken);
     }
 

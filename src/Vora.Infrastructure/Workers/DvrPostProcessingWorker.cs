@@ -6,6 +6,7 @@ using System.Text.Json;
 using Vora.Application.Analysis;
 using Vora.Application.Iptv;
 using Vora.Application.Settings;
+using Vora.Application.Streaming;
 using Vora.Domain.Entities.Iptv;
 using Vora.Domain.Entities.Settings;
 using Vora.Domain.Enums;
@@ -21,12 +22,16 @@ public class DvrPostProcessingWorker : BackgroundService
 
     private readonly IServiceScopeFactory _scopeFactory;
     private readonly IHardwareCapabilityService _hardware;
+    private readonly IEncodeSlots _slots;
+    private readonly DvrEncodes _encodes;
     private readonly ILogger<DvrPostProcessingWorker> _logger;
 
-    public DvrPostProcessingWorker(IServiceScopeFactory scopeFactory, IHardwareCapabilityService hardware, ILogger<DvrPostProcessingWorker> logger)
+    public DvrPostProcessingWorker(IServiceScopeFactory scopeFactory, IHardwareCapabilityService hardware, IEncodeSlots slots, DvrEncodes encodes, ILogger<DvrPostProcessingWorker> logger)
     {
         _scopeFactory = scopeFactory;
         _hardware = hardware;
+        _slots = slots;
+        _encodes = encodes;
         _logger = logger;
     }
 
@@ -75,6 +80,37 @@ public class DvrPostProcessingWorker : BackgroundService
 
     private async Task ProcessSingleRecordingAsync(IptvRecordingSession session, IIptvRepository repo, ISystemSettingsRepository settingsRepo, IClientNotifier notifier)
     {
+        // A conversion takes a GPU or CPU slot like any other encode. When none is free the recording is
+        // left as it is, and the next pass (a minute on) asks again.
+        var settings = await settingsRepo.GetSettingsAsync();
+        var encoder = await HardwareEncoderChoice.ResolveAsync(settings, _hardware);
+        DvrEncodes.Encode? encoding = null;
+        if (!settings.DisableVideoTranscoding)
+        {
+            using var hold = await _slots.HoldAsync();
+            var slot = _slots.Assign(session.Id, gpuReady: encoder is not null, settings.MaxGpuTranscodes, settings.MaxCpuTranscodes);
+            if (slot.Refusal is { } refusal)
+            {
+                _logger.LogDebug("[DVR Post-Processor] {Title} waits for a transcode slot: {Refusal}", session.Title, refusal);
+                return;
+            }
+
+            if (!slot.OnGpu) encoder = null;
+            encoding = _encodes.Begin(session.Id, slot.OnGpu);
+        }
+
+        try
+        {
+            await ConvertRecordingAsync(session, repo, notifier, settings, encoder, encoding);
+        }
+        finally
+        {
+            encoding?.Dispose();
+        }
+    }
+
+    private async Task ConvertRecordingAsync(IptvRecordingSession session, IIptvRepository repo, IClientNotifier notifier, ServerSetting settings, HardwareAccelerator? encoder, DvrEncodes.Encode? encoding)
+    {
         string originalPath = session.OutputFilePath!;
         string newPath = Path.ChangeExtension(originalPath, ".mp4");
 
@@ -85,7 +121,16 @@ public class DvrPostProcessingWorker : BackgroundService
 
         try
         {
-            bool transcodeSuccess = await TranscodeRecordingAsync(originalPath, newPath, settingsRepo);
+            bool transcodeSuccess;
+            try
+            {
+                transcodeSuccess = await TranscodeRecordingAsync(originalPath, newPath, settings, encoder, encoding);
+            }
+            finally
+            {
+                // The conversion is over: the slot is free for a viewer while comskip runs.
+                encoding?.Dispose();
+            }
 
             if (transcodeSuccess && File.Exists(newPath))
             {
@@ -113,11 +158,8 @@ public class DvrPostProcessingWorker : BackgroundService
         }
     }
 
-    private async Task<bool> TranscodeRecordingAsync(string inputPath, string outputPath, ISystemSettingsRepository settingsRepo)
+    private async Task<bool> TranscodeRecordingAsync(string inputPath, string outputPath, ServerSetting settings, HardwareAccelerator? encoder, DvrEncodes.Encode? encoding)
     {
-        var settings = await settingsRepo.GetSettingsAsync();
-        var encoder = await HardwareEncoderChoice.ResolveAsync(settings, _hardware);
-
         if (settings.DisableVideoTranscoding)
         {
             _logger.LogInformation("[DVR Post-Processor] Transcoding disabled. Remuxing to MP4...");
@@ -131,6 +173,7 @@ public class DvrPostProcessingWorker : BackgroundService
         if (encoder is null) return false;
 
         _logger.LogWarning("[DVR Post-Processor] {Encoder} encode failed; retrying on the CPU.", HardwareArguments.Label(encoder.Type));
+        encoding?.MovedToCpu();
         return await RunFfmpegTranscodeAsync(BuildFfmpegArgs(inputPath, outputPath, settings, encoder: null));
     }
 

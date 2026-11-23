@@ -113,7 +113,7 @@ public sealed class EndOfFileSegmentTests : IDisposable
         var repository = Substitute.For<ISystemSettingsRepository>();
         repository.GetSettingsAsync().Returns(new ServerSetting { TranscoderTempDirectory = output });
         var services = new ServiceCollection().AddScoped(_ => repository).BuildServiceProvider();
-        return (new FFmpegTranscodeService(services, Substitute.For<IHardwareCapabilityService>(), NullLogger<FFmpegTranscodeService>.Instance), output);
+        return (new FFmpegTranscodeService(services, Substitute.For<IHardwareCapabilityService>(), new EncodeSlots([new PlaybackEncodes()]), NullLogger<FFmpegTranscodeService>.Instance), output);
     }
 
     private static PlaybackDecisionVM EncodeDecision(double durationSeconds) => new()

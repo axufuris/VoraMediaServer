@@ -40,7 +40,7 @@ public sealed class ImageSubtitleBurnInTests : IDisposable
         var repository = Substitute.For<ISystemSettingsRepository>();
         repository.GetSettingsAsync().Returns(new ServerSetting { TranscoderTempDirectory = _output, UseHardwareAcceleration = false });
         var services = new ServiceCollection().AddScoped(_ => repository).BuildServiceProvider();
-        return new FFmpegTranscodeService(services, Substitute.For<IHardwareCapabilityService>(), NullLogger<FFmpegTranscodeService>.Instance);
+        return new FFmpegTranscodeService(services, Substitute.For<IHardwareCapabilityService>(), new EncodeSlots([new PlaybackEncodes()]), NullLogger<FFmpegTranscodeService>.Instance);
     }
 
     private async Task<string> SourceAsync(bool withEmbeddedSubtitle, CancellationToken cancellationToken)

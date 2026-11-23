@@ -48,7 +48,7 @@ public sealed class GpuFailureRetryTests : IDisposable
         hardware.ResolveAsync(Arg.Any<HardwareAccelerationType>(), Arg.Any<string>(), Arg.Any<CancellationToken>())
             .Returns(new HardwareAccelerator(HardwareAccelerationType.QuickSync, "/dev/dri/renderD999", GpuVendor.Intel));
         var services = new ServiceCollection().AddScoped(_ => repository).BuildServiceProvider();
-        var transcoder = new FFmpegTranscodeService(services, hardware, NullLogger<FFmpegTranscodeService>.Instance);
+        var transcoder = new FFmpegTranscodeService(services, hardware, new EncodeSlots([new PlaybackEncodes()]), NullLogger<FFmpegTranscodeService>.Instance);
 
         var decision = new PlaybackDecisionVM
         {

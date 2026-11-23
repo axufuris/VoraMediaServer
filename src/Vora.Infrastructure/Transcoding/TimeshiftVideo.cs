@@ -3,6 +3,7 @@ using System.Text.Json;
 using Microsoft.Extensions.Logging;
 using Vora.Application.Iptv;
 using Vora.Application.Settings;
+using Vora.Application.Streaming;
 using Vora.Infrastructure.Analysis;
 using Vora.Infrastructure.Processes;
 
@@ -15,12 +16,14 @@ public sealed class TimeshiftVideo : ITimeshiftVideo
 
     private readonly ISystemSettingsRepository _settings;
     private readonly IHardwareCapabilityService _hardware;
+    private readonly IEncodeSlots _slots;
     private readonly ILogger<TimeshiftVideo> _logger;
 
-    public TimeshiftVideo(ISystemSettingsRepository settings, IHardwareCapabilityService hardware, ILogger<TimeshiftVideo> logger)
+    public TimeshiftVideo(ISystemSettingsRepository settings, IHardwareCapabilityService hardware, IEncodeSlots slots, ILogger<TimeshiftVideo> logger)
     {
         _settings = settings;
         _hardware = hardware;
+        _slots = slots;
         _logger = logger;
     }
 
@@ -51,7 +54,7 @@ public sealed class TimeshiftVideo : ITimeshiftVideo
         }
     }
 
-    public async Task<TimeshiftVideoArguments> EncodeArgumentsAsync(LiveVideoEncode encode, bool onCpu, CancellationToken cancellationToken = default)
+    public async Task<TimeshiftVideoArguments> EncodeArgumentsAsync(LiveVideoEncode encode, Guid viewerKey, bool onCpu, CancellationToken cancellationToken = default)
     {
         var settings = await _settings.GetSettingsAsync();
         if (settings.DisableVideoTranscoding)
@@ -61,7 +64,10 @@ public sealed class TimeshiftVideo : ITimeshiftVideo
         }
 
         var encoder = onCpu ? null : await HardwareEncoderChoice.ResolveAsync(settings, _hardware, cancellationToken);
-        return TimeshiftVideoArgumentsBuilder.Build(encode, encoder);
+        var slot = _slots.Assign(viewerKey, gpuReady: encoder is not null, settings.MaxGpuTranscodes, settings.MaxCpuTranscodes);
+        if (slot.Refusal is { } refusal) throw new EncodeLimitReachedException(refusal);
+
+        return TimeshiftVideoArgumentsBuilder.Build(encode, slot.OnGpu ? encoder : null);
     }
 
     internal static IReadOnlyList<string> ProbeArguments(string segmentPath) =>

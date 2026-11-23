@@ -6,6 +6,7 @@ using Microsoft.Extensions.Logging;
 using Vora.Api.Extensions;
 using Vora.Application.Iptv;
 using Vora.Application.Iptv.ViewModels;
+using Vora.Application.Streaming;
 
 namespace Vora.Api.Endpoints;
 
@@ -61,6 +62,10 @@ public static class IptvPassthroughEndpoints
         catch (TunerLimitReachedException)
         {
             return Results.Conflict(new { error = "All available tuners for this playlist are in use." });
+        }
+        catch (EncodeLimitReachedException ex)
+        {
+            return Results.Json(new { error = ex.Message }, statusCode: StatusCodes.Status503ServiceUnavailable);
         }
         catch (IptvSourceException)
         {

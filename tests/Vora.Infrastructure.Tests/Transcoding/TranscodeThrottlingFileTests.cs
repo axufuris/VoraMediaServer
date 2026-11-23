@@ -47,7 +47,7 @@ public sealed class TranscodeThrottlingFileTests : IDisposable
         var repository = Substitute.For<ISystemSettingsRepository>();
         repository.GetSettingsAsync().Returns(new ServerSetting { TranscoderTempDirectory = output, UseHardwareAcceleration = false, TranscoderThrottleBuffer = 30 });
         var services = new ServiceCollection().AddScoped(_ => repository).BuildServiceProvider();
-        var transcoder = new FFmpegTranscodeService(services, Substitute.For<IHardwareCapabilityService>(), NullLogger<FFmpegTranscodeService>.Instance);
+        var transcoder = new FFmpegTranscodeService(services, Substitute.For<IHardwareCapabilityService>(), new EncodeSlots([new PlaybackEncodes()]), NullLogger<FFmpegTranscodeService>.Instance);
         var decision = new PlaybackDecisionVM
         {
             MediaItemId = Guid.NewGuid(),

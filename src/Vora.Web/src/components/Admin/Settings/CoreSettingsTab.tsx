@@ -304,6 +304,10 @@ export default function CoreSettingsTab({ serverId, scanners, hardware, showModa
                         </div>
                     </div>
 
+                    <FieldHint>
+                        These count every video the server has to convert: a playback transcode, a live TV channel your player can't play as it is (antenna channels are usually MPEG-2), and a recording being converted. A GPU's encoder only runs so many at once. An encode uses the GPU while it is under its limit, then the CPU; past both it is refused, and a recording waits. Video that is copied doesn't count.
+                    </FieldHint>
+
                     <div>
                         <FieldLabel>Max Background Transcodes</FieldLabel>
                         <select

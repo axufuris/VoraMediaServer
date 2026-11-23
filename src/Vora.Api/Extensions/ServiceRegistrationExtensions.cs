@@ -582,6 +582,12 @@ public static class ServiceRegistrationExtensions
         services.AddSingleton<IFileSystemBrowserService, FileSystemBrowserService>();
         services.AddSingleton<IFolderWatcherService, FolderWatcherService>();
         services.AddSingleton<ITimeshiftCoordinator, TimeshiftCoordinator>();
+        // Every place a video encode runs, so the GPU and CPU transcode limits cover all of them.
+        services.AddSingleton<Vora.Application.Streaming.IEncodeSource>(sp => sp.GetRequiredService<ITimeshiftCoordinator>());
+        services.AddSingleton<Vora.Application.Streaming.IEncodeSource, PlaybackEncodes>();
+        services.AddSingleton<DvrEncodes>();
+        services.AddSingleton<Vora.Application.Streaming.IEncodeSource>(sp => sp.GetRequiredService<DvrEncodes>());
+        services.AddSingleton<Vora.Application.Streaming.IEncodeSlots, EncodeSlots>();
         services.AddScoped<ITimeshiftVideo, TimeshiftVideo>();
         services.AddSingleton<ITunerRegistry, TunerRegistry>();
         services.AddSingleton<ITranscodeService, FFmpegTranscodeService>();

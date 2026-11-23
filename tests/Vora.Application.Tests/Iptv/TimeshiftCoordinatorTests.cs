@@ -1,6 +1,7 @@
 using System.Diagnostics;
 using Microsoft.Extensions.Logging.Abstractions;
 using Vora.Application.Iptv;
+using Vora.Application.Streaming;
 
 namespace Vora.Application.Tests.Iptv;
 
@@ -130,5 +131,33 @@ public class TimeshiftCoordinatorTests : IDisposable
         {
             File.SetLastWriteTimeUtc(file, utcTime);
         }
+    }
+
+    [Fact]
+    public void Only_sessions_that_encode_and_whose_ffmpeg_is_running_hold_an_encoder()
+    {
+        using var running = Process.GetCurrentProcess();
+        var encodingOnGpu = Guid.NewGuid();
+        var encodingOnCpu = Guid.NewGuid();
+        var copying = Guid.NewGuid();
+        var stopped = Guid.NewGuid();
+
+        _coordinator.TryRegister(encodingOnGpu, running, CreateProfileSessionDirectory(encodingOnGpu), LiveSessionKind.Timeshift, new RunningEncode(OnGpu: true)).Should().BeTrue();
+        _coordinator.TryRegister(encodingOnCpu, running, CreateProfileSessionDirectory(encodingOnCpu), LiveSessionKind.Remux, new RunningEncode(OnGpu: false)).Should().BeTrue();
+        _coordinator.TryRegister(copying, running, CreateProfileSessionDirectory(copying)).Should().BeTrue();
+        _coordinator.TryRegister(stopped, new Process(), CreateProfileSessionDirectory(stopped), LiveSessionKind.Timeshift, new RunningEncode(OnGpu: true)).Should().BeTrue();
+
+        _coordinator.RunningEncodes(Guid.NewGuid()).Should().BeEquivalentTo([new RunningEncode(true), new RunningEncode(false)]);
+    }
+
+    [Fact]
+    public void A_session_restarting_is_not_counted_against_itself()
+    {
+        using var running = Process.GetCurrentProcess();
+        var viewer = Guid.NewGuid();
+        _coordinator.TryRegister(viewer, running, CreateProfileSessionDirectory(viewer), LiveSessionKind.Timeshift, new RunningEncode(OnGpu: true));
+
+        _coordinator.RunningEncodes(viewer).Should().BeEmpty();
+        _coordinator.RunningEncodes(Guid.NewGuid()).Should().ContainSingle();
     }
 }
