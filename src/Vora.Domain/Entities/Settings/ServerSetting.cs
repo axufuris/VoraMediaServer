@@ -157,7 +157,7 @@ public class ServerSetting
 
     public int MaxGpuTranscodes { get; set; } = 2;
     public int MaxCpuTranscodes { get; set; }
-    public int MaxBackgroundTranscodes { get; set; }
+    public int LiveTvX264Preset { get; set; } = 2;
 
     public bool EnableDailyMixes { get; set; } = true;
     public string DailyMixSchedule { get; set; } = "Daily3am";

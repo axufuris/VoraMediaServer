@@ -3221,6 +3221,9 @@ namespace Vora.Infrastructure.Migrations
                     b.Property<TimeSpan>("IptvSyncTime")
                         .HasColumnType("interval");
 
+                    b.Property<int>("LiveTvX264Preset")
+                        .HasColumnType("integer");
+
                     b.Property<string>("LocalMediaScannerProviderId")
                         .IsRequired()
                         .HasMaxLength(64)
@@ -3228,9 +3231,6 @@ namespace Vora.Infrastructure.Migrations
 
                     b.Property<bool>("ManuallySpecifyPublicPort")
                         .HasColumnType("boolean");
-
-                    b.Property<int>("MaxBackgroundTranscodes")
-                        .HasColumnType("integer");
 
                     b.Property<int>("MaxCpuTranscodes")
                         .HasColumnType("integer");

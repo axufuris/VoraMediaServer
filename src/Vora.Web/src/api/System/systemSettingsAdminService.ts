@@ -75,7 +75,7 @@ export interface ServerSettings {
     enableHevcOptimization: boolean;
     maxGpuTranscodes: number;
     maxCpuTranscodes: number;
-    maxBackgroundTranscodes: number;
+    liveTvX264Preset: number;
     hardwareTranscodingDevice: string;
     transcoderThrottleBuffer: number;
     tonemappingAlgorithm: string;

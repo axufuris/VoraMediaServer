@@ -693,6 +693,18 @@ public sealed class LegacyDatabase : IAsyncDisposable
         await ReplaceCombinedMigrationAsync(db, ContinueListeningMigration, "10.0.9", cancellationToken);
     }
 
+    public const string LiveTvPresetMigration = "20261119235856_ChangesSinceInitial";
+
+    public async Task BuildLiveTvPresetStateAsync(CancellationToken cancellationToken)
+    {
+        await using var db = NewContext();
+        await db.Database.MigrateAsync(cancellationToken);
+        await db.Database.ExecuteSqlRawAsync(
+            "ALTER TABLE \"ServerSettings\" DROP COLUMN \"LiveTvX264Preset\"; ALTER TABLE \"ServerSettings\" ADD COLUMN \"MaxBackgroundTranscodes\" integer NOT NULL DEFAULT 0;",
+            cancellationToken);
+        await ReplaceCombinedMigrationAsync(db, LiveTvPresetMigration, "10.0.9", cancellationToken);
+    }
+
     private static async Task ReplaceCombinedMigrationAsync(VoraDbContext db, string migrationId, string productVersion, CancellationToken cancellationToken)
     {
         await db.Database.ExecuteSqlAsync(

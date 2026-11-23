@@ -52,7 +52,9 @@ ALTER TABLE ""IptvChannels"" ADD COLUMN IF NOT EXISTS ""VideoLevel"" integer;
 ALTER TABLE ""IptvChannels"" ADD COLUMN IF NOT EXISTS ""VideoHeight"" integer;
 ALTER TABLE ""IptvChannels"" ADD COLUMN IF NOT EXISTS ""VideoFrameRate"" double precision;
 ALTER TABLE ""IptvChannels"" ADD COLUMN IF NOT EXISTS ""VideoInterlaced"" boolean;
-ALTER TABLE ""IptvChannels"" ADD COLUMN IF NOT EXISTS ""VideoFormatSeenAt"" timestamp with time zone;");
+ALTER TABLE ""IptvChannels"" ADD COLUMN IF NOT EXISTS ""VideoFormatSeenAt"" timestamp with time zone;
+ALTER TABLE ""ServerSettings"" ADD COLUMN IF NOT EXISTS ""LiveTvX264Preset"" integer NOT NULL DEFAULT 2;
+ALTER TABLE ""ServerSettings"" DROP COLUMN IF EXISTS ""MaxBackgroundTranscodes"";");
 
             migrationBuilder.Sql(@"
 UPDATE ""UserMediaStates"" SET ""ResumePositionSeconds"" = 0
@@ -582,6 +584,17 @@ CREATE INDEX IF NOT EXISTS ""IX_MusicResumePoints_ProfileId_UpdatedAt"" ON ""Mus
         /// <inheritdoc />
         protected override void Down(MigrationBuilder migrationBuilder)
         {
+            migrationBuilder.DropColumn(
+                name: "LiveTvX264Preset",
+                table: "ServerSettings");
+
+            migrationBuilder.AddColumn<int>(
+                name: "MaxBackgroundTranscodes",
+                table: "ServerSettings",
+                type: "integer",
+                nullable: false,
+                defaultValue: 0);
+
             migrationBuilder.DropTable(
                 name: "MusicResumePoints");
 

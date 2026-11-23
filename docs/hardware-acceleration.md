@@ -30,8 +30,6 @@ An encode takes a GPU slot while there is one, then a CPU slot, then is refused:
 
 Each place that encodes keeps its own record of what it is running and reports it through `IEncodeSource` (the transcode dictionary, the live session registry, `DvrEncodes`), so nothing has to be kept in step and a stopped session can't leave a slot taken. `EncodeSlots` adds them up when a start asks. The start holds `IEncodeSlots.HoldAsync` from choosing a slot until it has registered its encode, so two starts at the same moment (every viewer reconnecting after a restart) can't both take the last slot.
 
-`Max Background Transcodes` in the admin UI is stored but nothing reads it.
-
 ## Finding the GPU
 
 `GpuDeviceDiscovery` lists what the container can see, once per process:

@@ -99,6 +99,22 @@ public sealed class TimeshiftVideoTests : IDisposable
     private void NvidiaPresent() =>
         _hardware.ResolveAsync(HardwareAccelerationType.Auto, "Auto", Arg.Any<CancellationToken>()).Returns(new HardwareAccelerator(HardwareAccelerationType.Nvidia, "0", GpuVendor.Nvidia));
 
+    [Theory]
+    [InlineData(0, "ultrafast")]
+    [InlineData(2, "veryfast")]
+    [InlineData(4, "fast")]
+    [InlineData(8, "fast")]
+    [InlineData(-1, "ultrafast")]
+    public async Task A_cpu_live_encode_runs_the_admins_x264_preset_held_to_ultra_fast_through_fast(int preset, string name)
+    {
+        _settings.GetSettingsAsync().Returns(new ServerSetting { UseHardwareEncoding = false, LiveTvX264Preset = preset });
+
+        var video = await Video().EncodeArgumentsAsync(new LiveVideoEncode(41, null, false), _viewer, onCpu: false, TestContext.Current.CancellationToken);
+
+        video.Encoder.Should().Be("libx264");
+        video.Video.Take(4).Should().Equal("-c:v", "libx264", "-preset", name);
+    }
+
     [Fact]
     public async Task A_live_encode_takes_the_cpu_once_the_gpu_has_as_many_encodes_as_the_limit_allows()
     {

@@ -159,7 +159,7 @@ public class SystemSettingsManager : ISystemSettingsManager
         settings.EnableHevcOptimization = request.EnableHevcOptimization;
         settings.MaxGpuTranscodes = request.MaxGpuTranscodes;
         settings.MaxCpuTranscodes = request.MaxCpuTranscodes;
-        settings.MaxBackgroundTranscodes = request.MaxBackgroundTranscodes;
+        settings.LiveTvX264Preset = Math.Clamp(request.LiveTvX264Preset, 0, 4);
         settings.HardwareTranscodingDevice = string.IsNullOrWhiteSpace(request.HardwareTranscodingDevice) ? "Auto" : request.HardwareTranscodingDevice;
         settings.TranscoderThrottleBuffer = request.TranscoderThrottleBuffer;
         settings.TonemappingAlgorithm = string.IsNullOrWhiteSpace(request.TonemappingAlgorithm) ? "hable" : request.TonemappingAlgorithm;
