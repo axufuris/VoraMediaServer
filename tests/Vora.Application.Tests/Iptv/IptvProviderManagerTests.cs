@@ -25,6 +25,7 @@ public class IptvProviderManagerTests
     public IptvProviderManagerTests()
     {
         var resolver = new IptvUpstreamResolver(_protector);
+        _repo.GetServerSettingsAsync().Returns(new ServerSetting());
         _manager = new IptvManager(_repo, Substitute.For<IIptvEpgService>(), _users, _tasks, _timeshift, _tuners,
             Substitute.For<IStreamingTokenSigner>(), Substitute.For<ITimeshiftVideo>(), Substitute.For<IEncodeSlots>(), new IptvChannelLoader(_upstream, resolver), resolver, _protector,
             NullLogger<IptvManager>.Instance);
@@ -406,11 +407,11 @@ public class IptvProviderManagerTests
         var viewer = Guid.NewGuid();
         var playlistId = Guid.NewGuid();
         _tuners.TryAcquire(playlistId, 0, IptvManager.TimeshiftLeaseKey(viewer), TunerLeaseKind.Timeshift);
-        _timeshift.KindOf(viewer).Returns(LiveSessionKind.Timeshift);
+        _timeshift.KindOfViewer(viewer).Returns(LiveSessionKind.Timeshift);
 
         await _manager.StopLiveRemuxAsync(viewer);
 
-        await _timeshift.DidNotReceive().StopAsync(viewer);
+        await _timeshift.DidNotReceive().DetachAsync(viewer);
         _tuners.ActiveCount(playlistId).Should().Be(1);
     }
 
@@ -418,13 +419,15 @@ public class IptvProviderManagerTests
     public async Task Stopping_a_viewer_s_remux_ends_it_and_frees_its_connection()
     {
         var viewer = Guid.NewGuid();
+        var session = Guid.NewGuid();
         var playlistId = Guid.NewGuid();
-        _tuners.TryAcquire(playlistId, 0, IptvManager.TimeshiftLeaseKey(viewer), TunerLeaseKind.Timeshift);
-        _timeshift.KindOf(viewer).Returns(LiveSessionKind.Remux);
+        _tuners.TryAcquire(playlistId, 0, IptvManager.TimeshiftLeaseKey(session), TunerLeaseKind.Timeshift);
+        _timeshift.KindOfViewer(viewer).Returns(LiveSessionKind.Remux);
+        _timeshift.DetachAsync(viewer).Returns((Guid?)session);
 
         await _manager.StopLiveRemuxAsync(viewer);
 
-        await _timeshift.Received(1).StopAsync(viewer);
+        await _timeshift.Received(1).DetachAsync(viewer);
         _tuners.ActiveCount(playlistId).Should().Be(0);
     }
 

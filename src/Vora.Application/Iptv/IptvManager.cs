@@ -400,59 +400,27 @@ public class IptvManager : IIptvManager
 
         await using var profileLock = await _timeshiftCoordinator.LockProfileAsync(profileId);
 
-        var leaseKey = TimeshiftLeaseKey(profileId);
-        var maxConcurrent = playlist is null ? 0 : IptvConnectionLimit.Of(playlist);
-
-        _tunerRegistry.Release(leaseKey);
         _tunerRegistry.ReleaseStartingWith(IptvPassthroughService.ViewerLiveLeasePrefix(profileId, channel.PlaylistId));
-        if (!_tunerRegistry.TryAcquire(channel.PlaylistId, maxConcurrent, leaseKey, TunerLeaseKind.Timeshift))
+
+        var maxConcurrent = playlist is null ? 0 : IptvConnectionLimit.Of(playlist);
+        var result = await JoinOrStartAsync(channel, profileId, upstream, secret, limits, LiveSessionKind.Timeshift, maxConcurrent);
+        if (result.Session is { } session) return SessionUrl(session);
+
+        if (result.Failure == LiveStartFailure.StreamUnreadable)
         {
-            return null;
+            throw new InvalidOperationException("FFmpeg failed to generate the stream playlist in time. The stream source may be dead or incompatible.");
         }
-
-        try
-        {
-            var run = await StartFormatAwareAsync(channel, profileId, upstream, secret, limits, LiveSessionKind.Timeshift);
-            if (run is null)
-            {
-                _tunerRegistry.Release(leaseKey);
-                return null;
-            }
-
-            if (!_timeshiftCoordinator.IsActive(profileId))
-            {
-                _tunerRegistry.Release(leaseKey);
-                return null;
-            }
-
-            if (!File.Exists(run.PlaylistPath))
-            {
-                await _timeshiftCoordinator.StopAsync(profileId);
-                _tunerRegistry.Release(leaseKey);
-                if (TunerIsBusy(run, channel)) return null;
-                throw new InvalidOperationException("FFmpeg failed to generate the stream playlist in time. The stream source may be dead or incompatible.");
-            }
-
-            var sessionId = Path.GetFileName(run.SessionPath);
-            var token = _tokenSigner.Sign(TimeshiftTokenScope, $"{profileId}:{sessionId}", TimeshiftTokenTtl);
-            return $"/api/streaming/hls/timeshift/{token}/{profileId}/{sessionId}/{PlaylistFileName}";
-        }
-        catch
-        {
-            _tunerRegistry.Release(leaseKey);
-            throw;
-        }
+        return null;
     }
 
     public async Task StopTimeshiftSessionAsync(Guid profileId)
     {
         await using var profileLock = await _timeshiftCoordinator.LockProfileAsync(profileId);
-        _tunerRegistry.Release(TimeshiftLeaseKey(profileId));
-        await _timeshiftCoordinator.StopAsync(profileId);
+        await LeaveAsync(profileId);
     }
 
     public void PingTimeshiftSession(Guid profileId) =>
-        _timeshiftCoordinator.Heartbeat(profileId);
+        _timeshiftCoordinator.HeartbeatViewer(profileId);
 
     public async Task<string> StartLiveRemuxAsync(IptvChannel channel, IptvUpstream upstream, Guid viewerKey, int connectionLimit, LiveVideoLimits? limits = null)
     {
@@ -461,44 +429,145 @@ public class IptvManager : IIptvManager
 
         await using var viewerLock = await _timeshiftCoordinator.LockProfileAsync(viewerKey);
 
-        var leaseKey = TimeshiftLeaseKey(viewerKey);
-        _tunerRegistry.Release(leaseKey);
-        if (!_tunerRegistry.TryAcquire(channel.PlaylistId, connectionLimit, leaseKey, TunerLeaseKind.Timeshift))
+        var result = await JoinOrStartAsync(channel, viewerKey, upstream, secret, limits, LiveSessionKind.Remux, connectionLimit);
+        if (result.Session is not { } session)
         {
-            throw new TunerLimitReachedException();
-        }
-
-        try
-        {
-            var run = await StartFormatAwareAsync(channel, viewerKey, upstream, secret, limits, LiveSessionKind.Remux)
-                ?? throw new InvalidOperationException("Another stream for this viewer is starting.");
-
-            if (!_timeshiftCoordinator.IsActive(viewerKey) || !File.Exists(run.PlaylistPath))
+            throw result.Failure switch
             {
-                await _timeshiftCoordinator.StopAsync(viewerKey);
-                if (TunerIsBusy(run, channel)) throw new TunerLimitReachedException();
-                throw new IptvSourceException("The channel's stream could not be read.");
-            }
+                LiveStartFailure.TunersBusy => new TunerLimitReachedException(),
+                LiveStartFailure.Superseded => new InvalidOperationException("Another stream for this viewer is starting."),
+                _ => new IptvSourceException("The channel's stream could not be read.")
+            };
+        }
 
-            _logger.LogInformation("Passthrough of {Channel} is remuxed to HLS because its stream isn't HLS.", channel.Name);
-            var sessionId = Path.GetFileName(run.SessionPath);
-            var token = _tokenSigner.Sign(TimeshiftTokenScope, $"{viewerKey}:{sessionId}", TimeshiftTokenTtl);
-            return $"/api/streaming/hls/timeshift/{token}/{viewerKey}/{sessionId}/{PlaylistFileName}";
-        }
-        catch
-        {
-            _tunerRegistry.Release(leaseKey);
-            throw;
-        }
+        _logger.LogInformation("Passthrough of {Channel} is remuxed to HLS because its stream isn't HLS.", channel.Name);
+        return SessionUrl(session);
     }
 
     public async Task StopLiveRemuxAsync(Guid viewerKey)
     {
         await using var viewerLock = await _timeshiftCoordinator.LockProfileAsync(viewerKey);
-        if (_timeshiftCoordinator.KindOf(viewerKey) != LiveSessionKind.Remux) return;
+        if (_timeshiftCoordinator.KindOfViewer(viewerKey) != LiveSessionKind.Remux) return;
 
-        _tunerRegistry.Release(TimeshiftLeaseKey(viewerKey));
-        await _timeshiftCoordinator.StopAsync(viewerKey);
+        await LeaveAsync(viewerKey);
+    }
+
+    private enum LiveStartFailure
+    {
+        TunersBusy,
+        Superseded,
+        Gone,
+        StreamUnreadable
+    }
+
+    private sealed record LiveSessionStart(Guid SessionKey, string SessionPath);
+
+    private sealed record LiveStartResult(LiveSessionStart? Session, LiveStartFailure Failure)
+    {
+        public static LiveStartResult Started(LiveSessionStart session) => new(session, default);
+
+        public static LiveStartResult Failed(LiveStartFailure failure) => new(null, failure);
+    }
+
+    private string SessionUrl(LiveSessionStart session)
+    {
+        var sessionId = Path.GetFileName(session.SessionPath);
+        var token = _tokenSigner.Sign(TimeshiftTokenScope, $"{session.SessionKey}:{sessionId}", TimeshiftTokenTtl);
+        return $"/api/streaming/hls/timeshift/{token}/{session.SessionKey}/{sessionId}/{PlaylistFileName}";
+    }
+
+    private async Task LeaveAsync(Guid viewerKey)
+    {
+        if (await _timeshiftCoordinator.DetachAsync(viewerKey) is { } stopped)
+        {
+            _tunerRegistry.Release(TimeshiftLeaseKey(stopped));
+        }
+    }
+
+    private async Task<LiveStartResult> JoinOrStartAsync(
+        IptvChannel channel, Guid viewerKey, IptvUpstream upstream, string? secret, LiveVideoLimits? sent, LiveSessionKind kind, int maxConcurrent)
+    {
+        await using var channelLock = await _timeshiftCoordinator.LockChannelAsync(channel.Id, kind);
+
+        foreach (var exited in await _timeshiftCoordinator.StopExitedAsync(channel.Id, kind))
+        {
+            _tunerRegistry.Release(TimeshiftLeaseKey(exited));
+        }
+
+        var limits = LiveVideoLimits.Effective(sent);
+        if (await TryJoinAsync(channel, viewerKey, limits, kind) is { } joined) return LiveStartResult.Started(joined);
+
+        await LeaveAsync(viewerKey);
+
+        var sessionKey = Guid.NewGuid();
+        var leaseKey = TimeshiftLeaseKey(sessionKey);
+        if (!_tunerRegistry.TryAcquire(channel.PlaylistId, maxConcurrent, leaseKey, TunerLeaseKind.Timeshift))
+        {
+            return LiveStartResult.Failed(LiveStartFailure.TunersBusy);
+        }
+
+        try
+        {
+            var run = await StartFormatAwareAsync(channel, sessionKey, upstream, secret, sent, kind);
+            if (run is null)
+            {
+                _tunerRegistry.Release(leaseKey);
+                return LiveStartResult.Failed(LiveStartFailure.Superseded);
+            }
+
+            if (!_timeshiftCoordinator.IsActive(sessionKey))
+            {
+                _tunerRegistry.Release(leaseKey);
+                return LiveStartResult.Failed(LiveStartFailure.Gone);
+            }
+
+            if (!File.Exists(run.PlaylistPath))
+            {
+                await _timeshiftCoordinator.StopAsync(sessionKey);
+                _tunerRegistry.Release(leaseKey);
+                return LiveStartResult.Failed(TunerIsBusy(run, channel) ? LiveStartFailure.TunersBusy : LiveStartFailure.StreamUnreadable);
+            }
+
+            if (!(await _timeshiftCoordinator.AttachAsync(viewerKey, sessionKey)).Attached)
+            {
+                _tunerRegistry.Release(leaseKey);
+                return LiveStartResult.Failed(LiveStartFailure.Gone);
+            }
+
+            return LiveStartResult.Started(new LiveSessionStart(sessionKey, run.SessionPath));
+        }
+        catch
+        {
+            await _timeshiftCoordinator.StopAsync(sessionKey);
+            _tunerRegistry.Release(leaseKey);
+            throw;
+        }
+    }
+
+    private async Task<LiveSessionStart?> TryJoinAsync(IptvChannel channel, Guid viewerKey, LiveVideoLimits limits, LiveSessionKind kind)
+    {
+        var joinableFor = LiveSessionLifetime.JoinableFor(await _repository.GetServerSettingsAsync());
+        var now = DateTime.UtcNow;
+        var own = _timeshiftCoordinator.SessionOfViewer(viewerKey);
+        var candidate = _timeshiftCoordinator.SharedSessions(channel.Id, kind)
+            .Where(session => session.SessionKey != own
+                && now - session.StartedAtUtc < joinableFor
+                && File.Exists(Path.Combine(session.SessionPath, PlaylistFileName))
+                && LiveVideoDecision.Serves(session.Encode, session.Source, limits))
+            .OrderBy(session => session.Encode is null ? 0 : 1)
+            .ThenBy(session => session.Encode?.MaxHeight ?? int.MaxValue)
+            .FirstOrDefault();
+        if (candidate is null) return null;
+
+        var attached = await _timeshiftCoordinator.AttachAsync(viewerKey, candidate.SessionKey);
+        if (!attached.Attached) return null;
+
+        if (attached.StoppedSessionKey is { } stopped) _tunerRegistry.Release(TimeshiftLeaseKey(stopped));
+
+        _logger.LogInformation(
+            "{Kind} of {Channel} joins a running session instead of starting another ({Encoder}, {Viewers} viewers now).",
+            kind == LiveSessionKind.Remux ? "Live remux" : "Timeshift", channel.Name, candidate.Encode is null ? "copy" : "encode", candidate.Viewers + 1);
+        return new LiveSessionStart(candidate.SessionKey, candidate.SessionPath);
     }
 
     internal static LiveVideoFormat? StoredVideoFormat(IptvChannel channel) =>
@@ -527,13 +596,14 @@ public class IptvManager : IIptvManager
     /// is not yet known starts by copying and restarts when its first segment shows the player
     /// can't take it. A player that sent no limits is assumed to take <see cref="LiveVideoLimits.Default"/>.
     /// </summary>
-    private async Task<TimeshiftRun?> StartFormatAwareAsync(IptvChannel channel, Guid viewerKey, IptvUpstream upstream, string? secret, LiveVideoLimits? sent, LiveSessionKind kind)
+    private async Task<TimeshiftRun?> StartFormatAwareAsync(IptvChannel channel, Guid sessionKey, IptvUpstream upstream, string? secret, LiveVideoLimits? sent, LiveSessionKind kind)
     {
         var limits = LiveVideoLimits.Effective(sent);
         var segmentSeconds = kind == LiveSessionKind.Remux ? LiveRemuxSegmentSeconds : LiveVideoDecision.TimeshiftSegmentSeconds;
         var label = kind == LiveSessionKind.Remux ? "Live remux" : "Timeshift";
 
         var known = StoredVideoFormat(channel);
+        var source = known;
         var encode = known is not null && !LiveVideoDecision.Plays(known, limits)
             ? LiveVideoDecision.EncodeFor(known, limits, segmentSeconds)
             : null;
@@ -542,11 +612,11 @@ public class IptvManager : IIptvManager
         if (encode is null)
         {
             video = TimeshiftVideoArguments.Copy;
-            run = await LaunchTimeshiftAsync(viewerKey, upstream, secret, video, kind);
+            run = await LaunchTimeshiftAsync(sessionKey, channel.Id, null, source, upstream, secret, video, kind);
         }
         else
         {
-            (video, run) = await LaunchEncodeAsync(encode, onCpu: false, launchCopy: true, viewerKey, upstream, secret, kind);
+            (video, run) = await LaunchEncodeAsync(encode, source, onCpu: false, launchCopy: true, channel.Id, sessionKey, upstream, secret, kind);
         }
         if (video.Encodes && known is not null)
         {
@@ -559,11 +629,17 @@ public class IptvManager : IIptvManager
         {
             if (!video.Encodes)
             {
-                var seen = await LearnVideoFormatAsync(channel, known, viewerKey, run);
+                var seen = await LearnVideoFormatAsync(channel, known, sessionKey, run);
+                if (seen is not null)
+                {
+                    source = seen;
+                    _timeshiftCoordinator.SetSource(sessionKey, seen);
+                }
+
                 if (encode is null && seen is not null && LiveVideoDecision.Mismatch(seen, limits) is { } reason)
                 {
                     encode = LiveVideoDecision.EncodeFor(seen, limits, segmentSeconds);
-                    var restart = await LaunchEncodeAsync(encode, onCpu: false, launchCopy: false, viewerKey, upstream, secret, kind);
+                    var restart = await LaunchEncodeAsync(encode, source, onCpu: false, launchCopy: false, channel.Id, sessionKey, upstream, secret, kind);
                     video = restart.Video;
                     if (video.Encodes)
                     {
@@ -574,20 +650,20 @@ public class IptvManager : IIptvManager
                 }
             }
 
-            await WaitForFileAsync(viewerKey, run, SecondSegmentFileName);
+            await WaitForFileAsync(sessionKey, run, SecondSegmentFileName);
 
             if (encode is not null && video.OnGpu && HasExited(run.Process) && !File.Exists(run.PlaylistPath))
             {
                 _logger.LogWarning("{Kind} of {Channel} failed to encode with {Encoder}; retrying on the CPU.", label, channel.Name, video.Encoder);
-                (video, run) = await LaunchEncodeAsync(encode, onCpu: true, launchCopy: true, viewerKey, upstream, secret, kind);
+                (video, run) = await LaunchEncodeAsync(encode, source, onCpu: true, launchCopy: true, channel.Id, sessionKey, upstream, secret, kind);
                 if (run is null) return null;
-                await WaitForFileAsync(viewerKey, run, SecondSegmentFileName);
+                await WaitForFileAsync(sessionKey, run, SecondSegmentFileName);
             }
         }
         catch (EncodeLimitReachedException)
         {
             // The session already started (copying, or on a GPU that failed) is of no use to a viewer who is turned away.
-            await _timeshiftCoordinator.StopAsync(viewerKey);
+            await _timeshiftCoordinator.StopAsync(sessionKey);
             throw;
         }
 
@@ -596,23 +672,23 @@ public class IptvManager : IIptvManager
 
     // An encode takes a GPU or CPU slot. The slot is held from the moment it is chosen until the session
     // that uses it is registered, so two starts at the same moment can't both take the last one.
-    // launchCopy: whether the viewer's session is replaced even when transcoding turns out to be off and the
+    // launchCopy: whether the session is replaced even when transcoding turns out to be off and the
     // video is copied. When it is, the session being replaced is stopped first, so stopping it (a moment)
-    // isn't done while other starts wait for the slots, and a viewer who is then turned away isn't left
-    // with the stream they asked to leave.
+    // isn't done while other starts wait for the slots.
     private async Task<(TimeshiftVideoArguments Video, TimeshiftRun? Run)> LaunchEncodeAsync(
-        LiveVideoEncode encode, bool onCpu, bool launchCopy, Guid viewerKey, IptvUpstream upstream, string? secret, LiveSessionKind kind)
+        LiveVideoEncode encode, LiveVideoFormat? source, bool onCpu, bool launchCopy, Guid channelId, Guid sessionKey, IptvUpstream upstream, string? secret, LiveSessionKind kind)
     {
-        if (launchCopy) await _timeshiftCoordinator.StopAsync(viewerKey);
+        if (launchCopy) await _timeshiftCoordinator.StopAsync(sessionKey);
 
         using var slot = await _encodeSlots.HoldAsync();
-        var video = await _timeshiftVideo.EncodeArgumentsAsync(encode, viewerKey, onCpu);
+        var video = await _timeshiftVideo.EncodeArgumentsAsync(encode, sessionKey, onCpu);
         if (!video.Encodes && !launchCopy) return (video, null);
 
-        return (video, await LaunchTimeshiftAsync(viewerKey, upstream, secret, video, kind));
+        return (video, await LaunchTimeshiftAsync(sessionKey, channelId, encode, source, upstream, secret, video, kind));
     }
 
-    private async Task<TimeshiftRun?> LaunchTimeshiftAsync(Guid profileId, IptvUpstream upstream, string? secret, TimeshiftVideoArguments video, LiveSessionKind kind)
+    private async Task<TimeshiftRun?> LaunchTimeshiftAsync(
+        Guid profileId, Guid channelId, LiveVideoEncode? encode, LiveVideoFormat? source, IptvUpstream upstream, string? secret, TimeshiftVideoArguments video, LiveSessionKind kind)
     {
         var sessionPath = await PrepareTimeshiftDirectoryAsync(profileId);
         var outputPath = Path.Combine(sessionPath, PlaylistFileName).Replace("\\", "/");
@@ -621,7 +697,8 @@ public class IptvManager : IIptvManager
         var process = BuildTimeshiftProcess(upstream.Url, upstream.Policy, outputPath, segmentPath, video, kind == LiveSessionKind.Remux);
 
         await _timeshiftCoordinator.StopAsync(profileId);
-        if (!_timeshiftCoordinator.TryRegister(profileId, process, sessionPath, kind, video.Encodes ? new RunningEncode(video.OnGpu) : null))
+        var share = new LiveSessionShare(channelId, video.Encodes ? encode : null, source);
+        if (!_timeshiftCoordinator.TryRegister(profileId, process, sessionPath, kind, video.Encodes ? new RunningEncode(video.OnGpu) : null, share))
         {
             process.Dispose();
             TryDeleteDirectory(sessionPath);

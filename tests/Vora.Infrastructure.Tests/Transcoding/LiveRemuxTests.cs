@@ -35,7 +35,7 @@ public sealed class LiveRemuxTests : IAsyncDisposable
 
     public async ValueTask DisposeAsync()
     {
-        await _coordinator.StopAsync(_viewer);
+        await _coordinator.DetachAsync(_viewer);
         await _serving.CancelAsync();
         _listener?.Stop();
         _serving.Dispose();
@@ -61,7 +61,7 @@ public sealed class LiveRemuxTests : IAsyncDisposable
         url.Should().StartWith($"/api/streaming/hls/timeshift/").And.EndWith("/index.m3u8");
         var session = SessionFolder(url);
         File.Exists(Path.Combine(session, "index.m3u8")).Should().BeTrue();
-        _coordinator.KindOf(_viewer).Should().Be(LiveSessionKind.Remux);
+        _coordinator.KindOfViewer(_viewer).Should().Be(LiveSessionKind.Remux);
         _tuners.ActiveCount(channel.PlaylistId).Should().Be(1);
         lock (_requests)
         {
@@ -75,7 +75,7 @@ public sealed class LiveRemuxTests : IAsyncDisposable
         await Manager().StopTimeshiftSessionAsync(_viewer);
 
         Directory.Exists(session).Should().BeFalse();
-        _coordinator.IsActive(_viewer).Should().BeFalse();
+        _coordinator.KindOfViewer(_viewer).Should().BeNull();
         _tuners.ActiveCount(channel.PlaylistId).Should().Be(0);
     }
 
@@ -97,7 +97,7 @@ public sealed class LiveRemuxTests : IAsyncDisposable
         var evicted = await _coordinator.EvictStaleSessionsAsync(TimeSpan.FromHours(1), TimeSpan.FromHours(6), remuxMaxIdle: TimeSpan.Zero);
         foreach (var viewer in evicted) _tuners.Release(IptvManager.TimeshiftLeaseKey(viewer));
 
-        evicted.Should().Equal(_viewer);
+        evicted.Should().ContainSingle().Which.Should().NotBe(_viewer, "an evicted session is named by its own key, not by the viewer's");
         Directory.Exists(SessionFolder(second)).Should().BeFalse();
         _tuners.ActiveCount(channel.PlaylistId).Should().Be(0);
     }
@@ -256,7 +256,7 @@ public sealed class LiveRemuxTests : IAsyncDisposable
 
         await act.Should().ThrowAsync<TunerLimitReachedException>();
         _tuners.ActiveCount(channel.PlaylistId).Should().Be(0);
-        _coordinator.IsActive(_viewer).Should().BeFalse();
+        _coordinator.KindOfViewer(_viewer).Should().BeNull();
     }
 
     [Fact]

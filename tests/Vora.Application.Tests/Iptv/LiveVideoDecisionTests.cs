@@ -201,6 +201,54 @@ public class LiveVideoDecisionTests
         LiveVideoDecision.Plays(H264("High", 40), limits).Should().BeTrue();
     }
 
+    private static readonly LiveVideoFormat Mpeg2 = new("mpeg2video", "Main", 8, 1080, 29.97, true);
+    private static readonly LiveVideoEncode Level41 = new(41, null, true);
+
+    [Fact]
+    public void A_copy_session_serves_a_player_that_takes_the_video_it_carries_and_one_that_does_not_is_not_served()
+    {
+        LiveVideoDecision.Serves(null, H264("High", 41), Roku).Should().BeTrue();
+        LiveVideoDecision.Serves(null, H264("High 10", 41), Roku).Should().BeFalse();
+        LiveVideoDecision.Serves(null, Mpeg2, LiveVideoLimits.Default).Should().BeFalse();
+    }
+
+    [Fact]
+    public void A_copy_session_whose_format_is_not_known_serves_nobody()
+    {
+        LiveVideoDecision.Serves(null, null, LiveVideoLimits.Default).Should().BeFalse();
+    }
+
+    [Fact]
+    public void An_encode_session_serves_any_player_that_takes_h264_high_at_its_level()
+    {
+        LiveVideoDecision.Serves(Level41, Mpeg2, LiveVideoLimits.Default).Should().BeTrue();
+        LiveVideoDecision.Serves(Level41, Mpeg2, Roku).Should().BeTrue();
+        LiveVideoDecision.Serves(Level41, Mpeg2, Roku with { MaxH264Level = 40 }).Should().BeFalse("4.1 is above the player's 4.0");
+        LiveVideoDecision.Serves(Level41, Mpeg2, new LiveVideoLimits(["h264"], null, ["main"])).Should().BeFalse("it takes no High profile");
+        LiveVideoDecision.Serves(Level41, Mpeg2, new LiveVideoLimits(["hevc"], null, null)).Should().BeFalse("it takes no H.264");
+    }
+
+    [Fact]
+    public void An_encode_session_serves_a_smaller_screen_but_not_a_bigger_one_than_it_scaled_to()
+    {
+        var tv = Level41;
+        var phone = Level41 with { MaxHeight = 720 };
+
+        LiveVideoDecision.Serves(tv, Mpeg2, Roku with { MaxHeight = 720 }).Should().BeTrue("a phone takes a 1080 picture");
+        LiveVideoDecision.Serves(phone, Mpeg2, Roku with { MaxHeight = 720 }).Should().BeTrue();
+        LiveVideoDecision.Serves(phone, Mpeg2, Roku).Should().BeFalse("a TV that wants 1080 is not given a 720 picture");
+        LiveVideoDecision.Serves(phone, Mpeg2 with { Height = 576 }, Roku).Should().BeTrue("a 576 channel is not scaled, so the 720 cap changes nothing");
+    }
+
+    [Fact]
+    public void An_encode_session_whose_picture_height_is_not_known_is_not_offered_to_a_player_that_wants_a_size()
+    {
+        var unknownHeight = new LiveVideoFormat("mpeg2video", null, null, null, null, null);
+
+        LiveVideoDecision.Serves(Level41, unknownHeight, Roku).Should().BeFalse();
+        LiveVideoDecision.Serves(Level41 with { MaxHeight = 1080 }, unknownHeight, Roku).Should().BeTrue();
+    }
+
     [Fact]
     public void An_interlaced_picture_is_deinterlaced_and_a_progressive_one_is_not()
     {

@@ -86,5 +86,20 @@ public static class LiveVideoDecision
             ? EncodedHeights.Where(step => step <= height).DefaultIfEmpty(EncodedHeights[0]).Max()
             : MaxEncodedHeight;
 
+    public static LiveVideoFormat? OutputOf(LiveVideoEncode? sessionEncode, LiveVideoFormat? sessionSource) =>
+        sessionEncode is null
+            ? sessionSource
+            : new LiveVideoFormat(H264, "High", sessionEncode.Level, sessionEncode.MaxHeight ?? sessionSource?.Height, sessionSource?.FrameRate, false);
+
+    public static bool Serves(LiveVideoEncode? sessionEncode, LiveVideoFormat? sessionSource, LiveVideoLimits limits)
+    {
+        var output = OutputOf(sessionEncode, sessionSource);
+        if (output is null || !Plays(output, limits)) return false;
+        if (sessionEncode is null) return true;
+
+        var wanted = Math.Min(sessionSource?.Height ?? int.MaxValue, EncodedHeightFor(limits.MaxHeight));
+        return (output.Height ?? 0) >= wanted;
+    }
+
     private static string LevelName(int level) => (level / 10.0).ToString("0.0", CultureInfo.InvariantCulture);
 }

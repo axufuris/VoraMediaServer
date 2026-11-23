@@ -9,10 +9,6 @@ public class TimeshiftJanitorWorker : BackgroundService
 {
     private const string DefaultTranscodeDirectory = "/transcode";
 
-    private const int MinSessionLifetimeHours = 1;
-    private const int MaxSessionLifetimeHours = 48;
-    private const int DefaultSessionLifetimeHours = 6;
-
     private static readonly TimeSpan TickInterval = TimeSpan.FromSeconds(60);
     private static readonly TimeSpan MaxIdleDuration = TimeSpan.FromMinutes(2);
     private static readonly TimeSpan LiveMaxIdleDuration = TimeSpan.FromSeconds(90);
@@ -53,9 +49,9 @@ public class TimeshiftJanitorWorker : BackgroundService
                     var (timeshiftRoot, maxSessionLifetime) = await ReadJanitorConfigAsync();
 
                     var evictedTimeshifts = await _coordinator.EvictStaleSessionsAsync(MaxIdleDuration, maxSessionLifetime);
-                    foreach (var profileId in evictedTimeshifts)
+                    foreach (var sessionKey in evictedTimeshifts)
                     {
-                        _tunerRegistry.Release(IptvManager.TimeshiftLeaseKey(profileId));
+                        _tunerRegistry.Release(IptvManager.TimeshiftLeaseKey(sessionKey));
                     }
 
                     _tunerRegistry.EvictIdle(TunerLeaseKind.Live, LiveMaxIdleDuration);
@@ -99,10 +95,6 @@ public class TimeshiftJanitorWorker : BackgroundService
             : settings.TranscoderTempDirectory;
         var timeshiftRoot = Path.Combine(tempDir, TimeshiftCoordinator.TimeshiftSubdirectory);
 
-        var hours = settings.TimeshiftMaxSessionHours <= 0
-            ? DefaultSessionLifetimeHours
-            : Math.Clamp(settings.TimeshiftMaxSessionHours, MinSessionLifetimeHours, MaxSessionLifetimeHours);
-
-        return (timeshiftRoot, TimeSpan.FromHours(hours));
+        return (timeshiftRoot, LiveSessionLifetime.Of(settings));
     }
 }

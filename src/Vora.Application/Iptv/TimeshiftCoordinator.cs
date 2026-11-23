@@ -11,16 +11,29 @@ public enum LiveSessionKind
     Remux = 1
 }
 
+public sealed record LiveSessionShare(Guid ChannelId, LiveVideoEncode? Encode, LiveVideoFormat? Source);
+
+public sealed record AttachResult(bool Attached, Guid? StoppedSessionKey);
+
+public sealed record SharedLiveSession(Guid SessionKey, string SessionPath, LiveVideoEncode? Encode, LiveVideoFormat? Source, DateTime StartedAtUtc, int Viewers);
+
 public interface ITimeshiftCoordinator : IEncodeSource
 {
-    /// <param name="encode">What the session's ffmpeg encodes, or null when it copies the video, so the server
-    /// can count the encodes it is running.</param>
-    bool TryRegister(Guid profileId, Process process, string sessionPath, LiveSessionKind kind = LiveSessionKind.Timeshift, RunningEncode? encode = null);
-    bool IsActive(Guid profileId);
-    LiveSessionKind? KindOf(Guid profileId);
-    void Heartbeat(Guid profileId);
-    Task StopAsync(Guid profileId);
+    bool TryRegister(Guid sessionKey, Process process, string sessionPath, LiveSessionKind kind = LiveSessionKind.Timeshift, RunningEncode? encode = null, LiveSessionShare? share = null);
+    bool IsActive(Guid sessionKey);
+    LiveSessionKind? KindOf(Guid sessionKey);
+    void Heartbeat(Guid sessionKey);
+    Task StopAsync(Guid sessionKey);
+    void SetSource(Guid sessionKey, LiveVideoFormat? source);
+    IReadOnlyList<SharedLiveSession> SharedSessions(Guid channelId, LiveSessionKind kind);
+    Task<IReadOnlyList<Guid>> StopExitedAsync(Guid channelId, LiveSessionKind kind);
+    Task<AttachResult> AttachAsync(Guid viewerKey, Guid sessionKey);
+    Task<Guid?> DetachAsync(Guid viewerKey);
+    LiveSessionKind? KindOfViewer(Guid viewerKey);
+    Guid? SessionOfViewer(Guid viewerKey);
+    void HeartbeatViewer(Guid viewerKey);
     Task<IAsyncDisposable> LockProfileAsync(Guid profileId);
+    Task<IAsyncDisposable> LockChannelAsync(Guid channelId, LiveSessionKind kind);
     Task<IReadOnlyList<Guid>> EvictStaleSessionsAsync(TimeSpan maxIdleDuration, TimeSpan maxSessionLifetime, TimeSpan? remuxMaxIdle = null);
     Task ReapOrphanedDirectoriesAsync(string timeshiftRoot, TimeSpan maxIdleAge);
 }
@@ -35,8 +48,11 @@ public class TimeshiftCoordinator : ITimeshiftCoordinator
     private const int DirectoryDeleteRetries = 3;
     private const int DirectoryDeleteRetryDelayMs = 100;
 
-    private readonly ConcurrentDictionary<Guid, ActiveSession> _activeTimeshifts = new();
+    private readonly object _sync = new();
+    private readonly Dictionary<Guid, ActiveSession> _sessions = new();
+    private readonly Dictionary<Guid, Guid> _viewerSessions = new();
     private readonly ConcurrentDictionary<Guid, SemaphoreSlim> _profileLocks = new();
+    private readonly ConcurrentDictionary<(Guid ChannelId, LiveSessionKind Kind), SemaphoreSlim> _channelLocks = new();
     private readonly ILogger<TimeshiftCoordinator> _logger;
 
     public TimeshiftCoordinator(ILogger<TimeshiftCoordinator> logger)
@@ -44,25 +60,38 @@ public class TimeshiftCoordinator : ITimeshiftCoordinator
         _logger = logger;
     }
 
-    public bool TryRegister(Guid profileId, Process process, string sessionPath, LiveSessionKind kind = LiveSessionKind.Timeshift, RunningEncode? encode = null)
+    public bool TryRegister(Guid sessionKey, Process process, string sessionPath, LiveSessionKind kind = LiveSessionKind.Timeshift, RunningEncode? encode = null, LiveSessionShare? share = null)
     {
         var now = DateTime.UtcNow;
-        return _activeTimeshifts.TryAdd(profileId, new ActiveSession(process, sessionPath, kind, encode)
+        lock (_sync)
         {
-            StartedAtUtc = now,
-            LastHeartbeatUtc = now
-        });
+            if (_sessions.ContainsKey(sessionKey)) return false;
+
+            _sessions[sessionKey] = new ActiveSession(process, sessionPath, kind, encode, share)
+            {
+                StartedAtUtc = now,
+                LastHeartbeatUtc = now,
+                Source = share?.Source
+            };
+            return true;
+        }
     }
 
-    public bool IsActive(Guid profileId) => _activeTimeshifts.ContainsKey(profileId);
+    public bool IsActive(Guid sessionKey)
+    {
+        lock (_sync) return _sessions.ContainsKey(sessionKey);
+    }
 
-    // A session whose ffmpeg has stopped (or never started) holds no encoder, so it is not counted even
-    // while it waits to be evicted.
-    public IReadOnlyList<RunningEncode> RunningEncodes(Guid except) =>
-        _activeTimeshifts
-            .Where(session => session.Key != except && session.Value.Encode is not null && IsRunning(session.Value.Process))
-            .Select(session => session.Value.Encode!)
-            .ToList();
+    public IReadOnlyList<RunningEncode> RunningEncodes(Guid except)
+    {
+        lock (_sync)
+        {
+            return _sessions
+                .Where(session => session.Key != except && session.Value.Encode is not null && IsRunning(session.Value.Process))
+                .Select(session => session.Value.Encode!)
+                .ToList();
+        }
+    }
 
     private static bool IsRunning(Process process)
     {
@@ -76,40 +105,174 @@ public class TimeshiftCoordinator : ITimeshiftCoordinator
         }
     }
 
-    public LiveSessionKind? KindOf(Guid profileId) =>
-        _activeTimeshifts.TryGetValue(profileId, out var session) ? session.Kind : null;
-
-    public void Heartbeat(Guid profileId)
+    public LiveSessionKind? KindOf(Guid sessionKey)
     {
-        if (_activeTimeshifts.TryGetValue(profileId, out var session))
+        lock (_sync) return _sessions.TryGetValue(sessionKey, out var session) ? session.Kind : null;
+    }
+
+    public void Heartbeat(Guid sessionKey)
+    {
+        lock (_sync)
         {
-            session.LastHeartbeatUtc = DateTime.UtcNow;
+            if (_sessions.TryGetValue(sessionKey, out var session))
+            {
+                session.LastHeartbeatUtc = DateTime.UtcNow;
+            }
         }
     }
 
-    public Task StopAsync(Guid profileId)
+    public Task StopAsync(Guid sessionKey)
     {
-        if (_activeTimeshifts.TryRemove(profileId, out var session))
-        {
-            TerminateProcess(session.Process, profileId);
-            TryDeleteSessionDirectory(session.SessionPath, profileId);
-        }
+        ActiveSession? session;
+        lock (_sync) session = Remove(sessionKey);
+
+        if (session is not null) Release(session, sessionKey);
         return Task.CompletedTask;
+    }
+
+    public void SetSource(Guid sessionKey, LiveVideoFormat? source)
+    {
+        lock (_sync)
+        {
+            if (_sessions.TryGetValue(sessionKey, out var session))
+            {
+                session.Source = source;
+            }
+        }
+    }
+
+    public IReadOnlyList<SharedLiveSession> SharedSessions(Guid channelId, LiveSessionKind kind)
+    {
+        lock (_sync)
+        {
+            return _sessions
+                .Where(session => session.Value.Share?.ChannelId == channelId && session.Value.Kind == kind && IsRunning(session.Value.Process))
+                .Select(session => new SharedLiveSession(
+                    session.Key, session.Value.SessionPath, session.Value.Share!.Encode, session.Value.Source, session.Value.StartedAtUtc, session.Value.Viewers.Count))
+                .ToList();
+        }
+    }
+
+    public Task<IReadOnlyList<Guid>> StopExitedAsync(Guid channelId, LiveSessionKind kind)
+    {
+        var exited = new List<(Guid Key, ActiveSession Session)>();
+        lock (_sync)
+        {
+            foreach (var session in _sessions.Where(s => s.Value.Share?.ChannelId == channelId && s.Value.Kind == kind && !IsRunning(s.Value.Process)).ToList())
+            {
+                exited.Add((session.Key, Remove(session.Key)!));
+            }
+        }
+
+        foreach (var (key, session) in exited) Release(session, key);
+        return Task.FromResult<IReadOnlyList<Guid>>(exited.Select(s => s.Key).ToList());
+    }
+
+    public Task<AttachResult> AttachAsync(Guid viewerKey, Guid sessionKey)
+    {
+        ActiveSession? stopped = null;
+        var stoppedKey = Guid.Empty;
+        lock (_sync)
+        {
+            if (!_sessions.TryGetValue(sessionKey, out var session)) return Task.FromResult(new AttachResult(false, null));
+
+            if (_viewerSessions.TryGetValue(viewerKey, out var previous) && previous != sessionKey && _sessions.TryGetValue(previous, out var left))
+            {
+                left.Viewers.Remove(viewerKey);
+                if (left.Viewers.Count == 0)
+                {
+                    stopped = Remove(previous);
+                    stoppedKey = previous;
+                }
+            }
+
+            session.Viewers.Add(viewerKey);
+            _viewerSessions[viewerKey] = sessionKey;
+        }
+
+        if (stopped is not null) Release(stopped, stoppedKey);
+        return Task.FromResult(new AttachResult(true, stopped is null ? null : stoppedKey));
+    }
+
+    public Task<Guid?> DetachAsync(Guid viewerKey)
+    {
+        ActiveSession? stopped;
+        Guid sessionKey;
+        lock (_sync)
+        {
+            if (!_viewerSessions.Remove(viewerKey, out sessionKey)) return Task.FromResult<Guid?>(null);
+            if (!_sessions.TryGetValue(sessionKey, out var session)) return Task.FromResult<Guid?>(null);
+
+            session.Viewers.Remove(viewerKey);
+            if (session.Viewers.Count > 0) return Task.FromResult<Guid?>(null);
+
+            stopped = Remove(sessionKey);
+        }
+
+        if (stopped is null) return Task.FromResult<Guid?>(null);
+
+        Release(stopped, sessionKey);
+        return Task.FromResult<Guid?>(sessionKey);
+    }
+
+    public LiveSessionKind? KindOfViewer(Guid viewerKey)
+    {
+        lock (_sync)
+        {
+            return _viewerSessions.TryGetValue(viewerKey, out var sessionKey) && _sessions.TryGetValue(sessionKey, out var session) ? session.Kind : null;
+        }
+    }
+
+    public Guid? SessionOfViewer(Guid viewerKey)
+    {
+        lock (_sync) return _viewerSessions.TryGetValue(viewerKey, out var sessionKey) ? sessionKey : null;
+    }
+
+    public void HeartbeatViewer(Guid viewerKey)
+    {
+        lock (_sync)
+        {
+            if (_viewerSessions.TryGetValue(viewerKey, out var sessionKey) && _sessions.TryGetValue(sessionKey, out var session))
+            {
+                session.LastHeartbeatUtc = DateTime.UtcNow;
+            }
+        }
+    }
+
+    private ActiveSession? Remove(Guid sessionKey)
+    {
+        if (!_sessions.Remove(sessionKey, out var session)) return null;
+
+        foreach (var viewer in session.Viewers) _viewerSessions.Remove(viewer);
+        return session;
+    }
+
+    private void Release(ActiveSession session, Guid sessionKey)
+    {
+        TerminateProcess(session.Process, sessionKey);
+        TryDeleteSessionDirectory(session.SessionPath, sessionKey);
     }
 
     public async Task<IAsyncDisposable> LockProfileAsync(Guid profileId)
     {
         var gate = _profileLocks.GetOrAdd(profileId, _ => new SemaphoreSlim(1, 1));
         await gate.WaitAsync();
-        return new ProfileLockReleaser(gate);
+        return new LockReleaser(gate);
     }
 
-    private sealed class ProfileLockReleaser : IAsyncDisposable
+    public async Task<IAsyncDisposable> LockChannelAsync(Guid channelId, LiveSessionKind kind)
+    {
+        var gate = _channelLocks.GetOrAdd((channelId, kind), _ => new SemaphoreSlim(1, 1));
+        await gate.WaitAsync();
+        return new LockReleaser(gate);
+    }
+
+    private sealed class LockReleaser : IAsyncDisposable
     {
         private readonly SemaphoreSlim _gate;
         private int _released;
 
-        public ProfileLockReleaser(SemaphoreSlim gate) => _gate = gate;
+        public LockReleaser(SemaphoreSlim gate) => _gate = gate;
 
         public ValueTask DisposeAsync()
         {
@@ -124,33 +287,36 @@ public class TimeshiftCoordinator : ITimeshiftCoordinator
     public Task<IReadOnlyList<Guid>> EvictStaleSessionsAsync(TimeSpan maxIdleDuration, TimeSpan maxSessionLifetime, TimeSpan? remuxMaxIdle = null)
     {
         var now = DateTime.UtcNow;
-        var evicted = new List<Guid>();
-        foreach (var kvp in _activeTimeshifts)
+        var evicted = new List<(Guid Key, ActiveSession Session, bool Idle, bool Expired)>();
+        lock (_sync)
         {
-            var profileId = kvp.Key;
-            var idleLimit = kvp.Value.Kind == LiveSessionKind.Remux ? remuxMaxIdle ?? LiveRemuxMaxIdle : maxIdleDuration;
-            var isIdle = now - kvp.Value.LastHeartbeatUtc > idleLimit;
-            var exceededLifetime = now - kvp.Value.StartedAtUtc > maxSessionLifetime;
-            if (!isIdle && !exceededLifetime) continue;
-
-            if (_activeTimeshifts.TryRemove(profileId, out var session))
+            foreach (var kvp in _sessions.ToList())
             {
-                TerminateProcess(session.Process, profileId);
-                TryDeleteSessionDirectory(session.SessionPath, profileId);
-                evicted.Add(profileId);
-                _logger.LogInformation(
-                    "Evicted {Kind} session for profile {ProfileId} (idle: {Idle}, exceededLifetime: {ExceededLifetime}).",
-                    session.Kind, profileId, isIdle, exceededLifetime);
+                var idleLimit = kvp.Value.Kind == LiveSessionKind.Remux ? remuxMaxIdle ?? LiveRemuxMaxIdle : maxIdleDuration;
+                var isIdle = now - kvp.Value.LastHeartbeatUtc > idleLimit;
+                var exceededLifetime = now - kvp.Value.StartedAtUtc > maxSessionLifetime;
+                if (!isIdle && !exceededLifetime) continue;
+
+                evicted.Add((kvp.Key, Remove(kvp.Key)!, isIdle, exceededLifetime));
             }
         }
-        return Task.FromResult<IReadOnlyList<Guid>>(evicted);
+
+        foreach (var (key, session, isIdle, exceededLifetime) in evicted)
+        {
+            Release(session, key);
+            _logger.LogInformation(
+                "Evicted {Kind} session {SessionKey} (idle: {Idle}, exceededLifetime: {ExceededLifetime}).",
+                session.Kind, key, isIdle, exceededLifetime);
+        }
+        return Task.FromResult<IReadOnlyList<Guid>>(evicted.Select(e => e.Key).ToList());
     }
 
     public Task ReapOrphanedDirectoriesAsync(string timeshiftRoot, TimeSpan maxIdleAge)
     {
         if (!Directory.Exists(timeshiftRoot)) return Task.CompletedTask;
 
-        var activeProfileIds = new HashSet<Guid>(_activeTimeshifts.Keys);
+        HashSet<Guid> activeProfileIds;
+        lock (_sync) activeProfileIds = new HashSet<Guid>(_sessions.Keys);
         var cutoffUtc = DateTime.UtcNow - maxIdleAge;
 
         string[] profileDirectories;
@@ -292,9 +458,11 @@ public class TimeshiftCoordinator : ITimeshiftCoordinator
         }
     }
 
-    private sealed record ActiveSession(Process Process, string SessionPath, LiveSessionKind Kind, RunningEncode? Encode)
+    private sealed record ActiveSession(Process Process, string SessionPath, LiveSessionKind Kind, RunningEncode? Encode, LiveSessionShare? Share)
     {
         public required DateTime StartedAtUtc { get; init; }
         public required DateTime LastHeartbeatUtc { get; set; }
+        public LiveVideoFormat? Source { get; set; }
+        public HashSet<Guid> Viewers { get; } = [];
     }
 }
