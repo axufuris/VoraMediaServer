@@ -309,15 +309,21 @@ export default function CoreSettingsTab({ serverId, scanners, hardware, showModa
                     </FieldHint>
 
                     <div>
-                        <FieldLabel>Max Background Transcodes</FieldLabel>
+                        <FieldLabel>Live TV x264 Preset</FieldLabel>
                         <select
-                            value={serverSettings.maxBackgroundTranscodes}
-                            onChange={e => setServerSettings({ ...serverSettings, maxBackgroundTranscodes: Number(e.target.value) })}
+                            value={serverSettings.liveTvX264Preset}
+                            onChange={e => setServerSettings({ ...serverSettings, liveTvX264Preset: Number(e.target.value) })}
                             className="vora-input max-w-xs cursor-pointer"
                         >
-                            <option value={0}>Unlimited</option>
-                            {[...Array(20)].map((_, i) => <option key={i + 1} value={i + 1}>{i + 1}</option>)}
+                            <option value={0}>Ultra Fast</option>
+                            <option value={1}>Super Fast</option>
+                            <option value={2}>Very Fast</option>
+                            <option value={3}>Faster</option>
+                            <option value={4}>Fast</option>
                         </select>
+                        <FieldHint>
+                            How hard the CPU works when it converts a live TV channel your player can't play. A faster preset uses less CPU (Super Fast about a fifth less than Very Fast, Ultra Fast about half) and makes a larger stream at the same quality, which matters over a slow connection. A GPU encode isn't affected.
+                        </FieldHint>
                     </div>
 
                     <div className="pt-4 border-t border-[var(--vora-border-subtle)]">

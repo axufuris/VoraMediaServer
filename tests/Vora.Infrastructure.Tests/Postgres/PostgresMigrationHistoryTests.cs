@@ -1693,4 +1693,40 @@ public class PostgresMigrationHistoryTests(PostgresDatabase database) : IClassFi
         (await HomeRowsAsync(again, cancellationToken)).Should().Equal(rows);
     }
 
+    [Fact]
+    public async Task A_database_on_the_continue_listening_migration_gains_the_live_tv_preset_on_very_fast_and_loses_the_background_transcodes_column()
+    {
+        Assert.SkipUnless(PostgresDatabase.IsConfigured, PostgresDatabase.SkipReason);
+        var cancellationToken = TestContext.Current.CancellationToken;
+        await using var legacy = new LegacyDatabase();
+        await legacy.BuildLiveTvPresetStateAsync(cancellationToken);
+
+        await using (var before = legacy.NewContext())
+        {
+            (await before.Database.GetPendingMigrationsAsync(cancellationToken)).Should().Equal(MigrationHistoryTests.ChangesSinceInitial);
+            var columns = await ColumnsAsync(before, "ServerSettings", cancellationToken);
+            columns.Should().Contain("MaxBackgroundTranscodes").And.NotContain("LiveTvX264Preset");
+            await before.Database.ExecuteSqlRawAsync("UPDATE \"ServerSettings\" SET \"MaxGpuTranscodes\" = 3, \"MaxBackgroundTranscodes\" = 4", cancellationToken);
+        }
+
+        await legacy.MigrateAsync(cancellationToken);
+
+        await using (var after = legacy.NewContext())
+        {
+            (await after.Database.GetPendingMigrationsAsync(cancellationToken)).Should().BeEmpty();
+            var columns = await ColumnsAsync(after, "ServerSettings", cancellationToken);
+            columns.Should().Contain("LiveTvX264Preset").And.NotContain("MaxBackgroundTranscodes");
+            var settings = await after.Set<ServerSetting>().AsNoTracking().SingleAsync(cancellationToken);
+            settings.LiveTvX264Preset.Should().Be(2);
+            settings.MaxGpuTranscodes.Should().Be(3);
+            await after.Database.ExecuteSqlRawAsync("UPDATE \"ServerSettings\" SET \"LiveTvX264Preset\" = 0", cancellationToken);
+            await after.Database.ExecuteSqlAsync($"DELETE FROM \"__EFMigrationsHistory\" WHERE \"MigrationId\" = {MigrationHistoryTests.ChangesSinceInitial}", cancellationToken);
+        }
+
+        await legacy.MigrateAsync(cancellationToken);
+
+        await using var again = legacy.NewContext();
+        (await again.Set<ServerSetting>().AsNoTracking().SingleAsync(cancellationToken)).LiveTvX264Preset.Should().Be(0);
+    }
+
 }

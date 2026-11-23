@@ -39,6 +39,31 @@ public class SystemSettingsManagerTests
 
     // ---------- Clamping & coercion ----------
 
+    [Theory]
+    [InlineData(-3, 0)]
+    [InlineData(0, 0)]
+    [InlineData(2, 2)]
+    [InlineData(4, 4)]
+    [InlineData(8, 4)]
+    public async Task UpdateServerSettingsAsync_holds_the_live_tv_x264_preset_to_ultra_fast_through_fast(int sent, int saved)
+    {
+        var settings = new ServerSetting();
+        _repo.GetSettingsForUpdateAsync().Returns(settings);
+        var req = ValidRequest();
+        req.LiveTvX264Preset = sent;
+
+        await Build().UpdateServerSettingsAsync(req);
+
+        settings.LiveTvX264Preset.Should().Be(saved);
+    }
+
+    [Fact]
+    public void A_new_server_runs_live_tv_encodes_on_very_fast()
+    {
+        new ServerSetting().LiveTvX264Preset.Should().Be(2);
+        new ServerSettingsVM().LiveTvX264Preset.Should().Be(2);
+    }
+
     [Fact]
     public async Task UpdateServerSettingsAsync_clamps_silence_threshold_offset_to_min_minus_40()
     {

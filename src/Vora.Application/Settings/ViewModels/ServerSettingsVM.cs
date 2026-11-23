@@ -57,7 +57,7 @@ public class ServerSettingsVM
     public bool EnableHevcOptimization { get; set; } = true;
     public int MaxGpuTranscodes { get; set; } = 2;
     public int MaxCpuTranscodes { get; set; }
-    public int MaxBackgroundTranscodes { get; set; }
+    public int LiveTvX264Preset { get; set; } = 2;
     public string HardwareTranscodingDevice { get; set; } = "Auto";
     public int TranscoderThrottleBuffer { get; set; } = 60;
     public string TonemappingAlgorithm { get; set; } = "hable";
@@ -143,7 +143,7 @@ public class ServerSettingsVM
             EnableHevcOptimization = s.EnableHevcOptimization,
             MaxGpuTranscodes = s.MaxGpuTranscodes,
             MaxCpuTranscodes = s.MaxCpuTranscodes,
-            MaxBackgroundTranscodes = s.MaxBackgroundTranscodes,
+            LiveTvX264Preset = s.LiveTvX264Preset,
             HardwareTranscodingDevice = s.HardwareTranscodingDevice,
             TranscoderThrottleBuffer = s.TranscoderThrottleBuffer,
             TonemappingAlgorithm = s.TonemappingAlgorithm,

@@ -67,7 +67,7 @@ public sealed class TimeshiftVideo : ITimeshiftVideo
         var slot = _slots.Assign(viewerKey, gpuReady: encoder is not null, settings.MaxGpuTranscodes, settings.MaxCpuTranscodes);
         if (slot.Refusal is { } refusal) throw new EncodeLimitReachedException($"{refusal} This channel has to be transcoded for this device, so it can't start until another stream ends.");
 
-        return TimeshiftVideoArgumentsBuilder.Build(encode, slot.OnGpu ? encoder : null);
+        return TimeshiftVideoArgumentsBuilder.Build(encode, slot.OnGpu ? encoder : null, Math.Clamp(settings.LiveTvX264Preset, 0, 4));
     }
 
     internal static IReadOnlyList<string> ProbeArguments(string segmentPath) =>

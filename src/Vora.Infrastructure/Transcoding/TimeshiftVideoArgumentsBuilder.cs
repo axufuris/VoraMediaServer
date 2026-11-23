@@ -13,7 +13,7 @@ internal static class TimeshiftVideoArgumentsBuilder
     public const string CpuEncoder = "libx264";
     public const string FlaggedFramesDeinterlace = "yadif=deint=interlaced";
 
-    public static TimeshiftVideoArguments Build(LiveVideoEncode encode, HardwareAccelerator? encoder)
+    public static TimeshiftVideoArguments Build(LiveVideoEncode encode, HardwareAccelerator? encoder, int x264Preset = X264Presets.Default)
     {
         var gpu = encoder is { Type: HardwareAccelerationType.Nvidia or HardwareAccelerationType.QuickSync or HardwareAccelerationType.Vaapi }
             ? encoder
@@ -26,7 +26,7 @@ internal static class TimeshiftVideoArgumentsBuilder
 
         var video = new List<string>();
         if (filters.Count > 0) video.AddRange(["-vf", string.Join(",", filters)]);
-        video.AddRange(Encoder(gpu));
+        video.AddRange(Encoder(gpu, x264Preset));
         video.AddRange(["-profile:v", "high", "-level", encode.Level.ToString(CultureInfo.InvariantCulture)]);
         if (gpu is null or { Type: HardwareAccelerationType.Nvidia }) video.AddRange(["-pix_fmt", "yuv420p"]);
         video.AddRange(["-force_key_frames", KeyframeEvery(encode.SegmentSeconds)]);
@@ -36,13 +36,13 @@ internal static class TimeshiftVideoArgumentsBuilder
             : new TimeshiftVideoArguments(HardwareArguments.InitDevices(gpu), video, HardwareArguments.Label(gpu.Type), OnGpu: true);
     }
 
-    private static List<string> Encoder(HardwareAccelerator? gpu) => gpu?.Type switch
+    private static List<string> Encoder(HardwareAccelerator? gpu, int x264Preset) => gpu?.Type switch
     {
         HardwareAccelerationType.Nvidia when gpu.Device is { } device => ["-c:v", "h264_nvenc", "-gpu", device, "-preset", "p4", "-cq", "28", "-forced-idr", "1"],
         HardwareAccelerationType.Nvidia => ["-c:v", "h264_nvenc", "-preset", "p4", "-cq", "28", "-forced-idr", "1"],
         HardwareAccelerationType.QuickSync => ["-c:v", "h264_qsv", "-preset", "veryfast", "-global_quality", "28", "-forced_idr", "1"],
         HardwareAccelerationType.Vaapi => ["-c:v", "h264_vaapi", "-qp", "28"],
-        _ => ["-c:v", CpuEncoder, "-preset", "veryfast", "-crf", "23"],
+        _ => ["-c:v", CpuEncoder, "-preset", X264Presets.Name(x264Preset), "-crf", "23"],
     };
 
     private static List<string> UploadFilters(HardwareAccelerator? gpu) => gpu?.Type switch

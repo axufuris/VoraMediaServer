@@ -14,7 +14,7 @@ using Vora.Infrastructure.Persistence;
 namespace Vora.Infrastructure.Migrations
 {
     [DbContext(typeof(VoraDbContext))]
-    [Migration("20261119235856_ChangesSinceInitial")]
+    [Migration("20261123022252_ChangesSinceInitial")]
     partial class ChangesSinceInitial
     {
         /// <inheritdoc />
@@ -3224,6 +3224,9 @@ namespace Vora.Infrastructure.Migrations
                     b.Property<TimeSpan>("IptvSyncTime")
                         .HasColumnType("interval");
 
+                    b.Property<int>("LiveTvX264Preset")
+                        .HasColumnType("integer");
+
                     b.Property<string>("LocalMediaScannerProviderId")
                         .IsRequired()
                         .HasMaxLength(64)
@@ -3231,9 +3234,6 @@ namespace Vora.Infrastructure.Migrations
 
                     b.Property<bool>("ManuallySpecifyPublicPort")
                         .HasColumnType("boolean");
-
-                    b.Property<int>("MaxBackgroundTranscodes")
-                        .HasColumnType("integer");
 
                     b.Property<int>("MaxCpuTranscodes")
                         .HasColumnType("integer");

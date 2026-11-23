@@ -22,6 +22,27 @@ public class TimeshiftVideoArgumentsTests
         known.Video.Take(2).Should().Equal("-vf", "yadif,scale=-2:'min(ih,1080)'");
     }
 
+    [Theory]
+    [InlineData(0, "ultrafast")]
+    [InlineData(1, "superfast")]
+    [InlineData(2, "veryfast")]
+    [InlineData(3, "faster")]
+    [InlineData(4, "fast")]
+    public void The_cpu_encode_runs_the_x264_preset_the_admin_chose_for_live_tv(int preset, string name)
+    {
+        var arguments = TimeshiftVideoArgumentsBuilder.Build(Level41, encoder: null, preset);
+
+        arguments.Video.Take(6).Should().Equal("-c:v", "libx264", "-preset", name, "-crf", "23");
+    }
+
+    [Fact]
+    public void A_gpu_encode_ignores_the_x264_preset()
+    {
+        var arguments = TimeshiftVideoArgumentsBuilder.Build(Level41, new HardwareAccelerator(HardwareAccelerationType.Nvidia, "0", GpuVendor.Nvidia), x264Preset: 0);
+
+        arguments.Video.Should().Contain("h264_nvenc").And.NotContain("ultrafast").And.Contain("p4");
+    }
+
     [Fact]
     public void An_encode_for_a_small_screen_scales_the_picture_down_to_the_height_it_was_given()
     {
