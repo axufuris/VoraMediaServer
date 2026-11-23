@@ -35,10 +35,10 @@ public class SignalRClientNotifier(IHubContext<VoraHub> hubContext) : IClientNot
         hubContext.Clients.All.SendAsync("TasksUpdated");
 
     public Task NotifyUserAccessUpdatedAsync(Guid userId) =>
-        hubContext.Clients.Groups(VoraHub.UserGroupName(userId), VoraHub.AdminGroupName).SendAsync("UserAccessUpdated", userId.ToString());
+        hubContext.Clients.Group(VoraHub.UserGroupName(userId)).SendAsync("UserAccessUpdated", userId.ToString());
 
     public Task NotifyProfileAccessUpdatedAsync(Guid profileId) =>
-        hubContext.Clients.Groups(VoraHub.ProfileGroupName(profileId), VoraHub.AdminGroupName).SendAsync("ProfileAccessUpdated", profileId.ToString());
+        hubContext.Clients.Group(VoraHub.ProfileGroupName(profileId)).SendAsync("ProfileAccessUpdated", profileId.ToString());
 
     public Task NotifyDvrSessionsUpdatedAsync() =>
         hubContext.Clients.All.SendAsync("DvrSessionsUpdated");
@@ -53,7 +53,7 @@ public class SignalRClientNotifier(IHubContext<VoraHub> hubContext) : IClientNot
         hubContext.Clients.All.SendAsync("MusicAlbumUpdated", albumId.ToString());
 
     public Task NotifyMusicMixesUpdatedAsync(Guid profileId) =>
-        hubContext.Clients.Groups(VoraHub.ProfileGroupName(profileId), VoraHub.AdminGroupName).SendAsync("MusicMixesUpdated", profileId.ToString());
+        hubContext.Clients.Group(VoraHub.ProfileGroupName(profileId)).SendAsync("MusicMixesUpdated", profileId.ToString());
 
     public Task NotifyMusicHistoryUpdatedAsync(Guid profileId) =>
         hubContext.Clients.Group(VoraHub.ProfileGroupName(profileId)).SendAsync("MusicHistoryUpdated", profileId.ToString());
