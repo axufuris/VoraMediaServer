@@ -26,7 +26,7 @@ public static class DvrPlaybackEndpoints
             .WithName("PlayDvrSession")
             .Produces<DvrPlaybackUrlResponse>(StatusCodes.Status200OK);
         group.MapGet("/dvr/file/{sessionId:guid}", ServeRecordingFileAsync);
-        group.MapGet("/hls/timeshift/{token}/{profileId:guid}/{sessionId}/{fileName}", ServeTimeshiftHlsAsync);
+        group.MapGet("/hls/timeshift/{token}/{sessionKey:guid}/{sessionId}/{fileName}", ServeTimeshiftHlsAsync);
 
         return group;
     }
@@ -73,7 +73,7 @@ public static class DvrPlaybackEndpoints
 
     private static async Task<IResult> ServeTimeshiftHlsAsync(
         string token,
-        Guid profileId,
+        Guid sessionKey,
         string sessionId,
         string fileName,
         ISystemSettingsRepository settingsRepo,
@@ -81,21 +81,21 @@ public static class DvrPlaybackEndpoints
         ITimeshiftCoordinator coordinator,
         HttpContext context)
     {
-        if (!signer.TryVerify(token, TimeshiftTokenScope, out var payload) || payload != $"{profileId}:{sessionId}")
+        if (!signer.TryVerify(token, TimeshiftTokenScope, out var payload) || payload != $"{sessionKey}:{sessionId}")
         {
             return Results.NotFound();
         }
 
         var settings = await settingsRepo.GetSettingsAsync();
         var tempDir = string.IsNullOrWhiteSpace(settings.TranscoderTempDirectory) ? "/transcode" : settings.TranscoderTempDirectory;
-        var path = SafePathResolver.ResolveContainedSubPath(tempDir, "timeshift", profileId.ToString(), sessionId, fileName);
+        var path = SafePathResolver.ResolveContainedSubPath(tempDir, "timeshift", sessionKey.ToString(), sessionId, fileName);
 
         if (path == null || !File.Exists(path))
         {
             return Results.NotFound();
         }
 
-        coordinator.Heartbeat(profileId);
+        coordinator.Heartbeat(sessionKey);
 
         var contentType = fileName.EndsWith(".m3u8") ? "application/vnd.apple.mpegurl" : "video/MP2T";
 

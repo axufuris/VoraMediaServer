@@ -1,3 +1,5 @@
+using System.ComponentModel;
+using System.Diagnostics;
 using System.Net;
 using System.Net.Sockets;
 using System.Text;
@@ -25,6 +27,10 @@ public sealed class TimeshiftClientLimitsTests : IAsyncDisposable
     private readonly IIptvRepository _repository = Substitute.For<IIptvRepository>();
     private readonly TimeshiftCoordinator _coordinator = new(NullLogger<TimeshiftCoordinator>.Instance);
     private readonly Guid _profileId = Guid.NewGuid();
+    private readonly Guid _otherProfileId = Guid.NewGuid();
+    private readonly TunerRegistry _tuners = new();
+    private int _accepted;
+    private bool _hold;
     private readonly CancellationTokenSource _serving = new();
     private TcpListener? _listener;
 
@@ -37,7 +43,8 @@ public sealed class TimeshiftClientLimitsTests : IAsyncDisposable
 
     public async ValueTask DisposeAsync()
     {
-        await _coordinator.StopAsync(_profileId);
+        await _coordinator.DetachAsync(_profileId);
+        await _coordinator.DetachAsync(_otherProfileId);
         await _serving.CancelAsync();
         _listener?.Stop();
         _serving.Dispose();
@@ -115,7 +122,7 @@ public sealed class TimeshiftClientLimitsTests : IAsyncDisposable
         var start = () => manager.StartTimeshiftSessionAsync(channel.Id, Guid.NewGuid(), _profileId, Roku);
 
         await start.Should().ThrowAsync<EncodeLimitReachedException>().WithMessage("Maximum CPU transcodes reached.*");
-        _coordinator.IsActive(_profileId).Should().BeFalse("nothing was started for the viewer who was turned away");
+        _coordinator.KindOfViewer(_profileId).Should().BeNull("nothing was started for the viewer who was turned away");
     }
 
     [Fact]
@@ -130,6 +137,125 @@ public sealed class TimeshiftClientLimitsTests : IAsyncDisposable
         var url = await manager.StartTimeshiftSessionAsync(channel.Id, Guid.NewGuid(), _profileId, Roku);
 
         url.Should().NotBeNull();
+    }
+
+    private static readonly LiveVideoFormat High10At1080 = new("h264", "High 10", 51, 1080, 25, false);
+
+    [Fact]
+    public async Task Two_viewers_of_one_channel_share_one_session_one_encode_and_one_tuner()
+    {
+        Assert.SkipUnless(FfmpegTool.IsAvailable(), FfmpegTool.SkipReason);
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var channel = Serve(await SampleAsync("high10", "yuv420p10le", "5.1", cancellationToken), new LiveVideoFormat("h264", "High 10", 51, 360, 25, false), hold: true);
+        var manager = Manager();
+
+        var first = await manager.StartTimeshiftSessionAsync(channel.Id, Guid.NewGuid(), _profileId, Roku);
+        var second = await manager.StartTimeshiftSessionAsync(channel.Id, Guid.NewGuid(), _otherProfileId, Roku);
+
+        second.Should().Be(first);
+        _accepted.Should().Be(1, "one connection to the tuner serves both viewers");
+        _tuners.ActiveCount(channel.PlaylistId).Should().Be(1);
+        _coordinator.RunningEncodes(Guid.NewGuid()).Should().ContainSingle("one encode, not one per viewer");
+        _coordinator.SharedSessions(channel.Id, LiveSessionKind.Timeshift).Should().ContainSingle().Which.Viewers.Should().Be(2);
+        (await SessionFormatAsync(second, cancellationToken)).Should().BeEquivalentTo(new { Codec = "h264", Profile = "High", Level = (int?)41 });
+
+        await manager.StopTimeshiftSessionAsync(_profileId);
+
+        _tuners.ActiveCount(channel.PlaylistId).Should().Be(1, "the other viewer is still watching");
+        _coordinator.SharedSessions(channel.Id, LiveSessionKind.Timeshift).Should().ContainSingle().Which.Viewers.Should().Be(1);
+
+        await manager.StopTimeshiftSessionAsync(_otherProfileId);
+
+        _tuners.ActiveCount(channel.PlaylistId).Should().Be(0, "the last viewer leaving frees the tuner");
+        _coordinator.SharedSessions(channel.Id, LiveSessionKind.Timeshift).Should().BeEmpty();
+        _coordinator.RunningEncodes(Guid.NewGuid()).Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task A_player_that_cannot_take_the_shared_encode_gets_one_of_its_own()
+    {
+        Assert.SkipUnless(FfmpegTool.IsAvailable(), FfmpegTool.SkipReason);
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var channel = Serve(await SampleAsync("high10", "yuv420p10le", "5.1", cancellationToken), new LiveVideoFormat("h264", "High 10", 51, 360, 25, false), hold: true);
+        var manager = Manager();
+        var levelFour = new LiveVideoLimits(["h264"], 40, ["high"]);
+
+        var first = await manager.StartTimeshiftSessionAsync(channel.Id, Guid.NewGuid(), _profileId, Roku);
+        var second = await manager.StartTimeshiftSessionAsync(channel.Id, Guid.NewGuid(), _otherProfileId, levelFour);
+
+        second.Should().NotBe(first);
+        _accepted.Should().Be(2);
+        _tuners.ActiveCount(channel.PlaylistId).Should().Be(2);
+        _coordinator.RunningEncodes(Guid.NewGuid()).Should().HaveCount(2);
+        (await SessionFormatAsync(second, cancellationToken)).Should().BeEquivalentTo(new { Level = (int?)40 });
+    }
+
+    [Fact]
+    public async Task A_phone_joins_the_encode_a_tv_started()
+    {
+        Assert.SkipUnless(FfmpegTool.IsAvailable(), FfmpegTool.SkipReason);
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var channel = Serve(await SampleAsync("high10", "yuv420p10le", "5.1", cancellationToken), High10At1080, hold: true);
+        var manager = Manager();
+
+        var tv = await manager.StartTimeshiftSessionAsync(channel.Id, Guid.NewGuid(), _profileId, Roku);
+        var phone = await manager.StartTimeshiftSessionAsync(channel.Id, Guid.NewGuid(), _otherProfileId, Roku with { MaxHeight = 720 });
+
+        phone.Should().Be(tv);
+        _accepted.Should().Be(1);
+        _tuners.ActiveCount(channel.PlaylistId).Should().Be(1);
+    }
+
+    [Fact]
+    public async Task A_tv_does_not_join_the_smaller_picture_a_phone_started()
+    {
+        Assert.SkipUnless(FfmpegTool.IsAvailable(), FfmpegTool.SkipReason);
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var channel = Serve(await SampleAsync("high10", "yuv420p10le", "5.1", cancellationToken), High10At1080, hold: true);
+        var manager = Manager();
+
+        var phone = await manager.StartTimeshiftSessionAsync(channel.Id, Guid.NewGuid(), _profileId, Roku with { MaxHeight = 720 });
+        var tv = await manager.StartTimeshiftSessionAsync(channel.Id, Guid.NewGuid(), _otherProfileId, Roku);
+
+        tv.Should().NotBe(phone);
+        _accepted.Should().Be(2);
+        _tuners.ActiveCount(channel.PlaylistId).Should().Be(2);
+    }
+
+    [Fact]
+    public async Task A_session_whose_ffmpeg_has_died_is_replaced_not_joined_and_its_tuner_is_freed()
+    {
+        Assert.SkipUnless(OperatingSystem.IsLinux() && FfmpegTool.IsAvailable(), "Finds ffmpeg's command line under /proc, so it needs Linux and ffmpeg.");
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var channel = Serve(await SampleAsync("high10", "yuv420p10le", "5.1", cancellationToken), new LiveVideoFormat("h264", "High 10", 51, 360, 25, false), hold: true);
+        var manager = Manager();
+        var first = await manager.StartTimeshiftSessionAsync(channel.Id, Guid.NewGuid(), _profileId, Roku);
+        KillFfmpegWritingUnder(_root);
+        var until = DateTime.UtcNow.AddSeconds(10);
+        while (_coordinator.SharedSessions(channel.Id, LiveSessionKind.Timeshift).Count > 0 && DateTime.UtcNow < until)
+        {
+            await Task.Delay(100, cancellationToken);
+        }
+        _coordinator.SharedSessions(channel.Id, LiveSessionKind.Timeshift).Should().BeEmpty("the session's ffmpeg was killed");
+
+        var second = await manager.StartTimeshiftSessionAsync(channel.Id, Guid.NewGuid(), _otherProfileId, Roku);
+
+        second.Should().NotBeNull().And.NotBe(first);
+        _tuners.ActiveCount(channel.PlaylistId).Should().Be(1, "the ended session's tuner was freed for the new one");
+    }
+
+    private static void KillFfmpegWritingUnder(string folder)
+    {
+        foreach (var process in Process.GetProcessesByName("ffmpeg"))
+        {
+            try
+            {
+                if (File.ReadAllText($"/proc/{process.Id}/cmdline").Contains(folder, StringComparison.Ordinal)) process.Kill();
+            }
+            catch (Exception ex) when (ex is IOException or InvalidOperationException or Win32Exception)
+            {
+            }
+        }
     }
 
     private sealed class Running(params RunningEncode[] encodes) : IEncodeSource
@@ -158,7 +284,7 @@ public sealed class TimeshiftClientLimitsTests : IAsyncDisposable
         users.GetUserAccountAsync(Arg.Any<Guid>()).Returns(new UserVM
         {
             HasAllIptvAccess = true,
-            Profiles = new List<UserProfileVM> { new() { Id = _profileId, HasAllIptvAccess = true } }
+            Profiles = new List<UserProfileVM> { new() { Id = _profileId, HasAllIptvAccess = true }, new() { Id = _otherProfileId, HasAllIptvAccess = true } }
         });
         var protector = Substitute.For<IIptvSecretProtector>();
 
@@ -168,7 +294,7 @@ public sealed class TimeshiftClientLimitsTests : IAsyncDisposable
             users,
             Substitute.For<ITaskQueueManager>(),
             _coordinator,
-            new TunerRegistry(),
+            _tuners,
             signer,
             new TimeshiftVideo(settings, Substitute.For<IHardwareCapabilityService>(), slots, NullLogger<TimeshiftVideo>.Instance),
             slots,
@@ -181,8 +307,8 @@ public sealed class TimeshiftClientLimitsTests : IAsyncDisposable
     private async Task<LiveVideoFormat?> SessionFormatAsync(string? url, CancellationToken cancellationToken)
     {
         url.Should().NotBeNull();
-        var sessionId = (url ?? string.Empty).Split('/')[^2];
-        var segment = Path.Combine(_root, TimeshiftCoordinator.TimeshiftSubdirectory, _profileId.ToString(), sessionId, "seg_000.ts");
+        var parts = (url ?? string.Empty).Split('/');
+        var segment = Path.Combine(_root, TimeshiftCoordinator.TimeshiftSubdirectory, parts[^3], parts[^2], "seg_000.ts");
         var video = new TimeshiftVideo(Substitute.For<ISystemSettingsRepository>(), Substitute.For<IHardwareCapabilityService>(), Substitute.For<IEncodeSlots>(), NullLogger<TimeshiftVideo>.Instance);
         return await video.ReadFormatAsync(segment, cancellationToken);
     }
@@ -198,8 +324,9 @@ public sealed class TimeshiftClientLimitsTests : IAsyncDisposable
         return path;
     }
 
-    private IptvChannel Serve(string sample, LiveVideoFormat? known)
+    private IptvChannel Serve(string sample, LiveVideoFormat? known, bool hold = false)
     {
+        _hold = hold;
         var stream = File.ReadAllBytes(sample);
         _listener = new TcpListener(IPAddress.Loopback, 0);
         _listener.Start();
@@ -223,7 +350,7 @@ public sealed class TimeshiftClientLimitsTests : IAsyncDisposable
         return channel;
     }
 
-    private static async Task AcceptAsync(TcpListener listener, byte[] stream, CancellationToken cancellationToken)
+    private async Task AcceptAsync(TcpListener listener, byte[] stream, CancellationToken cancellationToken)
     {
         while (!cancellationToken.IsCancellationRequested)
         {
@@ -236,6 +363,7 @@ public sealed class TimeshiftClientLimitsTests : IAsyncDisposable
             {
                 return;
             }
+            Interlocked.Increment(ref _accepted);
             _ = SendStreamAsync(client, stream, cancellationToken);
         }
     }
@@ -254,7 +382,7 @@ public sealed class TimeshiftClientLimitsTests : IAsyncDisposable
         return false;
     }
 
-    private static async Task SendStreamAsync(TcpClient client, byte[] stream, CancellationToken cancellationToken)
+    private async Task SendStreamAsync(TcpClient client, byte[] stream, CancellationToken cancellationToken)
     {
         using (client)
         {
@@ -268,6 +396,7 @@ public sealed class TimeshiftClientLimitsTests : IAsyncDisposable
                     await network.WriteAsync(stream.AsMemory(offset, Math.Min(ChunkBytes, stream.Length - offset)), cancellationToken);
                     await Task.Delay(ChunkDelayMs, cancellationToken);
                 }
+                if (_hold) await Task.Delay(Timeout.Infinite, cancellationToken);
             }
             catch (Exception ex) when (ex is IOException or SocketException or OperationCanceledException or ObjectDisposedException)
             {

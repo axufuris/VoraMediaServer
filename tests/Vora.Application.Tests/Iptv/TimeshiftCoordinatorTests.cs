@@ -160,4 +160,187 @@ public class TimeshiftCoordinatorTests : IDisposable
         _coordinator.RunningEncodes(viewer).Should().BeEmpty();
         _coordinator.RunningEncodes(Guid.NewGuid()).Should().ContainSingle();
     }
+
+    private static readonly LiveVideoEncode Encode41 = new(41, null, true);
+
+    private Guid RegisterShared(Guid channel, Process? process = null, LiveSessionKind kind = LiveSessionKind.Timeshift, LiveVideoEncode? encode = null)
+    {
+        var session = Guid.NewGuid();
+        _coordinator.TryRegister(session, process ?? new Process(), CreateProfileSessionDirectory(session), kind, encode is null ? null : new RunningEncode(OnGpu: false), new LiveSessionShare(channel, encode, null))
+            .Should().BeTrue();
+        return session;
+    }
+
+    [Fact]
+    public async Task A_session_stops_only_when_its_last_viewer_leaves()
+    {
+        var session = RegisterShared(Guid.NewGuid());
+        var first = Guid.NewGuid();
+        var second = Guid.NewGuid();
+        (await _coordinator.AttachAsync(first, session)).Attached.Should().BeTrue();
+        (await _coordinator.AttachAsync(second, session)).Attached.Should().BeTrue();
+
+        (await _coordinator.DetachAsync(first)).Should().BeNull();
+        _coordinator.IsActive(session).Should().BeTrue();
+        _coordinator.SessionOfViewer(first).Should().BeNull();
+        _coordinator.SessionOfViewer(second).Should().Be(session);
+
+        (await _coordinator.DetachAsync(second)).Should().Be(session, "the key of the session that stopped, for the caller to free its tuner");
+        _coordinator.IsActive(session).Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task A_viewer_who_is_not_watching_has_nothing_to_leave()
+    {
+        (await _coordinator.DetachAsync(Guid.NewGuid())).Should().BeNull();
+    }
+
+    [Fact]
+    public async Task A_viewer_who_moves_to_another_session_stops_the_one_nobody_is_left_on()
+    {
+        var channel = Guid.NewGuid();
+        var old = RegisterShared(channel);
+        var next = RegisterShared(channel);
+        var viewer = Guid.NewGuid();
+        await _coordinator.AttachAsync(viewer, old);
+
+        var moved = await _coordinator.AttachAsync(viewer, next);
+
+        moved.Should().Be(new AttachResult(true, old));
+        _coordinator.IsActive(old).Should().BeFalse();
+        _coordinator.SessionOfViewer(viewer).Should().Be(next);
+    }
+
+    [Fact]
+    public async Task A_viewer_who_moves_leaves_the_session_other_viewers_are_still_on_running()
+    {
+        var channel = Guid.NewGuid();
+        var old = RegisterShared(channel);
+        var next = RegisterShared(channel);
+        var mover = Guid.NewGuid();
+        var staying = Guid.NewGuid();
+        await _coordinator.AttachAsync(mover, old);
+        await _coordinator.AttachAsync(staying, old);
+
+        var moved = await _coordinator.AttachAsync(mover, next);
+
+        moved.Should().Be(new AttachResult(true, null));
+        _coordinator.IsActive(old).Should().BeTrue();
+        _coordinator.SessionOfViewer(staying).Should().Be(old);
+    }
+
+    [Fact]
+    public async Task A_viewer_can_not_attach_to_a_session_that_is_gone()
+    {
+        (await _coordinator.AttachAsync(Guid.NewGuid(), Guid.NewGuid())).Should().Be(new AttachResult(false, null));
+    }
+
+    [Fact]
+    public async Task Stopping_a_session_forgets_the_viewers_on_it()
+    {
+        var session = RegisterShared(Guid.NewGuid(), kind: LiveSessionKind.Remux);
+        var viewer = Guid.NewGuid();
+        await _coordinator.AttachAsync(viewer, session);
+        _coordinator.KindOfViewer(viewer).Should().Be(LiveSessionKind.Remux);
+
+        await _coordinator.StopAsync(session);
+
+        _coordinator.KindOfViewer(viewer).Should().BeNull();
+        _coordinator.SessionOfViewer(viewer).Should().BeNull();
+    }
+
+    [Fact]
+    public async Task Evicting_an_idle_session_forgets_its_viewers_and_names_the_session_not_the_viewer()
+    {
+        var session = RegisterShared(Guid.NewGuid());
+        var viewer = Guid.NewGuid();
+        await _coordinator.AttachAsync(viewer, session);
+
+        var evicted = await _coordinator.EvictStaleSessionsAsync(TimeSpan.Zero, TimeSpan.FromHours(6));
+
+        evicted.Should().Equal(session);
+        _coordinator.SessionOfViewer(viewer).Should().BeNull();
+    }
+
+    [Fact]
+    public async Task A_viewers_ping_keeps_the_session_it_watches_alive()
+    {
+        var session = RegisterShared(Guid.NewGuid());
+        var viewer = Guid.NewGuid();
+        await _coordinator.AttachAsync(viewer, session);
+        await Task.Delay(300, TestContext.Current.CancellationToken);
+
+        _coordinator.HeartbeatViewer(viewer);
+        var evicted = await _coordinator.EvictStaleSessionsAsync(TimeSpan.FromMilliseconds(200), TimeSpan.FromHours(6));
+
+        evicted.Should().BeEmpty();
+        _coordinator.IsActive(session).Should().BeTrue();
+    }
+
+    [Fact]
+    public void Only_running_sessions_of_the_same_channel_and_kind_can_be_joined()
+    {
+        using var running = Process.GetCurrentProcess();
+        var channel = Guid.NewGuid();
+        var copy = RegisterShared(channel, running);
+        var encode = RegisterShared(channel, running, encode: Encode41);
+        RegisterShared(channel, running, LiveSessionKind.Remux);
+        RegisterShared(Guid.NewGuid(), running);
+        RegisterShared(channel);
+
+        var shared = _coordinator.SharedSessions(channel, LiveSessionKind.Timeshift);
+
+        shared.Select(s => s.SessionKey).Should().BeEquivalentTo([copy, encode]);
+        shared.Single(s => s.SessionKey == encode).Encode.Should().Be(Encode41);
+        shared.Single(s => s.SessionKey == copy).Encode.Should().BeNull();
+    }
+
+    [Fact]
+    public void A_session_that_learned_its_source_says_so_to_the_next_viewer()
+    {
+        using var running = Process.GetCurrentProcess();
+        var channel = Guid.NewGuid();
+        var session = RegisterShared(channel, running);
+        var format = new LiveVideoFormat("h264", "High", 41, 1080, 25, false);
+
+        _coordinator.SetSource(session, format);
+
+        _coordinator.SharedSessions(channel, LiveSessionKind.Timeshift).Single().Source.Should().Be(format);
+    }
+
+    [Fact]
+    public async Task Sessions_whose_ffmpeg_has_stopped_are_cleared_for_that_channel_only()
+    {
+        var channel = Guid.NewGuid();
+        var dead = RegisterShared(channel);
+        var otherKind = RegisterShared(channel, kind: LiveSessionKind.Remux);
+        var otherChannel = RegisterShared(Guid.NewGuid());
+        var viewer = Guid.NewGuid();
+        await _coordinator.AttachAsync(viewer, dead);
+
+        var cleared = await _coordinator.StopExitedAsync(channel, LiveSessionKind.Timeshift);
+
+        cleared.Should().Equal(dead);
+        _coordinator.IsActive(dead).Should().BeFalse();
+        _coordinator.SessionOfViewer(viewer).Should().BeNull();
+        _coordinator.IsActive(otherKind).Should().BeTrue();
+        _coordinator.IsActive(otherChannel).Should().BeTrue();
+    }
+
+    [Fact]
+    public async Task Starts_for_one_channel_and_kind_wait_for_each_other_and_other_channels_do_not()
+    {
+        var channel = Guid.NewGuid();
+        await using var first = await _coordinator.LockChannelAsync(channel, LiveSessionKind.Timeshift);
+
+        var sameChannel = _coordinator.LockChannelAsync(channel, LiveSessionKind.Timeshift);
+        await using var otherKind = await _coordinator.LockChannelAsync(channel, LiveSessionKind.Remux);
+        await using var otherChannel = await _coordinator.LockChannelAsync(Guid.NewGuid(), LiveSessionKind.Timeshift);
+
+        await Task.Delay(100, TestContext.Current.CancellationToken);
+        sameChannel.IsCompleted.Should().BeFalse();
+
+        await first.DisposeAsync();
+        await using var second = await sameChannel.WaitAsync(TimeSpan.FromSeconds(5), TestContext.Current.CancellationToken);
+    }
 }
