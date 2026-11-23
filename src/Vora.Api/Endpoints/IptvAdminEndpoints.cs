@@ -70,6 +70,10 @@ public static class IptvAdminEndpoints
             .Produces<IptvConnectionTestVM>(StatusCodes.Status200OK);
         group.MapPut("/playlists/{id:guid}", UpdatePlaylistAsync)
             .Produces<IptvPlaylistVM>(StatusCodes.Status200OK);
+        group.MapGet("/playlists/{id:guid}/tuners", GetTunerStatusAsync)
+            .WithName("GetHdHomeRunStatus")
+            .Produces<HdHomeRunStatusVM>(StatusCodes.Status200OK)
+            .Produces(StatusCodes.Status404NotFound);
         group.MapPost("/playlists/{id:guid}/refresh", RefreshPlaylistAsync);
         group.MapDelete("/playlists/{id:guid}", DeletePlaylistAsync);
 
@@ -146,6 +150,12 @@ public static class IptvAdminEndpoints
         CountryFilter = request.CountryFilter,
         EnableHealthCheck = request.EnableHealthCheck
     };
+
+    private static async Task<IResult> GetTunerStatusAsync(Guid id, IHdHomeRunStatusManager manager, CancellationToken cancellationToken)
+    {
+        var status = await manager.GetAsync(id, cancellationToken);
+        return status is null ? Results.NotFound() : Results.Ok(status);
+    }
 
     private static async Task<IResult> RefreshPlaylistAsync(Guid id, IIptvManager manager)
     {

@@ -8,6 +8,7 @@ using Vora.Domain.Enums;
 
 namespace Vora.Application.Tests.Iptv;
 
+[Collection(EpgServiceCollection.Name)]
 public sealed class IptvProviderGuideTests : IDisposable
 {
     private const string Guide = """

@@ -76,6 +76,32 @@ export interface IptvConnectionTestVM {
     channelCount: number;
 }
 
+export interface HdHomeRunTunerVM {
+    index: number;
+    inUse: boolean;
+    channelNumber?: string | null;
+    channelName?: string | null;
+    frequencyMhz?: number | null;
+    signalStrengthPercent?: number | null;
+    signalQualityPercent?: number | null;
+    symbolQualityPercent?: number | null;
+    bitsPerSecond?: number | null;
+    targetAddress?: string | null;
+}
+
+export interface HdHomeRunStatusVM {
+    succeeded: boolean;
+    error?: string | null;
+    deviceName?: string | null;
+    model?: string | null;
+    firmwareVersion?: string | null;
+    deviceId?: string | null;
+    tunerCount: number;
+    tunersInUse: number;
+    voraStreams: number;
+    tuners: HdHomeRunTunerVM[];
+}
+
 export const iptvAdminService = {
     getPlaylists: async (serverId?: string, kind?: IptvChannelKind): Promise<IptvPlaylistVM[]> => {
         const response = await apiClient.get<IptvPlaylistVM[]>('/iptv/admin/playlists', {
@@ -97,6 +123,11 @@ export const iptvAdminService = {
 
     testConnection: async (request: IptvPlaylistRequest, playlistId?: string, serverId?: string): Promise<IptvConnectionTestVM> => {
         const response = await apiClient.post<IptvConnectionTestVM>('/iptv/admin/playlists/test-connection', { ...request, playlistId }, { serverId });
+        return response.data;
+    },
+
+    getTunerStatus: async (id: string, serverId?: string): Promise<HdHomeRunStatusVM> => {
+        const response = await apiClient.get<HdHomeRunStatusVM>(`/iptv/admin/playlists/${id}/tuners`, { serverId });
         return response.data;
     },
 

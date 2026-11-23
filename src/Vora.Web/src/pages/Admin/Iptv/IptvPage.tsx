@@ -7,6 +7,7 @@ import AdminIptvChannelsModal from '../../../components/Admin/IptvChannelsModal'
 import IptvPlaylistEditModal from '../../../components/Admin/IptvPlaylistEditModal';
 import IptvEpgSourceEditModal from '../../../components/Admin/IptvEpgSourceEditModal';
 import IptvEpgDiagnosticsModal from '../../../components/Admin/IptvEpgDiagnosticsModal';
+import TunerStatusModal from '../../../components/Admin/Iptv/TunerStatusModal';
 import FeatureToggle from '../../../components/Admin/Features/FeatureToggle';
 import PageHeader from '../../../components/Admin/Primitives/PageHeader';
 import HealthBadge from '../../../components/Admin/Primitives/HealthBadge';
@@ -71,6 +72,7 @@ export default function IptvPage({ kind }: IptvPageProps) {
     const [editingPlaylist, setEditingPlaylist] = useState<IptvPlaylistVM | null>(null);
     const [editingEpgSource, setEditingEpgSource] = useState<IptvEpgSourceVM | null>(null);
     const [showDiagnostics, setShowDiagnostics] = useState(false);
+    const [tunerPlaylist, setTunerPlaylist] = useState<IptvPlaylistVM | null>(null);
 
     const [serverSettings, setServerSettings] = useState<ServerSettings | null>(null);
     const [isSavingTimeshift, setIsSavingTimeshift] = useState(false);
@@ -555,6 +557,15 @@ export default function IptvPage({ kind }: IptvPageProps) {
                                                 >
                                                     Channels
                                                 </button>
+                                                {p.sourceType === 'HdHomeRun' && (
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => setTunerPlaylist(p)}
+                                                        className="text-xs font-semibold px-2.5 py-1 rounded-[var(--vora-radius-md)] text-[var(--vora-text-primary)] bg-[var(--vora-bg-sunken)] hover:bg-[var(--vora-border-strong)] cursor-pointer transition-colors"
+                                                    >
+                                                        Tuners
+                                                    </button>
+                                                )}
                                                 <button
                                                     type="button"
                                                     onClick={() => setEditingPlaylist(p)}
@@ -752,6 +763,16 @@ export default function IptvPage({ kind }: IptvPageProps) {
                     source={editingEpgSource}
                     serverId={serverId}
                     onSaved={loadData}
+                />
+            )}
+
+            {tunerPlaylist && (
+                <TunerStatusModal
+                    isOpen={true}
+                    onClose={() => setTunerPlaylist(null)}
+                    playlistId={tunerPlaylist.id}
+                    playlistName={tunerPlaylist.name}
+                    serverId={serverId}
                 />
             )}
 

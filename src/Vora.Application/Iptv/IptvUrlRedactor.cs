@@ -9,7 +9,7 @@ public static class IptvUrlRedactor
     private const int ShortestMaskedSecret = 3;
 
     private const string CredentialKeys =
-        "username|user|usr|login|password|pass|passwd|pwd|token|access_token|auth|auth_token|authtoken|apikey|api_key|api-key|key|secret|signature|sig|hdnts|hdnea|wmsauthsign|md5";
+        "username|user|usr|login|password|pass|passwd|pwd|token|access_token|auth|deviceauth|auth_token|authtoken|apikey|api_key|api-key|key|secret|signature|sig|hdnts|hdnea|wmsauthsign|md5";
 
     private static readonly Regex UserInfo = new(
         @"(?<scheme>\b[a-z][a-z0-9+.\-]*://)[^/\s?#@'""<>]+@",

@@ -92,6 +92,16 @@ describe('IptvSourceFields', () => {
         expect(screen.queryByLabelText('M3U URL')).not.toBeInTheDocument();
         expect(screen.queryByRole('button', { name: 'Advanced' })).not.toBeInTheDocument();
         expect(screen.queryByRole('checkbox', { name: /Use the provider's guide/ })).not.toBeInTheDocument();
+        expect(screen.getByRole('checkbox', { name: /Use Silicondust's guide/ })).toBeChecked();
+    });
+
+    it("lets the admin turn off Silicondust's guide for a tuner", () => {
+        const drafts: IptvSourceDraft[] = [];
+        render(<Harness initial={{ sourceType: 'HdHomeRun', serverUrl: '192.168.1.50' }} onDraft={d => drafts.push(d)} />);
+
+        fireEvent.click(screen.getByRole('checkbox', { name: /Use Silicondust's guide/ }));
+
+        expect(drafts.at(-1)?.useProviderGuide).toBe(false);
     });
 
     it('does not offer a tuner for internet radio', () => {

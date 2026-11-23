@@ -12,7 +12,7 @@ public class HdHomeRunParserTests
     {
         var device = HdHomeRunParser.ParseDevice(HdHomeRunFixtures.Discover);
 
-        device.Should().Be(new HdHomeRunDevice("HDHomeRun FLEX 4K", "HDHR5-4K", "1080ABCD", 4));
+        device.Should().Be(new HdHomeRunDevice("HDHomeRun FLEX 4K", "HDHR5-4K", "1080ABCD", 4, "20240101"));
     }
 
     [Fact]
@@ -74,6 +74,66 @@ public class HdHomeRunParserTests
     {
         HdHomeRunParser.StreamUrl(null, "7.1", new Uri("https://hdhr.lan")).Should().Be("https://hdhr.lan:5004/auto/v7.1");
         HdHomeRunParser.StreamUrl("not a url", "5", Device).Should().Be("http://192.168.1.50:5004/auto/v5");
+    }
+
+    [Fact]
+    public void The_status_lists_each_tuner_with_what_it_is_tuned_to_and_how_well()
+    {
+        const string status = """
+            [
+             {"Resource":"tuner1"},
+             {"Resource":"tuner0","VctNumber":"7.1","VctName":"WABC-DT","Frequency":473000000,"SignalStrengthPercent":84,"SignalQualityPercent":100,"SymbolQualityPercent":98,"TargetIP":"192.168.1.20","NetworkRate":19393088},
+             {"Resource":"system","Version":1}
+            ]
+            """;
+
+        var tuners = HdHomeRunParser.ParseStatus(status);
+
+        tuners.Should().Equal(
+            new HdHomeRunTuner(0, true, "7.1", "WABC-DT", 473000000, 84, 100, 98, 19393088, "192.168.1.20"),
+            new HdHomeRunTuner(1, false, null, null, null, null, null, null, null, null));
+    }
+
+    [Fact]
+    public void A_tuner_is_in_use_when_it_has_a_channel_a_frequency_or_a_receiver_and_idle_when_it_has_none()
+    {
+        var tuners = HdHomeRunParser.ParseStatus("""
+            [{"Resource":"tuner0","Frequency":0},{"Resource":"tuner1","Frequency":605000000},{"Resource":"tuner2","TargetIP":"192.168.1.9"},{"Resource":"tuner3","VctName":"KRON"}]
+            """);
+
+        tuners.Select(t => t.InUse).Should().Equal(false, true, true, true);
+        tuners[0].FrequencyHz.Should().BeNull();
+    }
+
+    [Fact]
+    public void Percentages_stay_between_nothing_and_everything_and_numbers_sent_as_text_are_read()
+    {
+        var tuner = HdHomeRunParser.ParseStatus("""
+            [{"Resource":"tuner0","VctNumber":5,"SignalStrengthPercent":140,"SignalQualityPercent":"72","SymbolQualityPercent":-3,"Frequency":"473000000"}]
+            """).Single();
+
+        tuner.ChannelNumber.Should().Be("5");
+        tuner.SignalStrengthPercent.Should().Be(100);
+        tuner.SignalQualityPercent.Should().Be(72);
+        tuner.SymbolQualityPercent.Should().Be(0);
+        tuner.FrequencyHz.Should().Be(473000000);
+    }
+
+    [Fact]
+    public void A_status_that_is_not_a_list_is_not_a_tuner_status()
+    {
+        var notAList = () => HdHomeRunParser.ParseStatus("""{"Resource":"tuner0"}""");
+
+        notAList.Should().Throw<IptvSourceException>().WithMessage("*tuner status*");
+        HdHomeRunParser.ParseStatus("[]").Should().BeEmpty();
+    }
+
+    [Fact]
+    public void The_guide_address_carries_the_devices_authorization_escaped_and_a_device_without_one_has_none()
+    {
+        HdHomeRunParser.DeviceAuth(HdHomeRunFixtures.Discover).Should().Be("secret-auth");
+        HdHomeRunParser.DeviceAuth("""{"FriendlyName":"Old"}""").Should().BeNull();
+        HdHomeRunParser.GuideUrl("a b+c/d=").Should().Be("https://api.hdhomerun.com/api/xmltv?DeviceAuth=a%20b%2Bc%2Fd%3D");
     }
 
     [Fact]

@@ -151,12 +151,16 @@ export default function IptvSourceFields({ idPrefix, kind, draft, onChange, pass
                 </div>
             )}
 
-            {isXtream && kind === 'Tv' && (
+            {(isXtream || isTuner) && kind === 'Tv' && (
                 <label className="flex cursor-pointer select-none items-center gap-3 rounded-[var(--vora-radius-md)] border border-[var(--vora-border-subtle)] bg-[var(--vora-bg-sunken)] p-3">
                     <input type="checkbox" checked={draft.useProviderGuide} onChange={e => change({ useProviderGuide: e.target.checked })} className="h-4 w-4 cursor-pointer accent-[var(--vora-accent-500)]" />
                     <div className="flex flex-col">
-                        <span className="text-sm font-semibold text-[var(--vora-text-primary)]">Use the provider's guide</span>
-                        <span className="text-xs text-[var(--vora-text-muted)]">Reads the account's own TV guide in each guide sync. Your EPG sources come first; the provider's guide fills in the channels they don't cover.</span>
+                        <span className="text-sm font-semibold text-[var(--vora-text-primary)]">{isTuner ? "Use Silicondust's guide" : "Use the provider's guide"}</span>
+                        <span className="text-xs text-[var(--vora-text-muted)]">
+                            {isTuner
+                                ? "Downloads the device's TV guide from Silicondust about once a day. It sends the device's own authorization string and nothing else. Your EPG sources come first; this fills in the channels they don't cover."
+                                : "Reads the account's own TV guide in each guide sync. Your EPG sources come first; the provider's guide fills in the channels they don't cover."}
+                        </span>
                     </div>
                 </label>
             )}
