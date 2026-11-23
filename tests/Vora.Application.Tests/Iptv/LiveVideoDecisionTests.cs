@@ -7,7 +7,7 @@ public class LiveVideoDecisionTests
     private static readonly LiveVideoLimits Roku = new(["h264", "hevc", "mpeg4"], 42, ["baseline", "main", "high"]);
     private static readonly LiveVideoLimits None = new(null, null, null);
 
-    private static LiveVideoFormat H264(string? profile, int? level, int height = 1080, double frameRate = 25, bool interlaced = false) =>
+    private static LiveVideoFormat H264(string? profile, int? level, int? height = 1080, double frameRate = 25, bool interlaced = false) =>
         new("h264", profile, level, height, frameRate, interlaced);
 
     [Fact]
@@ -148,6 +148,57 @@ public class LiveVideoDecisionTests
         LiveVideoDecision.EncodeFor(H264("High 10", 51, height: 2160), Roku).MaxHeight.Should().Be(1080);
         LiveVideoDecision.EncodeFor(H264("High 10", 51, height: 1080), Roku).MaxHeight.Should().BeNull();
         LiveVideoDecision.EncodeFor(H264("High 10", 51, height: 576), Roku).MaxHeight.Should().BeNull();
+    }
+
+    [Theory]
+    [InlineData(null, 1080)]
+    [InlineData(2160, 1080)]
+    [InlineData(1080, 1080)]
+    [InlineData(900, 720)]
+    [InlineData(768, 720)]
+    [InlineData(720, 720)]
+    [InlineData(600, 480)]
+    [InlineData(480, 480)]
+    [InlineData(240, 480)]
+    [InlineData(0, 480)]
+    public void An_encode_is_sized_to_the_largest_of_480_720_and_1080_that_fits_the_players_height(int? playerHeight, int expected)
+    {
+        LiveVideoDecision.EncodedHeightFor(playerHeight).Should().Be(expected);
+    }
+
+    [Fact]
+    public void A_picture_taller_than_the_players_height_is_scaled_down_to_it_and_one_that_fits_is_left_alone()
+    {
+        var phone = Roku with { MaxHeight = 720 };
+
+        LiveVideoDecision.EncodeFor(H264("High 10", 51, height: 1080), phone).MaxHeight.Should().Be(720);
+        LiveVideoDecision.EncodeFor(H264("High 10", 51, height: 2160), phone).MaxHeight.Should().Be(720);
+        LiveVideoDecision.EncodeFor(H264("High 10", 51, height: 720), phone).MaxHeight.Should().BeNull();
+        LiveVideoDecision.EncodeFor(H264("High 10", 51, height: 576), phone).MaxHeight.Should().BeNull("an encode never scales up");
+        LiveVideoDecision.EncodeFor(H264("High 10", 51, height: null), phone).MaxHeight.Should().Be(720, "an unknown height is capped to be safe");
+        LiveVideoDecision.EncodeFor(H264("High 10", 51, height: 1080), Roku with { MaxHeight = 2160 }).MaxHeight.Should().BeNull();
+    }
+
+    [Fact]
+    public void A_players_height_does_not_change_whether_its_video_plays()
+    {
+        var phone = Roku with { MaxHeight = 480 };
+
+        LiveVideoDecision.Plays(H264("High", 40, height: 1080), phone).Should().BeTrue();
+        LiveVideoDecision.Mismatch(new LiveVideoFormat("mpeg2video", "Main", 8, 1080, 29.97, true), phone).Should().Be("the player doesn't take mpeg2video");
+    }
+
+    [Fact]
+    public void A_player_that_sent_only_its_height_is_still_assumed_to_take_the_modern_codecs_and_not_mpeg2()
+    {
+        var onlyHeight = new LiveVideoLimits(null, null, null, 720);
+
+        onlyHeight.IsEmpty.Should().BeTrue();
+        var limits = LiveVideoLimits.Effective(onlyHeight);
+        limits.VideoCodecs.Should().BeEquivalentTo(LiveVideoLimits.Default.VideoCodecs);
+        limits.MaxHeight.Should().Be(720);
+        LiveVideoDecision.Plays(new LiveVideoFormat("mpeg2video", "Main", 8, 1080, 29.97, true), limits).Should().BeFalse();
+        LiveVideoDecision.Plays(H264("High", 40), limits).Should().BeTrue();
     }
 
     [Fact]

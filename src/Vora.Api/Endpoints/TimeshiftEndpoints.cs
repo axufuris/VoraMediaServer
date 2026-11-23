@@ -13,6 +13,8 @@ public class StartTimeshiftRequestDto
     public List<string>? VideoCodecs { get; set; }
     public int? MaxH264Level { get; set; }
     public List<string>? H264Profiles { get; set; }
+
+    public int? MaxHeight { get; set; }
 }
 
 public static class TimeshiftEndpoints
@@ -47,7 +49,7 @@ public static class TimeshiftEndpoints
             return Results.Forbid();
         }
 
-        var limits = new LiveVideoLimits(request.VideoCodecs, request.MaxH264Level, request.H264Profiles);
+        var limits = new LiveVideoLimits(request.VideoCodecs, request.MaxH264Level, request.H264Profiles, request.MaxHeight);
         string? url;
         try
         {

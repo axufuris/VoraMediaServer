@@ -8,6 +8,20 @@ import { detectHlsVideoCodecs } from './hardwareScanner';
 // desktop app's native player's list, which the live player doesn't use.
 export interface LiveVideoLimits {
     videoCodecs: string[];
+    maxHeight?: number;
 }
 
-export const liveVideoLimits = (): LiveVideoLimits => ({ videoCodecs: detectHlsVideoCodecs() });
+const PHONE_SCREEN_CSS_PIXELS = 600;
+const PHONE_VIDEO_HEIGHT = 720;
+
+export const screenVideoHeight = (screen: { width: number; height: number }, pixelRatio: number): number | undefined => {
+    const shortSide = Math.min(screen.width, screen.height);
+    if (!(shortSide > 0)) return undefined;
+    if (shortSide < PHONE_SCREEN_CSS_PIXELS) return PHONE_VIDEO_HEIGHT;
+    return Math.round(shortSide * (pixelRatio > 0 ? pixelRatio : 1));
+};
+
+export const liveVideoLimits = (): LiveVideoLimits => {
+    const maxHeight = screenVideoHeight(window.screen, window.devicePixelRatio);
+    return { videoCodecs: detectHlsVideoCodecs(), ...(maxHeight ? { maxHeight } : {}) };
+};

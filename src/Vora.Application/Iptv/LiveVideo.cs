@@ -8,7 +8,7 @@ namespace Vora.Application.Iptv;
 /// </summary>
 public sealed record LiveVideoFormat(string Codec, string? Profile, int? Level, int? Height, double? FrameRate, bool? Interlaced);
 
-public sealed record LiveVideoLimits(IReadOnlyList<string>? VideoCodecs, int? MaxH264Level, IReadOnlyList<string>? H264Profiles)
+public sealed record LiveVideoLimits(IReadOnlyList<string>? VideoCodecs, int? MaxH264Level, IReadOnlyList<string>? H264Profiles, int? MaxHeight = null)
 {
     /// <summary>
     /// What a player that did not say is assumed to take: the modern codecs, not the legacy ones
@@ -20,7 +20,10 @@ public sealed record LiveVideoLimits(IReadOnlyList<string>? VideoCodecs, int? Ma
     public bool IsEmpty => VideoCodecs is null && MaxH264Level is null && H264Profiles is null;
 
     /// <summary>The limits the player sent, or <see cref="Default"/> when it sent none.</summary>
-    public static LiveVideoLimits Effective(LiveVideoLimits? sent) => sent is { IsEmpty: false } ? sent : Default;
+    public static LiveVideoLimits Effective(LiveVideoLimits? sent) =>
+        sent is null || (sent.IsEmpty && sent.MaxHeight is null) ? Default
+        : sent.IsEmpty ? Default with { MaxHeight = sent.MaxHeight }
+        : sent;
 }
 
 /// <param name="Deinterlace">Whether the encode deinterlaces at all.</param>
@@ -33,6 +36,7 @@ public static class LiveVideoDecision
     public const int StandardLevel = 41;
     public const int HighFrameRateLevel = 42;
     public const int MaxEncodedHeight = 1080;
+    public static readonly int[] EncodedHeights = [480, 720, MaxEncodedHeight];
     public const int TimeshiftSegmentSeconds = 4;
 
     private const double StandardLevelMaxFrameRate = 30.5;
@@ -72,9 +76,15 @@ public static class LiveVideoDecision
     {
         var wanted = format.FrameRate > StandardLevelMaxFrameRate ? HighFrameRateLevel : StandardLevel;
         var level = limits.MaxH264Level is { } maxLevel ? Math.Min(wanted, maxLevel) : wanted;
-        var tooTall = format.Height is not { } height || height > MaxEncodedHeight;
-        return new LiveVideoEncode(level, tooTall ? MaxEncodedHeight : null, format.Interlaced != false, segmentSeconds, OnlyFlaggedFrames: format.Interlaced is null);
+        var cap = EncodedHeightFor(limits.MaxHeight);
+        var tooTall = format.Height is not { } height || height > cap;
+        return new LiveVideoEncode(level, tooTall ? cap : null, format.Interlaced != false, segmentSeconds, OnlyFlaggedFrames: format.Interlaced is null);
     }
+
+    public static int EncodedHeightFor(int? playerHeight) =>
+        playerHeight is { } height
+            ? EncodedHeights.Where(step => step <= height).DefaultIfEmpty(EncodedHeights[0]).Max()
+            : MaxEncodedHeight;
 
     private static string LevelName(int level) => (level / 10.0).ToString("0.0", CultureInfo.InvariantCulture);
 }
