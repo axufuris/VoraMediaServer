@@ -23,7 +23,6 @@ public class StartPassthroughRequestDto
     public int? MaxH264Level { get; set; }
     public List<string>? H264Profiles { get; set; }
 
-    /// <summary>The tallest picture, in pixels, the player can use; see <see cref="LiveVideoLimits.MaxHeight"/>.</summary>
     public int? MaxHeight { get; set; }
 }
 

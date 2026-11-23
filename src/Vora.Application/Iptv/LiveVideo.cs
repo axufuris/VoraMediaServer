@@ -8,8 +8,6 @@ namespace Vora.Application.Iptv;
 /// </summary>
 public sealed record LiveVideoFormat(string Codec, string? Profile, int? Level, int? Height, double? FrameRate, bool? Interlaced);
 
-/// <param name="MaxHeight">The tallest picture, in pixels, the player can use (a phone asks for 720, a TV for its own height).
-/// It only sizes an encode; video that is copied is never resized. Null when the player did not say.</param>
 public sealed record LiveVideoLimits(IReadOnlyList<string>? VideoCodecs, int? MaxH264Level, IReadOnlyList<string>? H264Profiles, int? MaxHeight = null)
 {
     /// <summary>
@@ -19,10 +17,9 @@ public sealed record LiveVideoLimits(IReadOnlyList<string>? VideoCodecs, int? Ma
     /// </summary>
     public static LiveVideoLimits Default { get; } = new(["h264", "hevc", "vp9", "av1"], null, null);
 
-    /// <summary>Whether the player said nothing about the video it takes (its height does not count: it sizes an encode, not what plays).</summary>
     public bool IsEmpty => VideoCodecs is null && MaxH264Level is null && H264Profiles is null;
 
-    /// <summary>The limits the player sent, or <see cref="Default"/> when it sent none; a player that sent only its height still gets the default codecs.</summary>
+    /// <summary>The limits the player sent, or <see cref="Default"/> when it sent none.</summary>
     public static LiveVideoLimits Effective(LiveVideoLimits? sent) =>
         sent is null || (sent.IsEmpty && sent.MaxHeight is null) ? Default
         : sent.IsEmpty ? Default with { MaxHeight = sent.MaxHeight }
@@ -84,11 +81,6 @@ public static class LiveVideoDecision
         return new LiveVideoEncode(level, tooTall ? cap : null, format.Interlaced != false, segmentSeconds, OnlyFlaggedFrames: format.Interlaced is null);
     }
 
-    /// <summary>
-    /// The tallest picture an encode makes for a player that can use <paramref name="playerHeight"/> pixels: the
-    /// largest of 480, 720 and 1080 that fits it (never below 480, never above 1080), so that players with
-    /// different screens still land on a few sizes that viewers of one channel can share.
-    /// </summary>
     public static int EncodedHeightFor(int? playerHeight) =>
         playerHeight is { } height
             ? EncodedHeights.Where(step => step <= height).DefaultIfEmpty(EncodedHeights[0]).Max()
