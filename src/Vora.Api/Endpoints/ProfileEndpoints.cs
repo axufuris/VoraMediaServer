@@ -33,7 +33,7 @@ public class CreateProfileDto
     public bool HasAllIptvAccess { get; set; } = true;
     public List<Guid> AllowedIptvPlaylistIds { get; set; } = new();
     public bool CanAddCustomPodcastFeeds { get; set; } = true;
-    public bool CanRecordLiveTv { get; set; }
+    public bool? CanRecordLiveTv { get; set; }
     public string? ShowtimesLocation { get; set; }
 }
 
@@ -283,7 +283,7 @@ public static class ProfileEndpoints
             request.AllowedIptvPlaylistIds,
             request.AccessSchedules,
             request.CanAddCustomPodcastFeeds,
-            request.CanRecordLiveTv,
+            request.CanRecordLiveTv ?? false,
             request.ShowtimesLocation);
 
         return Results.Created($"/api/users/{userId}", new { ProfileId = profileId });

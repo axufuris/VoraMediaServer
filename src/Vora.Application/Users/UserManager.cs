@@ -14,7 +14,7 @@ public interface IUserManager
     Task<bool> ValidateProfilePinAsync(Guid profileId, string pin);
     Task<Guid> CreateManagedProfileAsync(Guid primaryUserId, string name, string? imageUrl, string? pin, List<string> allowedMovieRatings, List<string> allowedTvRatings, List<string> allowedMusicRatings, bool hasAllLibraryAccess, bool blockUnrated, List<Guid> allowedLibraries, bool hasAllIptvAccess, List<Guid> allowedIptvPlaylists, List<ProfileScheduleVM> schedules, bool canAddCustomPodcastFeeds, bool canRecordLiveTv, string? showtimesLocation);
     Task UpdateUserAccountAsync(Guid userId, Guid callingAccountId, bool callerIsAdmin, string displayName, string? newPassword, bool? emailNotifyOnRequestAvailable = null);
-    Task UpdateManagedProfileAsync(Guid profileId, string name, string? imageUrl, string? pin, List<string> allowedMovieRatings, List<string> allowedTvRatings, List<string> allowedMusicRatings, bool hasAllLibraryAccess, bool blockUnrated, List<Guid> allowedLibraries, bool hasAllIptvAccess, List<Guid> allowedIptvPlaylists, List<ProfileScheduleVM> schedules, bool canAddCustomPodcastFeeds, bool canRecordLiveTv, string? showtimesLocation);
+    Task UpdateManagedProfileAsync(Guid profileId, string name, string? imageUrl, string? pin, List<string> allowedMovieRatings, List<string> allowedTvRatings, List<string> allowedMusicRatings, bool hasAllLibraryAccess, bool blockUnrated, List<Guid> allowedLibraries, bool hasAllIptvAccess, List<Guid> allowedIptvPlaylists, List<ProfileScheduleVM> schedules, bool canAddCustomPodcastFeeds, bool? canRecordLiveTv, string? showtimesLocation);
     Task DeleteManagedProfileAsync(Guid profileId);
     Task<bool> AccountOwnsProfileAsync(Guid accountId, Guid profileId);
     Task UpdateUserAccessAsync(Guid userId, bool hasAllLibraryAccess, List<Guid> allowedLibraries, bool canRequest, bool autoApprove, bool enableAiRecommendations, bool hasAllIptvAccess, List<Guid> allowedIptvPlaylists, bool canRecordLiveTv, long dvrStorageQuotaBytes, bool canTimeshiftIptv, bool canAddCustomPodcastFeeds);
@@ -177,7 +177,7 @@ public class UserManager(
         List<Guid> allowedIptvPlaylists,
         List<ProfileScheduleVM> schedules,
         bool canAddCustomPodcastFeeds,
-        bool canRecordLiveTv,
+        bool? canRecordLiveTv,
         string? showtimesLocation)
     {
         var profile = await repository.GetProfileByIdAsync(profileId)
@@ -342,7 +342,7 @@ public class UserManager(
         bool hasAllIptvAccess,
         List<Guid> allowedIptvPlaylists,
         bool canAddCustomPodcastFeeds,
-        bool canRecordLiveTv,
+        bool? canRecordLiveTv,
         string? showtimesLocation)
     {
         profile.Name = name;
@@ -356,7 +356,11 @@ public class UserManager(
         profile.HasAllIptvAccess = hasAllIptvAccess;
         profile.AllowedIptvPlaylistIds = allowedIptvPlaylists ?? new List<Guid>();
         profile.CanAddCustomPodcastFeeds = canAddCustomPodcastFeeds;
-        profile.CanRecordLiveTv = canRecordLiveTv;
+        if (canRecordLiveTv.HasValue)
+        {
+            profile.CanRecordLiveTv = canRecordLiveTv.Value;
+        }
+
         if (showtimesLocation != null)
         {
             profile.ShowtimesLocation = string.IsNullOrWhiteSpace(showtimesLocation) ? null : showtimesLocation.Trim();
