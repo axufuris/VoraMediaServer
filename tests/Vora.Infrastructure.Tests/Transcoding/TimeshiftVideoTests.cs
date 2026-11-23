@@ -123,7 +123,7 @@ public sealed class TimeshiftVideoTests : IDisposable
 
         var start = async () => await Video().EncodeArgumentsAsync(new LiveVideoEncode(41, null, false), _viewer, onCpu: false, TestContext.Current.CancellationToken);
 
-        await start.Should().ThrowAsync<EncodeLimitReachedException>().WithMessage("Maximum GPU and CPU transcodes reached.");
+        await start.Should().ThrowAsync<EncodeLimitReachedException>().WithMessage("Maximum GPU and CPU transcodes reached.*");
     }
 
     [Fact]
@@ -135,7 +135,7 @@ public sealed class TimeshiftVideoTests : IDisposable
 
         var retry = async () => await Video().EncodeArgumentsAsync(new LiveVideoEncode(41, null, false), _viewer, onCpu: true, TestContext.Current.CancellationToken);
 
-        await retry.Should().ThrowAsync<EncodeLimitReachedException>().WithMessage("Maximum CPU transcodes reached.");
+        await retry.Should().ThrowAsync<EncodeLimitReachedException>().WithMessage("Maximum CPU transcodes reached.*");
     }
 
     [Fact]

@@ -22,6 +22,9 @@ public class StartPassthroughRequestDto
     public List<string>? VideoCodecs { get; set; }
     public int? MaxH264Level { get; set; }
     public List<string>? H264Profiles { get; set; }
+
+    /// <summary>The tallest picture, in pixels, the player can use; see <see cref="LiveVideoLimits.MaxHeight"/>.</summary>
+    public int? MaxHeight { get; set; }
 }
 
 public static class IptvPassthroughEndpoints
@@ -51,7 +54,7 @@ public static class IptvPassthroughEndpoints
 
         try
         {
-            var limits = new LiveVideoLimits(request.VideoCodecs, request.MaxH264Level, request.H264Profiles);
+            var limits = new LiveVideoLimits(request.VideoCodecs, request.MaxH264Level, request.H264Profiles, request.MaxHeight);
             var result = await service.StartPassthroughAsync(request.ChannelId, accountId.Value, user.GetProfileId(), limits);
             return Results.Ok(new PassthroughStartVM { Url = result.Url, StreamType = result.StreamType, AudioFormat = result.AudioFormat });
         }

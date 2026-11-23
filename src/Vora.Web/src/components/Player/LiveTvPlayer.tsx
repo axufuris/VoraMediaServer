@@ -28,6 +28,7 @@ import { useDialog } from '../../dialogs';
 import { useLivePermissions } from './useLivePermissions';
 import { parseServerDate, serverTimeMs } from '../../utils/serverTime';
 import { secureImageUrl } from '../../utils/secureImageUrl';
+import { liveStartRefusal } from '../../utils/liveStartError';
 
 export default function LiveTvPlayer() {
     const dialog = useDialog();
@@ -153,8 +154,11 @@ export default function LiveTvPlayer() {
                 if (!isMounted) return;
                 setIsVideoLoading(false);
                 const status = (err as { response?: { status?: number } }).response?.status;
+                const refusal = liveStartRefusal(err);
                 if (status === 409) {
                     await dialog.alert("All available tuners for this playlist are in use. Try again once another stream stops.");
+                } else if (refusal) {
+                    await dialog.alert(refusal);
                 } else {
                     console.error("Failed to start IPTV passthrough:", err);
                 }

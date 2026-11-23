@@ -23,6 +23,16 @@ public class TimeshiftVideoArgumentsTests
     }
 
     [Fact]
+    public void An_encode_for_a_small_screen_scales_the_picture_down_to_the_height_it_was_given()
+    {
+        var phone = LiveVideoDecision.EncodeFor(new LiveVideoFormat("mpeg2video", "Main", 8, 1080, 29.97, true), new LiveVideoLimits(null, null, null, MaxHeight: 720));
+
+        var arguments = TimeshiftVideoArgumentsBuilder.Build(phone, encoder: null);
+
+        arguments.Video.Take(2).Should().Equal("-vf", "yadif,scale=-2:'min(ih,720)'");
+    }
+
+    [Fact]
     public void The_cpu_encodes_h264_high_at_the_planned_level_with_a_keyframe_every_segment()
     {
         var arguments = TimeshiftVideoArgumentsBuilder.Build(Level41, encoder: null);

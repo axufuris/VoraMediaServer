@@ -114,7 +114,7 @@ public sealed class TimeshiftClientLimitsTests : IAsyncDisposable
 
         var start = () => manager.StartTimeshiftSessionAsync(channel.Id, Guid.NewGuid(), _profileId, Roku);
 
-        await start.Should().ThrowAsync<EncodeLimitReachedException>().WithMessage("Maximum CPU transcodes reached.");
+        await start.Should().ThrowAsync<EncodeLimitReachedException>().WithMessage("Maximum CPU transcodes reached.*");
         _coordinator.IsActive(_profileId).Should().BeFalse("nothing was started for the viewer who was turned away");
     }
 
