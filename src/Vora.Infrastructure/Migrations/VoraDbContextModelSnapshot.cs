@@ -3091,6 +3091,27 @@ namespace Vora.Infrastructure.Migrations
                     b.Property<TimeSpan>("DetectionScheduleTime")
                         .HasColumnType("interval");
 
+                    b.Property<int>("DeviceDefaultBitrate")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("DeviceDefaultMaxResolution")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("DeviceDefaultSeekStepSeconds")
+                        .HasColumnType("integer");
+
+                    b.Property<bool>("DeviceDefaultSoundOnClick")
+                        .HasColumnType("boolean");
+
+                    b.Property<bool>("DeviceDefaultSoundOnMove")
+                        .HasColumnType("boolean");
+
+                    b.Property<bool>("DeviceDefaultSoundOnNavOpen")
+                        .HasColumnType("boolean");
+
+                    b.Property<int>("DeviceDefaultVolumeStepPercent")
+                        .HasColumnType("integer");
+
                     b.Property<bool>("DisableVideoTranscoding")
                         .HasColumnType("boolean");
 

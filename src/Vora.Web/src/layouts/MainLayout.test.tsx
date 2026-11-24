@@ -10,12 +10,12 @@ import { clearApiClientCache } from '../api/client';
 const mocks = vi.hoisted(() => ({
     getNavPrefs: vi.fn(),
     saveNavPrefs: vi.fn(),
-    getPlaybackPrefs: vi.fn(),
+    getPlaybackSettings: vi.fn(),
     playbackCapabilities: vi.fn(),
 }));
 
 vi.mock('../api/Users/profileDeviceSettingsService', () => ({
-    profileDeviceSettingsService: { getNavPrefs: mocks.getNavPrefs, saveNavPrefs: mocks.saveNavPrefs, getPlaybackPrefs: mocks.getPlaybackPrefs },
+    profileDeviceSettingsService: { getNavPrefs: mocks.getNavPrefs, saveNavPrefs: mocks.saveNavPrefs, getPlaybackSettings: mocks.getPlaybackSettings },
 }));
 vi.mock('../api/Media/libraryService', () => ({ libraryService: { getLibraries: () => Promise.resolve([]) } }));
 vi.mock('../api/Auth/authService', () => ({ authService: { logout: vi.fn() } }));
@@ -76,7 +76,7 @@ beforeEach(() => {
     serverVault.setActiveServerId('home');
     mocks.getNavPrefs.mockResolvedValue(null);
     mocks.saveNavPrefs.mockResolvedValue(undefined);
-    mocks.getPlaybackPrefs.mockResolvedValue('{"bitrate":8}');
+    mocks.getPlaybackSettings.mockResolvedValue({ bitrate: 8, maxResolution: 1080, maxAudioChannels: 6, seekStepSeconds: 30, volumeStepPercent: 2, soundOnClick: true, soundOnNavOpen: true, soundOnMove: true });
     mocks.playbackCapabilities.mockResolvedValue({});
 });
 
@@ -91,10 +91,10 @@ describe('MainLayout on a second server', () => {
     it("loads and saves the sidebar and playback prefs of that server's own profile", async () => {
         renderAt('/server/second');
 
-        await waitFor(() => expect(mocks.getPlaybackPrefs).toHaveBeenCalled());
+        await waitFor(() => expect(mocks.getPlaybackSettings).toHaveBeenCalled());
         expect(mocks.getNavPrefs).toHaveBeenCalledWith('profile-2', 'device-1', 'second');
-        expect(mocks.getPlaybackPrefs).toHaveBeenCalledWith('profile-2', 'device-1', 'second');
-        await waitFor(() => expect(localStorage.getItem('playback_prefs_profile-2_device-1')).toBe('{"bitrate":8}'));
+        expect(mocks.getPlaybackSettings).toHaveBeenCalledWith('profile-2', 'device-1', 'second');
+        await waitFor(() => expect(localStorage.getItem('playback_prefs_profile-2_device-1')).toBe('{"bitrate":8,"maxResolution":1080,"maxAudioChannels":6,"seekStepSeconds":30,"volumeStepPercent":2}'));
         expect(localStorage.getItem('playback_prefs_profile-1_device-1')).toBeNull();
 
         fireEvent.click(await screen.findByRole('button', { name: 'Music' }));
@@ -105,9 +105,9 @@ describe('MainLayout on a second server', () => {
     it('keeps the primary profile on the primary server', async () => {
         renderAt('/');
 
-        await waitFor(() => expect(mocks.getPlaybackPrefs).toHaveBeenCalled());
+        await waitFor(() => expect(mocks.getPlaybackSettings).toHaveBeenCalled());
         expect(mocks.getNavPrefs).toHaveBeenCalledWith('profile-1', 'device-1', undefined);
-        expect(mocks.getPlaybackPrefs).toHaveBeenCalledWith('profile-1', 'device-1', undefined);
+        expect(mocks.getPlaybackSettings).toHaveBeenCalledWith('profile-1', 'device-1', undefined);
 
         fireEvent.click(await screen.findByRole('button', { name: 'Music' }));
 

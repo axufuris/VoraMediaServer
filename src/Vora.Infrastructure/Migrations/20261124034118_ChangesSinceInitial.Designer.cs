@@ -14,7 +14,7 @@ using Vora.Infrastructure.Persistence;
 namespace Vora.Infrastructure.Migrations
 {
     [DbContext(typeof(VoraDbContext))]
-    [Migration("20261124031534_ChangesSinceInitial")]
+    [Migration("20261124034118_ChangesSinceInitial")]
     partial class ChangesSinceInitial
     {
         /// <inheritdoc />
@@ -3093,6 +3093,27 @@ namespace Vora.Infrastructure.Migrations
 
                     b.Property<TimeSpan>("DetectionScheduleTime")
                         .HasColumnType("interval");
+
+                    b.Property<int>("DeviceDefaultBitrate")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("DeviceDefaultMaxResolution")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("DeviceDefaultSeekStepSeconds")
+                        .HasColumnType("integer");
+
+                    b.Property<bool>("DeviceDefaultSoundOnClick")
+                        .HasColumnType("boolean");
+
+                    b.Property<bool>("DeviceDefaultSoundOnMove")
+                        .HasColumnType("boolean");
+
+                    b.Property<bool>("DeviceDefaultSoundOnNavOpen")
+                        .HasColumnType("boolean");
+
+                    b.Property<int>("DeviceDefaultVolumeStepPercent")
+                        .HasColumnType("integer");
 
                     b.Property<bool>("DisableVideoTranscoding")
                         .HasColumnType("boolean");

@@ -272,6 +272,59 @@ public class UserRepository(VoraDbContext context) : IUserRepository
             if (iptvPrefs != null) s.IptvPrefsJson = iptvPrefs;
         });
 
+    public async Task<List<ProfileDeviceRecord>> GetProfileDevicesAsync(Guid profileId)
+    {
+        var settings = await context.Set<ProfileDeviceSetting>()
+            .AsNoTracking()
+            .Where(s => s.ProfileId == profileId)
+            .Select(s => new { s.DeviceId, s.PlaybackPrefs })
+            .ToListAsync();
+        var settingDeviceIds = settings.Select(s => s.DeviceId).ToList();
+        var devices = await context.ClientDevices
+            .AsNoTracking()
+            .Where(d => d.LastProfileId == profileId || settingDeviceIds.Contains(d.DeviceId))
+            .ToDictionaryAsync(d => d.DeviceId);
+
+        return settingDeviceIds.Union(devices.Keys)
+            .Select(deviceId =>
+            {
+                devices.TryGetValue(deviceId, out var device);
+                return new ProfileDeviceRecord(
+                    deviceId,
+                    settings.FirstOrDefault(s => s.DeviceId == deviceId)?.PlaybackPrefs,
+                    device?.DeviceName ?? string.Empty,
+                    device?.ClientName ?? string.Empty,
+                    device?.DeviceType ?? string.Empty,
+                    device?.OperatingSystem ?? string.Empty,
+                    device?.LastConnectedAt);
+            })
+            .OrderByDescending(record => record.LastConnectedAt ?? DateTime.MinValue)
+            .ThenBy(record => record.DeviceId, StringComparer.Ordinal)
+            .ToList();
+    }
+
+    public async Task SaveProfileDevicePlaybackPrefsAsync(Guid profileId, IReadOnlyDictionary<string, string> playbackPrefsByDevice)
+    {
+        var deviceIds = playbackPrefsByDevice.Keys.ToList();
+        var existing = await context.Set<ProfileDeviceSetting>()
+            .Where(s => s.ProfileId == profileId && deviceIds.Contains(s.DeviceId))
+            .ToDictionaryAsync(s => s.DeviceId);
+
+        foreach (var (deviceId, playbackPrefs) in playbackPrefsByDevice)
+        {
+            if (existing.TryGetValue(deviceId, out var setting))
+            {
+                setting.PlaybackPrefs = playbackPrefs;
+            }
+            else
+            {
+                context.Set<ProfileDeviceSetting>().Add(new ProfileDeviceSetting { ProfileId = profileId, DeviceId = deviceId, PlaybackPrefs = playbackPrefs });
+            }
+        }
+
+        await context.SaveChangesAsync();
+    }
+
     public Task<string?> GetProfileDeviceDiscoveryLayoutAsync(Guid profileId, string deviceId) =>
         ReadProfileDeviceFieldAsync(profileId, deviceId, s => s.DiscoveryLayoutJson);
 

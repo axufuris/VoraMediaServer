@@ -3,14 +3,15 @@ import { useParams } from 'react-router-dom';
 import PageHeader from '../../components/Admin/Primitives/PageHeader';
 import { useActionToast } from '../../components/Admin/Primitives/ActionToast';
 import ClientSettingsEditor from '../../components/Common/ClientSettings/ClientSettingsEditor';
-import { clientDefaultsService } from '../../api/System/clientDefaultsService';
-import type { ClientSettingsVM, SaveClientSettingsRequest } from '../../api/Users/profileService';
+import DeviceSettingsEditor from '../../components/Common/ClientSettings/DeviceSettingsEditor';
+import { clientDefaultsService, type ClientDefaultsVM } from '../../api/System/clientDefaultsService';
+import type { ClientSettingsVM, DeviceSettingsVM, SaveClientSettingsRequest } from '../../api/Users/profileService';
 import { resolveReason } from '../../utils/apiError';
 
 export default function ClientDefaultsPage() {
     const { serverId } = useParams<{ serverId?: string }>();
     const { toast, showToast } = useActionToast();
-    const [settings, setSettings] = useState<ClientSettingsVM | null>(null);
+    const [settings, setSettings] = useState<ClientDefaultsVM | null>(null);
     const [error, setError] = useState<string | null>(null);
 
     useEffect(() => {
@@ -21,7 +22,17 @@ export default function ClientDefaultsPage() {
         return () => { cancelled = true; };
     }, [serverId]);
 
-    const save = (request: SaveClientSettingsRequest) => clientDefaultsService.save(request, serverId);
+    const save = async (request: SaveClientSettingsRequest): Promise<ClientSettingsVM> => {
+        const saved = await clientDefaultsService.save(request, serverId);
+        setSettings(saved);
+        return saved;
+    };
+
+    const saveDevice = async (device: DeviceSettingsVM) => {
+        const saved = await clientDefaultsService.save({ device }, serverId);
+        setSettings(saved);
+        showToast('Saved the device defaults.');
+    };
 
     return (
         <div data-vora-page="">
@@ -36,14 +47,25 @@ export default function ClientDefaultsPage() {
                 {error && <p role="alert" className="m-0 text-sm text-[var(--vora-danger-text)]">{error}</p>}
                 {!error && !settings && <div className="vora-skeleton h-64" />}
                 {settings && (
-                    <div className="vora-card p-6">
-                        <ClientSettingsEditor
-                            settings={settings}
-                            onSave={save}
-                            onSaved={() => showToast('Saved the client defaults.')}
-                            saveLabel="Save defaults"
-                        />
-                    </div>
+                    <>
+                        <section className="vora-card p-6">
+                            <h2 className="m-0 mb-1 text-base font-semibold text-[var(--vora-text-primary)]">New profiles start with</h2>
+                            <p className="m-0 mb-6 text-sm text-[var(--vora-text-muted)]">Copied into a profile when it is created. A profile that already exists keeps what it has.</p>
+                            <ClientSettingsEditor
+                                settings={settings}
+                                onSave={save}
+                                onSaved={() => showToast('Saved the client defaults.')}
+                                saveLabel="Save defaults"
+                            />
+                        </section>
+                        <section className="vora-card p-6">
+                            <h2 className="m-0 mb-1 text-base font-semibold text-[var(--vora-text-primary)]">Devices that have not set their own</h2>
+                            <p className="m-0 mb-6 text-sm text-[var(--vora-text-muted)]">
+                                Bitrate and resolution limits, the skip and volume steps and the sounds are kept for each device. A device that has not saved its own follows these, so a change here reaches those devices straight away, and a device keeps its own once it saves.
+                            </p>
+                            <DeviceSettingsEditor settings={settings.device} saveLabel="Save device defaults" onSave={saveDevice} />
+                        </section>
+                    </>
                 )}
             </div>
             {toast}

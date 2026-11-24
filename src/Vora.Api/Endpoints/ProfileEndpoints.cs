@@ -179,6 +179,18 @@ public static class ProfileEndpoints
             .ProducesProblem(StatusCodes.Status400BadRequest)
             .Produces(StatusCodes.Status404NotFound);
 
+        group.MapGet("/profiles/{profileId:guid}/device-settings", GetProfileDeviceSettingsAsync)
+            .RequireAuthorization("AdminOnly")
+            .WithName("GetProfileDeviceSettings")
+            .Produces<List<ProfileDeviceVM>>(StatusCodes.Status200OK)
+            .Produces(StatusCodes.Status404NotFound);
+        group.MapPut("/profiles/{profileId:guid}/device-settings", SaveProfileDeviceSettingsAsync)
+            .RequireAuthorization("AdminOnly")
+            .WithName("SaveProfileDeviceSettings")
+            .Produces<List<ProfileDeviceVM>>(StatusCodes.Status200OK)
+            .ProducesProblem(StatusCodes.Status400BadRequest)
+            .Produces(StatusCodes.Status404NotFound);
+
         group.MapGet("/profiles/{profileId:guid}/viewing-history", GetViewingHistoryAsync)
             .RequireAuthorization("AdminOnly")
             .WithName("GetProfileViewingHistory")
@@ -434,6 +446,12 @@ public static class ProfileEndpoints
     private static async Task<IResult> SaveProfileClientSettingsAsync(Guid profileId, [FromBody] SaveClientSettingsRequest body, IProfileClientSettingsManager manager) =>
         Results.Ok(await manager.SaveAsync(profileId, body));
 
+    private static async Task<IResult> GetProfileDeviceSettingsAsync(Guid profileId, IProfileDeviceSettingsManager manager) =>
+        Results.Ok(await manager.ListAsync(profileId));
+
+    private static async Task<IResult> SaveProfileDeviceSettingsAsync(Guid profileId, [FromBody] SaveProfileDeviceSettingsRequest body, IProfileDeviceSettingsManager manager) =>
+        Results.Ok(await manager.SaveAsync(profileId, body));
+
     private static async Task<IResult> GetMyTrackPreferencesAsync(HttpContext ctx, ITrackPreferenceManager manager)
     {
         var profileId = ctx.User.GetProfileId();
@@ -507,25 +525,20 @@ public static class ProfileEndpoints
         return Results.NoContent();
     }
 
-    private static async Task<IResult> GetPlaybackPrefsAsync(Guid profileId, string deviceId, IUserManager manager)
+    private static async Task<IResult> GetPlaybackPrefsAsync(Guid profileId, string deviceId, IProfileDeviceSettingsManager manager)
     {
-        var prefs = await manager.GetProfileDevicePlaybackPrefsAsync(profileId, deviceId);
-        return Results.Ok(ParsePlaybackSettings(prefs));
-    }
-
-    private static ClientPlaybackSettingsDto ParsePlaybackSettings(string? prefsJson)
-    {
-        if (string.IsNullOrWhiteSpace(prefsJson)) return new ClientPlaybackSettingsDto();
-
-        try
+        var playback = await manager.GetPlaybackAsync(profileId, deviceId);
+        return Results.Ok(new ClientPlaybackSettingsDto
         {
-            return JsonSerializer.Deserialize<ClientPlaybackSettingsDto>(prefsJson, new JsonSerializerOptions { PropertyNameCaseInsensitive = true })
-                ?? new ClientPlaybackSettingsDto();
-        }
-        catch (JsonException)
-        {
-            return new ClientPlaybackSettingsDto();
-        }
+            Bitrate = playback.Settings.Bitrate,
+            MaxResolution = playback.Settings.MaxResolution,
+            MaxAudioChannels = playback.MaxAudioChannels,
+            SeekStepSeconds = playback.Settings.SeekStepSeconds,
+            VolumeStepPercent = playback.Settings.VolumeStepPercent,
+            SoundOnClick = playback.Settings.SoundOnClick,
+            SoundOnNavOpen = playback.Settings.SoundOnNavOpen,
+            SoundOnMove = playback.Settings.SoundOnMove
+        });
     }
 
     private static async Task<IResult> GetDiscoveryLayoutAsync(Guid profileId, string deviceId, IUserManager manager)

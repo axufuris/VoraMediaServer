@@ -36,6 +36,7 @@ export const VORA_EVENTS = {
     TasksUpdated: 'TasksUpdated',
     UserAccessUpdated: 'UserAccessUpdated',
     ProfileAccessUpdated: 'ProfileAccessUpdated',
+    ClientSettingsChanged: 'ClientSettingsChanged',
     DvrSessionsUpdated: 'DvrSessionsUpdated',
     ChannelFavoritesUpdated: 'ChannelFavoritesUpdated',
     WatchlistUpdated: 'WatchlistUpdated',

@@ -717,6 +717,18 @@ public sealed class LegacyDatabase : IAsyncDisposable
         await ReplaceCombinedMigrationAsync(db, ClientDefaultsMigration, "10.0.9", cancellationToken);
     }
 
+    public const string DeviceDefaultsMigration = "20261124031534_ChangesSinceInitial";
+
+    public async Task BuildDeviceDefaultsStateAsync(CancellationToken cancellationToken)
+    {
+        await using var db = NewContext();
+        await db.Database.MigrateAsync(cancellationToken);
+        await db.Database.ExecuteSqlRawAsync(
+            "ALTER TABLE \"ServerSettings\" DROP COLUMN \"DeviceDefaultBitrate\", DROP COLUMN \"DeviceDefaultMaxResolution\", DROP COLUMN \"DeviceDefaultSeekStepSeconds\", DROP COLUMN \"DeviceDefaultVolumeStepPercent\", DROP COLUMN \"DeviceDefaultSoundOnClick\", DROP COLUMN \"DeviceDefaultSoundOnNavOpen\", DROP COLUMN \"DeviceDefaultSoundOnMove\";",
+            cancellationToken);
+        await ReplaceCombinedMigrationAsync(db, DeviceDefaultsMigration, "10.0.9", cancellationToken);
+    }
+
     private static async Task ReplaceCombinedMigrationAsync(VoraDbContext db, string migrationId, string productVersion, CancellationToken cancellationToken)
     {
         await db.Database.ExecuteSqlAsync(

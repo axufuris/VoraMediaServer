@@ -8,10 +8,17 @@ import type { ClientSettingsVM, UserProfileVM } from '../../../api/Users/profile
 const mocks = vi.hoisted(() => ({
     adminGetClientSettings: vi.fn(),
     adminSaveClientSettings: vi.fn(),
+    adminGetDeviceSettings: vi.fn(),
+    adminSaveDeviceSettings: vi.fn(),
 }));
 
 vi.mock('../../../api/Users/profileService', () => ({
-    profileService: { adminGetClientSettings: mocks.adminGetClientSettings, adminSaveClientSettings: mocks.adminSaveClientSettings },
+    profileService: {
+        adminGetClientSettings: mocks.adminGetClientSettings,
+        adminSaveClientSettings: mocks.adminSaveClientSettings,
+        adminGetDeviceSettings: mocks.adminGetDeviceSettings,
+        adminSaveDeviceSettings: mocks.adminSaveDeviceSettings,
+    },
 }));
 
 const sam = { id: 'p-sam', name: 'Sam' } as UserProfileVM;
@@ -29,6 +36,7 @@ describe('ProfileClientSettingsModal', () => {
     beforeEach(() => {
         Object.values(mocks).forEach(m => m.mockReset());
         mocks.adminGetClientSettings.mockResolvedValue(settings);
+        mocks.adminGetDeviceSettings.mockResolvedValue([]);
     });
 
     it("opens on the profile's own settings, named for the profile", async () => {
@@ -61,6 +69,17 @@ describe('ProfileClientSettingsModal', () => {
 
         expect(await screen.findByRole('alert')).toHaveTextContent('Profile not found.');
         expect(screen.queryByRole('button', { name: 'Save' })).toBeNull();
+    });
+
+    it("lists the profile's devices below its settings", async () => {
+        mocks.adminGetDeviceSettings.mockResolvedValue([
+            { deviceId: 'tv', name: 'Living room', clientName: 'Vora Android', deviceType: 'TV', operatingSystem: 'Android', settings: { bitrate: 0, maxResolution: 0, seekStepSeconds: 10, volumeStepPercent: 5, soundOnClick: true, soundOnNavOpen: true, soundOnMove: true } },
+        ]);
+        renderModal();
+
+        expect(await screen.findByText('Living room')).toBeInTheDocument();
+        expect(screen.getByRole('heading', { name: 'Devices' })).toBeInTheDocument();
+        expect(mocks.adminGetDeviceSettings).toHaveBeenCalledWith('p-sam', 's1');
     });
 
     it('closes without saving', async () => {

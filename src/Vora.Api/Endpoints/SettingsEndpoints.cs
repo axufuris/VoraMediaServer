@@ -65,10 +65,10 @@ public static class SettingsEndpoints
 
         group.MapGet("/client-defaults", GetClientDefaultsAsync)
             .WithName("GetClientDefaults")
-            .Produces<ClientSettingsVM>(StatusCodes.Status200OK);
+            .Produces<ClientDefaultsVM>(StatusCodes.Status200OK);
         group.MapPut("/client-defaults", SaveClientDefaultsAsync)
             .WithName("SaveClientDefaults")
-            .Produces<ClientSettingsVM>(StatusCodes.Status200OK)
+            .Produces<ClientDefaultsVM>(StatusCodes.Status200OK)
             .ProducesProblem(StatusCodes.Status400BadRequest);
 
         routes.MapGet("/api/server/features", GetFeatureFlagsAsync)
@@ -82,7 +82,7 @@ public static class SettingsEndpoints
     private static async Task<IResult> GetClientDefaultsAsync(IClientDefaultsManager manager) =>
         Results.Ok(await manager.GetAsync());
 
-    private static async Task<IResult> SaveClientDefaultsAsync([FromBody] SaveClientSettingsRequest body, IClientDefaultsManager manager) =>
+    private static async Task<IResult> SaveClientDefaultsAsync([FromBody] SaveClientDefaultsRequest body, IClientDefaultsManager manager) =>
         Results.Ok(await manager.SaveAsync(body));
 
     private static async Task<IResult> GetServerSettingsAsync(ISystemSettingsManager manager)

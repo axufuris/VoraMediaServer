@@ -86,9 +86,7 @@ export default function ProvidersTab({ activeProfileId, serverId, onSaved }: { a
 
         if (activeProfileId) {
             try {
-                const prefsKey = `playback_prefs_${activeProfileId}_${deviceId}`;
-                const prefsString = localStorage.getItem(prefsKey) || '{}';
-                await profileDeviceSettingsService.saveClientSettings(activeProfileId, deviceId, prefsString, iptvPrefsString, serverId);
+                await profileDeviceSettingsService.saveClientSettings(activeProfileId, deviceId, { iptvPrefsJson: iptvPrefsString }, serverId);
             } catch (error) {
                 console.error('Failed to save provider settings to server:', error);
             }
