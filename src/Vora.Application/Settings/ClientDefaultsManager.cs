@@ -1,3 +1,4 @@
+using Vora.Application.Analysis;
 using Vora.Application.Streaming;
 using Vora.Application.Users;
 using Vora.Application.Users.ViewModels;
@@ -8,31 +9,38 @@ namespace Vora.Application.Settings;
 
 public interface IClientDefaultsManager
 {
-    Task<ClientSettingsVM> GetAsync();
-    Task<ClientSettingsVM> SaveAsync(SaveClientSettingsRequest request);
+    Task<ClientDefaultsVM> GetAsync();
+    Task<ClientDefaultsVM> SaveAsync(SaveClientDefaultsRequest request);
     Task ApplyToNewProfileAsync(UserProfile profile);
+    Task<DeviceSettings> GetDeviceDefaultsAsync();
 }
 
-public sealed class ClientDefaultsManager(ISystemSettingsRepository settingsRepository) : IClientDefaultsManager
+public sealed class ClientDefaultsManager(ISystemSettingsRepository settingsRepository, IClientNotifier notifier) : IClientDefaultsManager
 {
-    public async Task<ClientSettingsVM> GetAsync() =>
+    public async Task<ClientDefaultsVM> GetAsync() =>
         ViewOf(await settingsRepository.GetSettingsAsync());
 
-    public async Task<ClientSettingsVM> SaveAsync(SaveClientSettingsRequest request)
+    public async Task<ClientDefaultsVM> SaveAsync(SaveClientDefaultsRequest request)
     {
         var settings = await settingsRepository.GetSettingsForUpdateAsync();
 
         var playback = request.Playback is null ? null : PlaybackOf(settings).Updated(request.Playback);
         var tracks = request.Tracks is null ? null : TrackPreferences.From(request.Tracks);
         var sort = request.LibrarySort is null ? null : LibrarySortChoice.From(request.LibrarySort);
+        var device = request.Device is null ? null : DeviceSettings.From(request.Device);
 
         if (playback is not null) Store(settings, playback);
         if (tracks is not null) Store(settings, tracks);
         if (sort is not null) Store(settings, sort);
+        if (device is not null) Store(settings, device);
 
         await settingsRepository.SaveChangesAsync();
+        if (device is not null) await notifier.NotifyClientDefaultsChangedAsync();
         return ViewOf(settings);
     }
+
+    public async Task<DeviceSettings> GetDeviceDefaultsAsync() =>
+        DeviceOf(await settingsRepository.GetSettingsAsync());
 
     public async Task ApplyToNewProfileAsync(UserProfile profile)
     {
@@ -42,12 +50,33 @@ public sealed class ClientDefaultsManager(ISystemSettingsRepository settingsRepo
         profile.Apply(LibrarySortOf(settings));
     }
 
-    private static ClientSettingsVM ViewOf(ServerSetting settings) => new()
+    private static ClientDefaultsVM ViewOf(ServerSetting settings) => new()
     {
         Playback = PlaybackOf(settings).ToViewModel(),
         Tracks = TracksOf(settings).ToViewModel(settings),
-        LibrarySort = LibrarySortOf(settings).ToViewModel()
+        LibrarySort = LibrarySortOf(settings).ToViewModel(),
+        Device = DeviceOf(settings).ToViewModel()
     };
+
+    private static DeviceSettings DeviceOf(ServerSetting settings) => new(
+        settings.DeviceDefaultBitrate,
+        settings.DeviceDefaultMaxResolution,
+        settings.DeviceDefaultSeekStepSeconds,
+        settings.DeviceDefaultVolumeStepPercent,
+        settings.DeviceDefaultSoundOnClick,
+        settings.DeviceDefaultSoundOnNavOpen,
+        settings.DeviceDefaultSoundOnMove);
+
+    private static void Store(ServerSetting settings, DeviceSettings device)
+    {
+        settings.DeviceDefaultBitrate = device.Bitrate;
+        settings.DeviceDefaultMaxResolution = device.MaxResolution;
+        settings.DeviceDefaultSeekStepSeconds = device.SeekStepSeconds;
+        settings.DeviceDefaultVolumeStepPercent = device.VolumeStepPercent;
+        settings.DeviceDefaultSoundOnClick = device.SoundOnClick;
+        settings.DeviceDefaultSoundOnNavOpen = device.SoundOnNavOpen;
+        settings.DeviceDefaultSoundOnMove = device.SoundOnMove;
+    }
 
     private static PlaybackBehaviour PlaybackOf(ServerSetting settings) => new(
         settings.NewProfileAutoSkipIntro,

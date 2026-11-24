@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Modal, ModalBody, ModalHeader } from '../../Common/Modal';
 import ClientSettingsEditor from '../../Common/ClientSettings/ClientSettingsEditor';
+import ProfileDevicesPanel from './ProfileDevicesPanel';
 import { profileService, type ClientSettingsVM, type SaveClientSettingsRequest, type UserProfileVM } from '../../../api/Users/profileService';
 import { resolveReason } from '../../../utils/apiError';
 
@@ -37,11 +38,20 @@ export default function ProfileClientSettingsModal({ profile, serverId, onClose,
                 {error && <p role="alert" className="m-0 text-sm text-[var(--vora-danger-text)]">{error}</p>}
                 {!error && !settings && <div className="vora-skeleton h-48" />}
                 {settings && (
-                    <ClientSettingsEditor
-                        settings={settings}
-                        onSave={save}
-                        onSaved={() => onSaved(`Saved the client settings for ${profile.name}.`)}
-                    />
+                    <div className="space-y-8">
+                        <ClientSettingsEditor
+                            settings={settings}
+                            onSave={save}
+                            onSaved={() => onSaved(`Saved the client settings for ${profile.name}.`)}
+                        />
+                        <section className="border-t border-[var(--vora-border-subtle)] pt-6">
+                            <h3 className="m-0 mb-1 text-sm font-semibold text-[var(--vora-text-primary)]">Devices</h3>
+                            <p className="m-0 mb-4 text-xs text-[var(--vora-text-muted)]">
+                                Bitrate and resolution limits, the skip and volume steps and the sounds are kept for each device. A device that has not saved its own follows the server's defaults.
+                            </p>
+                            <ProfileDevicesPanel profileId={profile.id} serverId={serverId} />
+                        </section>
+                    </div>
                 )}
             </ModalBody>
         </Modal>

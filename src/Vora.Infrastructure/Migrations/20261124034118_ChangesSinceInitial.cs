@@ -66,7 +66,14 @@ ALTER TABLE ""ServerSettings"" ADD COLUMN IF NOT EXISTS ""NewProfileSubtitleLang
 ALTER TABLE ""ServerSettings"" ADD COLUMN IF NOT EXISTS ""NewProfileSubtitleMode"" integer;
 ALTER TABLE ""ServerSettings"" ADD COLUMN IF NOT EXISTS ""NewProfilePreferHearingImpairedSubtitles"" boolean NOT NULL DEFAULT FALSE;
 ALTER TABLE ""ServerSettings"" ADD COLUMN IF NOT EXISTS ""NewProfileLibrarySort"" integer;
-ALTER TABLE ""ServerSettings"" ADD COLUMN IF NOT EXISTS ""NewProfileLibrarySortDescending"" boolean NOT NULL DEFAULT FALSE;");
+ALTER TABLE ""ServerSettings"" ADD COLUMN IF NOT EXISTS ""NewProfileLibrarySortDescending"" boolean NOT NULL DEFAULT FALSE;
+ALTER TABLE ""ServerSettings"" ADD COLUMN IF NOT EXISTS ""DeviceDefaultBitrate"" integer NOT NULL DEFAULT 0;
+ALTER TABLE ""ServerSettings"" ADD COLUMN IF NOT EXISTS ""DeviceDefaultMaxResolution"" integer NOT NULL DEFAULT 0;
+ALTER TABLE ""ServerSettings"" ADD COLUMN IF NOT EXISTS ""DeviceDefaultSeekStepSeconds"" integer NOT NULL DEFAULT 10;
+ALTER TABLE ""ServerSettings"" ADD COLUMN IF NOT EXISTS ""DeviceDefaultVolumeStepPercent"" integer NOT NULL DEFAULT 5;
+ALTER TABLE ""ServerSettings"" ADD COLUMN IF NOT EXISTS ""DeviceDefaultSoundOnClick"" boolean NOT NULL DEFAULT TRUE;
+ALTER TABLE ""ServerSettings"" ADD COLUMN IF NOT EXISTS ""DeviceDefaultSoundOnNavOpen"" boolean NOT NULL DEFAULT TRUE;
+ALTER TABLE ""ServerSettings"" ADD COLUMN IF NOT EXISTS ""DeviceDefaultSoundOnMove"" boolean NOT NULL DEFAULT TRUE;");
 
             migrationBuilder.Sql(@"
 UPDATE ""UserMediaStates"" SET ""ResumePositionSeconds"" = 0
@@ -596,6 +603,34 @@ CREATE INDEX IF NOT EXISTS ""IX_MusicResumePoints_ProfileId_UpdatedAt"" ON ""Mus
         /// <inheritdoc />
         protected override void Down(MigrationBuilder migrationBuilder)
         {
+            migrationBuilder.DropColumn(
+                name: "DeviceDefaultBitrate",
+                table: "ServerSettings");
+
+            migrationBuilder.DropColumn(
+                name: "DeviceDefaultMaxResolution",
+                table: "ServerSettings");
+
+            migrationBuilder.DropColumn(
+                name: "DeviceDefaultSeekStepSeconds",
+                table: "ServerSettings");
+
+            migrationBuilder.DropColumn(
+                name: "DeviceDefaultVolumeStepPercent",
+                table: "ServerSettings");
+
+            migrationBuilder.DropColumn(
+                name: "DeviceDefaultSoundOnClick",
+                table: "ServerSettings");
+
+            migrationBuilder.DropColumn(
+                name: "DeviceDefaultSoundOnNavOpen",
+                table: "ServerSettings");
+
+            migrationBuilder.DropColumn(
+                name: "DeviceDefaultSoundOnMove",
+                table: "ServerSettings");
+
             migrationBuilder.DropColumn(
                 name: "NewProfileAutoSkipIntro",
                 table: "ServerSettings");

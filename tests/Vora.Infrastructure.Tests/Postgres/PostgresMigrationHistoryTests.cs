@@ -1775,4 +1775,45 @@ public class PostgresMigrationHistoryTests(PostgresDatabase database) : IClassFi
         kept.NewProfileAutoPlayNext.Should().BeFalse();
         kept.NewProfileMinimumCreditsSceneSeconds.Should().Be(40);
     }
+    [Fact]
+    public async Task A_database_on_the_new_profile_defaults_migration_gains_device_defaults_that_match_what_a_device_gets_today()
+    {
+        Assert.SkipUnless(PostgresDatabase.IsConfigured, PostgresDatabase.SkipReason);
+        var cancellationToken = TestContext.Current.CancellationToken;
+        await using var legacy = new LegacyDatabase();
+        await legacy.BuildDeviceDefaultsStateAsync(cancellationToken);
+
+        await using (var before = legacy.NewContext())
+        {
+            (await before.Database.GetPendingMigrationsAsync(cancellationToken)).Should().Equal(MigrationHistoryTests.ChangesSinceInitial);
+            (await ColumnsAsync(before, "ServerSettings", cancellationToken)).Should().NotContain("DeviceDefaultSeekStepSeconds");
+            await before.Database.ExecuteSqlRawAsync("UPDATE \"ServerSettings\" SET \"NewProfileAudioLanguage\" = 'spa'", cancellationToken);
+        }
+
+        await legacy.MigrateAsync(cancellationToken);
+
+        await using (var after = legacy.NewContext())
+        {
+            (await after.Database.GetPendingMigrationsAsync(cancellationToken)).Should().BeEmpty();
+            var settings = await after.Set<ServerSetting>().AsNoTracking().SingleAsync(cancellationToken);
+            settings.NewProfileAudioLanguage.Should().Be("spa");
+            settings.DeviceDefaultBitrate.Should().Be(0);
+            settings.DeviceDefaultMaxResolution.Should().Be(0);
+            settings.DeviceDefaultSeekStepSeconds.Should().Be(10);
+            settings.DeviceDefaultVolumeStepPercent.Should().Be(5);
+            settings.DeviceDefaultSoundOnClick.Should().BeTrue();
+            settings.DeviceDefaultSoundOnNavOpen.Should().BeTrue();
+            settings.DeviceDefaultSoundOnMove.Should().BeTrue();
+            await after.Database.ExecuteSqlRawAsync("UPDATE \"ServerSettings\" SET \"DeviceDefaultBitrate\" = 20, \"DeviceDefaultSeekStepSeconds\" = 30, \"DeviceDefaultSoundOnMove\" = FALSE", cancellationToken);
+            await after.Database.ExecuteSqlAsync($"DELETE FROM \"__EFMigrationsHistory\" WHERE \"MigrationId\" = {MigrationHistoryTests.ChangesSinceInitial}", cancellationToken);
+        }
+
+        await legacy.MigrateAsync(cancellationToken);
+
+        await using var again = legacy.NewContext();
+        var kept = await again.Set<ServerSetting>().AsNoTracking().SingleAsync(cancellationToken);
+        kept.DeviceDefaultBitrate.Should().Be(20);
+        kept.DeviceDefaultSeekStepSeconds.Should().Be(30);
+        kept.DeviceDefaultSoundOnMove.Should().BeFalse();
+    }
 }

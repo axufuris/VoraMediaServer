@@ -61,4 +61,27 @@ public class SignalRClientNotifierTests
 
         ReachedOnly(VoraHub.ProfileGroupName(profileId), "MusicMixesUpdated", profileId.ToString());
     }
+
+    [Fact]
+    public async Task A_profiles_client_settings_change_reaches_only_that_profile_and_not_the_admins()
+    {
+        var profileId = Guid.NewGuid();
+
+        await _notifier.NotifyClientSettingsChangedAsync(profileId);
+
+        ReachedOnly(VoraHub.ProfileGroupName(profileId), "ClientSettingsChanged", profileId.ToString());
+    }
+
+    [Fact]
+    public async Task A_change_to_the_client_defaults_reaches_every_client_with_no_payload()
+    {
+        await _notifier.NotifyClientDefaultsChangedAsync();
+
+        _ = _clients.Received(1).All;
+        _clients.DidNotReceive().Group(Arg.Any<string>());
+        await _proxy.Received(1).SendCoreAsync(
+            "ClientSettingsChanged",
+            Arg.Is<object?[]>(args => args.Length == 0),
+            Arg.Any<CancellationToken>());
+    }
 }

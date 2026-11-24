@@ -1,6 +1,7 @@
 using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
+using Vora.Application.Analysis;
 using Vora.Application.Auth;
 using Vora.Application.Email;
 using Vora.Application.Settings;
@@ -29,7 +30,7 @@ public class AdminCreateUserTests
             Options.Create(new JwtOptions { Issuer = "test", Audience = "test", SecretKey = new string('x', 64) }),
             Substitute.For<IEmailService>(),
             Substitute.For<IInvitationManager>(),
-            new ClientDefaultsManager(_settings),
+            new ClientDefaultsManager(_settings, Substitute.For<IClientNotifier>()),
             new MemoryCache(new MemoryCacheOptions()),
             NullLogger<AuthManager>.Instance);
     }

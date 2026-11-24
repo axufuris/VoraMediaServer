@@ -218,6 +218,14 @@ public class ServerSetting
     public LibrarySortField? NewProfileLibrarySort { get; set; }
     public bool NewProfileLibrarySortDescending { get; set; }
 
+    public int DeviceDefaultBitrate { get; set; }
+    public int DeviceDefaultMaxResolution { get; set; }
+    public int DeviceDefaultSeekStepSeconds { get; set; } = 10;
+    public int DeviceDefaultVolumeStepPercent { get; set; } = 5;
+    public bool DeviceDefaultSoundOnClick { get; set; } = true;
+    public bool DeviceDefaultSoundOnNavOpen { get; set; } = true;
+    public bool DeviceDefaultSoundOnMove { get; set; } = true;
+
     public bool EmailEnabled { get; set; }
     public string? SmtpHost { get; set; }
     public int SmtpPort { get; set; } = 587;

@@ -1,3 +1,4 @@
+using Vora.Application.Analysis;
 using Vora.Application.Settings;
 using Vora.Application.Streaming.Requests;
 using Vora.Application.Users;
@@ -13,13 +14,14 @@ public class ProfileClientSettingsManagerTests
     private readonly IUserRepository _users = Substitute.For<IUserRepository>();
     private readonly ISystemSettingsRepository _settings = Substitute.For<ISystemSettingsRepository>();
     private readonly UserProfile _profile = new() { Name = "Sam", AutoSkipIntro = true, PreferredAudioLanguage = "fra" };
+    private readonly IClientNotifier _notifier = Substitute.For<IClientNotifier>();
     private readonly ProfileClientSettingsManager _manager;
 
     public ProfileClientSettingsManagerTests()
     {
         _users.GetProfileByIdAsync(_profile.Id).Returns(_profile);
         _settings.GetSettingsAsync().Returns(new ServerSetting { MetadataLanguage = "ita" });
-        _manager = new ProfileClientSettingsManager(_users, _settings);
+        _manager = new ProfileClientSettingsManager(_users, _settings, _notifier);
     }
 
     [Fact]
@@ -50,6 +52,7 @@ public class ProfileClientSettingsManagerTests
         saved.LibrarySort.Descending.Should().BeTrue();
         saved.Tracks.AudioLanguage.Should().Be("fra");
         await _users.Received(1).UpdateProfileAsync(_profile);
+        await _notifier.Received(1).NotifyClientSettingsChangedAsync(_profile.Id);
     }
 
     [Fact]
@@ -74,6 +77,7 @@ public class ProfileClientSettingsManagerTests
         _profile.AutoSkipCredits.Should().BeFalse();
         _profile.PreferredAudioLanguage.Should().Be("fra");
         await _users.DidNotReceive().UpdateProfileAsync(Arg.Any<UserProfile>());
+        await _notifier.DidNotReceive().NotifyClientSettingsChangedAsync(Arg.Any<Guid>());
     }
 
     [Fact]
@@ -94,7 +98,7 @@ public class ProfileClientSettingsManagerTests
         var playback = new PlaybackPreferencesVM { AutoSkipIntro = true, UpNextOrder = UpNextOrder.InOrder, MinimumCreditsSceneSeconds = 9000 };
         _users.GetProfileByIdAsync(own.Id).Returns(own);
         _users.GetProfileByIdAsync(admin.Id).Returns(admin);
-        var userManager = new UserManager(_users, Substitute.For<IUserProfileImageService>(), Substitute.For<Vora.Application.Analysis.IClientNotifier>(), Substitute.For<IClientDefaultsManager>(), Microsoft.Extensions.Logging.Abstractions.NullLogger<UserManager>.Instance);
+        var userManager = new UserManager(_users, Substitute.For<IUserProfileImageService>(), _notifier, Substitute.For<IClientDefaultsManager>(), Microsoft.Extensions.Logging.Abstractions.NullLogger<UserManager>.Instance);
 
         await userManager.SavePlaybackPreferencesAsync(own.Id, playback);
         await _manager.SaveAsync(admin.Id, new SaveClientSettingsRequest { Playback = playback });

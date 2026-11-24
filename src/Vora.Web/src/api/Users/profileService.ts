@@ -109,6 +109,31 @@ export interface SaveClientSettingsRequest {
     librarySort?: LibrarySortVM;
 }
 
+export interface DeviceSettingsVM {
+    bitrate: number;
+    maxResolution: number;
+    seekStepSeconds: number;
+    volumeStepPercent: number;
+    soundOnClick: boolean;
+    soundOnNavOpen: boolean;
+    soundOnMove: boolean;
+}
+
+export interface ProfileDeviceVM {
+    deviceId: string;
+    name: string;
+    clientName: string;
+    deviceType: string;
+    operatingSystem: string;
+    lastConnectedAt?: string | null;
+    settings: DeviceSettingsVM;
+}
+
+export interface SaveProfileDeviceSettingsRequest {
+    deviceIds?: string[] | null;
+    settings: DeviceSettingsVM;
+}
+
 export const profileService = {
     // Account owner only. Off means nothing about this profile's listening is
     // sent to OpenAI, and no one can Blend with it.
@@ -183,6 +208,16 @@ export const profileService = {
 
     adminSaveClientSettings: async (profileId: string, request: SaveClientSettingsRequest, serverId?: string): Promise<ClientSettingsVM> => {
         const response = await apiClient.put<ClientSettingsVM, SaveClientSettingsRequest>(`/users/profiles/${profileId}/client-settings`, request, { serverId });
+        return response.data;
+    },
+
+    adminGetDeviceSettings: async (profileId: string, serverId?: string): Promise<ProfileDeviceVM[]> => {
+        const response = await apiClient.get<ProfileDeviceVM[]>(`/users/profiles/${profileId}/device-settings`, { serverId });
+        return response.data;
+    },
+
+    adminSaveDeviceSettings: async (profileId: string, request: SaveProfileDeviceSettingsRequest, serverId?: string): Promise<ProfileDeviceVM[]> => {
+        const response = await apiClient.put<ProfileDeviceVM[], SaveProfileDeviceSettingsRequest>(`/users/profiles/${profileId}/device-settings`, request, { serverId });
         return response.data;
     },
 

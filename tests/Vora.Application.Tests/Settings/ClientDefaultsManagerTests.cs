@@ -1,3 +1,4 @@
+using Vora.Application.Analysis;
 using Vora.Application.Settings;
 using Vora.Application.Streaming.Requests;
 using Vora.Application.Users;
@@ -12,16 +13,17 @@ public class ClientDefaultsManagerTests
 {
     private readonly ISystemSettingsRepository _repository = Substitute.For<ISystemSettingsRepository>();
     private readonly ServerSetting _settings = new();
+    private readonly IClientNotifier _notifier = Substitute.For<IClientNotifier>();
     private readonly ClientDefaultsManager _manager;
 
     public ClientDefaultsManagerTests()
     {
         _repository.GetSettingsAsync().Returns(_settings);
         _repository.GetSettingsForUpdateAsync().Returns(_settings);
-        _manager = new ClientDefaultsManager(_repository);
+        _manager = new ClientDefaultsManager(_repository, _notifier);
     }
 
-    private static SaveClientSettingsRequest Everything() => new()
+    private static SaveClientDefaultsRequest Everything() => new()
     {
         Playback = new PlaybackPreferencesVM
         {
@@ -97,7 +99,7 @@ public class ClientDefaultsManagerTests
     {
         await _manager.SaveAsync(Everything());
 
-        await _manager.SaveAsync(new SaveClientSettingsRequest { LibrarySort = new LibrarySortVM { Sort = LibrarySortField.Title } });
+        await _manager.SaveAsync(new SaveClientDefaultsRequest { LibrarySort = new LibrarySortVM { Sort = LibrarySortField.Title } });
 
         var current = await _manager.GetAsync();
         current.LibrarySort.Sort.Should().Be(LibrarySortField.Title);
@@ -111,7 +113,7 @@ public class ClientDefaultsManagerTests
     {
         await _manager.SaveAsync(Everything());
 
-        await _manager.SaveAsync(new SaveClientSettingsRequest { Playback = new PlaybackPreferencesVM { AutoSkipIntro = false, MinimumCreditsSceneSeconds = 20 } });
+        await _manager.SaveAsync(new SaveClientDefaultsRequest { Playback = new PlaybackPreferencesVM { AutoSkipIntro = false, MinimumCreditsSceneSeconds = 20 } });
 
         var playback = (await _manager.GetAsync()).Playback;
         playback.AutoSkipIntro.Should().BeFalse();
@@ -139,8 +141,8 @@ public class ClientDefaultsManagerTests
     [Fact]
     public async Task An_unknown_library_sort_or_subtitle_mode_is_refused()
     {
-        var sort = () => _manager.SaveAsync(new SaveClientSettingsRequest { LibrarySort = new LibrarySortVM { Sort = (LibrarySortField)99 } });
-        var mode = () => _manager.SaveAsync(new SaveClientSettingsRequest { Tracks = new SaveTrackPreferencesRequest { SubtitleMode = (SubtitleMode)99 } });
+        var sort = () => _manager.SaveAsync(new SaveClientDefaultsRequest { LibrarySort = new LibrarySortVM { Sort = (LibrarySortField)99 } });
+        var mode = () => _manager.SaveAsync(new SaveClientDefaultsRequest { Tracks = new SaveTrackPreferencesRequest { SubtitleMode = (SubtitleMode)99 } });
 
         await sort.Should().ThrowAsync<ArgumentException>();
         await mode.Should().ThrowAsync<ArgumentException>();
@@ -150,7 +152,7 @@ public class ClientDefaultsManagerTests
     [Fact]
     public async Task A_language_name_is_stored_as_the_code_and_the_seconds_are_kept_in_range()
     {
-        await _manager.SaveAsync(new SaveClientSettingsRequest
+        await _manager.SaveAsync(new SaveClientDefaultsRequest
         {
             Tracks = new SaveTrackPreferencesRequest { AudioLanguage = "Spanish" },
             Playback = new PlaybackPreferencesVM { MinimumCreditsSceneSeconds = 9000 }
@@ -165,10 +167,58 @@ public class ClientDefaultsManagerTests
     {
         await _manager.SaveAsync(Everything());
 
-        await _manager.SaveAsync(new SaveClientSettingsRequest { Tracks = new SaveTrackPreferencesRequest() });
+        await _manager.SaveAsync(new SaveClientDefaultsRequest { Tracks = new SaveTrackPreferencesRequest() });
 
         var profile = new UserProfile { Name = "New" };
         await _manager.ApplyToNewProfileAsync(profile);
         profile.TracksOf().Should().Be(new UserProfile { Name = "Fresh" }.TracksOf());
+    }
+
+    [Fact]
+    public async Task The_device_defaults_start_as_a_device_with_nothing_saved_has_always_had()
+    {
+        (await _manager.GetDeviceDefaultsAsync()).Should().Be(DeviceSettings.Shipped);
+        (await _manager.GetAsync()).Device.Should().BeEquivalentTo(DeviceSettings.Shipped.ToViewModel());
+    }
+
+    [Fact]
+    public async Task Saved_device_defaults_are_read_back_and_every_client_is_told()
+    {
+        var device = new DeviceSettings(20, 1080, 30, 2, false, true, false);
+
+        var saved = await _manager.SaveAsync(new SaveClientDefaultsRequest { Device = device.ToViewModel() });
+
+        saved.Device.Should().BeEquivalentTo(device.ToViewModel());
+        (await _manager.GetDeviceDefaultsAsync()).Should().Be(device);
+        _settings.DeviceDefaultBitrate.Should().Be(20);
+        _settings.DeviceDefaultSoundOnClick.Should().BeFalse();
+        await _notifier.Received(1).NotifyClientDefaultsChangedAsync();
+    }
+
+    [Fact]
+    public async Task A_save_without_the_device_section_leaves_the_device_defaults_and_tells_no_one()
+    {
+        await _manager.SaveAsync(new SaveClientDefaultsRequest { Device = new DeviceSettings(20, 1080, 30, 2, false, true, false).ToViewModel() });
+        _notifier.ClearReceivedCalls();
+
+        await _manager.SaveAsync(Everything());
+
+        _settings.DeviceDefaultBitrate.Should().Be(20);
+        await _notifier.DidNotReceive().NotifyClientDefaultsChangedAsync();
+    }
+
+    [Fact]
+    public async Task A_bad_device_setting_refuses_the_whole_save()
+    {
+        var request = Everything();
+        request.Device = DeviceSettings.Shipped.ToViewModel();
+        request.Device.VolumeStepPercent = 3;
+
+        var act = () => _manager.SaveAsync(request);
+
+        await act.Should().ThrowAsync<ArgumentException>();
+        _settings.NewProfileAudioLanguage.Should().BeNull();
+        await _repository.DidNotReceive().SaveChangesAsync();
+        await _notifier.DidNotReceive().NotifyClientDefaultsChangedAsync();
     }
 }

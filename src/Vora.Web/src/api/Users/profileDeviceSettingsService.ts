@@ -1,5 +1,21 @@
 import { apiClient } from '../client';
 
+export interface ClientPlaybackSettings {
+    bitrate: number;
+    maxResolution: number;
+    maxAudioChannels: number;
+    seekStepSeconds: number;
+    volumeStepPercent: number;
+    soundOnClick: boolean;
+    soundOnNavOpen: boolean;
+    soundOnMove: boolean;
+}
+
+export interface ClientSettingsBlobs {
+    playbackPrefs?: string;
+    iptvPrefsJson?: string;
+}
+
 export const profileDeviceSettingsService = {
     getNavPrefs: async (profileId: string, deviceId: string, serverId?: string): Promise<string | null> => {
         const response = await apiClient.get<{ navPrefsJson: string | null }>(`/users/profiles/${profileId}/devices/${deviceId}/nav`, { serverId });
@@ -10,13 +26,9 @@ export const profileDeviceSettingsService = {
         await apiClient.put(`/users/profiles/${profileId}/devices/${deviceId}/nav`, { navPrefsJson }, { serverId });
     },
 
-    getPlaybackPrefs: async (profileId: string, deviceId: string, serverId?: string): Promise<string | null> => {
-        const response = await apiClient.get<{ playbackPrefs: string | null }>(`/users/profiles/${profileId}/devices/${deviceId}/playback`, { serverId });
-        return response.data.playbackPrefs;
-    },
-
-    savePlaybackPrefs: async (profileId: string, deviceId: string, playbackPrefs: string, serverId?: string): Promise<void> => {
-        await apiClient.put(`/users/profiles/${profileId}/devices/${deviceId}/playback`, { playbackPrefs }, { serverId });
+    getPlaybackSettings: async (profileId: string, deviceId: string, serverId?: string): Promise<ClientPlaybackSettings> => {
+        const response = await apiClient.get<ClientPlaybackSettings>(`/users/profiles/${profileId}/devices/${deviceId}/playback`, { serverId });
+        return response.data;
     },
 
     getDiscoveryLayout: async (profileId: string, deviceId: string, serverId?: string): Promise<string | null> => {
@@ -58,7 +70,7 @@ export const profileDeviceSettingsService = {
         await apiClient.put(`/users/profiles/${profileId}/radio-prefs`, { radioPrefsJson }, { serverId });
     },
 
-    saveClientSettings: async (profileId: string, deviceId: string, playbackPrefs: string, iptvPrefsJson: string, serverId?: string): Promise<void> => {
-        await apiClient.put(`/users/profiles/${profileId}/devices/${deviceId}/settings`, { playbackPrefs, iptvPrefsJson }, { serverId });
+    saveClientSettings: async (profileId: string, deviceId: string, blobs: ClientSettingsBlobs, serverId?: string): Promise<void> => {
+        await apiClient.put(`/users/profiles/${profileId}/devices/${deviceId}/settings`, blobs, { serverId });
     }
 };

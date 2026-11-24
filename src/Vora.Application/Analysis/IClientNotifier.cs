@@ -16,6 +16,8 @@ public interface IClientNotifier
     Task NotifyTasksUpdatedAsync();
     Task NotifyUserAccessUpdatedAsync(Guid userId);
     Task NotifyProfileAccessUpdatedAsync(Guid profileId);
+    Task NotifyClientSettingsChangedAsync(Guid profileId);
+    Task NotifyClientDefaultsChangedAsync();
     Task NotifyDvrSessionsUpdatedAsync();
     Task NotifyPodcastEpisodesUpdatedAsync(Guid showId);
     Task NotifyMusicArtistUpdatedAsync(Guid artistId);

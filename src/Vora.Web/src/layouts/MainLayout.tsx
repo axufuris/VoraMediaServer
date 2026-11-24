@@ -23,6 +23,7 @@ import NowPlayingFullscreen from '../components/Player/NowPlayingFullscreen';
 import { useDialog } from '../dialogs';
 
 import { profileDeviceSettingsService } from '../api/Users/profileDeviceSettingsService';
+import { usePlaybackPrefsSync } from '../hooks/usePlaybackPrefsSync';
 import MainLayoutSidebar from './parts/MainLayoutSidebar';
 import MainLayoutUserMenu from './parts/MainLayoutUserMenu';
 import { useSidebarCollapsed } from './parts/useSidebarCollapsed';
@@ -260,39 +261,10 @@ export default function MainLayout() {
     }, [activeProfileId, serverId]);
 
     useEffect(() => {
-        let isMounted = true;
+        if (activeProfileId) void loadNav();
+    }, [activeProfileId, loadNav]);
 
-        const initializeData = async () => {
-            if (!activeProfileId) return;
-
-            await loadNav();
-
-            if (profileDeviceSettingsService.getPlaybackPrefs) {
-                const deviceId = localStorage.getItem('device_id') || 'unknown';
-                const prefsKey = `playback_prefs_${activeProfileId}_${deviceId}`;
-                const saved = localStorage.getItem(prefsKey);
-
-                if (!saved) {
-                    try {
-                        const serverSaved = await profileDeviceSettingsService.getPlaybackPrefs(activeProfileId, deviceId, serverId);
-                        if (serverSaved && isMounted) {
-                            localStorage.setItem(prefsKey, serverSaved);
-                        } else if (isMounted) {
-                            localStorage.setItem(prefsKey, "0");
-                        }
-                    } catch (e: unknown) {
-                        console.error("Failed to fetch playback prefs", e);
-                    }
-                }
-            }
-        };
-
-        initializeData();
-
-        return () => {
-            isMounted = false;
-        };
-    }, [activeProfileId, serverId, loadNav]);
+    usePlaybackPrefsSync(activeProfileId, serverId);
 
     const saveNavPrefs = (items: NavItem[]) => {
         const deviceId = localStorage.getItem('device_id') || 'unknown';

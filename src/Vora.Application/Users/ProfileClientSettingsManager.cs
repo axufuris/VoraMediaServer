@@ -1,3 +1,4 @@
+using Vora.Application.Analysis;
 using Vora.Application.Settings;
 using Vora.Application.Streaming;
 using Vora.Application.Users.ViewModels;
@@ -11,7 +12,7 @@ public interface IProfileClientSettingsManager
     Task<ClientSettingsVM> SaveAsync(Guid profileId, SaveClientSettingsRequest request);
 }
 
-public sealed class ProfileClientSettingsManager(IUserRepository users, ISystemSettingsRepository settingsRepository) : IProfileClientSettingsManager
+public sealed class ProfileClientSettingsManager(IUserRepository users, ISystemSettingsRepository settingsRepository, IClientNotifier notifier) : IProfileClientSettingsManager
 {
     public async Task<ClientSettingsVM> GetAsync(Guid profileId) =>
         await ViewOfAsync(await ProfileAsync(profileId));
@@ -29,6 +30,7 @@ public sealed class ProfileClientSettingsManager(IUserRepository users, ISystemS
         if (sort is not null) profile.Apply(sort);
 
         await users.UpdateProfileAsync(profile);
+        await notifier.NotifyClientSettingsChangedAsync(profile.Id);
         return await ViewOfAsync(profile);
     }
 
