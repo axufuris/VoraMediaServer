@@ -17,17 +17,19 @@ public class AdminCreateUserTests
 {
     private readonly IUserRepository _users = Substitute.For<IUserRepository>();
     private readonly ISystemSettingsRepository _settings = Substitute.For<ISystemSettingsRepository>();
+    private readonly ServerSetting _serverSettings = new() { RegistrationMode = RegistrationMode.Disabled };
     private readonly AuthManager _manager;
 
     public AdminCreateUserTests()
     {
-        _settings.GetSettingsAsync().Returns(new ServerSetting { RegistrationMode = RegistrationMode.Disabled });
+        _settings.GetSettingsAsync().Returns(_serverSettings);
         _manager = new AuthManager(
             _users,
             _settings,
             Options.Create(new JwtOptions { Issuer = "test", Audience = "test", SecretKey = new string('x', 64) }),
             Substitute.For<IEmailService>(),
             Substitute.For<IInvitationManager>(),
+            new ClientDefaultsManager(_settings),
             new MemoryCache(new MemoryCacheOptions()),
             NullLogger<AuthManager>.Instance);
     }
@@ -44,6 +46,27 @@ public class AdminCreateUserTests
             && !u.IsAdmin
             && u.Profiles.Count == 1
             && u.Profiles.First().Name == "Sam"));
+    }
+
+    [Fact]
+    public async Task The_first_profile_of_a_new_account_starts_from_the_servers_defaults()
+    {
+        _serverSettings.NewProfileAutoSkipIntro = true;
+        _serverSettings.NewProfileAutoPlayNext = false;
+        _serverSettings.NewProfileEpisodeLayout = EpisodeLayout.List;
+        _serverSettings.NewProfileAudioLanguage = "spa";
+        _serverSettings.NewProfileLibrarySort = LibrarySortField.DateAdded;
+        _serverSettings.NewProfileLibrarySortDescending = true;
+
+        await _manager.CreateUserAsAdminAsync("sam@example.com", "a-long-password", "Sam");
+
+        await _users.Received(1).AddUserAsync(Arg.Is<User>(u =>
+            u.Profiles.Single().AutoSkipIntro
+            && !u.Profiles.Single().AutoPlayNext
+            && u.Profiles.Single().EpisodeLayout == EpisodeLayout.List
+            && u.Profiles.Single().PreferredAudioLanguage == "spa"
+            && u.Profiles.Single().LibrarySort == LibrarySortField.DateAdded
+            && u.Profiles.Single().LibrarySortDescending));
     }
 
     [Fact]

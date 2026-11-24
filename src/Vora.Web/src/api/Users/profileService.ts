@@ -97,6 +97,18 @@ export interface SaveTrackPreferencesRequest {
     preferHearingImpairedSubtitles: boolean;
 }
 
+export interface ClientSettingsVM {
+    playback: PlaybackPreferencesVM;
+    tracks: TrackPreferencesVM;
+    librarySort: LibrarySortVM;
+}
+
+export interface SaveClientSettingsRequest {
+    playback?: PlaybackPreferencesVM;
+    tracks?: SaveTrackPreferencesRequest;
+    librarySort?: LibrarySortVM;
+}
+
 export const profileService = {
     // Account owner only. Off means nothing about this profile's listening is
     // sent to OpenAI, and no one can Blend with it.
@@ -161,6 +173,16 @@ export const profileService = {
 
     adminClearViewingHistory: async (profileId: string, request: ClearViewingHistoryRequest, serverId?: string): Promise<ClearedViewingHistoryVM> => {
         const response = await apiClient.post<ClearedViewingHistoryVM>(`/users/profiles/${profileId}/viewing-history/clear`, request, { serverId });
+        return response.data;
+    },
+
+    adminGetClientSettings: async (profileId: string, serverId?: string): Promise<ClientSettingsVM> => {
+        const response = await apiClient.get<ClientSettingsVM>(`/users/profiles/${profileId}/client-settings`, { serverId });
+        return response.data;
+    },
+
+    adminSaveClientSettings: async (profileId: string, request: SaveClientSettingsRequest, serverId?: string): Promise<ClientSettingsVM> => {
+        const response = await apiClient.put<ClientSettingsVM, SaveClientSettingsRequest>(`/users/profiles/${profileId}/client-settings`, request, { serverId });
         return response.data;
     },
 

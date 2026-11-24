@@ -29,6 +29,7 @@ public class AuthManagerPasswordSignInTests
             Options.Create(new JwtOptions { Issuer = "test", Audience = "test", SecretKey = new string('x', 64) }),
             Substitute.For<IEmailService>(),
             Substitute.For<IInvitationManager>(),
+            Substitute.For<IClientDefaultsManager>(),
             new MemoryCache(new MemoryCacheOptions()),
             NullLogger<AuthManager>.Instance);
     }

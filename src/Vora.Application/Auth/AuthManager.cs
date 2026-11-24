@@ -71,6 +71,7 @@ public class AuthManager(
     IOptions<JwtOptions> jwtOptions,
     IEmailService emailService,
     IInvitationManager invitationManager,
+    IClientDefaultsManager clientDefaults,
     IMemoryCache memoryCache,
     ILogger<AuthManager> logger) : IAuthManager
 {
@@ -150,7 +151,7 @@ public class AuthManager(
             var invitedUser = BuildUser(normalizedEmail, password, displayName, isAdmin: false);
             try
             {
-                await repository.AddUserAsync(invitedUser);
+                await AddNewUserAsync(invitedUser);
             }
             catch (Exception ex)
             {
@@ -199,7 +200,7 @@ public class AuthManager(
         var user = BuildUser(normalizedEmail, password, displayName, isAdmin: false);
         try
         {
-            await repository.AddUserAsync(user);
+            await AddNewUserAsync(user);
         }
         catch (Exception ex)
         {
@@ -236,7 +237,7 @@ public class AuthManager(
         }
 
         var user = BuildUser(normalizedEmail, password, name, isAdmin: false);
-        await repository.AddUserAsync(user);
+        await AddNewUserAsync(user);
         logger.LogInformation("Admin created account {UserId}", user.Id);
         return AdminCreateUserResult.Created(user.Id);
     }
@@ -255,7 +256,7 @@ public class AuthManager(
         }
 
         var user = BuildUser(normalizedEmail, GenerateUnusablePassword(), name, isAdmin: false, hasPassword: false);
-        await repository.AddUserAsync(user);
+        await AddNewUserAsync(user);
         logger.LogInformation("Admin created account {UserId} without a password", user.Id);
         return AdminCreateUserResult.Created(user.Id);
     }
@@ -269,7 +270,7 @@ public class AuthManager(
             ? BuildUser(normalizedEmail, GenerateUnusablePassword(), name, isAdmin: true, canRequestMedia: true, canTimeshiftIptv: true, canAddCustomPodcastFeeds: true, canRecordLiveTv: true, hasPassword: false)
             : BuildUser(normalizedEmail, GenerateUnusablePassword(), name, isAdmin: false, hasPassword: false);
 
-        await repository.AddUserAsync(user);
+        await AddNewUserAsync(user);
         logger.LogInformation("Created account {UserId} from an external sign-in", user.Id);
         return user;
     }
@@ -292,7 +293,7 @@ public class AuthManager(
         var admin = BuildUser(email, password, displayName, isAdmin: true, canRequestMedia: true, canTimeshiftIptv: true, canAddCustomPodcastFeeds: true, canRecordLiveTv: true);
         try
         {
-            await repository.AddUserAsync(admin);
+            await AddNewUserAsync(admin);
         }
         catch (Exception ex)
         {
@@ -620,6 +621,16 @@ public class AuthManager(
         }
 
         return user.AllowedLibraryIds.Intersect(profile.AllowedLibraryIds).ToList();
+    }
+
+    private async Task AddNewUserAsync(User user)
+    {
+        foreach (var profile in user.Profiles)
+        {
+            await clientDefaults.ApplyToNewProfileAsync(profile);
+        }
+
+        await repository.AddUserAsync(user);
     }
 
     private static string GenerateUnusablePassword() => Base64UrlEncode(RandomNumberGenerator.GetBytes(32));

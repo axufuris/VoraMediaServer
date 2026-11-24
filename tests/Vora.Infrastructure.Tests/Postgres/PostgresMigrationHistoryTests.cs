@@ -1729,4 +1729,50 @@ public class PostgresMigrationHistoryTests(PostgresDatabase database) : IClassFi
         (await again.Set<ServerSetting>().AsNoTracking().SingleAsync(cancellationToken)).LiveTvX264Preset.Should().Be(0);
     }
 
+    [Fact]
+    public async Task A_database_on_the_live_tv_preset_migration_gains_new_profile_defaults_that_match_what_a_new_profile_gets_today()
+    {
+        Assert.SkipUnless(PostgresDatabase.IsConfigured, PostgresDatabase.SkipReason);
+        var cancellationToken = TestContext.Current.CancellationToken;
+        await using var legacy = new LegacyDatabase();
+        await legacy.BuildClientDefaultsStateAsync(cancellationToken);
+
+        await using (var before = legacy.NewContext())
+        {
+            (await before.Database.GetPendingMigrationsAsync(cancellationToken)).Should().Equal(MigrationHistoryTests.ChangesSinceInitial);
+            (await ColumnsAsync(before, "ServerSettings", cancellationToken)).Should().NotContain("NewProfileAutoPlayNext");
+            await before.Database.ExecuteSqlRawAsync("UPDATE \"ServerSettings\" SET \"MaxGpuTranscodes\" = 3", cancellationToken);
+        }
+
+        await legacy.MigrateAsync(cancellationToken);
+
+        await using (var after = legacy.NewContext())
+        {
+            (await after.Database.GetPendingMigrationsAsync(cancellationToken)).Should().BeEmpty();
+            var settings = await after.Set<ServerSetting>().AsNoTracking().SingleAsync(cancellationToken);
+            settings.MaxGpuTranscodes.Should().Be(3);
+            settings.NewProfileAutoSkipIntro.Should().BeFalse();
+            settings.NewProfileAutoSkipCredits.Should().BeFalse();
+            settings.NewProfileAutoPlayNext.Should().BeTrue();
+            settings.NewProfileUpNextOrder.Should().Be(UpNextOrder.WhereILeftOff);
+            settings.NewProfileEpisodeLayout.Should().Be(EpisodeLayout.Row);
+            settings.NewProfileMinimumCreditsSceneSeconds.Should().Be(15);
+            settings.NewProfileAudioLanguage.Should().BeNull();
+            settings.NewProfileSubtitleLanguage.Should().BeNull();
+            settings.NewProfileSubtitleMode.Should().BeNull();
+            settings.NewProfilePreferHearingImpairedSubtitles.Should().BeFalse();
+            settings.NewProfileLibrarySort.Should().BeNull();
+            settings.NewProfileLibrarySortDescending.Should().BeFalse();
+            await after.Database.ExecuteSqlRawAsync("UPDATE \"ServerSettings\" SET \"NewProfileAudioLanguage\" = 'spa', \"NewProfileAutoPlayNext\" = FALSE, \"NewProfileMinimumCreditsSceneSeconds\" = 40", cancellationToken);
+            await after.Database.ExecuteSqlAsync($"DELETE FROM \"__EFMigrationsHistory\" WHERE \"MigrationId\" = {MigrationHistoryTests.ChangesSinceInitial}", cancellationToken);
+        }
+
+        await legacy.MigrateAsync(cancellationToken);
+
+        await using var again = legacy.NewContext();
+        var kept = await again.Set<ServerSetting>().AsNoTracking().SingleAsync(cancellationToken);
+        kept.NewProfileAudioLanguage.Should().Be("spa");
+        kept.NewProfileAutoPlayNext.Should().BeFalse();
+        kept.NewProfileMinimumCreditsSceneSeconds.Should().Be(40);
+    }
 }

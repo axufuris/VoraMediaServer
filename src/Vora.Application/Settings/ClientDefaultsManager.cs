@@ -1,0 +1,93 @@
+using Vora.Application.Streaming;
+using Vora.Application.Users;
+using Vora.Application.Users.ViewModels;
+using Vora.Domain.Entities.Settings;
+using Vora.Domain.Entities.Users;
+
+namespace Vora.Application.Settings;
+
+public interface IClientDefaultsManager
+{
+    Task<ClientSettingsVM> GetAsync();
+    Task<ClientSettingsVM> SaveAsync(SaveClientSettingsRequest request);
+    Task ApplyToNewProfileAsync(UserProfile profile);
+}
+
+public sealed class ClientDefaultsManager(ISystemSettingsRepository settingsRepository) : IClientDefaultsManager
+{
+    public async Task<ClientSettingsVM> GetAsync() =>
+        ViewOf(await settingsRepository.GetSettingsAsync());
+
+    public async Task<ClientSettingsVM> SaveAsync(SaveClientSettingsRequest request)
+    {
+        var settings = await settingsRepository.GetSettingsForUpdateAsync();
+
+        var playback = request.Playback is null ? null : PlaybackOf(settings).Updated(request.Playback);
+        var tracks = request.Tracks is null ? null : TrackPreferences.From(request.Tracks);
+        var sort = request.LibrarySort is null ? null : LibrarySortChoice.From(request.LibrarySort);
+
+        if (playback is not null) Store(settings, playback);
+        if (tracks is not null) Store(settings, tracks);
+        if (sort is not null) Store(settings, sort);
+
+        await settingsRepository.SaveChangesAsync();
+        return ViewOf(settings);
+    }
+
+    public async Task ApplyToNewProfileAsync(UserProfile profile)
+    {
+        var settings = await settingsRepository.GetSettingsAsync();
+        profile.Apply(PlaybackOf(settings));
+        profile.Apply(TracksOf(settings));
+        profile.Apply(LibrarySortOf(settings));
+    }
+
+    private static ClientSettingsVM ViewOf(ServerSetting settings) => new()
+    {
+        Playback = PlaybackOf(settings).ToViewModel(),
+        Tracks = TracksOf(settings).ToViewModel(settings),
+        LibrarySort = LibrarySortOf(settings).ToViewModel()
+    };
+
+    private static PlaybackBehaviour PlaybackOf(ServerSetting settings) => new(
+        settings.NewProfileAutoSkipIntro,
+        settings.NewProfileAutoSkipCredits,
+        settings.NewProfileAutoPlayNext,
+        settings.NewProfileUpNextOrder,
+        settings.NewProfileEpisodeLayout,
+        settings.NewProfileMinimumCreditsSceneSeconds);
+
+    private static void Store(ServerSetting settings, PlaybackBehaviour playback)
+    {
+        settings.NewProfileAutoSkipIntro = playback.AutoSkipIntro;
+        settings.NewProfileAutoSkipCredits = playback.AutoSkipCredits;
+        settings.NewProfileAutoPlayNext = playback.AutoPlayNext;
+        settings.NewProfileUpNextOrder = playback.UpNextOrder;
+        settings.NewProfileEpisodeLayout = playback.EpisodeLayout;
+        settings.NewProfileMinimumCreditsSceneSeconds = playback.MinimumCreditsSceneSeconds;
+    }
+
+    private static TrackPreferences TracksOf(ServerSetting settings) => new(
+        settings.NewProfileAudioLanguage,
+        settings.NewProfileSubtitleMode,
+        settings.NewProfileSubtitleLanguage,
+        settings.NewProfilePreferHearingImpairedSubtitles);
+
+    private static void Store(ServerSetting settings, TrackPreferences tracks)
+    {
+        settings.NewProfileAudioLanguage = tracks.AudioLanguage;
+        settings.NewProfileSubtitleLanguage = tracks.SubtitleLanguage;
+        settings.NewProfileSubtitleMode = tracks.SubtitleMode;
+        settings.NewProfilePreferHearingImpairedSubtitles = tracks.PreferHearingImpaired;
+    }
+
+    private static LibrarySortChoice LibrarySortOf(ServerSetting settings) => new(
+        settings.NewProfileLibrarySort,
+        settings.NewProfileLibrarySortDescending);
+
+    private static void Store(ServerSetting settings, LibrarySortChoice sort)
+    {
+        settings.NewProfileLibrarySort = sort.Sort;
+        settings.NewProfileLibrarySortDescending = sort.Descending;
+    }
+}

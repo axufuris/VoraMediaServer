@@ -10,6 +10,8 @@ import PageHeader from '../../components/Admin/Primitives/PageHeader';
 import HealthBadge from '../../components/Admin/Primitives/HealthBadge';
 import AddUserModal from '../../components/Admin/Users/AddUserModal';
 import ClearViewingHistoryModal from '../../components/Admin/Users/ClearViewingHistoryModal';
+import ProfileClientSettingsModal from '../../components/Admin/Users/ProfileClientSettingsModal';
+import { useActionToast } from '../../components/Admin/Primitives/ActionToast';
 import SignUpCard from '../../components/Admin/Users/SignUpCard';
 import { resolveAdminPath } from '../../components/Admin/Shell/adminNavData';
 import { signInMethodsLine } from '../../components/Admin/Users/signInMethods';
@@ -26,6 +28,8 @@ export default function UserManagementPage() {
     const [editingUser, setEditingUser] = useState<UserVM | null>(null);
     const [editingShowtimes, setEditingShowtimes] = useState<UserProfileVM | null>(null);
     const [clearingHistory, setClearingHistory] = useState<UserProfileVM | null>(null);
+    const [editingClientSettings, setEditingClientSettings] = useState<UserProfileVM | null>(null);
+    const { toast, showToast } = useActionToast();
 
     const loadData = useCallback(async () => {
         try {
@@ -166,9 +170,17 @@ export default function UserManagementPage() {
                                                 </div>
                                                 <button
                                                     type="button"
+                                                    onClick={() => setEditingClientSettings(profile)}
+                                                    title={`Change ${profile.name}'s playback, audio, subtitle and sort settings`}
+                                                    className="mt-2 text-[10px] font-semibold px-2 py-0.5 rounded border border-[var(--vora-border-subtle)] text-[var(--vora-text-secondary)] hover:text-[var(--vora-text-primary)] hover:border-[var(--vora-accent-500)] cursor-pointer"
+                                                >
+                                                    Client settings
+                                                </button>
+                                                <button
+                                                    type="button"
                                                     onClick={() => setEditingShowtimes(profile)}
                                                     title="Set movie showtimes location"
-                                                    className="mt-2 text-[10px] font-semibold px-2 py-0.5 rounded border border-[var(--vora-border-subtle)] text-[var(--vora-text-secondary)] hover:text-[var(--vora-text-primary)] hover:border-[var(--vora-accent-500)] cursor-pointer"
+                                                    className="mt-1.5 text-[10px] font-semibold px-2 py-0.5 rounded border border-[var(--vora-border-subtle)] text-[var(--vora-text-secondary)] hover:text-[var(--vora-text-primary)] hover:border-[var(--vora-accent-500)] cursor-pointer"
                                                 >
                                                     Showtimes
                                                 </button>
@@ -214,6 +226,15 @@ export default function UserManagementPage() {
             {clearingHistory && (
                 <ClearViewingHistoryModal profile={clearingHistory} serverId={serverId} onClose={() => setClearingHistory(null)} />
             )}
+            {editingClientSettings && (
+                <ProfileClientSettingsModal
+                    profile={editingClientSettings}
+                    serverId={serverId}
+                    onClose={() => setEditingClientSettings(null)}
+                    onSaved={message => { setEditingClientSettings(null); showToast(message); }}
+                />
+            )}
+            {toast}
         </div>
     );
 }
