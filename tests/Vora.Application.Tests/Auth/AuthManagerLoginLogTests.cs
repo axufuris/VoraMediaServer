@@ -51,6 +51,7 @@ public class AuthManagerLoginLogTests
             jwtOptions,
             Substitute.For<IEmailService>(),
             Substitute.For<IInvitationManager>(),
+            Substitute.For<IClientDefaultsManager>(),
             new MemoryCache(new MemoryCacheOptions()),
             _log);
 

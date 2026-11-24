@@ -51,3 +51,23 @@ describe('the pages that moved into External Connections', () => {
         expect(queue?.label).toBe('Request Queue');
     });
 });
+
+describe('the Client Defaults nav entry', () => {
+    const entry = ADMIN_NAV.find(e => e.pathTemplate === '/admin/client-defaults');
+
+    it('sits in the Server section, right after Client Templates', () => {
+        expect(entry?.section).toBe('Server');
+        expect(entry?.label).toBe('Client Defaults');
+        const index = ADMIN_NAV.findIndex(e => e.pathTemplate === '/admin/client-defaults');
+        expect(ADMIN_NAV[index - 1].label).toBe('Client Templates');
+    });
+
+    it('uses an icon that exists, and moves under the server on the multi-server form', () => {
+        expect(entry && Icons[entry.icon]).toBeTruthy();
+        expect(resolveAdminPath('/admin/client-defaults', 's1')).toBe('/admin/server/s1/client-defaults');
+    });
+
+    it('is the only entry for its path', () => {
+        expect(ADMIN_NAV.filter(e => e.pathTemplate === '/admin/client-defaults')).toHaveLength(1);
+    });
+});

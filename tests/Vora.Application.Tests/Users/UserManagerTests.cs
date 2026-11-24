@@ -1,6 +1,7 @@
 using System.Linq.Expressions;
 using Microsoft.Extensions.Logging.Abstractions;
 using Vora.Application.Analysis;
+using Vora.Application.Settings;
 using Vora.Application.Users;
 using Vora.Application.Users.ViewModels;
 using Vora.Domain.Entities.Users;
@@ -12,6 +13,7 @@ public class UserManagerTests
     private readonly IUserRepository _repo;
     private readonly IUserProfileImageService _images;
     private readonly IClientNotifier _notifier;
+    private readonly IClientDefaultsManager _defaults;
     private readonly UserManager _manager;
 
     public UserManagerTests()
@@ -19,7 +21,8 @@ public class UserManagerTests
         _repo = Substitute.For<IUserRepository>();
         _images = Substitute.For<IUserProfileImageService>();
         _notifier = Substitute.For<IClientNotifier>();
-        _manager = new UserManager(_repo, _images, _notifier, NullLogger<UserManager>.Instance);
+        _defaults = Substitute.For<IClientDefaultsManager>();
+        _manager = new UserManager(_repo, _images, _notifier, _defaults, NullLogger<UserManager>.Instance);
     }
 
     private static UserProfile MakeProfile(Guid id, string? imageUrl = null) => new()
@@ -109,6 +112,26 @@ public class UserManagerTests
             !p.HasAllLibraryAccess &&
             !p.HasAllIptvAccess &&
             !p.CanAddCustomPodcastFeeds));
+    }
+
+    [Fact]
+    public async Task CreateManagedProfileAsync_gives_the_new_profile_the_server_defaults_before_saving_it()
+    {
+        UserProfile? saved = null;
+        await _repo.AddProfileAsync(Arg.Do<UserProfile>(p => saved = p));
+
+        await _manager.CreateManagedProfileAsync(
+            Guid.NewGuid(), "Kid", null, null,
+            new List<string>(), new List<string>(), new List<string>(),
+            true, false, new List<Guid>(), true, new List<Guid>(), new List<ProfileScheduleVM>(), true, false, null);
+
+        saved.Should().NotBeNull();
+        await _defaults.Received(1).ApplyToNewProfileAsync(saved!);
+        Received.InOrder(() =>
+        {
+            _defaults.ApplyToNewProfileAsync(Arg.Any<UserProfile>());
+            _repo.AddProfileAsync(Arg.Any<UserProfile>());
+        });
     }
 
     [Fact]

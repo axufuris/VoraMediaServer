@@ -705,6 +705,18 @@ public sealed class LegacyDatabase : IAsyncDisposable
         await ReplaceCombinedMigrationAsync(db, LiveTvPresetMigration, "10.0.9", cancellationToken);
     }
 
+    public const string ClientDefaultsMigration = "20261123022252_ChangesSinceInitial";
+
+    public async Task BuildClientDefaultsStateAsync(CancellationToken cancellationToken)
+    {
+        await using var db = NewContext();
+        await db.Database.MigrateAsync(cancellationToken);
+        await db.Database.ExecuteSqlRawAsync(
+            "ALTER TABLE \"ServerSettings\" DROP COLUMN \"NewProfileAutoSkipIntro\", DROP COLUMN \"NewProfileAutoSkipCredits\", DROP COLUMN \"NewProfileAutoPlayNext\", DROP COLUMN \"NewProfileUpNextOrder\", DROP COLUMN \"NewProfileEpisodeLayout\", DROP COLUMN \"NewProfileMinimumCreditsSceneSeconds\", DROP COLUMN \"NewProfileAudioLanguage\", DROP COLUMN \"NewProfileSubtitleLanguage\", DROP COLUMN \"NewProfileSubtitleMode\", DROP COLUMN \"NewProfilePreferHearingImpairedSubtitles\", DROP COLUMN \"NewProfileLibrarySort\", DROP COLUMN \"NewProfileLibrarySortDescending\";",
+            cancellationToken);
+        await ReplaceCombinedMigrationAsync(db, ClientDefaultsMigration, "10.0.9", cancellationToken);
+    }
+
     private static async Task ReplaceCombinedMigrationAsync(VoraDbContext db, string migrationId, string productVersion, CancellationToken cancellationToken)
     {
         await db.Database.ExecuteSqlAsync(

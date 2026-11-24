@@ -205,6 +205,19 @@ public class ServerSetting
 
     public string DefaultClientTemplateId { get; set; } = "vora-cinema";
 
+    public bool NewProfileAutoSkipIntro { get; set; }
+    public bool NewProfileAutoSkipCredits { get; set; }
+    public bool NewProfileAutoPlayNext { get; set; } = true;
+    public UpNextOrder NewProfileUpNextOrder { get; set; } = UpNextOrder.WhereILeftOff;
+    public EpisodeLayout NewProfileEpisodeLayout { get; set; } = EpisodeLayout.Row;
+    public int NewProfileMinimumCreditsSceneSeconds { get; set; } = 15;
+    public string? NewProfileAudioLanguage { get; set; }
+    public string? NewProfileSubtitleLanguage { get; set; }
+    public SubtitleMode? NewProfileSubtitleMode { get; set; }
+    public bool NewProfilePreferHearingImpairedSubtitles { get; set; }
+    public LibrarySortField? NewProfileLibrarySort { get; set; }
+    public bool NewProfileLibrarySortDescending { get; set; }
+
     public bool EmailEnabled { get; set; }
     public string? SmtpHost { get; set; }
     public int SmtpPort { get; set; } = 587;

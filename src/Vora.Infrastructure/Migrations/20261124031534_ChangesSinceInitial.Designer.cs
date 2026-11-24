@@ -14,7 +14,7 @@ using Vora.Infrastructure.Persistence;
 namespace Vora.Infrastructure.Migrations
 {
     [DbContext(typeof(VoraDbContext))]
-    [Migration("20261123022252_ChangesSinceInitial")]
+    [Migration("20261124031534_ChangesSinceInitial")]
     partial class ChangesSinceInitial
     {
         /// <inheritdoc />
@@ -3250,6 +3250,44 @@ namespace Vora.Infrastructure.Migrations
                         .HasColumnType("character varying(16)");
 
                     b.Property<int>("MissingMediaRetentionDays")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("NewProfileAudioLanguage")
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)");
+
+                    b.Property<bool>("NewProfileAutoPlayNext")
+                        .HasColumnType("boolean");
+
+                    b.Property<bool>("NewProfileAutoSkipCredits")
+                        .HasColumnType("boolean");
+
+                    b.Property<bool>("NewProfileAutoSkipIntro")
+                        .HasColumnType("boolean");
+
+                    b.Property<int>("NewProfileEpisodeLayout")
+                        .HasColumnType("integer");
+
+                    b.Property<int?>("NewProfileLibrarySort")
+                        .HasColumnType("integer");
+
+                    b.Property<bool>("NewProfileLibrarySortDescending")
+                        .HasColumnType("boolean");
+
+                    b.Property<int>("NewProfileMinimumCreditsSceneSeconds")
+                        .HasColumnType("integer");
+
+                    b.Property<bool>("NewProfilePreferHearingImpairedSubtitles")
+                        .HasColumnType("boolean");
+
+                    b.Property<string>("NewProfileSubtitleLanguage")
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)");
+
+                    b.Property<int?>("NewProfileSubtitleMode")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("NewProfileUpNextOrder")
                         .HasColumnType("integer");
 
                     b.Property<TimeSpan>("NightlyScanTime")

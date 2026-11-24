@@ -54,7 +54,19 @@ ALTER TABLE ""IptvChannels"" ADD COLUMN IF NOT EXISTS ""VideoFrameRate"" double 
 ALTER TABLE ""IptvChannels"" ADD COLUMN IF NOT EXISTS ""VideoInterlaced"" boolean;
 ALTER TABLE ""IptvChannels"" ADD COLUMN IF NOT EXISTS ""VideoFormatSeenAt"" timestamp with time zone;
 ALTER TABLE ""ServerSettings"" ADD COLUMN IF NOT EXISTS ""LiveTvX264Preset"" integer NOT NULL DEFAULT 2;
-ALTER TABLE ""ServerSettings"" DROP COLUMN IF EXISTS ""MaxBackgroundTranscodes"";");
+ALTER TABLE ""ServerSettings"" DROP COLUMN IF EXISTS ""MaxBackgroundTranscodes"";
+ALTER TABLE ""ServerSettings"" ADD COLUMN IF NOT EXISTS ""NewProfileAutoSkipIntro"" boolean NOT NULL DEFAULT FALSE;
+ALTER TABLE ""ServerSettings"" ADD COLUMN IF NOT EXISTS ""NewProfileAutoSkipCredits"" boolean NOT NULL DEFAULT FALSE;
+ALTER TABLE ""ServerSettings"" ADD COLUMN IF NOT EXISTS ""NewProfileAutoPlayNext"" boolean NOT NULL DEFAULT TRUE;
+ALTER TABLE ""ServerSettings"" ADD COLUMN IF NOT EXISTS ""NewProfileUpNextOrder"" integer NOT NULL DEFAULT 1;
+ALTER TABLE ""ServerSettings"" ADD COLUMN IF NOT EXISTS ""NewProfileEpisodeLayout"" integer NOT NULL DEFAULT 0;
+ALTER TABLE ""ServerSettings"" ADD COLUMN IF NOT EXISTS ""NewProfileMinimumCreditsSceneSeconds"" integer NOT NULL DEFAULT 15;
+ALTER TABLE ""ServerSettings"" ADD COLUMN IF NOT EXISTS ""NewProfileAudioLanguage"" character varying(16);
+ALTER TABLE ""ServerSettings"" ADD COLUMN IF NOT EXISTS ""NewProfileSubtitleLanguage"" character varying(16);
+ALTER TABLE ""ServerSettings"" ADD COLUMN IF NOT EXISTS ""NewProfileSubtitleMode"" integer;
+ALTER TABLE ""ServerSettings"" ADD COLUMN IF NOT EXISTS ""NewProfilePreferHearingImpairedSubtitles"" boolean NOT NULL DEFAULT FALSE;
+ALTER TABLE ""ServerSettings"" ADD COLUMN IF NOT EXISTS ""NewProfileLibrarySort"" integer;
+ALTER TABLE ""ServerSettings"" ADD COLUMN IF NOT EXISTS ""NewProfileLibrarySortDescending"" boolean NOT NULL DEFAULT FALSE;");
 
             migrationBuilder.Sql(@"
 UPDATE ""UserMediaStates"" SET ""ResumePositionSeconds"" = 0
@@ -584,6 +596,54 @@ CREATE INDEX IF NOT EXISTS ""IX_MusicResumePoints_ProfileId_UpdatedAt"" ON ""Mus
         /// <inheritdoc />
         protected override void Down(MigrationBuilder migrationBuilder)
         {
+            migrationBuilder.DropColumn(
+                name: "NewProfileAutoSkipIntro",
+                table: "ServerSettings");
+
+            migrationBuilder.DropColumn(
+                name: "NewProfileAutoSkipCredits",
+                table: "ServerSettings");
+
+            migrationBuilder.DropColumn(
+                name: "NewProfileAutoPlayNext",
+                table: "ServerSettings");
+
+            migrationBuilder.DropColumn(
+                name: "NewProfileUpNextOrder",
+                table: "ServerSettings");
+
+            migrationBuilder.DropColumn(
+                name: "NewProfileEpisodeLayout",
+                table: "ServerSettings");
+
+            migrationBuilder.DropColumn(
+                name: "NewProfileMinimumCreditsSceneSeconds",
+                table: "ServerSettings");
+
+            migrationBuilder.DropColumn(
+                name: "NewProfileAudioLanguage",
+                table: "ServerSettings");
+
+            migrationBuilder.DropColumn(
+                name: "NewProfileSubtitleLanguage",
+                table: "ServerSettings");
+
+            migrationBuilder.DropColumn(
+                name: "NewProfileSubtitleMode",
+                table: "ServerSettings");
+
+            migrationBuilder.DropColumn(
+                name: "NewProfilePreferHearingImpairedSubtitles",
+                table: "ServerSettings");
+
+            migrationBuilder.DropColumn(
+                name: "NewProfileLibrarySort",
+                table: "ServerSettings");
+
+            migrationBuilder.DropColumn(
+                name: "NewProfileLibrarySortDescending",
+                table: "ServerSettings");
+
             migrationBuilder.DropColumn(
                 name: "LiveTvX264Preset",
                 table: "ServerSettings");

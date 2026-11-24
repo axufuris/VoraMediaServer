@@ -524,6 +524,8 @@ public static class ServiceRegistrationExtensions
         services.AddScoped<ITrackPreferenceManager, TrackPreferenceManager>();
         services.AddScoped<ISyncAndStateManager, SyncAndStateManager>();
         services.AddScoped<ISystemSettingsManager, SystemSettingsManager>();
+        services.AddScoped<IClientDefaultsManager, ClientDefaultsManager>();
+        services.AddScoped<IProfileClientSettingsManager, ProfileClientSettingsManager>();
         services.AddSingleton<ITaskQueueManager, TaskQueueManager>();
         services.AddSingleton<Vora.Plugins.Interfaces.ITaskProgressReporter, TaskProgressReporter>();
         services.AddSingleton<IThemeBundleLoader>(sp =>

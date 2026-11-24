@@ -41,6 +41,7 @@ public class AuthManagerPasswordResetTests
             jwtOptions,
             _email,
             _invitations,
+            Substitute.For<IClientDefaultsManager>(),
             _cache,
             NullLogger<AuthManager>.Instance);
     }

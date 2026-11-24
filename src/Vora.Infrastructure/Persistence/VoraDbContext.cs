@@ -1561,6 +1561,8 @@ public class VoraDbContext : DbContext
         modelBuilder.Entity<ServerSetting>(entity =>
         {
             entity.Property(e => e.DefaultClientTemplateId).HasMaxLength(64);
+            entity.Property(e => e.NewProfileAudioLanguage).HasMaxLength(16);
+            entity.Property(e => e.NewProfileSubtitleLanguage).HasMaxLength(16);
         });
 
         modelBuilder.Entity<ClientTemplateSchedule>(entity =>

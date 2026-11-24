@@ -2,6 +2,7 @@
 using System.Text;
 using Microsoft.Extensions.Logging;
 using Vora.Application.Analysis;
+using Vora.Application.Settings;
 using Vora.Application.Users.ViewModels;
 using Vora.Domain.Entities.Users;
 
@@ -50,6 +51,7 @@ public class UserManager(
     IUserRepository repository,
     IUserProfileImageService imageService,
     IClientNotifier notifier,
+    IClientDefaultsManager clientDefaults,
     ILogger<UserManager> logger) : IUserManager
 {
     public Task<List<UserVM>> GetAllUsersAsync() =>
@@ -115,6 +117,8 @@ public class UserManager(
         {
             profile.AccessSchedules.Add(schedule);
         }
+
+        await clientDefaults.ApplyToNewProfileAsync(profile);
 
         try
         {
@@ -398,69 +402,34 @@ public class UserManager(
     {
         var profile = await repository.GetProfileByIdAsync(profileId)
             ?? throw new InvalidOperationException("Profile not found.");
-        return PlaybackPreferencesOf(profile);
+        return profile.PlaybackOf().ToViewModel();
     }
 
     public async Task<PlaybackPreferencesVM> SavePlaybackPreferencesAsync(Guid profileId, PlaybackPreferencesVM prefs)
     {
-        if (prefs.UpNextOrder is { } unknownOrder && !Enum.IsDefined(unknownOrder))
-        {
-            throw new ArgumentException($"'{unknownOrder}' is not an up-next order.", nameof(prefs));
-        }
-        if (prefs.EpisodeLayout is { } unknownLayout && !Enum.IsDefined(unknownLayout))
-        {
-            throw new ArgumentException($"'{unknownLayout}' is not an episode layout.", nameof(prefs));
-        }
-
         var profile = await repository.GetProfileByIdAsync(profileId)
             ?? throw new InvalidOperationException("Profile not found.");
-        profile.AutoSkipIntro = prefs.AutoSkipIntro;
-        profile.AutoSkipCredits = prefs.AutoSkipCredits;
-        if (prefs.AutoPlayNext is bool autoPlayNext) profile.AutoPlayNext = autoPlayNext;
-        if (prefs.UpNextOrder is { } upNextOrder) profile.UpNextOrder = upNextOrder;
-        if (prefs.EpisodeLayout is { } episodeLayout) profile.EpisodeLayout = episodeLayout;
-        profile.MinimumCreditsSceneSeconds = Math.Clamp(prefs.MinimumCreditsSceneSeconds, 0, 600);
+        profile.Apply(profile.PlaybackOf().Updated(prefs));
         await repository.UpdateProfileAsync(profile);
-        return PlaybackPreferencesOf(profile);
+        return profile.PlaybackOf().ToViewModel();
     }
-
-    private static PlaybackPreferencesVM PlaybackPreferencesOf(UserProfile profile) => new()
-    {
-        AutoSkipIntro = profile.AutoSkipIntro,
-        AutoSkipCredits = profile.AutoSkipCredits,
-        AutoPlayNext = profile.AutoPlayNext,
-        UpNextOrder = profile.UpNextOrder,
-        EpisodeLayout = profile.EpisodeLayout,
-        MinimumCreditsSceneSeconds = profile.MinimumCreditsSceneSeconds
-    };
 
     public async Task<LibrarySortVM> GetLibrarySortAsync(Guid profileId)
     {
         var profile = await repository.GetProfileByIdAsync(profileId)
             ?? throw new InvalidOperationException("Profile not found.");
-        return LibrarySortOf(profile);
+        return profile.LibrarySortOf().ToViewModel();
     }
 
     public async Task<LibrarySortVM> SaveLibrarySortAsync(Guid profileId, LibrarySortVM sort)
     {
-        if (sort.Sort is { } field && !Enum.IsDefined(field))
-        {
-            throw new ArgumentException($"'{field}' is not a library sort.", nameof(sort));
-        }
-
+        var choice = LibrarySortChoice.From(sort);
         var profile = await repository.GetProfileByIdAsync(profileId)
             ?? throw new InvalidOperationException("Profile not found.");
-        profile.LibrarySort = sort.Sort;
-        profile.LibrarySortDescending = sort.Sort.HasValue && sort.Descending;
+        profile.Apply(choice);
         await repository.UpdateProfileAsync(profile);
-        return LibrarySortOf(profile);
+        return profile.LibrarySortOf().ToViewModel();
     }
-
-    private static LibrarySortVM LibrarySortOf(UserProfile profile) => new()
-    {
-        Sort = profile.LibrarySort,
-        Descending = profile.LibrarySortDescending
-    };
 
     private static IEnumerable<ProfileAccessSchedule> BuildScheduleEntities(Guid profileId, IEnumerable<ProfileScheduleVM> schedules)
     {

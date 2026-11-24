@@ -167,6 +167,18 @@ public static class ProfileEndpoints
             .RequireAuthorization("AdminOnly")
             .Produces<ShowtimesLocationDto>(StatusCodes.Status200OK);
 
+        group.MapGet("/profiles/{profileId:guid}/client-settings", GetProfileClientSettingsAsync)
+            .RequireAuthorization("AdminOnly")
+            .WithName("GetProfileClientSettings")
+            .Produces<ClientSettingsVM>(StatusCodes.Status200OK)
+            .Produces(StatusCodes.Status404NotFound);
+        group.MapPut("/profiles/{profileId:guid}/client-settings", SaveProfileClientSettingsAsync)
+            .RequireAuthorization("AdminOnly")
+            .WithName("SaveProfileClientSettings")
+            .Produces<ClientSettingsVM>(StatusCodes.Status200OK)
+            .ProducesProblem(StatusCodes.Status400BadRequest)
+            .Produces(StatusCodes.Status404NotFound);
+
         group.MapGet("/profiles/{profileId:guid}/viewing-history", GetViewingHistoryAsync)
             .RequireAuthorization("AdminOnly")
             .WithName("GetProfileViewingHistory")
@@ -415,6 +427,12 @@ public static class ProfileEndpoints
         if (!profileId.HasValue) return Results.Unauthorized();
         return Results.Ok(await manager.SaveLibrarySortAsync(profileId.Value, body));
     }
+
+    private static async Task<IResult> GetProfileClientSettingsAsync(Guid profileId, IProfileClientSettingsManager manager) =>
+        Results.Ok(await manager.GetAsync(profileId));
+
+    private static async Task<IResult> SaveProfileClientSettingsAsync(Guid profileId, [FromBody] SaveClientSettingsRequest body, IProfileClientSettingsManager manager) =>
+        Results.Ok(await manager.SaveAsync(profileId, body));
 
     private static async Task<IResult> GetMyTrackPreferencesAsync(HttpContext ctx, ITrackPreferenceManager manager)
     {

@@ -41,6 +41,7 @@ const LinkDevicePage = lazyPage(() => import('./pages/Auth/LinkDevicePage'));
 const AdminUserManagementPage = lazyPage(() => import('./pages/Admin/UserManagementPage'));
 const AdminInvitationsPage = lazyPage(() => import('./pages/Admin/InvitationsPage'));
 const AdminSignInProvidersPage = lazyPage(() => import('./pages/Admin/SignInProvidersPage'));
+const AdminClientDefaultsPage = lazyPage(() => import('./pages/Admin/ClientDefaultsPage'));
 const AuthorizedDevicesPage = lazyPage(() => import('./pages/Admin/AuthorizedDevicesPage'));
 const AdminDashboardPage = lazyPage(() => import('./pages/Admin/DashboardPage'));
 const AdminAppearancePage = lazyPage(() => import('./pages/Admin/AppearancePage'));
@@ -249,6 +250,7 @@ export default function App() {
                         <Route path="users" element={<AdminUserManagementPage />} />
                         <Route path="invitations" element={<AdminInvitationsPage />} />
                         <Route path="sign-in-providers" element={<AdminSignInProvidersPage />} />
+                        <Route path="client-defaults" element={<AdminClientDefaultsPage />} />
                         <Route path="libraries/:id/manage" element={<ManageLibrary />} />
                         <Route path="libraries/new" element={<CreateLibrary />} />
                         <Route path="tasks" element={<TaskDashboard />} />
@@ -285,6 +287,7 @@ export default function App() {
                             <Route path="users" element={<AdminUserManagementPage />} />
                             <Route path="invitations" element={<AdminInvitationsPage />} />
                             <Route path="sign-in-providers" element={<AdminSignInProvidersPage />} />
+                            <Route path="client-defaults" element={<AdminClientDefaultsPage />} />
                             <Route path="libraries/:id/manage" element={<ManageLibrary />} />
                             <Route path="libraries/new" element={<CreateLibrary />} />
                             <Route path="tasks" element={<TaskDashboard />} />

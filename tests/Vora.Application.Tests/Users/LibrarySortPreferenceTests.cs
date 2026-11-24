@@ -1,6 +1,7 @@
 using Microsoft.Extensions.Logging.Abstractions;
 using NSubstitute;
 using Vora.Application.Analysis;
+using Vora.Application.Settings;
 using Vora.Application.Users;
 using Vora.Application.Users.ViewModels;
 using Vora.Domain.Entities.Users;
@@ -16,7 +17,7 @@ public class LibrarySortPreferenceTests
 
     public LibrarySortPreferenceTests()
     {
-        _manager = new UserManager(_repo, Substitute.For<IUserProfileImageService>(), Substitute.For<IClientNotifier>(), NullLogger<UserManager>.Instance);
+        _manager = new UserManager(_repo, Substitute.For<IUserProfileImageService>(), Substitute.For<IClientNotifier>(), Substitute.For<IClientDefaultsManager>(), NullLogger<UserManager>.Instance);
         _repo.GetProfileByIdAsync(_profile.Id).Returns(_profile);
     }
 
