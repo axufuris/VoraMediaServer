@@ -43,7 +43,7 @@ public class ClientDeviceSettingsEndpointTests : IClassFixture<VoraApiTestFactor
         var user = new User { Email = $"{Guid.NewGuid():N}@example.com", DisplayName = "Parent" };
         var profile = new UserProfile { Name = "Kid", UserId = user.Id };
         db.AddRange(user, profile);
-        db.Add(new ClientDevice { DeviceId = tv, DeviceName = "Living room", ClientName = "Vora Android", DeviceType = "TV", OperatingSystem = "Android", LastProfileId = profile.Id, LastConnectedAt = DateTime.UtcNow.AddHours(-2) });
+        db.Add(new ClientDevice { DeviceId = tv, DeviceName = "Living room", Nickname = "Big screen", ClientName = "Vora Android", DeviceType = "TV", OperatingSystem = "Android", LastProfileId = profile.Id, LastConnectedAt = DateTime.UtcNow.AddHours(-2) });
         db.Add(new ClientDevice { DeviceId = phone, DeviceName = "Phone", ClientName = "Vora Android", DeviceType = "Phone", OperatingSystem = "Android", LastProfileId = profile.Id, LastConnectedAt = DateTime.UtcNow.AddHours(-1) });
         if (tvBlob is not null) db.Add(new ProfileDeviceSetting { ProfileId = profile.Id, DeviceId = tv, PlaybackPrefs = tvBlob });
         await db.SaveChangesAsync(TestContext.Current.CancellationToken);
@@ -138,6 +138,7 @@ public class ClientDeviceSettingsEndpointTests : IClassFixture<VoraApiTestFactor
         list.Select(device => device.GetProperty("deviceId").GetString()).Should().Equal(seeded.Phone, seeded.Tv);
         var tv = list.Single(device => device.GetProperty("deviceId").GetString() == seeded.Tv);
         tv.GetProperty("name").GetString().Should().Be("Living room");
+        tv.GetProperty("nickname").GetString().Should().Be("Big screen");
         tv.GetProperty("deviceType").GetString().Should().Be("TV");
         tv.GetProperty("settings").GetProperty("bitrate").GetInt32().Should().Be(4);
         tv.GetProperty("settings").GetProperty("seekStepSeconds").GetInt32().Should().Be(15);

@@ -293,6 +293,7 @@ public class UserRepository(VoraDbContext context) : IUserRepository
                     deviceId,
                     settings.FirstOrDefault(s => s.DeviceId == deviceId)?.PlaybackPrefs,
                     device?.DeviceName ?? string.Empty,
+                    device?.Nickname ?? string.Empty,
                     device?.ClientName ?? string.Empty,
                     device?.DeviceType ?? string.Empty,
                     device?.OperatingSystem ?? string.Empty,

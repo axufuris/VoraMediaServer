@@ -84,6 +84,9 @@ components/Admin/Primitives/
                           HealthBadge, StatusDot, EmptyState. These are what
                           admin pages compose against; don't hand-roll new
                           card / header / badge styles.
+components/Admin/Devices/ DeviceTable, DeviceNicknameEditor (the Authorized
+                          Devices page), deviceList.ts (its search, last-user
+                          filter and grouping)
 components/Admin/Features/
                           FeatureToggle (per-feature on/off pill),
                           FeaturePluginList (groups plugins by type with
@@ -120,7 +123,8 @@ pages/Profile/            AccountSettingsPage, ProfileSelectionPage
 pages/Admin/              DashboardPage, AiStatsPage, HistoryPage,
                           MusicHistoryPage, PluginsPage, RequestsPage,
                           SettingsPage, UserManagementPage, DedupePage,
-                          AuthorizedDevicesPage, AppearancePage,
+                          AuthorizedDevicesPage, ProfileClientSettingsPage,
+                          AppearancePage,
                           MediaTrashPage, ExternalConnectionsPage
                           (Request Servers + Webhooks tabs)
 pages/Admin/Libraries/    CreateLibrary, ManageLibrary

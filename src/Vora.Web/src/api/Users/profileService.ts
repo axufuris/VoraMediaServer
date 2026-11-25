@@ -122,6 +122,7 @@ export interface DeviceSettingsVM {
 export interface ProfileDeviceVM {
     deviceId: string;
     name: string;
+    nickname: string;
     clientName: string;
     deviceType: string;
     operatingSystem: string;
@@ -213,12 +214,12 @@ export const profileService = {
 
     adminGetDeviceSettings: async (profileId: string, serverId?: string): Promise<ProfileDeviceVM[]> => {
         const response = await apiClient.get<ProfileDeviceVM[]>(`/users/profiles/${profileId}/device-settings`, { serverId });
-        return response.data;
+        return response.data.map(device => ({ ...device, nickname: device.nickname ?? '' }));
     },
 
     adminSaveDeviceSettings: async (profileId: string, request: SaveProfileDeviceSettingsRequest, serverId?: string): Promise<ProfileDeviceVM[]> => {
         const response = await apiClient.put<ProfileDeviceVM[], SaveProfileDeviceSettingsRequest>(`/users/profiles/${profileId}/device-settings`, request, { serverId });
-        return response.data;
+        return response.data.map(device => ({ ...device, nickname: device.nickname ?? '' }));
     },
 
     getMyPlaybackPreferences: async (serverId?: string): Promise<PlaybackPreferencesVM> => {

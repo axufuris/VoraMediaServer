@@ -5,6 +5,7 @@ export interface ClientDeviceVM {
     deviceId: string;
     clientName: string;
     deviceName: string;
+    nickname: string;
     deviceType: string;
     lastIpAddress: string;
     operatingSystem: string;
@@ -27,7 +28,11 @@ export interface DeviceCapabilitiesDto {
 export const deviceService = {
     getDevices: async (serverId?: string): Promise<ClientDeviceVM[]> => {
         const response = await apiClient.get<ClientDeviceVM[]>('/admin/devices', { serverId });
-        return response.data;
+        return response.data.map(device => ({ ...device, nickname: device.nickname ?? '' }));
+    },
+
+    setNickname: async (id: string, nickname: string, serverId?: string): Promise<void> => {
+        await apiClient.put(`/admin/devices/${id}/nickname`, { nickname }, { serverId });
     },
 
     blockDevice: async (id: string, serverId?: string): Promise<void> => {

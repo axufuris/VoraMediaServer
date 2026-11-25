@@ -73,7 +73,8 @@ ALTER TABLE ""ServerSettings"" ADD COLUMN IF NOT EXISTS ""DeviceDefaultSeekStepS
 ALTER TABLE ""ServerSettings"" ADD COLUMN IF NOT EXISTS ""DeviceDefaultVolumeStepPercent"" integer NOT NULL DEFAULT 5;
 ALTER TABLE ""ServerSettings"" ADD COLUMN IF NOT EXISTS ""DeviceDefaultSoundOnClick"" boolean NOT NULL DEFAULT TRUE;
 ALTER TABLE ""ServerSettings"" ADD COLUMN IF NOT EXISTS ""DeviceDefaultSoundOnNavOpen"" boolean NOT NULL DEFAULT TRUE;
-ALTER TABLE ""ServerSettings"" ADD COLUMN IF NOT EXISTS ""DeviceDefaultSoundOnMove"" boolean NOT NULL DEFAULT TRUE;");
+ALTER TABLE ""ServerSettings"" ADD COLUMN IF NOT EXISTS ""DeviceDefaultSoundOnMove"" boolean NOT NULL DEFAULT TRUE;
+ALTER TABLE ""ClientDevices"" ADD COLUMN IF NOT EXISTS ""Nickname"" character varying(64) NOT NULL DEFAULT '';");
 
             migrationBuilder.Sql(@"
 UPDATE ""UserMediaStates"" SET ""ResumePositionSeconds"" = 0
@@ -603,6 +604,10 @@ CREATE INDEX IF NOT EXISTS ""IX_MusicResumePoints_ProfileId_UpdatedAt"" ON ""Mus
         /// <inheritdoc />
         protected override void Down(MigrationBuilder migrationBuilder)
         {
+            migrationBuilder.DropColumn(
+                name: "Nickname",
+                table: "ClientDevices");
+
             migrationBuilder.DropColumn(
                 name: "DeviceDefaultBitrate",
                 table: "ServerSettings");

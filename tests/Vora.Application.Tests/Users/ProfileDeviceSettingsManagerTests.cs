@@ -25,9 +25,9 @@ public class ProfileDeviceSettingsManagerTests
         _users.GetProfileDevicePlaybackPrefsAsync(_profileId, Arg.Any<string>()).Returns((string?)null);
         _users.GetProfileDevicesAsync(_profileId).Returns(new List<ProfileDeviceRecord>
         {
-            new("tv", """{"bitrate":4,"maxAudioChannels":6}""", "Living room", "Android TV", "TV", "Android", new DateTime(2026, 11, 20, 0, 0, 0, DateTimeKind.Utc)),
-            new("web", null, "", "Vora Web", "Browser", "Windows", new DateTime(2026, 11, 22, 0, 0, 0, DateTimeKind.Utc)),
-            new("ghost", """{"seekStepSeconds":30}""", "", "", "", "", null)
+            new("tv", """{"bitrate":4,"maxAudioChannels":6}""", "Living room", "Big screen", "Android TV", "TV", "Android", new DateTime(2026, 11, 20, 0, 0, 0, DateTimeKind.Utc)),
+            new("web", null, "", "", "Vora Web", "Browser", "Windows", new DateTime(2026, 11, 22, 0, 0, 0, DateTimeKind.Utc)),
+            new("ghost", """{"seekStepSeconds":30}""", "", "", "", "", "", null)
         });
         _users.SaveProfileDevicePlaybackPrefsAsync(_profileId, Arg.Do<IReadOnlyDictionary<string, string>>(prefs => _written = prefs)).Returns(Task.CompletedTask);
         _manager = new ProfileDeviceSettingsManager(_users, _defaults, _notifier);
@@ -63,6 +63,8 @@ public class ProfileDeviceSettingsManagerTests
 
         devices.Select(device => device.DeviceId).Should().Equal("tv", "web", "ghost");
         devices[0].Name.Should().Be("Living room");
+        devices[0].Nickname.Should().Be("Big screen");
+        devices[1].Nickname.Should().BeEmpty();
         devices[0].Settings.Bitrate.Should().Be(4);
         devices[0].Settings.MaxResolution.Should().Be(1080);
         devices[1].Name.Should().Be("Vora Web");

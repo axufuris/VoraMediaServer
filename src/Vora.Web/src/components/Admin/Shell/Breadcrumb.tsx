@@ -67,20 +67,23 @@ export default function Breadcrumb() {
         return () => { cancelled = true; };
     }, [libraryId, serverId, names]);
 
-    const labelFor = (seg: string): string => {
+    const labelFor = (seg: string, previous: string | undefined): string => {
         if (names[seg]) return names[seg];
         if (seg === libraryId) return 'Library';
+        if (GUID_RE.test(seg)) return previous === 'users' ? 'Profile' : 'Details';
         return pretty(seg);
     };
 
-    const crumbs: { label: string, to: string }[] = [];
+    // An id in the path has no page of its own, so its crumb names where we are
+    // without linking to a route that does not exist.
+    const crumbs: { label: string, to: string, linked: boolean }[] = [];
     let acc = '';
-    for (const seg of segments) {
+    segments.forEach((seg, index) => {
         acc += `/${seg}`;
-        if (seg === serverId) continue;
-        if (seg === 'server') continue;
-        crumbs.push({ label: labelFor(seg), to: acc });
-    }
+        if (seg === serverId) return;
+        if (seg === 'server') return;
+        crumbs.push({ label: labelFor(seg, segments[index - 1]), to: acc, linked: !GUID_RE.test(seg) });
+    });
 
     if (crumbs.length === 0) return null;
 
@@ -93,8 +96,8 @@ export default function Breadcrumb() {
                         {i > 0 && (
                             <svg className="w-3 h-3 shrink-0 text-[var(--vora-text-disabled)]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" /></svg>
                         )}
-                        {isLast ? (
-                            <span className="font-semibold text-[var(--vora-text-secondary)] truncate">{c.label}</span>
+                        {isLast || !c.linked ? (
+                            <span className={`truncate ${isLast ? 'font-semibold text-[var(--vora-text-secondary)]' : ''}`}>{c.label}</span>
                         ) : (
                             <Link to={c.to} className="hover:text-[var(--vora-text-secondary)] transition-colors truncate">{c.label}</Link>
                         )}

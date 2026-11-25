@@ -41,7 +41,7 @@ A server-wide "apply to existing profiles" button is deliberately not offered: i
 ## The web app
 
 - Admin → Server → **Client Defaults** (`/admin/client-defaults`, `ClientDefaultsPage`) edits the defaults.
-- Admin → **Users & Access**, **Client settings** on a profile's tile (`ProfileClientSettingsModal`) edits that profile.
+- Admin → **Users & Access**, **Client settings** on a profile's tile opens a page of its own, `/admin/users/:profileId/client-settings` (`ProfileClientSettingsPage`). It was a window once, and a window is too small as soon as a profile has more than a few devices. The **Profile** tab holds the three groups; the **Devices** tab holds the devices (below). `?tab=devices&device=<deviceId>` opens the Devices tab with that device's settings ready to edit, which is where **Settings** on the Authorized Devices page lands.
 - Both use `components/Common/ClientSettings/ClientSettingsEditor`. The fields are shared with the user's own Settings (`PlaybackBehaviourFields`, `TrackPreferenceFields`, `LibrarySortFields`; the form values and their conversions are in `clientSettingsForm.ts`), so a field added there appears in all three places.
 
 ## Per-device settings
@@ -58,7 +58,7 @@ They are saved with the rest of the defaults: `PUT /api/settings/client-defaults
 
 ### An admin editing a profile's devices
 
-- `GET /api/users/profiles/{profileId}/device-settings` (admin only) lists every device the profile has settings on or was last used on (`ProfileDeviceVM`: name, client, type, operating system, last connected, and the **settings it actually uses**, defaults filled in), most recently connected first.
+- `GET /api/users/profiles/{profileId}/device-settings` (admin only) lists every device the profile has settings on or was last used on (`ProfileDeviceVM`: name, **nickname**, client, type, operating system, last connected, and the **settings it actually uses**, defaults filled in), most recently connected first. The nickname is the admin's own name for the device (`docs/auth-and-devices.md`); the web shows it first and the device's own name beneath it, so two SHIELDs in one house can be told apart.
 - `PUT` on the same address takes `{ deviceIds, settings }`. `deviceIds` left out (or null) is every device in that list; a device the profile has not used is refused with 400 and nothing is written. The seven settings are validated first, every blob is written in one save, and the audio-layout pick and any other key in a blob are kept.
 - Either save sends `ClientSettingsChanged` to the profile (payload: the profile id), as does the admin edit of the profile's own groups. Nothing about the access permissions or the security stamp changes.
 
@@ -70,6 +70,6 @@ The web used to treat `playback_prefs_<profile>_<device>` in localStorage as the
 - Settings → Playback saves to the server first. If that fails it says so and changes nothing here, instead of saying it saved. While the tab is open it follows a change the server pushes, until something on the tab has been edited.
 - Settings → Providers sends only the Live TV preferences. It used to send the playback blob it had read from localStorage beside them, which would have undone an admin's change the device had not read yet.
 
-The admin side: **Client Defaults** has a second card for the device defaults, and a profile's **Client settings** window lists its devices below the profile groups (**Edit** on a device, **Set the same on every device…** for all of them).
+The admin side: **Client Defaults** has a second card for the device defaults, and the Devices tab of a profile's **Client settings** page (`ProfileDevicesPanel`) is a table: the device, when it was last used, what it uses, and **Edit**, which opens that device's settings in its own row. Ticking devices (the header box ticks every one shown) offers **Set the same on these N…**, which sends exactly those device ids, starting from what the most recently used of them has now. From six devices there is a filter box; a selection only ever applies to the devices it is showing.
 
 Not built: a way for the TV apps to listen for `ClientSettingsChanged` (they read the caps at every stream start, the seek step and sounds at launch or when Settings opens, so a change reaches them without it).
