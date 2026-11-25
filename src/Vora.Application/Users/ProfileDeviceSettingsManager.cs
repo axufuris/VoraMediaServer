@@ -63,6 +63,7 @@ public sealed class ProfileDeviceSettingsManager(IUserRepository users, IClientD
             {
                 DeviceId = device.DeviceId,
                 Name = FirstNamed(device.DeviceName, device.ClientName, device.DeviceId),
+                Nickname = device.Nickname,
                 ClientName = device.ClientName,
                 DeviceType = device.DeviceType,
                 OperatingSystem = device.OperatingSystem,

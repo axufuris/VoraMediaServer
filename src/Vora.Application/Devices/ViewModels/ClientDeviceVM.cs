@@ -9,6 +9,7 @@ public class ClientDeviceVM
     public string DeviceId { get; set; } = string.Empty;
     public string ClientName { get; set; } = string.Empty;
     public string DeviceName { get; set; } = string.Empty;
+    public string Nickname { get; set; } = string.Empty;
     public string DeviceType { get; set; } = string.Empty;
     public string LastIpAddress { get; set; } = string.Empty;
     public string OperatingSystem { get; set; } = string.Empty;
@@ -25,6 +26,7 @@ public class ClientDeviceVM
             DeviceId = d.DeviceId,
             ClientName = d.ClientName,
             DeviceName = d.DeviceName,
+            Nickname = d.Nickname,
             DeviceType = d.DeviceType,
             LastIpAddress = d.LastIpAddress,
             OperatingSystem = d.OperatingSystem,

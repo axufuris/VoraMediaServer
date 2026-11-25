@@ -41,3 +41,26 @@ describe('the admin breadcrumb for External Connections', () => {
         expect(trail.queryByText('S1')).not.toBeInTheDocument();
     });
 });
+
+describe('the admin breadcrumb for a page about one profile', () => {
+    const profileId = '0b8f5b2a-4c1d-4e0a-9f3e-6d2c7a1b8e90';
+
+    it('reads Admin, Users & Access, Profile, Client Settings, without a link for the id', () => {
+        renderAt(`/admin/users/${profileId}/client-settings`);
+
+        const trail = within(screen.getByRole('navigation', { name: 'Breadcrumb' }));
+        expect(trail.getByRole('link', { name: 'Users & Access' })).toHaveAttribute('href', '/admin/users');
+        expect(trail.getByText('Profile')).toBeInTheDocument();
+        expect(trail.queryByRole('link', { name: 'Profile' })).not.toBeInTheDocument();
+        expect(trail.getByText('Client Settings')).toBeInTheDocument();
+        expect(trail.queryByText(profileId)).not.toBeInTheDocument();
+    });
+
+    it('keeps the multi-server form out of the trail', () => {
+        renderAt(`/admin/server/s1/users/${profileId}/client-settings`, '/admin/server/:serverId/*');
+
+        const trail = within(screen.getByRole('navigation', { name: 'Breadcrumb' }));
+        expect(trail.getByRole('link', { name: 'Users & Access' })).toHaveAttribute('href', '/admin/server/s1/users');
+        expect(trail.getByText('Client Settings')).toBeInTheDocument();
+    });
+});

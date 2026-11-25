@@ -2,6 +2,7 @@
 using Microsoft.EntityFrameworkCore.ChangeTracking;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using System.Text.Json;
+using Vora.Application.Devices;
 using Vora.Application.SmartLists;
 using Vora.Domain.Entities.Actors;
 using Vora.Domain.Entities.Collections;
@@ -1139,6 +1140,7 @@ public class VoraDbContext : DbContext
             entity.Property(e => e.DeviceId).IsRequired().HasMaxLength(128);
             entity.Property(e => e.ClientName).HasMaxLength(64);
             entity.Property(e => e.DeviceName).HasMaxLength(128);
+            entity.Property(e => e.Nickname).IsRequired().HasMaxLength(DeviceNickname.MaxLength).HasDefaultValue(string.Empty);
             entity.Property(e => e.DeviceType).HasMaxLength(32);
             entity.Property(e => e.OperatingSystem).HasMaxLength(64);
             entity.Property(e => e.LastIpAddress).HasMaxLength(45);

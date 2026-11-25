@@ -11,6 +11,7 @@ public interface IDeviceManager
     Task<bool> BlockDeviceAsync(Guid id);
     Task<bool> UnblockDeviceAsync(Guid id);
     Task<bool> DeleteDeviceAsync(Guid id);
+    Task<bool> SetNicknameAsync(Guid id, string? nickname);
     Task UpdateDeviceCapabilitiesAsync(string deviceId, DeviceIdentity identity, DeviceCapabilitiesDto dto);
 }
 
@@ -27,21 +28,7 @@ public class DeviceManager : IDeviceManager
 
     public async Task<List<ClientDeviceVM>> GetAllDevicesAsync()
     {
-        return await _repository.GetProjectedDevicesAsync(d => new ClientDeviceVM
-        {
-            Id = d.Id,
-            DeviceId = d.DeviceId,
-            ClientName = d.ClientName,
-            DeviceName = d.DeviceName,
-            DeviceType = d.DeviceType,
-            LastIpAddress = d.LastIpAddress,
-            OperatingSystem = d.OperatingSystem,
-            Location = d.Location,
-            LastUserId = d.LastUserId,
-            LastProfileId = d.LastProfileId,
-            LastConnectedAt = d.LastConnectedAt,
-            IsBlocked = d.IsBlocked
-        });
+        return await _repository.GetProjectedDevicesAsync(ClientDeviceVM.Projection);
     }
 
     public async Task<bool> BlockDeviceAsync(Guid id)
@@ -79,6 +66,18 @@ public class DeviceManager : IDeviceManager
             return true;
         }
         return false;
+    }
+
+    public async Task<bool> SetNicknameAsync(Guid id, string? nickname)
+    {
+        var normalized = DeviceNickname.Normalize(nickname);
+
+        var device = await _repository.GetDeviceByIdAsync(id);
+        if (device == null) return false;
+
+        device.Nickname = normalized;
+        await _repository.UpdateDeviceAsync(device);
+        return true;
     }
 
     public async Task UpdateDeviceCapabilitiesAsync(string deviceId, DeviceIdentity identity, DeviceCapabilitiesDto dto)

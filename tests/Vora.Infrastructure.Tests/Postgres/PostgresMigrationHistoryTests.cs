@@ -1816,4 +1816,46 @@ public class PostgresMigrationHistoryTests(PostgresDatabase database) : IClassFi
         kept.DeviceDefaultSeekStepSeconds.Should().Be(30);
         kept.DeviceDefaultSoundOnMove.Should().BeFalse();
     }
+
+    [Fact]
+    public async Task A_database_on_the_device_defaults_migration_gains_device_nicknames_that_start_empty_and_survive_a_second_run()
+    {
+        Assert.SkipUnless(PostgresDatabase.IsConfigured, PostgresDatabase.SkipReason);
+        var cancellationToken = TestContext.Current.CancellationToken;
+        await using var legacy = new LegacyDatabase();
+        var device = new ClientDevice
+        {
+            DeviceId = "living-room", ClientName = "Vora", DeviceName = "Shield", DeviceType = "AndroidTV",
+            SupportedVideoCodecs = ["h264", "hevc"], MaxVideoBitDepth = 10,
+        };
+        await legacy.BuildDeviceNicknameStateAsync(async db =>
+        {
+            db.ClientDevices.Add(device);
+            await db.SaveChangesAsync(cancellationToken);
+        }, cancellationToken);
+
+        await using (var before = legacy.NewContext())
+        {
+            (await before.Database.GetPendingMigrationsAsync(cancellationToken)).Should().Equal(MigrationHistoryTests.ChangesSinceInitial);
+            (await ColumnsAsync(before, "ClientDevices", cancellationToken)).Should().NotContain("Nickname");
+        }
+
+        await legacy.MigrateAsync(cancellationToken);
+
+        await using (var after = legacy.NewContext())
+        {
+            (await after.Database.GetPendingMigrationsAsync(cancellationToken)).Should().BeEmpty();
+            var migrated = await after.ClientDevices.AsNoTracking().SingleAsync(d => d.Id == device.Id, cancellationToken);
+            migrated.Nickname.Should().BeEmpty();
+            migrated.DeviceName.Should().Be("Shield");
+            migrated.MaxVideoBitDepth.Should().Be(10);
+            await after.Database.ExecuteSqlRawAsync("UPDATE \"ClientDevices\" SET \"Nickname\" = 'Living room'", cancellationToken);
+            await after.Database.ExecuteSqlAsync($"DELETE FROM \"__EFMigrationsHistory\" WHERE \"MigrationId\" = {MigrationHistoryTests.ChangesSinceInitial}", cancellationToken);
+        }
+
+        await legacy.MigrateAsync(cancellationToken);
+
+        await using var again = legacy.NewContext();
+        (await again.ClientDevices.AsNoTracking().SingleAsync(d => d.Id == device.Id, cancellationToken)).Nickname.Should().Be("Living room");
+    }
 }

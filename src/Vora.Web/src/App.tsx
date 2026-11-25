@@ -43,6 +43,7 @@ const AdminInvitationsPage = lazyPage(() => import('./pages/Admin/InvitationsPag
 const AdminSignInProvidersPage = lazyPage(() => import('./pages/Admin/SignInProvidersPage'));
 const AdminClientDefaultsPage = lazyPage(() => import('./pages/Admin/ClientDefaultsPage'));
 const AuthorizedDevicesPage = lazyPage(() => import('./pages/Admin/AuthorizedDevicesPage'));
+const AdminProfileClientSettingsPage = lazyPage(() => import('./pages/Admin/ProfileClientSettingsPage'));
 const AdminDashboardPage = lazyPage(() => import('./pages/Admin/DashboardPage'));
 const AdminAppearancePage = lazyPage(() => import('./pages/Admin/AppearancePage'));
 const AdminTemplateSchedulesPage = lazyPage(() => import('./pages/Admin/Templates/SchedulesPage'));
@@ -248,6 +249,7 @@ export default function App() {
                         <Route path="library-updates" element={<LibraryUpdatesRedirect />} />
                         <Route path="devices" element={<AuthorizedDevicesPage />} />
                         <Route path="users" element={<AdminUserManagementPage />} />
+                        <Route path="users/:profileId/client-settings" element={<AdminProfileClientSettingsPage />} />
                         <Route path="invitations" element={<AdminInvitationsPage />} />
                         <Route path="sign-in-providers" element={<AdminSignInProvidersPage />} />
                         <Route path="client-defaults" element={<AdminClientDefaultsPage />} />
@@ -285,6 +287,7 @@ export default function App() {
                             <Route path="library-updates" element={<LibraryUpdatesRedirect />} />
                             <Route path="devices" element={<AuthorizedDevicesPage />} />
                             <Route path="users" element={<AdminUserManagementPage />} />
+                            <Route path="users/:profileId/client-settings" element={<AdminProfileClientSettingsPage />} />
                             <Route path="invitations" element={<AdminInvitationsPage />} />
                             <Route path="sign-in-providers" element={<AdminSignInProvidersPage />} />
                             <Route path="client-defaults" element={<AdminClientDefaultsPage />} />

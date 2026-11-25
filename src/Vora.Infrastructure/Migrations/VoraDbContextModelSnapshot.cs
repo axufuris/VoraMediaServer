@@ -4228,6 +4228,13 @@ namespace Vora.Infrastructure.Migrations
                     b.Property<int>("MaxVideoBitDepth")
                         .HasColumnType("integer");
 
+                    b.Property<string>("Nickname")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasDefaultValue("");
+
                     b.Property<string>("OperatingSystem")
                         .IsRequired()
                         .HasMaxLength(64)

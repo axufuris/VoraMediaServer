@@ -14,7 +14,7 @@ using Vora.Infrastructure.Persistence;
 namespace Vora.Infrastructure.Migrations
 {
     [DbContext(typeof(VoraDbContext))]
-    [Migration("20261124034118_ChangesSinceInitial")]
+    [Migration("20261124072427_ChangesSinceInitial")]
     partial class ChangesSinceInitial
     {
         /// <inheritdoc />
@@ -4230,6 +4230,13 @@ namespace Vora.Infrastructure.Migrations
 
                     b.Property<int>("MaxVideoBitDepth")
                         .HasColumnType("integer");
+
+                    b.Property<string>("Nickname")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasDefaultValue("");
 
                     b.Property<string>("OperatingSystem")
                         .IsRequired()

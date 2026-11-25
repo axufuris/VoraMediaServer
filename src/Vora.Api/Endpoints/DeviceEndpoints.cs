@@ -24,6 +24,11 @@ public static class DeviceEndpoints
         group.MapPut("/{id:guid}/block", BlockDeviceAsync);
         group.MapPut("/{id:guid}/unblock", UnblockDeviceAsync);
         group.MapDelete("/{id:guid}", DeleteDeviceAsync);
+        group.MapPut("/{id:guid}/nickname", SetNicknameAsync)
+            .WithName("SetDeviceNickname")
+            .Produces(StatusCodes.Status204NoContent)
+            .ProducesProblem(StatusCodes.Status400BadRequest)
+            .Produces(StatusCodes.Status404NotFound);
     }
 
     private static void MapClientDeviceEndpoints(IEndpointRouteBuilder routes)
@@ -55,6 +60,12 @@ public static class DeviceEndpoints
     {
         await manager.DeleteDeviceAsync(id);
         return Results.NoContent();
+    }
+
+    private static async Task<IResult> SetNicknameAsync(Guid id, [FromBody] SetDeviceNicknameRequest request, IDeviceManager manager)
+    {
+        var success = await manager.SetNicknameAsync(id, request.Nickname);
+        return success ? Results.NoContent() : Results.NotFound();
     }
 
     private static async Task<IResult> UpdateCapabilitiesAsync(HttpContext context, [FromBody] DeviceCapabilitiesDto dto, IDeviceManager manager)
