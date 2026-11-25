@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { useSearchParams, useNavigate, useParams } from 'react-router-dom';
 import { searchService, type AggregatedGlobalSearchResponse } from '../../api/Discovery/searchService';
 import { discoveryService, type DiscoveryItem } from '../../api/Discovery/discoveryService';
+import { useFeatureFlags } from '../../hooks/useFeatureFlags';
 import { storeMusicNav } from './Audio/Music/storeMusicNav';
 import MediaCard from '../../components/Client/Primitives/MediaCard';
 import PersonCard from '../../components/Client/Primitives/PersonCard';
@@ -15,6 +16,7 @@ export default function SearchPage() {
     const [searchParams] = useSearchParams();
     const query = searchParams.get('q') || '';
     const navigate = useNavigate();
+    const { discover } = useFeatureFlags();
 
     const [results, setResults] = useState<AggregatedGlobalSearchResponse | null>(null);
     const [discoveryResults, setDiscoveryResults] = useState<DiscoveryItem[]>([]);
@@ -28,7 +30,7 @@ export default function SearchPage() {
             try {
                 const [local, discovery] = await Promise.allSettled([
                     searchService.searchAllServers(query),
-                    discoveryService.search(query, serverId)
+                    discover ? discoveryService.search(query, serverId) : Promise.resolve<DiscoveryItem[]>([])
                 ]);
 
                 if (local.status === 'rejected') {
@@ -52,7 +54,7 @@ export default function SearchPage() {
         };
 
         fetchResults();
-    }, [query, serverId]);
+    }, [query, serverId, discover]);
 
     const formatReleaseDisplay = (releaseDate?: string, fallbackYear?: number | null) => {
         if (!releaseDate) return fallbackYear ? fallbackYear.toString() : null;

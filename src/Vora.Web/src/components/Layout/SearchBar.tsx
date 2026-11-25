@@ -2,54 +2,72 @@ import { useState, useEffect, useRef } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { searchService, type AggregatedGlobalSearchResponse } from '../../api/Discovery/searchService';
 import { discoveryService, type DiscoveryItem } from '../../api/Discovery/discoveryService';
+import { useFeatureFlags } from '../../hooks/useFeatureFlags';
 import { storeMusicNav } from '../../pages/Client/Audio/Music/storeMusicNav';
 import { formatDate, parseServerDate, yearOf } from '../../utils/serverTime';
 
 export default function SearchBar() {
     const { serverId } = useParams<{ serverId?: string }>();
     const navigate = useNavigate();
+    const { discover } = useFeatureFlags();
     const [query, setQuery] = useState('');
     const [localResults, setLocalResults] = useState<AggregatedGlobalSearchResponse | null>(null);
     const [discoveryResults, setDiscoveryResults] = useState<DiscoveryItem[]>([]);
 
+    const [searchFailed, setSearchFailed] = useState(false);
     const [isLoading, setIsLoading] = useState(false);
     const [isOpen, setIsOpen] = useState(false);
     const dropdownRef = useRef<HTMLDivElement>(null);
 
-    useEffect(() => {
-        if (query.trim().length < 3) {
+    const changeQuery = (value: string) => {
+        setQuery(value);
+        if (value.trim().length < 3) {
             setLocalResults(null);
             setDiscoveryResults([]);
+            setSearchFailed(false);
+            setIsLoading(false);
             setIsOpen(false);
-            return;
         }
+    };
 
+    useEffect(() => {
+        if (query.trim().length < 3) return;
+
+        // Each part of a search stands on its own: a server with Discover
+        // switched off refuses the Discover half, and that must not take the
+        // library's results down with it. An answer to an earlier keystroke
+        // that arrives late is dropped rather than shown over a newer one.
+        let superseded = false;
         const timer = setTimeout(async () => {
             setIsLoading(true);
-            try {
-                const [localData, discData] = await Promise.all([
-                    searchService.searchAllServers(query),
-                    discoveryService.search(query, serverId)
-                ]);
+            const [local, discovery] = await Promise.allSettled([
+                searchService.searchAllServers(query),
+                discover ? discoveryService.search(query, serverId) : Promise.resolve<DiscoveryItem[]>([]),
+            ]);
+            if (superseded) return;
 
-                setLocalResults(localData);
+            if (local.status === 'rejected') console.error('Search failed', local.reason);
+            if (discovery.status === 'rejected') console.error('Discovery search failed', discovery.reason);
 
-                const localTitles = new Set([
-                    ...localData.movies.map(m => m.title.toLowerCase()),
-                    ...localData.tvShows.map(s => s.title.toLowerCase())
-                ]);
+            const localData = local.status === 'fulfilled' ? local.value : null;
+            const discData = discovery.status === 'fulfilled' ? discovery.value : [];
+            const localTitles = new Set([
+                ...(localData?.movies ?? []).map(m => m.title.toLowerCase()),
+                ...(localData?.tvShows ?? []).map(s => s.title.toLowerCase())
+            ]);
 
-                setDiscoveryResults(discData.filter(d => !localTitles.has(d.title.toLowerCase())));
-                setIsOpen(true);
-            } catch (error) {
-                console.error("Search failed", error);
-            } finally {
-                setIsLoading(false);
-            }
+            setLocalResults(localData);
+            setSearchFailed(local.status === 'rejected');
+            setDiscoveryResults(discData.filter(d => !localTitles.has(d.title.toLowerCase())));
+            setIsOpen(true);
+            setIsLoading(false);
         }, 400);
 
-        return () => clearTimeout(timer);
-    }, [query, serverId]);
+        return () => {
+            superseded = true;
+            clearTimeout(timer);
+        };
+    }, [query, serverId, discover]);
 
     useEffect(() => {
         const handleClickOutside = (event: MouseEvent) => {
@@ -67,8 +85,7 @@ export default function SearchBar() {
     };
 
     const handleItemClick = (path: string) => {
-        setIsOpen(false);
-        setQuery('');
+        changeQuery('');
         navigate(path);
     };
 
@@ -120,7 +137,7 @@ export default function SearchBar() {
                     }}
                     placeholder="Search movies, shows, actors..."
                     value={query}
-                    onChange={(e) => setQuery(e.target.value)}
+                    onChange={(e) => changeQuery(e.target.value)}
                     onFocus={(e) => {
                         e.currentTarget.style.borderColor = 'var(--vora-accent-500)';
                         e.currentTarget.style.boxShadow = '0 0 0 3px var(--vora-accent-focus-ring)';
@@ -134,7 +151,7 @@ export default function SearchBar() {
                 {query && (
                     <button
                         type="button"
-                        onClick={() => { setQuery(''); setIsOpen(false); setLocalResults(null); setDiscoveryResults([]); }}
+                        onClick={() => changeQuery('')}
                         className="absolute right-3 cursor-pointer transition-colors"
                         style={{ color: 'var(--vora-text-muted)' }}
                     >
@@ -177,7 +194,7 @@ export default function SearchBar() {
 
                     <div className="max-h-[60vh] overflow-y-auto">
                         {totalResults === 0 && !isLoading ? (
-                            <div className="p-4 text-center text-sm" style={{ color: 'var(--vora-text-muted)' }}>No results found.</div>
+                            <div className="p-4 text-center text-sm" style={{ color: 'var(--vora-text-muted)' }}>{searchFailed ? "Couldn't search right now. Try again in a moment." : 'No results found.'}</div>
                         ) : (
                             <ul className="py-1">
                                 {localResults?.movies.slice(0, 3).map(m => (

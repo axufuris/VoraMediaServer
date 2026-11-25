@@ -8,10 +8,12 @@ import type { DiscoveryItem } from '../../api/Discovery/discoveryService';
 const mocks = vi.hoisted(() => ({
     searchAllServers: vi.fn(),
     discoverySearch: vi.fn(),
+    discover: { value: true },
 }));
 
 vi.mock('../../api/Discovery/searchService', () => ({ searchService: { searchAllServers: mocks.searchAllServers } }));
 vi.mock('../../api/Discovery/discoveryService', () => ({ discoveryService: { search: mocks.discoverySearch } }));
+vi.mock('../../hooks/useFeatureFlags', () => ({ useFeatureFlags: () => ({ discover: mocks.discover.value }) }));
 
 const local = (titles: string[]): AggregatedGlobalSearchResponse => ({
     query: 'marvel',
@@ -45,6 +47,18 @@ describe('SearchPage discovery results', () => {
     beforeEach(() => {
         mocks.searchAllServers.mockReset();
         mocks.discoverySearch.mockReset();
+        mocks.discover.value = true;
+    });
+
+    it('does not ask a server that has Discover off to search it, and still lists the library', async () => {
+        mocks.discover.value = false;
+        mocks.searchAllServers.mockResolvedValue(local(['Captain Marvel']));
+
+        renderSearch();
+
+        expect(await screen.findByText('Captain Marvel')).toBeInTheDocument();
+        expect(mocks.discoverySearch).not.toHaveBeenCalled();
+        expect(screen.queryByText('Discovery (not in library)')).toBeNull();
     });
 
     it('hides only what the server marks as in the library', async () => {
