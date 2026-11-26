@@ -1,4 +1,5 @@
 ﻿using System.Diagnostics;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Vora.Application.Analysis;
 using Vora.Application.Devices;
@@ -52,9 +53,11 @@ public class StreamManager : IStreamManager
     private readonly IMediaAnalyzerService _analyzer;
     private readonly IHardwareCapabilityService _hardware;
     private readonly IWatchlistManager _watchlist;
+    private readonly ILogger<StreamManager>? _logger;
 
-    public StreamManager(IStreamRepository repository, IBestPathDecisionManager decisionManager, ISystemSettingsRepository settingsRepo, IStreamingTokenSigner tokenSigner, IClientNotifier notifier, ITranscodeService transcodeService, IOptions<StoragePathsOptions> storagePaths, IClientLocationResolver locations, IMediaAnalyzerService analyzer, IHardwareCapabilityService hardware, IWatchlistManager watchlist)
+    public StreamManager(IStreamRepository repository, IBestPathDecisionManager decisionManager, ISystemSettingsRepository settingsRepo, IStreamingTokenSigner tokenSigner, IClientNotifier notifier, ITranscodeService transcodeService, IOptions<StoragePathsOptions> storagePaths, IClientLocationResolver locations, IMediaAnalyzerService analyzer, IHardwareCapabilityService hardware, IWatchlistManager watchlist, ILogger<StreamManager>? logger = null)
     {
+        _logger = logger;
         _watchlist = watchlist;
         _hardware = hardware;
         _locations = locations;
@@ -77,6 +80,7 @@ public class StreamManager : IStreamManager
 
         var selectedPart = mediaInfo.Parts.FirstOrDefault(p => p.Id == decision.SelectedMediaPartId);
         var selectedVideo = selectedPart?.VideoTracks.FirstOrDefault(v => v.Id == decision.SelectedVideoTrackId);
+        LogDecision(resolvedMediaId, client, capabilities, selectedPart, selectedVideo, decision);
 
         var session = new StreamSession
         {
@@ -116,6 +120,14 @@ public class StreamManager : IStreamManager
 
         var playToken = _tokenSigner.Sign(PlayTokenScope, createdSession.Id.ToString(), PlayTokenTtl);
         return new StartedStream(createdSession, $"/api/streaming/play/{createdSession.Id}?t={playToken}", decision.SelectedAudioTrackPosition, decision.SelectedSubtitleTrackPosition, decision.Reasons);
+    }
+
+    // One line per play, so "no picture" and "audio drops" reports can be read from the log (StreamDecisionLog).
+    private void LogDecision(Guid mediaId, ClientDevice client, DeviceCapsDto? capabilities, MediaPartStreamInfoDto? part, TrackStreamInfoDto? video, StreamDecisionDto decision)
+    {
+        if (_logger is null) return;
+        var audio = part?.AudioTracks.FirstOrDefault(a => a.Id == decision.SelectedAudioTrackId);
+        _logger.LogInformation("Stream decision for {MediaItemId}: {Decision}", mediaId, StreamDecisionLog.Describe(client, capabilities, part, video, audio, decision));
     }
 
     public async Task<StreamDecisionDto> PreviewDecisionAsync(Guid mediaId, string deviceId, Guid userId, Guid? profileId, Guid? videoTrackId = null, Guid? audioTrackId = null, Guid? subtitleTrackId = null, DeviceCapsDto? capabilities = null, Guid? mediaPartId = null, string? clientAddress = null)

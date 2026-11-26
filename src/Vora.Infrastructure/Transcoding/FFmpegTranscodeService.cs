@@ -116,8 +116,29 @@ public class FFmpegTranscodeService : ITranscodeService
             _transcodeLock.Release();
         }
 
-        await WaitForSegmentSealedAsync(decision.MediaItemId, startSegment, ctx, TimeSpan.FromSeconds(30), cancellationToken);
+        if (await WaitForSegmentSealedAsync(decision.MediaItemId, startSegment, ctx, TimeSpan.FromSeconds(30), cancellationToken))
+        {
+            // Not awaited: the player gets its playlist now; the probe only writes a log line.
+            _ = LogFirstSegmentAsync(decision.MediaItemId, startSegment, SegmentPath(ctx.TargetDir, decision.MediaItemId, startSegment));
+        }
         return outputPath;
+    }
+
+    /// <summary>
+    /// Logs what the first segment of a start holds (codec, tag, profile, pixel format, size, audio start
+    /// against video start) as <see cref="SegmentProbe"/> reads it, i.e. what the player is handed. Never throws.
+    /// </summary>
+    private async Task LogFirstSegmentAsync(Guid mediaItemId, int segment, string segmentPath)
+    {
+        try
+        {
+            var summary = await SegmentProbe.ProbeAsync(segmentPath, _logger);
+            if (summary is not null) _logger.LogInformation("Segment {Segment} of {MediaItemId} as the player receives it: {Summary}", segment, mediaItemId, summary);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogDebug(ex, "Could not log the first segment of {MediaItemId}.", mediaItemId);
+        }
     }
 
     private async Task MeasureUnknownDurationAsync(string sourceFilePath, PlaybackDecisionVM decision, CancellationToken cancellationToken)
