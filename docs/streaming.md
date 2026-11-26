@@ -171,6 +171,16 @@ The player's info button opens **Playback info**: how this stream is playing, th
 
 The wording is in `utils/playbackStats.ts`. Tests: `PlaybackStatsTests`, `TranscodeSummaryTests` (against real built arguments), `StreamFactsReadingTests`, `playbackStats.test.ts`, `PlaybackStatsSections.test.tsx`.
 
+## Reading the log for a playback report
+
+A report of "plays but no picture" or "audio drops out" from a device you do not have can be read from the server log. Three lines, in order, for one play:
+
+1. `Stream decision for <media id>: …` (`StreamManager`, `StreamDecisionLog`): the client's device type, what it claimed (video, **hlsVideo**, audio, containers, bit depth, channels, HDR), the source (container, video codec and size, bit depth, HDR, audio), what was chosen (strategy, `Copy`/`Transcode` and the target codec and container) and the reasons. `hlsVideo=[…](default for this device type)` means the client reported no HLS codec list and `HlsVideoCarriage` filled one in. A device that lists `hevc` there gets HEVC copied into MPEG-TS segments.
+2. `FFmpeg transcode launched for <media id> …: <command>`: the exact FFmpeg command.
+3. `Segment <n> of <media id> as the player receives it: …` (`SegmentProbe`): ffprobe of the first segment written, so the codec, its tag, profile, level, pixel format, size (and the coded size when it differs) and `audio starts +0.020s from the video`. It is logged a moment after the start and never delays playback; no ffprobe, no line.
+
+None of the three names a file path, address, account or token.
+
 ## Gotchas
 
 - **Concurrent sessions on the same title share a transcode.** `_activeTranscodes` is keyed by media item id, so two clients playing the same movie collide on the video. Subtitles are not affected — the cache is keyed on (part, track), so two viewers with different subtitle choices get different files.
